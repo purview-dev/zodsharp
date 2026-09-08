@@ -1,5 +1,3 @@
-using ZodSharp.Core;
-
 Console.WriteLine("=== Basic ZodSharp Examples ===\n");
 
 var nameSchema = Z.String().Min(3).Max(50);
@@ -35,11 +33,9 @@ var userResult = userSchema.Validate(userData);
 if (userResult.IsSuccess)
 {
 	Console.WriteLine("User validation: Success");
-#pragma warning disable IDE0370 // Remove unnecessary suppression
 	Console.WriteLine(
-		$"Validated user: {string.Join(", ", userResult.Value!.Select(static kvp => $"{kvp.Key}={kvp.Value}"))}"
+		$"Validated user: {string.Join(", ", userResult.Value.Select(static kvp => $"{kvp.Key}={kvp.Value}"))}"
 	);
-#pragma warning restore IDE0370 // Remove unnecessary suppression
 }
 else
 {

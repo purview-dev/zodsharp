@@ -45,7 +45,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		{
 			var hasDataAnnotations = TypeHelpers.HasType(
 				compilationContext.Compilation,
-				TypeLibrary.DataAnnotations.RequiredAttribute
+				TypeLibrary.System.ComponentModel.DataAnnotations.RequiredAttribute
 			);
 
 			compilationContext.RegisterSymbolAction(

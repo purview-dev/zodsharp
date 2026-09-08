@@ -8,10 +8,10 @@
 			Purview.SourceGeneratorFramework. Roslyn 4.13 uses the .NET 8 Immutable baseline,
 			allowing the generator assembly to be referenced by net8.0-net10.0 test projects.
 		-->
-		<RoslynCompilerVersion>4.13.0</RoslynCompilerVersion>
+		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.65.68</TUnitVersion>
-		<PurviewSourceGenFramework>1.0.0-prerelease.36</PurviewSourceGenFramework>
+		<PurviewSourceGenFramework>1.0.0-prerelease.37</PurviewSourceGenFramework>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageVersion Include="Bogus" Version="35.6.5" />

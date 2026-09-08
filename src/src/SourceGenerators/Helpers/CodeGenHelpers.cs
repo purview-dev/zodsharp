@@ -17,12 +17,12 @@ static class CodeGenHelpers
 				ifBody =>
 					ifBody.Assignment(
 						"errors",
-						$"new {TypeLibrary.Collections.List.MakeGeneric(TypeLibrary.ValidationError)}()"
+						$"new {TypeLibrary.System.Collections.Generic.List.MakeGeneric(TypeLibrary.ZodSharp.Core.ValidationError)}()"
 					)
 			);
 
 			writer.OpenDelimitedBlock(
-				$"errors.Add(new {TypeLibrary.ValidationError}",
+				$"errors.Add(new {TypeLibrary.ZodSharp.Core.ValidationError}",
 				"(",
 				"));",
 				bodyWriter =>

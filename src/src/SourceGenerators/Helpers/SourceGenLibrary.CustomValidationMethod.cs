@@ -22,7 +22,7 @@ partial class SourceGenLibrary
 		var isExplicitlyConfigured = !string.IsNullOrEmpty(configuredName);
 
 		var methodName = string.IsNullOrWhiteSpace(configuredName)
-			? TypeLibrary.DefaultCustomValidationMethodName
+			? TypeLibraryGenerator.DefaultCustomValidationMethodName
 			: configuredName!;
 
 		// Validate the configured name is a valid C# identifier.
@@ -287,7 +287,7 @@ partial class SourceGenLibrary
 
 		// Second parameter must be CancellationToken.
 		var secondParam = method.Parameters[1];
-		if (!TypeLibrary.CancellationToken.Equals(secondParam.Type))
+		if (!TypeLibraryGenerator.CancellationToken.Equals(secondParam.Type))
 		{
 			diagnostics.Add(
 				DiagnosticInfo.Create(
@@ -340,8 +340,8 @@ partial class SourceGenLibrary
 	/// from the compilation's framework symbols.
 	/// </summary>
 	static TypeIdentity GetExpectedReturnType(INamedTypeSymbol classSymbol) =>
-		TypeLibrary.ValueTask.MakeGeneric(
-			TypeLibrary.ValidationResult.MakeGeneric(
+		TypeLibraryGenerator.ValueTask.MakeGeneric(
+			TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(
 				classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
 			)
 		);
