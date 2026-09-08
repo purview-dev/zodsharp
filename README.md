@@ -55,34 +55,17 @@ dotnet add package Purview.ZodSharp.AspNetCore
 - **Purview.ZodSharp.NewtonsoftJson** — Newtonsoft.Json integration and JSON Schema import.
 - **Purview.ZodSharp.AspNetCore** — ASP.NET Core ProblemDetails integration.
 
-## Breaking Changes
+## Differences from the original fork
 
-### Target Frameworks: .NET Standard 2.1 → .NET 8, .NET 9, .NET 10
+This repository is a fork of [guinhx/ZodSharp](https://github.com/guinhx/ZodSharp). Compared with the original, this version:
 
-Starting with **v2.0.0**, all ZodSharp library packages (`Purview.ZodSharp`, `Purview.ZodSharp.SystemTextJson`,
-`Purview.ZodSharp.NewtonsoftJson`, `Purview.ZodSharp.AspNetCore`) no longer target `netstandard2.1`. They now
-multi-target `net8.0`, `net9.0` and `net10.0`. This is a breaking change for consumers running on
-older runtimes.
-
-**Why the packages moved:**
-
-- **Zero-allocation performance requires modern .NET.** The library's span-based validation,
-  struct-based rules, and reflection-free hot paths rely on modern BCL APIs — `DateOnly`/`TimeOnly`
-  bounds in `[Range]` validation, generic `Enum.IsDefined<T>`, `ArgumentNullException.ThrowIfNull`,
-  and more — none of which exist on .NET Standard 2.1.
-- **.NET Standard 2.1 has no dedicated runtime.** It is implemented only by .NET Core 3.0+ and is not
-  supported by .NET Framework, so targeting it added maintenance cost without meaningful reach.
-- **Removes conditional-compilation burden.** Multi-targeting forced `#if NETSTANDARD` branches and
-  API workarounds throughout the codebase. Dropping the target lets the library use modern APIs
-  unconditionally.
-- **Ecosystem direction.** New libraries are encouraged to multi-target concrete, in-support runtimes
-  instead of .NET Standard 2.1.
-
-The source generator (`Purview.ZodSharp.SourceGenerators`) ships inside the `Purview.ZodSharp` package and is
-unaffected: it remains on `netstandard2.0`
-because Roslyn generators must run inside any compiler host, including .NET Framework-based tooling.
-
-**Migrating:** retarget your application to .NET 8 (LTS) or later. No API changes are required.
+- **Publishes `Purview.*` packages.** A single `ZodSharp` package is split into `Purview.ZodSharp` (core + source generator), plus `Purview.ZodSharp.SystemTextJson`, `Purview.ZodSharp.NewtonsoftJson`, and `Purview.ZodSharp.AspNetCore` integration packages.
+- **Multi-targets `net8.0`, `net9.0`, and `net10.0`.** The original targeted .NET 9.0 and .NET Standard 2.1. The source generator remains on `netstandard2.0` so it can run in any compiler host.
+- **Adds System.Text.Json integration.** The original shipped Newtonsoft.Json integration only; JSON deserialize-and-validate is now available for both major JSON libraries.
+- **Adds JSON Schema interoperability.** Schemas can be exported via `Z.ToJsonSchema` and imported via `Z.FromJsonSchema`, enabling cross-language reuse with TypeScript/Zod.
+- **Adds ASP.NET Core ProblemDetails integration.** Failed validation results convert directly to `HttpValidationProblemDetails` via `result.ToHttpValidationProblemDetails()`.
+- **Expands DataAnnotations support.** `[Length]`, `[MinLength]`, `[MaxLength]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and more, with structured size failures (`Code`, `Origin`, `Minimum`/`Maximum`, `Inclusive`, `Path`).
+- **Changes generated composition methods.** The original `.And()`, `.Or()`, and `.Refine()` are superseded by value-first `.ApplyAnd()`, `.ApplyOr()`, and `.ApplyRefine()`.
 
 ## Usage Examples
 

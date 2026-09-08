@@ -1,6 +1,7 @@
 namespace ZodSharp.SourceGenerators.Helpers;
 
-static partial class TypeLibrary
+[GenerateTypeLibrary]
+public static partial class TypeLibraryGenerator
 {
 	public const string ZodSharpNamespace = "ZodSharp";
 
@@ -10,22 +11,22 @@ static partial class TypeLibrary
 	public const string DefaultCustomValidationMethodName = "CustomValidationAsync";
 
 	// This matches the name of the class, just so we can use the `nameof` for later...
-	public static readonly TypeIdentity ZodSchemaAttribute = new(nameof(ZodSchemaAttribute), ZodSharpNamespace);
+	[TypeRef(ZodSharpNamespace)]
+	static readonly TypeIdentity ZodSchemaAttribute = default;
 
-	public static readonly TypeIdentity ZodSchemaGeneratedAttribute = new(
-		nameof(ZodSchemaGeneratedAttribute),
-		ZodSharpCoreNamespace
-	);
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity ZodSchemaGeneratedAttribute = default;
 
 	// Other ZodSharp types...
-	public static readonly TypeIdentity IZodSchemaValidator = new(nameof(IZodSchemaValidator), ZodSharpCoreNamespace);
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity IZodSchemaValidator = default;
 
-	public static readonly TypeIdentity ValidationResult = new(nameof(ValidationResult), ZodSharpCoreNamespace);
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity ValidationResult = default;
 
-	public static readonly TypeIdentity ValidationResultMetadataName = new(
-		nameof(ValidationResultMetadataName),
-		ZodSharpCoreNamespace
-	);
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity ValidationResultMetadataName = default;
 
-	public static readonly TypeIdentity ValidationError = new(nameof(ValidationError), ZodSharpCoreNamespace);
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity ValidationError = default;
 }

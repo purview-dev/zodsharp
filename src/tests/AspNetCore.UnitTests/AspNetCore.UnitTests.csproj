@@ -17,13 +17,5 @@
 			ReferenceOutputAssembly="false"
 			PrivateAssets="all"
 		/>
-
-		<!-- References the generator assembly normally.
-         This lets tests pass HostKitGenerator to the testing framework. -->
-		<ProjectReference
-			Include="..\..\src\SourceGenerators\SourceGenerators.csproj"
-			ReferenceOutputAssembly="true"
-			PrivateAssets="all"
-		/>
 	</ItemGroup>
 </Project>

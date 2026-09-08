@@ -79,7 +79,7 @@ static class TypeHelpersExtensions
 				return false;
 
 			// Check if the type has the ZodSchema attribute
-			return namedType.GetAttributes().Any(a => TypeLibrary.ZodSchemaAttribute.Equals(a.AttributeClass));
+			return namedType.GetAttributes().Any(a => TypeLibrary.ZodSharp.ZodSchemaAttribute.Equals(a.AttributeClass));
 		}
 
 		public static bool HasDataAnnotationAttribute(IPropertySymbol propertySymbol)
@@ -89,7 +89,10 @@ static class TypeHelpersExtensions
 				.GetAttributes()
 				.Any(a =>
 					a.AttributeClass is not null
-					&& TypeHelpers.InheritsFrom(a.AttributeClass, TypeLibrary.DataAnnotations.ValidationAttribute)
+					&& TypeHelpers.InheritsFrom(
+						a.AttributeClass,
+						TypeLibrary.System.ComponentModel.DataAnnotations.ValidationAttribute
+					)
 				);
 		}
 

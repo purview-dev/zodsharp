@@ -8,22 +8,22 @@
 			Purview.SourceGeneratorFramework. Roslyn 4.13 uses the .NET 8 Immutable baseline,
 			allowing the generator assembly to be referenced by net8.0-net10.0 test projects.
 		-->
-		<RoslynCompilerVersion>4.13.0</RoslynCompilerVersion>
+		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.65.68</TUnitVersion>
-		<PurviewSourceGenFramework>1.0.0-prerelease.36</PurviewSourceGenFramework>
+		<PurviewSourceGenFramework>1.0.0-prerelease.37</PurviewSourceGenFramework>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageVersion Include="Bogus" Version="35.6.5" />
-		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
 		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynCompilerVersion)" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynAnalyzersVersion)" />
 		<PackageVersion Include="TUnit" Version="$(TUnitVersion)" />
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageVersion Include="System.Text.Json" Version="10.0.10" />
-		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+		<PackageVersion Include="System.Text.Json" Version="10.0.11" />
 		<PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
 		<PackageVersion Include="Purview.SourceGeneratorFramework" Version="$(PurviewSourceGenFramework)" />
 		<PackageVersion

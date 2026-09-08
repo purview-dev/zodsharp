@@ -1,9 +1,5 @@
 <Project>
 	<PropertyGroup>
-		<!--
-			Supported .NET target frameworks. .NET 8 leaves support in November 2026;
-			removing it is a single-line change here.
-		-->
 		<ZodSharpNetTargetFrameworks>net8.0;net9.0;net10.0</ZodSharpNetTargetFrameworks>
 		<TargetFrameworks>$(ZodSharpNetTargetFrameworks)</TargetFrameworks>
 		<NamespacePrefix>ZodSharp</NamespacePrefix>
@@ -25,9 +21,8 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(IsPackable)' == 'true'">
-		<Authors>ZodSharp Contributors</Authors>
+		<Authors>ZodSharp Contributors;Purview-Dev Contributors</Authors>
 		<PackageProjectUrl>https://github.com/purview-dev/zodsharp</PackageProjectUrl>
-		<RepositoryUrl>https://github.com/purview-dev/zodsharp</RepositoryUrl>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>

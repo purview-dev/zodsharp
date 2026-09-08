@@ -23,14 +23,14 @@ static partial class SourceGenLibrary
 				{
 					HasRequiredAttribute = TypeHelpers.HasType(
 						compilation,
-						TypeLibrary.DataAnnotations.RequiredAttribute
+						TypeLibrary.System.ComponentModel.DataAnnotations.RequiredAttribute
 					),
 				},
 			PropertyLibrary.DisableZodSharpSourceGeneratorProperty
 		);
 		var schemaSets = IncrementalPipeline.ForAttributeWithMetadataName(
 			context,
-			TypeLibrary.ZodSchemaAttribute,
+			TypeLibrary.ZodSharp.ZodSchemaAttribute,
 			predicate: static (node, _) => node is TypeDeclarationSyntax,
 			transform: static (attributeContext, cancellationToken) =>
 				GetSchemasForGeneration(attributeContext, cancellationToken)
@@ -115,7 +115,9 @@ static partial class SourceGenLibrary
 			propertyType = arrayType.ElementType;
 		else if (propertyType is INamedTypeSymbol namedType)
 		{
-			var enumerable = namedType.AllInterfaces.FirstOrDefault(TypeLibrary.Collections.IEnumerableT.Equals);
+			var enumerable = namedType.AllInterfaces.FirstOrDefault(
+				TypeLibrary.System.Collections.Generic.IEnumerable.Equals
+			);
 			if (enumerable is not null)
 				propertyType = enumerable.TypeArguments[0];
 		}
@@ -356,8 +358,8 @@ static partial class SourceGenLibrary
 
 		if (
 			originalType is IArrayTypeSymbol
-			|| TypeHelpers.IsOrImplements(originalType, TypeLibrary.Collections.IEnumerable)
-			|| TypeHelpers.IsOrImplements(originalType, TypeLibrary.Collections.IEnumerableT)
+			|| TypeHelpers.IsOrImplements(originalType, TypeLibrary.System.Collections.IEnumerable)
+			|| TypeHelpers.IsOrImplements(originalType, TypeLibrary.System.Collections.Generic.IEnumerable)
 		)
 		{
 			return PropertyValidationKind.Collection;
@@ -379,11 +381,13 @@ static partial class SourceGenLibrary
 
 		foreach (var iface in namedType.AllInterfaces)
 		{
-			if (TypeHelpers.Implements(iface, TypeLibrary.Collections.IEnumerableT))
+			if (TypeHelpers.Implements(iface, TypeLibrary.System.Collections.Generic.IEnumerable))
 				return new TypeIdentity(iface.TypeArguments[0]);
 		}
 
-		return namedType.IsGenericType && TypeHelpers.Implements(namedType, TypeLibrary.Collections.IEnumerableT)
+		return
+			namedType.IsGenericType
+			&& TypeHelpers.Implements(namedType, TypeLibrary.System.Collections.Generic.IEnumerable)
 			? new TypeIdentity(namedType.TypeArguments[0])
 			: null;
 	}
@@ -398,11 +402,13 @@ static partial class SourceGenLibrary
 
 		foreach (var iface in namedType.AllInterfaces)
 		{
-			if (TypeHelpers.Implements(iface, TypeLibrary.Collections.IEnumerableT))
+			if (TypeHelpers.Implements(iface, TypeLibrary.System.Collections.Generic.IEnumerable))
 				return iface.TypeArguments[0];
 		}
 
-		return namedType.IsGenericType && TypeHelpers.Implements(namedType, TypeLibrary.Collections.IEnumerableT)
+		return
+			namedType.IsGenericType
+			&& TypeHelpers.Implements(namedType, TypeLibrary.System.Collections.Generic.IEnumerable)
 			? namedType.TypeArguments[0]
 			: null;
 	}
@@ -428,10 +434,10 @@ static partial class SourceGenLibrary
 
 		if (propertyType is INamedTypeSymbol namedType)
 		{
-			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.Collections.ICollectionT))
+			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.Generic.ICollection))
 				return new("propertyValue.Count", "array", true);
 
-			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.Collections.IEnumerable))
+			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.IEnumerable))
 				return new(
 					"global::ZodSharp.Optimizations.CollectionCountHelper.GetCount(propertyValue)",
 					"array",
@@ -531,8 +537,8 @@ static partial class SourceGenLibrary
 		var supportsLengthAttribute =
 			propertyType.SpecialType == SpecialType.System_String
 			|| originalPropertyType is IArrayTypeSymbol
-			|| TypeHelpers.IsOrImplements(originalPropertyType, TypeLibrary.Collections.IEnumerable)
-			|| TypeHelpers.IsOrImplements(originalPropertyType, TypeLibrary.Collections.IEnumerableT);
+			|| TypeHelpers.IsOrImplements(originalPropertyType, TypeLibrary.System.Collections.IEnumerable)
+			|| TypeHelpers.IsOrImplements(originalPropertyType, TypeLibrary.System.Collections.Generic.IEnumerable);
 
 		if (attribute is not null && !supportsLengthAttribute)
 		{
@@ -618,7 +624,10 @@ static partial class SourceGenLibrary
 		{
 			if (
 				attribute.AttributeClass is null
-				|| !TypeHelpers.InheritsFrom(attribute.AttributeClass, TypeLibrary.DataAnnotations.ValidationAttribute)
+				|| !TypeHelpers.InheritsFrom(
+					attribute.AttributeClass,
+					TypeLibrary.System.ComponentModel.DataAnnotations.ValidationAttribute
+				)
 			)
 			{
 				continue;
@@ -663,7 +672,9 @@ static partial class SourceGenLibrary
 			propertyType = array.ElementType;
 		else if (propertyType is INamedTypeSymbol named)
 		{
-			var enumerable = named.AllInterfaces.FirstOrDefault(TypeLibrary.Collections.IEnumerableT.Equals);
+			var enumerable = named.AllInterfaces.FirstOrDefault(
+				TypeLibrary.System.Collections.Generic.IEnumerable.Equals
+			);
 			if (enumerable is not null)
 				propertyType = enumerable.TypeArguments[0];
 		}

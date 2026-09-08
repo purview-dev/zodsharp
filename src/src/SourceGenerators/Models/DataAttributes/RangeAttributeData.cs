@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using ZodSharp.SourceGenerators.Helpers;
 
 namespace ZodSharp.SourceGenerators.Models.DataAttributes;
 
@@ -55,7 +54,7 @@ readonly record struct RangeAttributeData(
 
 	public static RangeAttributeData FromAttributeData(AttributeData attributeData)
 	{
-		if (!TypeLibrary.DataAnnotations.RangeAttribute.Equals(attributeData.AttributeClass))
+		if (!TypeLibrary.System.ComponentModel.DataAnnotations.RangeAttribute.Equals(attributeData.AttributeClass))
 			return Empty;
 
 		var constructorArguments = attributeData.ConstructorArguments;

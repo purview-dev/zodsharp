@@ -27,7 +27,7 @@ partial class UserSchemaValidator
 		"IDE0390:Make method synchronous",
 		Justification = "This is an example of an asynchronous custom validation method"
 	)]
-	async ValueTask<ValidationResult<User>> CustomValidationAsync(User user, CancellationToken cancellationToken)
+	public async ValueTask<ValidationResult<User>> CustomValidationAsync(User user, CancellationToken cancellationToken)
 	{
 		WasCalled = true;
 

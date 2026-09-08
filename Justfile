@@ -60,34 +60,34 @@ pipeline-tests *args:
     "{{ pipeline_tool }}" --Build:RunTests=true --Release:Mode=None {{ args }}
 
 # Build and test with the specified configuration, defaulting to "Release"
-build solutionOrProject=solution configuration=build_configuration:
-    echo "Building {{ BLUE }}{{ solutionOrProject }}{{ NORMAL }} with configuration {{ YELLOW }}{{ configuration }}{{ NORMAL }}"
-    dotnet build {{ solutionOrProject }} -c {{ configuration }}
+build *args:
+    echo "Building {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
+    dotnet build {{ solution }} -c {{ build_configuration }} {{ args }}
 
 # Build and test with the specified configuration, defaulting to "Release"
-clean solutionOrProject=solution configuration=build_configuration:
-    echo "Cleaning {{ BLUE }}{{ solutionOrProject }}{{ NORMAL }} with configuration {{ YELLOW }}{{ configuration }}{{ NORMAL }}"
-    dotnet clean {{ solutionOrProject }} -c {{ configuration }}
+clean *args:
+    echo "Cleaning {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
+    dotnet clean {{ solution }} -c {{ build_configuration }} {{ args }}
 
 # Run the performance tests with the specified configuration, defaulting to "Release"
-perf-tests configuration=build_configuration *args:
-    echo "Running performance tests for {{ BLUE }}{{ perf_tests_project }}{{ NORMAL }} with configuration {{ YELLOW }}{{ configuration }}{{ NORMAL }}"
-    dotnet run --project {{ perf_tests_project }} -c {{ configuration }} {{ args }}
+perf-tests *args:
+    echo "Running performance tests for {{ BLUE }}{{ perf_tests_project }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
+    dotnet run --project {{ perf_tests_project }} -c {{ build_configuration }} {{ args }}
 
 # Run tests with the specified configuration, defaulting to "Release"
-test solutionOrProject=solution configuration=build_configuration filter=default_test_filter *args:
-    echo "Running tests for {{ BLUE }}{{ solutionOrProject }}{{ NORMAL }} with configuration {{ YELLOW }}{{ configuration }}{{ NORMAL }} and filter {{ GREEN }}{{ filter }}{{ NORMAL }}"
-    dotnet test {{ solutionOrProject }} -c {{ configuration }} --treenode-filter "{{ filter }}" {{ args }}
+test filter=default_test_filter *args:
+    echo "Running tests for {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }} and filter {{ GREEN }}{{ filter }}{{ NORMAL }}"
+    dotnet test {{ solution }} -c {{ build_configuration }} --treenode-filter "{{ filter }}" {{ args }}
 
 # Run tests with the specified configuration, defaulting to "Release"
-restore solutionOrProject=solution:
-    echo "Restoring dependencies for {{ BLUE }}{{ solutionOrProject }}{{ NORMAL }}"
-    dotnet restore {{ solutionOrProject }}
+restore *args:
+    echo "Restoring dependencies for {{ BLUE }}{{ solution }}{{ NORMAL }}"
+    dotnet restore {{ solution }} {{ args }}
 
 # Create NuGet package for the project
-pack solutionOrProject=solution configuration=build_configuration publish_folder=artifacts_folder:
-    echo "Packing {{ BLUE }}{{ solutionOrProject }}{{ NORMAL }} with configuration {{ YELLOW }}{{ configuration }}{{ NORMAL }} to {{ GREEN }}{{ publish_folder }}{{ NORMAL }}"
-    dotnet pack {{ solutionOrProject }} -c {{ configuration }} -o {{ publish_folder }}
+pack publish_folder=artifacts_folder *args:
+    echo "Packing {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }} to {{ GREEN }}{{ publish_folder }}{{ NORMAL }}"
+    dotnet pack {{ solution }} -c {{ build_configuration }} -o {{ publish_folder }} {{ args }}
 
 # Check code formatting using CSharpier
 lint-check:
@@ -102,3 +102,11 @@ lint-fix:
 # Open the solution in Visual Studio/ Registered application
 vs:
     open {{ solution }}
+
+# Clean up the repository by removing build artifacts, bin/obj folders etc, and shutting down the build server
+[group('Utilities')]
+scrub:
+    find . -type d \( -name bin -o -name obj \) -exec rm -rf {} +
+    just clean
+    just restore --force-evaluate
+    dotnet build-server shutdown

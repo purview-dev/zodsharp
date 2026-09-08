@@ -1,5 +1,4 @@
 using System.Globalization;
-using ZodSharp.SourceGenerators.Helpers;
 using ZodSharp.SourceGenerators.Models.DataAttributes;
 
 namespace ZodSharp.SourceGenerators;
@@ -85,7 +84,7 @@ partial class ZodSchemaGenerator
 		writer.MethodCallOn(
 			"errors",
 			"Add",
-			$"{TypeLibrary.ValidationError}.Create({errorCode.Surround()}, {messageExpression}, {pathFieldName}, origin: {origin.Surround()}, minimum: {(minimum.HasValue ? minimum.Value.ToString(CultureInfo.InvariantCulture) : "null")}, maximum: {(maximum.HasValue ? maximum.Value.ToString(CultureInfo.InvariantCulture) : "null")}, inclusive: true)"
+			$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create({errorCode.Surround()}, {messageExpression}, {pathFieldName}, origin: {origin.Surround()}, minimum: {(minimum.HasValue ? minimum.Value.ToString(CultureInfo.InvariantCulture) : "null")}, maximum: {(maximum.HasValue ? maximum.Value.ToString(CultureInfo.InvariantCulture) : "null")}, inclusive: true)"
 		);
 	}
 
@@ -107,7 +106,7 @@ partial class ZodSchemaGenerator
 		writer.MethodCallOn(
 			"errors",
 			"Add",
-			$"{TypeLibrary.ValidationError}.Create({errorCode.Surround()}, {messageExpression}, {pathFieldName})"
+			$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create({errorCode.Surround()}, {messageExpression}, {pathFieldName})"
 		);
 	}
 
