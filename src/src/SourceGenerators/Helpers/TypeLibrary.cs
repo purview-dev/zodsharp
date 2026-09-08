@@ -14,7 +14,7 @@ public static partial class TypeLibraryGenerator
 	[TypeRef(ZodSharpNamespace)]
 	static readonly TypeIdentity ZodSchemaAttribute = default;
 
-	[TypeRef(ZodSharpNamespace)]
+	[TypeRef(ZodSharpCoreNamespace)]
 	static readonly TypeIdentity ZodSchemaGeneratedAttribute = default;
 
 	// Other ZodSharp types...

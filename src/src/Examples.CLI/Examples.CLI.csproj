@@ -16,5 +16,6 @@
 			ReferenceOutputAssembly="false"
 			PrivateAssets="all"
 		/>
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
 	</ItemGroup>
 </Project>

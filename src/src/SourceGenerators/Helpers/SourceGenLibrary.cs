@@ -358,7 +358,7 @@ static partial class SourceGenLibrary
 
 		if (
 			originalType is IArrayTypeSymbol
-			|| TypeHelpers.IsOrImplements(originalType, TypeLibrary.System.Collections.Generic.IEnumerable)
+			|| TypeHelpers.IsOrImplements(originalType, TypeLibrary.System.Collections.IEnumerable)
 			|| TypeHelpers.IsOrImplements(originalType, TypeLibrary.System.Collections.Generic.IEnumerable)
 		)
 		{

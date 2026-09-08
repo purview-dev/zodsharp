@@ -16,10 +16,5 @@
 	<ItemGroup>
 		<PackageReference Include="BenchmarkDotNet" />
 		<PackageReference Include="Newtonsoft.Json" />
-		<!--
-			BenchmarkDotNet needs a newer Roslyn compiler than the source generator is built against.
-			Override the centrally-managed version here without affecting the shipped analyzer.
-		-->
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" />
 	</ItemGroup>
 </Project>
