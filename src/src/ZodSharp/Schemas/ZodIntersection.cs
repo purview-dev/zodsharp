@@ -27,9 +27,7 @@ public class ZodIntersection<T>(IZodSchema<T, T> left, IZodSchema<T, T> right) :
 		if (leftResult.IsSuccess && rightResult.IsSuccess)
 			return ValidationResult<T>.Success(value);
 
-		var allErrors = new List<ValidationError>();
-		allErrors.AddRange(leftResult.Errors);
-		allErrors.AddRange(rightResult.Errors);
+		List<ValidationError> allErrors = [.. leftResult.Errors, .. rightResult.Errors];
 		return ValidationResult<T>.Failure(allErrors);
 	}
 }

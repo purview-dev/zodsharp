@@ -10,8 +10,8 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerialize_GivenValidObject_ReturnsSuccessWithJsonString()
 	{
-		var schema = new TestUserSchema();
-		var user = new TestUser { Name = "John", Age = 30 };
+		TestUserSchema schema = new();
+		TestUser user = new() { Name = "John", Age = 30 };
 
 		var result = schema.ValidateAndSerialize(user);
 
@@ -26,8 +26,8 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerialize_GivenInvalidObject_ReturnsFailureWithoutSerializing()
 	{
-		var schema = new TestUserSchema();
-		var user = new TestUser { Name = "", Age = 30 };
+		TestUserSchema schema = new();
+		TestUser user = new() { Name = "", Age = 30 };
 
 		var result = schema.ValidateAndSerialize(user);
 
@@ -48,9 +48,9 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerialize_WithCamelCaseSettings_ProducesCamelCaseJson()
 	{
-		var schema = new TestUserSchema();
-		var user = new TestUser { Name = "Jane", Age = 25 };
-		var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+		TestUserSchema schema = new();
+		TestUser user = new() { Name = "Jane", Age = 25 };
+		JsonSerializerSettings settings = new() { ContractResolver = new CamelCasePropertyNamesContractResolver() };
 
 		var result = schema.ValidateAndSerialize(user, settings);
 
@@ -65,8 +65,8 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerialize_WithIndentedFormatting_ProducesIndentedJson()
 	{
-		var schema = new TestUserSchema();
-		var user = new TestUser { Name = "John", Age = 30 };
+		TestUserSchema schema = new();
+		TestUser user = new() { Name = "John", Age = 30 };
 
 		var result = schema.ValidateAndSerialize(user, formatting: Formatting.Indented);
 
@@ -77,7 +77,7 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerialize_GivenNullValue_ReturnsFailure()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 
 		var result = schema.ValidateAndSerialize(null!);
 
@@ -87,15 +87,15 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerializeAsync_GivenValidObject_WritesJsonToStream()
 	{
-		var schema = new TestUserSchema();
-		var user = new TestUser { Name = "John", Age = 30 };
-		using var stream = new MemoryStream();
+		TestUserSchema schema = new();
+		TestUser user = new() { Name = "John", Age = 30 };
+		using MemoryStream stream = new();
 
 		var result = await schema.ValidateAndSerializeAsync(user, stream);
 
 		await Assert.That(result.IsSuccess).IsTrue();
 		stream.Position = 0;
-		using var reader = new StreamReader(stream, Encoding.UTF8);
+		using StreamReader reader = new(stream, Encoding.UTF8);
 		var json = await reader.ReadToEndAsync();
 		await Assert.That(json).Contains("\"name\"");
 		await Assert.That(json).Contains("John");
@@ -106,9 +106,9 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerializeAsync_GivenInvalidObject_ReturnsFailureWithoutWriting()
 	{
-		var schema = new TestUserSchema();
-		var user = new TestUser { Name = "", Age = -1 };
-		using var stream = new MemoryStream();
+		TestUserSchema schema = new();
+		TestUser user = new() { Name = "", Age = -1 };
+		using MemoryStream stream = new();
 
 		var result = await schema.ValidateAndSerializeAsync(user, stream);
 
@@ -119,8 +119,8 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task ValidateAndSerializeAsync_GivenNullStream_ThrowsArgumentNullException()
 	{
-		var schema = new TestUserSchema();
-		var user = new TestUser { Name = "John", Age = 30 };
+		TestUserSchema schema = new();
+		TestUser user = new() { Name = "John", Age = 30 };
 
 		var exception = Assert.Throws<ArgumentNullException>(() =>
 			schema.ValidateAndSerializeAsync(user, null!).GetAwaiter().GetResult()
@@ -132,8 +132,8 @@ public class NewtonsoftJsonExportTests
 	[Test]
 	public async Task RoundTrip_SerializeThenDeserialize_ReturnsEquivalentObject()
 	{
-		var schema = new TestUserSchema();
-		var original = new TestUser { Name = "Alice", Age = 42 };
+		TestUserSchema schema = new();
+		TestUser original = new() { Name = "Alice", Age = 42 };
 
 		var serializeResult = schema.ValidateAndSerialize(original);
 		await Assert.That(serializeResult.IsSuccess).IsTrue();

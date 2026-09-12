@@ -6,6 +6,11 @@ namespace ZodSharp.Rules;
 /// Validation rule for URL format.
 /// <strong>This will allocate if the default Regex fails to validate by utilising <see cref="Uri.TryCreate(string?, UriKind, out Uri?)"/></strong>
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	"Naming",
+	"PDS0004:Use correct acronym capitalization",
+	Justification = "Name is real"
+)]
 public readonly record struct UrlRule : Core.IValidationRule<string>
 {
 	static readonly Regex UrlRegex = new(

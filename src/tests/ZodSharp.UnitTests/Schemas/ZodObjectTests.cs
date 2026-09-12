@@ -6,7 +6,7 @@ public class ZodObjectTests
 	public async Task ObjectValidate_GivenCompleteObject_ReturnsSuccess()
 	{
 		var schema = CreateUserSchema();
-		var data = new Dictionary<string, object?>
+		Dictionary<string, object?> data = new()
 		{
 			["name"] = "John Doe",
 			["age"] = 30.0,
@@ -23,7 +23,7 @@ public class ZodObjectTests
 	public async Task ObjectValidate_GivenMissingRequiredField_ReturnsFailure()
 	{
 		var schema = CreateUserSchema();
-		var data = new Dictionary<string, object?> { ["name"] = "John Doe", ["age"] = 30.0 };
+		Dictionary<string, object?> data = new() { ["name"] = "John Doe", ["age"] = 30.0 };
 
 		var result = schema.Validate(data);
 
@@ -35,7 +35,7 @@ public class ZodObjectTests
 	public async Task ObjectValidate_GivenWrongFieldType_ReturnsFailure()
 	{
 		var schema = CreateUserSchema();
-		var data = new Dictionary<string, object?>
+		Dictionary<string, object?> data = new()
 		{
 			["name"] = "John Doe",
 			["age"] = "not-a-number",
@@ -52,7 +52,7 @@ public class ZodObjectTests
 	public async Task ObjectValidate_GivenInvalidEmail_ReturnsFailure()
 	{
 		var schema = CreateUserSchema();
-		var data = new Dictionary<string, object?>
+		Dictionary<string, object?> data = new()
 		{
 			["name"] = "John Doe",
 			["age"] = 30.0,
@@ -72,7 +72,7 @@ public class ZodObjectTests
 		// as Int64, not Double. The SchemaWrapper must coerce boxed numeric values
 		// so hand-built object schemas validate JSON deserialization output.
 		var schema = CreateUserSchema();
-		var data = new Dictionary<string, object?>
+		Dictionary<string, object?> data = new()
 		{
 			["name"] = "John Doe",
 			["age"] = 30L,

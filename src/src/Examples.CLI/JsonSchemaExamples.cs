@@ -69,7 +69,7 @@ public static class JsonSchemaExamples
 		var productSchema = Z.FromJsonSchema(jsonSchemaString);
 
 		// Test validation with valid data
-		var validProduct = new Dictionary<string, object?>
+		Dictionary<string, object?> validProduct = new()
 		{
 			{ "title", "Laptop" },
 			{ "price", 999.99 },
@@ -80,7 +80,7 @@ public static class JsonSchemaExamples
 		Console.WriteLine($"Valid product: {(validResult.IsSuccess ? "PASSED" : "FAILED")}");
 
 		// Test validation with invalid data (missing required field)
-		var invalidProduct = new Dictionary<string, object?>
+		Dictionary<string, object?> invalidProduct = new()
 		{
 			{ "title", "Phone" },
 			// Missing "price" field
@@ -106,7 +106,7 @@ public static class JsonSchemaExamples
 		Console.WriteLine("--- Roundtrip: ZodSharp -> JSON Schema -> ZodSharp ---");
 
 		// Original ZodSharp schema
-		var originalSchema = Z.Object().Field("id", Z.String().Uuid()).Field("count", Z.Number().Min(0).Int()).Build();
+		var originalSchema = Z.Object().Field("id", Z.String().UUID()).Field("count", Z.Number().Min(0).Int()).Build();
 
 		// Convert to JSON Schema
 		var jsonSchema = Z.ToJsonSchema(originalSchema);
@@ -116,7 +116,7 @@ public static class JsonSchemaExamples
 		var parsedSchema = Z.FromJsonSchema(jsonString);
 
 		// Test both schemas with same data
-		var testData = new Dictionary<string, object?>
+		Dictionary<string, object?> testData = new()
 		{
 			{ "id", "550e8400-e29b-41d4-a716-446655440000" },
 			{ "count", 42.0 },

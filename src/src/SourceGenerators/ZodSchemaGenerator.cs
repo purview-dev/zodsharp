@@ -24,7 +24,7 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 
 		context.RegisterSourceOutput(
 			generationValueProviders,
-			(spc, model) =>
+			static (spc, model) =>
 			{
 				if (model.Context.Settings.IsSourceGeneratorDisabled)
 					return;
@@ -39,7 +39,7 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 
 					try
 					{
-						var outputContext = new SchemaGenerationOutputContext(model.Context, schema.Value);
+						SchemaGenerationOutputContext outputContext = new(model.Context, schema.Value);
 						BuildSchema(outputContext, spc, schema.Value.IsPrimary);
 					}
 					catch (CodeWriterScopeValidationException)
@@ -48,8 +48,9 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 					}
 					catch (Exception ex)
 					{
-						var diagnostic = DiagnosticInfo.Create(
+						var diagnostic = ReportableDiagnostic.Create(
 							DiagnosticLibrary.UnhandledException,
+							true,
 							schema.Value.TargetType.Name,
 							ex.Message
 						);

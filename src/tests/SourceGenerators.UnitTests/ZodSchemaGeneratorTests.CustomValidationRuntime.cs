@@ -199,7 +199,7 @@ namespace Testing
 		dynamic dynValidator = validator;
 		dynamic dynInstance = instance;
 
-		using var cts = new CancellationTokenSource();
+		using CancellationTokenSource cts = new();
 		await cts.CancelAsync();
 
 		dynamic task = dynValidator.ValidateAsync(dynInstance, cts.Token);

@@ -59,6 +59,11 @@ readonly record struct ZodPropertyDescriptor(
 	ValidationAttributes ValidationAttributes
 );
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	"Naming",
+	"PDS0004:Use correct acronym capitalization",
+	Justification = "Real names"
+)]
 readonly record struct ValidationAttributes(
 	GeneratorResult<RequiredAttributeData> Required,
 	GeneratorResult<CompareAttributeData> Compare,
@@ -96,7 +101,7 @@ readonly record struct ValidationAttributes(
 		|| Length.HasDiagnostics
 		|| Range.HasDiagnostics;
 
-	public ImmutableArray<DiagnosticInfo> GetDiagnostics() =>
+	public ImmutableArray<ReportableDiagnostic> GetDiagnostics() =>
 		[
 			.. Required.Diagnostics,
 			.. Compare.Diagnostics,

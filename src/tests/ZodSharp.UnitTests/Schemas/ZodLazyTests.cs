@@ -9,7 +9,7 @@ public class ZodLazyTests
 		categorySchema = Z.Lazy(() =>
 			Z.Object().Field("name", Z.String()).Field("subcategories", Z.Array(categorySchema!)).Build()
 		);
-		var data = new Dictionary<string, object?>
+		Dictionary<string, object?> data = new()
 		{
 			["name"] = "Electronics",
 			["subcategories"] = new[]

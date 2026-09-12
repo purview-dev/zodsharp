@@ -3,7 +3,7 @@ set quiet
 root_folder := "src"
 solution := root_folder / "ZodSharp.slnx"
 perf_tests_project := root_folder / "tests" / "ZodSharp.PerformanceTests" / "ZodSharp.PerformanceTests.csproj"
-build_configuration := "Release"
+build_configuration := "Debug"
 artifacts_folder := "./artifacts"
 default_test_filter := "/*/*/*/*/"
 
@@ -49,6 +49,7 @@ pipeline-release *args:
 [group('Pipeline')]
 pipeline-local-release *args:
     just ensure-pipeline-tool
+    just lint-fix
     echo "Running local release pipeline..."
     "{{ pipeline_tool }}" --Release:Mode=LocalNuGet {{ args }}
 
@@ -60,46 +61,61 @@ pipeline-tests *args:
     "{{ pipeline_tool }}" --Build:RunTests=true --Release:Mode=None {{ args }}
 
 # Build and test with the specified configuration, defaulting to "Release"
+[group('Build and Test')]
 build *args:
     echo "Building {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
     dotnet build {{ solution }} -c {{ build_configuration }} {{ args }}
 
 # Build and test with the specified configuration, defaulting to "Release"
+[group('Build and Test')]
 clean *args:
     echo "Cleaning {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
     dotnet clean {{ solution }} -c {{ build_configuration }} {{ args }}
 
 # Run the performance tests with the specified configuration, defaulting to "Release"
+[group('Build and Test')]
 perf-tests *args:
     echo "Running performance tests for {{ BLUE }}{{ perf_tests_project }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
     dotnet run --project {{ perf_tests_project }} -c {{ build_configuration }} {{ args }}
 
 # Run tests with the specified configuration, defaulting to "Release"
+[group('Build and Test')]
 test filter=default_test_filter *args:
     echo "Running tests for {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }} and filter {{ GREEN }}{{ filter }}{{ NORMAL }}"
     dotnet test {{ solution }} -c {{ build_configuration }} --treenode-filter "{{ filter }}" {{ args }}
 
 # Run tests with the specified configuration, defaulting to "Release"
+[group('Build and Test')]
 restore *args:
     echo "Restoring dependencies for {{ BLUE }}{{ solution }}{{ NORMAL }}"
     dotnet restore {{ solution }} {{ args }}
 
 # Create NuGet package for the project
+[group('Build and Test')]
 pack publish_folder=artifacts_folder *args:
     echo "Packing {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }} to {{ GREEN }}{{ publish_folder }}{{ NORMAL }}"
     dotnet pack {{ solution }} -c {{ build_configuration }} -o {{ publish_folder }} {{ args }}
 
+# Displays the current version of the project.
+# Requires Bun.
+[group('Build and Test')]
+version:
+    bun -e "console.log('Current Version: {{ GREEN }}' + require('./package.json').version + '{{ NORMAL }}')"
+
 # Check code formatting using CSharpier
+[group('Utilities')]
 lint-check:
     dotnet csharpier check .
     # dotnet format --verify-no-changes {{ solution }}
 
 # Fix code formatting issues using CSharpier
+[group('Utilities')]
 lint-fix:
     dotnet csharpier format .
     # dotnet format {{ solution }}
 
 # Open the solution in Visual Studio/ Registered application
+[group('Utilities')]
 vs:
     open {{ solution }}
 

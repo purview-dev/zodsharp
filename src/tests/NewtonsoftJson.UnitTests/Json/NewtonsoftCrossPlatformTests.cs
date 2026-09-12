@@ -77,7 +77,7 @@ public class NewtonsoftCrossPlatformTests
 	public async Task Newtonsoft_CanDeserializeAndValidate_ValidFixtureFromTS(string fixtureName)
 	{
 		var json = File.ReadAllText(Path.Combine(FixturesDir, $"{fixtureName}.json"));
-		var schema = new CrossPlatformUserSchema();
+		CrossPlatformUserSchema schema = new();
 
 		var result = schema.DeserializeAndValidate(json);
 
@@ -93,7 +93,7 @@ public class NewtonsoftCrossPlatformTests
 	public async Task Newtonsoft_Rejects_InvalidFixtureFromTS(string fixtureName)
 	{
 		var json = File.ReadAllText(Path.Combine(FixturesDir, $"{fixtureName}.json"));
-		var schema = new CrossPlatformUserSchema();
+		CrossPlatformUserSchema schema = new();
 
 		var result = schema.DeserializeAndValidate(json);
 
@@ -107,7 +107,7 @@ public class NewtonsoftCrossPlatformTests
 
 		foreach (var (name, json) in LoadAllFixtures())
 		{
-			var schema = new CrossPlatformUserSchema();
+			CrossPlatformUserSchema schema = new();
 			var result = schema.DeserializeAndValidate(json);
 			var expectedValid = manifest[name].Valid;
 
@@ -124,8 +124,8 @@ public class NewtonsoftCrossPlatformTests
 	public async Task Newtonsoft_SerializesValidData_CanBeParsedByTS_Zod(CancellationToken cancellationToken)
 	{
 		// Serialize valid data using Newtonsoft with camelCase, write to output dir for TS tests to consume
-		var schema = new CrossPlatformUserSchema();
-		var user = new CrossPlatformUser
+		CrossPlatformUserSchema schema = new();
+		CrossPlatformUser user = new()
 		{
 			Name = "CSharp Export",
 			Age = 42,
@@ -152,7 +152,7 @@ public class NewtonsoftCrossPlatformTests
 	{
 		// Read TS fixture -> deserialize in C# -> re-serialize in C# -> re-deserialize in C#
 		var originalJson = await File.ReadAllTextAsync(Path.Combine(FixturesDir, "valid.json"), cancellationToken);
-		var schema = new CrossPlatformUserSchema();
+		CrossPlatformUserSchema schema = new();
 
 		var firstResult = schema.DeserializeAndValidate(originalJson);
 		await Assert.That(firstResult.IsSuccess).IsTrue();

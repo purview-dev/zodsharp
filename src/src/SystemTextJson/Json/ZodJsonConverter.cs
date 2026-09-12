@@ -50,7 +50,7 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 	/// </summary>
 	JsonSerializerOptions WithoutThisConverter(JsonSerializerOptions options)
 	{
-		var copy = new JsonSerializerOptions(options);
+		JsonSerializerOptions copy = new(options);
 
 		for (var i = copy.Converters.Count - 1; i >= 0; i--)
 		{

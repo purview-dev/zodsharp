@@ -24,7 +24,7 @@ var userSchema = Z.Object()
 	.Field("email", Z.String().Email())
 	.Build();
 
-var userData = new Dictionary<string, object?>
+Dictionary<string, object?> userData = new()
 {
 	{ "name", "John Doe" },
 	{ "age", 30.0 },

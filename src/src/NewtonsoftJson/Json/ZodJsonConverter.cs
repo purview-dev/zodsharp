@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ZodSharp.Core;
 
@@ -54,7 +54,7 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 
 	JsonSerializer CreateSerializerWithoutThisConverter(JsonSerializer serializer)
 	{
-		var clone = new JsonSerializer
+		JsonSerializer clone = new()
 		{
 			CheckAdditionalContent = serializer.CheckAdditionalContent,
 			ConstructorHandling = serializer.ConstructorHandling,

@@ -113,7 +113,7 @@ public class HeavyPerformanceTests
 				"items",
 				Z.Array(
 						Z.Object()
-							.Field("id", Z.String().Uuid())
+							.Field("id", Z.String().UUID())
 							.Field("name", Z.String().Min(1).Max(100))
 							.Field("tags", Z.Array(Z.String()).Min(0).Max(10))
 							.Build()
@@ -123,7 +123,7 @@ public class HeavyPerformanceTests
 			)
 			.Build();
 
-		var data = new Dictionary<string, object?>
+		Dictionary<string, object?> data = new()
 		{
 			{
 				"items",

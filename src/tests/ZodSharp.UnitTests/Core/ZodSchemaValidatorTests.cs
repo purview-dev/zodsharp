@@ -8,7 +8,7 @@ public class ZodSchemaValidatorTests
 	public async Task Adapter_Delegates_ToInnerSchema()
 	{
 		IZodSchema<string> inner = new ZodString().Min(3);
-		var adapter = new ZodSchemaValidator<string>(inner);
+		ZodSchemaValidator<string> adapter = new(inner);
 		var ok = adapter.Validate("hello");
 		var bad = adapter.Validate("a");
 		await Assert.That(ok.IsSuccess).IsTrue();
@@ -19,7 +19,7 @@ public class ZodSchemaValidatorTests
 	public async Task Adapter_ValidateAsync_Delegates_ToInnerSchema()
 	{
 		IZodSchema<string> inner = new ZodString().Min(3);
-		var adapter = new ZodSchemaValidator<string>(inner);
+		ZodSchemaValidator<string> adapter = new(inner);
 		var ok = await adapter.ValidateAsync("hello");
 		await Assert.That(ok.IsSuccess).IsTrue();
 	}

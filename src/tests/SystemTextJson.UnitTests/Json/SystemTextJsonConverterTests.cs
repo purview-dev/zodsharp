@@ -11,7 +11,7 @@ public class SystemTextJsonConverterTests
 	[Test]
 	public async Task CreateValidatingConverter_GivenValidJson_DeserializesSuccessfully()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 		var options = CreateOptions(schema);
 
 		var deserialized = JsonSerializer.Deserialize<TestUser>("""{"Name":"John","Age":30}""", options);
@@ -24,7 +24,7 @@ public class SystemTextJsonConverterTests
 	[Test]
 	public async Task CreateValidatingConverter_GivenNullValue_ReturnsNull()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 		var options = CreateOptions(schema);
 
 		// System.Text.Json returns null for "null" without invoking the converter's Read
@@ -37,7 +37,7 @@ public class SystemTextJsonConverterTests
 	[Test]
 	public async Task CreateValidatingConverter_GivenInvalidData_ThrowsJsonException()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 		var options = CreateOptions(schema);
 
 		var exception = Assert.Throws<JsonException>(() =>
@@ -51,9 +51,9 @@ public class SystemTextJsonConverterTests
 	[Test]
 	public async Task CreateValidatingConverter_OnSerialize_ValidatesAndWrites()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 		var options = CreateOptions(schema);
-		var user = new TestUser { Name = "John", Age = 30 };
+		TestUser user = new() { Name = "John", Age = 30 };
 
 		var json = JsonSerializer.Serialize(user, options);
 
@@ -64,9 +64,9 @@ public class SystemTextJsonConverterTests
 	[Test]
 	public async Task CreateValidatingConverter_OnSerialize_GivenInvalidData_ThrowsJsonException()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 		var options = CreateOptions(schema);
-		var user = new TestUser { Name = "", Age = 30 };
+		TestUser user = new() { Name = "", Age = 30 };
 
 		var exception = Assert.Throws<JsonException>(() => JsonSerializer.Serialize(user, options));
 

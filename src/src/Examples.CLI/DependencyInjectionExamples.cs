@@ -29,7 +29,7 @@ static class DependencyInjectionExamples
 
 		// The source generator emitted [assembly: ZodSchemaGenerated(typeof(User))]
 		// and a UserSchemaValidator adapter. RegisterFromAssembly discovers both.
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		factory.RegisterFromAssembly(typeof(User).Assembly);
 
 		Console.WriteLine($"User registered: {factory.IsRegistered<User>()}");
@@ -60,10 +60,10 @@ static class DependencyInjectionExamples
 			.Field("stock", Z.Number().Min(0).Int())
 			.Build();
 
-		var services = new ServiceCollection();
+		ServiceCollection services = new();
 		services.AddSingleton<IZodSchemaFactory>(sp =>
 		{
-			var factory = new ZodSchemaFactory();
+			ZodSchemaFactory factory = new();
 			// Source-gen'd: auto-discovered from the assembly attribute.
 			factory.RegisterFromAssembly(typeof(User).Assembly);
 			// Non-source-gen'd: wrap the hand-built ZodObject in a validator adapter.
@@ -87,12 +87,12 @@ static class DependencyInjectionExamples
 		Console.WriteLine("--- Consumer Service with Constructor Injection ---");
 
 		var productSchema = BuildProductSchema();
-		var services = new ServiceCollection();
+		ServiceCollection services = new();
 
 		// Register the factory as a singleton, wiring both validator kinds once.
 		services.AddSingleton<IZodSchemaFactory>(sp =>
 		{
-			var factory = new ZodSchemaFactory();
+			ZodSchemaFactory factory = new();
 			factory.RegisterFromAssembly(typeof(User).Assembly);
 			factory.Register(new ZodSchemaValidator<Dictionary<string, object?>>(productSchema));
 			return factory;
@@ -133,10 +133,10 @@ static class DependencyInjectionExamples
 		Console.WriteLine("--- Scoped Validation with Failure Path ---");
 
 		var productSchema = BuildProductSchema();
-		var services = new ServiceCollection();
+		ServiceCollection services = new();
 		services.AddSingleton<IZodSchemaFactory>(sp =>
 		{
-			var factory = new ZodSchemaFactory();
+			ZodSchemaFactory factory = new();
 			factory.RegisterFromAssembly(typeof(User).Assembly);
 			factory.Register(new ZodSchemaValidator<Dictionary<string, object?>>(productSchema));
 			return factory;
@@ -146,7 +146,7 @@ static class DependencyInjectionExamples
 		var factory = provider.GetRequiredService<IZodSchemaFactory>();
 
 		// Intentionally invalid: missing sku, negative price, fractional stock.
-		var badProduct = new Dictionary<string, object?>
+		Dictionary<string, object?> badProduct = new()
 		{
 			{ "sku", "" },
 			{ "price", -5.0 },
@@ -165,10 +165,10 @@ static class DependencyInjectionExamples
 		Console.WriteLine("--- Mixed Resolution: Validate + Parse ---");
 
 		var productSchema = BuildProductSchema();
-		var services = new ServiceCollection();
+		ServiceCollection services = new();
 		services.AddSingleton<IZodSchemaFactory>(sp =>
 		{
-			var factory = new ZodSchemaFactory();
+			ZodSchemaFactory factory = new();
 			factory.RegisterFromAssembly(typeof(User).Assembly);
 			factory.Register(new ZodSchemaValidator<Dictionary<string, object?>>(productSchema));
 			return factory;

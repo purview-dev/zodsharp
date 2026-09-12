@@ -45,6 +45,11 @@ readonly partial record struct CreditCardAttributeData([NestedModel] ValidationA
 readonly partial record struct PhoneAttribute([NestedModel] ValidationAttributeData ValidationAttribute);
 
 [Generate("System.ComponentModel.DataAnnotations.UrlAttribute")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	"Naming",
+	"PDS0004:Use correct acronym capitalization",
+	Justification = "Real name"
+)]
 readonly partial record struct UrlAttribute([NestedModel] ValidationAttributeData ValidationAttribute);
 
 [Generate("System.ComponentModel.DataAnnotations.StringLengthAttribute")]

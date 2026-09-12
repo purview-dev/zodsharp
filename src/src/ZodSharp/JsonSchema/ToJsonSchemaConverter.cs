@@ -43,7 +43,7 @@ public static class ToJsonSchemaConverter
 	public static JsonSchemaDefinition Convert<T>(IZodSchema<T, T> schema, ToJsonSchemaOptions? options = null)
 	{
 		options ??= new ToJsonSchemaOptions();
-		var context = new ConversionContext();
+		ConversionContext context = new();
 
 		var result = ConvertSchema(schema, context);
 
@@ -110,7 +110,7 @@ public static class ToJsonSchemaConverter
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases")]
 	static JsonSchemaDefinition ConvertString(ZodString schema)
 	{
-		var result = new JsonSchemaDefinition { Type = "string" };
+		JsonSchemaDefinition result = new() { Type = "string" };
 
 		// Extract rules from the schema using reflection (since rules are private)
 		// We'll use the built-in rule inspection if available
@@ -155,7 +155,7 @@ public static class ToJsonSchemaConverter
 						result.Format = "uri";
 						break;
 
-					case nameof(UuidRule):
+					case nameof(UUIDRule):
 						result.Format = "uuid";
 						break;
 
@@ -182,7 +182,7 @@ public static class ToJsonSchemaConverter
 
 	static JsonSchemaDefinition ConvertNumber(ZodNumber schema)
 	{
-		var result = new JsonSchemaDefinition { Type = "number" };
+		JsonSchemaDefinition result = new() { Type = "number" };
 
 		// Extract rules from the schema
 		var schemaType = schema.GetType();
@@ -242,7 +242,7 @@ public static class ToJsonSchemaConverter
 
 	static JsonSchemaDefinition ConvertObject(ZodObject schema, ConversionContext ctx)
 	{
-		var result = new JsonSchemaDefinition
+		JsonSchemaDefinition result = new()
 		{
 			Type = "object",
 			Properties = [],
@@ -303,7 +303,7 @@ public static class ToJsonSchemaConverter
 
 	static JsonSchemaDefinition ConvertUnion(ZodUnion schema, ConversionContext ctx)
 	{
-		var result = new JsonSchemaDefinition { AnyOf = [] };
+		JsonSchemaDefinition result = new() { AnyOf = [] };
 
 		// Get options from ZodUnion
 		var optionsField = typeof(ZodUnion).GetField(
@@ -330,7 +330,7 @@ public static class ToJsonSchemaConverter
 		// Handle ZodArray<T>
 		if (typeName.StartsWith("ZodArray", StringComparison.Ordinal))
 		{
-			var result = new JsonSchemaDefinition { Type = "array" };
+			JsonSchemaDefinition result = new() { Type = "array" };
 
 			// Get element schema
 			var elementField = schemaType.GetField(
@@ -390,7 +390,7 @@ public static class ToJsonSchemaConverter
 
 			if (valueField?.GetValue(schema) is object value)
 			{
-				var result = new JsonSchemaDefinition
+				JsonSchemaDefinition result = new()
 				{
 					Const = value, // Set type based on value type
 					Type = value switch

@@ -519,7 +519,7 @@ public class ZodObjectShapeTests
 		// Arrange — a defaulted field supplied as a raw shape entry.
 		IZodSchema<object, object> defaultField = new ZodDefault<object>(new PassthroughSchema(), "fallback")!;
 		var shape = ImmutableDictionary<string, IZodSchema<object, object>>.Empty.Add("name", defaultField);
-		var schema = new ZodObject(shape);
+		ZodObject schema = new(shape);
 
 		// Act
 		var result = schema.Validate([]);
