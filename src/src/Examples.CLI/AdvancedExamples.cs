@@ -302,7 +302,7 @@ static class AdvancedExamples
 
 		if (result.IsSuccess)
 		{
-			Console.WriteLine($"Validated user: {result.Value!.Name}, Age: {result.Value.Age}");
+			Console.WriteLine($"Validated user: {result.Value.Name}, Age: {result.Value.Age}");
 		}
 		else
 		{

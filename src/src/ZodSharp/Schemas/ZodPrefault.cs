@@ -28,7 +28,7 @@ public class ZodPrefault<T>(IZodSchema<T, T> innerSchema, T prefaultValue) : Zod
 	{
 		var result = innerSchema.Validate(prefaultValue);
 		return result.IsSuccess
-			? ValidationResult<object>.Success(result.Value!)
+			? ValidationResult<object>.Success(result.Value)
 			: ValidationResult<object>.Failure(result.Errors);
 	}
 

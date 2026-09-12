@@ -513,7 +513,7 @@ public static class FromJsonSchemaParser
 
 			var result = inner.Validate(dict);
 			return result.IsSuccess
-				? ValidationResult<object>.Success(result.Value!)
+				? ValidationResult<object>.Success(result.Value)
 				: ValidationResult<object>.Failure(result.Errors);
 		}
 

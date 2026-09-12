@@ -29,7 +29,7 @@ public class ZodTransform<TInput, TOutput>(IZodSchema<TInput, TInput> inputSchem
 
 		try
 		{
-			var transformedValue = transform(validationResult.Value!);
+			var transformedValue = transform(validationResult.Value);
 			return ValidationResult<TOutput>.Success(transformedValue);
 		}
 		catch (Exception ex)

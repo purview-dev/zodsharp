@@ -973,6 +973,8 @@ dotnet_diagnostic.CA1845.severity = error
 # Prefer AsSpan over Substring
 dotnet_diagnostic.CA1846.severity = error
 
+dotnet_diagnostic.ignore_internalsvisibleto = true
+dotnet_diagnostic.CA1852.ignore_internalsvisibleto = true
 
 # Unsafe DataSet or DataTable in serializable type can be vulnerable to remote code execution attacks
 dotnet_diagnostic.CA2352.severity = error

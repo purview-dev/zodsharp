@@ -104,6 +104,61 @@ static class AttributeGenHelper
 								IsInitOnly = true,
 							}
 						);
+
+					body.XmlSummary(
+							"Optional name of a synchronous refinement method to invoke",
+							"during synchronous validation. When set, the generator looks for an",
+							"instance method with the signature:",
+							"<c>IEnumerable&lt;ValidationError&gt; MethodName()</c> or",
+							"<c>IEnumerable&lt;ValidationError&gt; MethodName(RefineCtx&lt;T&gt; ctx)</c>.",
+							"If null, the default name <c>Validate</c> is used.",
+							"No diagnostic is reported when the default name has no matching method."
+						)
+						.Property(
+							new(
+								nameof(ZodSchemaAttributeData.RefinementMethodName),
+								PurviewTypeLibrary.System.String.AsTypeReference().Nullable(body),
+								TypeDeclarationAccessibility.Public
+							)
+							{
+								IsInitOnly = true,
+							}
+						);
+
+					body.XmlSummary(
+							"Whether to generate an <c>IValidateOptions&lt;T&gt;</c> validator for this type.",
+							"Generation is driven by auto-detection by default: enabled when the type name ends",
+							"with a configured suffix (e.g. <c>Options</c> or <c>Settings</c>) and the",
+							"<c>ZodSharpAutoGenerateOptionsValidators</c> MSBuild property is not disabled.",
+							"Set to true to force generation or set <c>SuppressIValidateOptions</c> to opt out."
+						)
+						.Property(
+							new(
+								nameof(ZodSchemaAttributeData.GenerateIValidateOptions),
+								PurviewTypeLibrary.System.Boolean,
+								TypeDeclarationAccessibility.Public
+							)
+							{
+								IsInitOnly = true,
+								Initializer = "false",
+							}
+						);
+
+					body.XmlSummary(
+							"Suppresses generation of the <c>IValidateOptions&lt;T&gt;</c> validator for this type,",
+							"even when auto-detection would otherwise enable it."
+						)
+						.Property(
+							new(
+								nameof(ZodSchemaAttributeData.SuppressIValidateOptions),
+								PurviewTypeLibrary.System.Boolean,
+								TypeDeclarationAccessibility.Public
+							)
+							{
+								IsInitOnly = true,
+								Initializer = "false",
+							}
+						);
 				}
 			);
 

@@ -11,6 +11,8 @@ sealed record SchemaGenerationModel(GenerationContext<SchemaGenerationCapabiliti
 sealed record SchemaGenerationCapabilities : IGenerationCapabilities
 {
 	public bool HasRequiredAttribute { get; init; }
+
+	public bool HasIValidateOptions { get; init; }
 }
 
 readonly record struct SchemaSet(EquatableArray<ZodSchemaDescriptor> Schemas);
@@ -19,6 +21,7 @@ enum PropertyValidationKind
 {
 	String,
 	Numeric,
+	Comparable,
 	Collection,
 	Complex,
 	Unsupported,
@@ -31,8 +34,11 @@ readonly record struct LengthAccessor(string LengthExpression, string Origin, bo
 /// <param name="TargetCanBeNull">Indicates whether the target type can be null.</param>
 /// <param name="ContainingTypes">The containing types of the target type, if it is a nested type.</param>
 /// <param name="TargetAccessibility">The accessibility of the target type, if it is a type declaration.</param>
+/// <param name="IsValueType">Indicates whether the target type is a struct.</param>
 /// <param name="Properties">The validatable properties of the target type that will be included in the schema.</param>
 /// <param name="CustomValidationMethod">The custom validation method data, if any.</param>
+/// <param name="SyncValidationMethod">The synchronous refinement method data, if any.</param>
+/// <param name="GenerateIValidateOptions">Requested IValidateOptions generation: null = auto, true = force, false = opt out.</param>
 /// <param name="IsPrimary">True if this is the primary schema for the target type, false if it is a secondary schema.</param>
 readonly record struct ZodSchemaDescriptor(
 	TypeIdentity TargetType,
@@ -40,8 +46,11 @@ readonly record struct ZodSchemaDescriptor(
 	bool TargetCanBeNull,
 	EquatableArray<TypeDeclarationOptions> ContainingTypes,
 	TypeDeclarationAccessibility? TargetAccessibility,
+	bool IsValueType,
 	EquatableArray<GeneratorResult<ZodPropertyDescriptor>> Properties,
 	GeneratorResult<CustomValidationMethodData> CustomValidationMethod,
+	GeneratorResult<SyncValidationMethodData> SyncValidationMethod,
+	bool? GenerateIValidateOptions,
 	bool IsPrimary
 );
 
@@ -56,6 +65,7 @@ readonly record struct ZodPropertyDescriptor(
 	bool ElementTypeCanBeNull,
 	TypeIdentity? NestedSchemaType,
 	LengthAccessor LengthAccessor,
+	bool CompareViaCompareTo,
 	ValidationAttributes ValidationAttributes
 );
 

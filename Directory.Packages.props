@@ -21,6 +21,7 @@
 			Include="Microsoft.Extensions.DependencyInjection.Abstractions"
 			Version="$(DotnetRuntimeVersion)"
 		/>
+		<PackageVersion Include="Microsoft.Extensions.Options" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynCompilerVersion)" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynAnalyzersVersion)" />

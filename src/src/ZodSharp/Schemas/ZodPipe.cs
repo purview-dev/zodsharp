@@ -30,7 +30,7 @@ public class ZodPipe<TSourceOutput, TTargetOutput>(
 	{
 		var sourceResult = source.Validate(value);
 		return sourceResult.IsSuccess
-			? target.Validate(sourceResult.Value!)
+			? target.Validate(sourceResult.Value)
 			: ValidationResult<TTargetOutput>.Failure(sourceResult.Errors);
 	}
 }

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
 using ZodSharp.SourceGenerators.Models;
 using ZodSharp.SourceGenerators.Models.DataAttributes;
 
@@ -9,6 +10,11 @@ namespace ZodSharp.SourceGenerators.Helpers;
 
 static partial class SourceGenLibrary
 {
+	const string IValidateOptionsMetadataName = "Microsoft.Extensions.Options.IValidateOptions`1";
+
+	static bool HasIValidateOptionsType(Compilation compilation) =>
+		compilation.GetTypeByMetadataName(IValidateOptionsMetadataName) is not null;
+
 	public static IncrementalValueProvider<SchemaGenerationModel> GetGeneratorValueProviders(
 		IncrementalGeneratorInitializationContext context
 	)
@@ -25,6 +31,7 @@ static partial class SourceGenLibrary
 						compilation,
 						TypeLibrary.System.ComponentModel.DataAnnotations.RequiredAttribute
 					),
+					HasIValidateOptions = HasIValidateOptionsType(compilation),
 				},
 			PropertyLibrary.DisableZodSharpSourceGeneratorProperty
 		);
@@ -35,13 +42,99 @@ static partial class SourceGenLibrary
 			transform: static (attributeContext, cancellationToken) =>
 				GetSchemasForGeneration(attributeContext, cancellationToken)
 		);
-
-		return generationContext.CollectWith(
-			schemaSets,
-			static (outputContext, sets, _) =>
-				new SchemaGenerationModel(outputContext) { ZodSchemas = Deduplicate(sets) },
-			"CollectZodSchemas"
+		var autoDetectSettings = context.AnalyzerConfigOptionsProvider.Select(
+			static (provider, _) => ReadAutoDetectSettings(provider)
 		);
+
+		return generationContext
+			.CollectWith(
+				schemaSets,
+				static (outputContext, sets, _) =>
+					new SchemaGenerationModel(outputContext) { ZodSchemas = Deduplicate(sets) },
+				"CollectZodSchemas"
+			)
+			.Combine(autoDetectSettings)
+			.Select(static (pair, _) => ApplyIValidateOptionsAutoDetection(pair));
+	}
+
+	readonly record struct AutoDetectSettings(bool AutoGenerate, EquatableArray<string> Suffixes);
+
+	static AutoDetectSettings ReadAutoDetectSettings(AnalyzerConfigOptionsProvider provider)
+	{
+		// Auto-detection is on by default; only an explicit "false" disables it.
+		var autoGenerate =
+			!provider.GlobalOptions.TryGetValue(
+				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsProperty}",
+				out var autoGenerateValue
+			)
+			|| !bool.TryParse(autoGenerateValue, out var autoGenerateEnabled)
+			|| autoGenerateEnabled;
+
+		var suffixes = ParseAutoGenerateIValidateOptionsSuffixes(
+			provider.GlobalOptions.TryGetValue(
+				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsSuffixesProperty}",
+				out var suffixValue
+			)
+				? suffixValue
+				: null
+		);
+
+		return new(autoGenerate, suffixes);
+	}
+
+	static EquatableArray<string> ParseAutoGenerateIValidateOptionsSuffixes(string? value)
+	{
+		var raw = string.IsNullOrWhiteSpace(value) ? "Options;Settings" : value!;
+		var builder = ImmutableArray.CreateBuilder<string>();
+		foreach (var segment in raw.Split(';', ','))
+		{
+			var suffix = segment.Trim();
+			if (suffix.Length > 0)
+				builder.Add(suffix);
+		}
+
+		return new(builder.ToImmutable());
+	}
+
+	static SchemaGenerationModel ApplyIValidateOptionsAutoDetection(
+		(SchemaGenerationModel Model, AutoDetectSettings Settings) input
+	)
+	{
+		var (model, settings) = input;
+		if (!settings.AutoGenerate || settings.Suffixes.Count == 0)
+			return model;
+
+		var builder = ImmutableArray.CreateBuilder<GeneratorResult<ZodSchemaDescriptor>>(model.ZodSchemas.Count);
+		foreach (var result in model.ZodSchemas)
+		{
+			if (!result.ShouldProcess)
+			{
+				builder.Add(result);
+				continue;
+			}
+
+			var schema = result.Value;
+			if (
+				schema.GenerateIValidateOptions is null
+				&& schema.IsPrimary
+				&& !schema.IsValueType
+				&& settings.Suffixes.Any(suffix => schema.TargetType.Name.EndsWith(suffix, StringComparison.Ordinal))
+			)
+			{
+				builder.Add(
+					GeneratorResult<ZodSchemaDescriptor>.Create(schema with { GenerateIValidateOptions = true })
+				);
+			}
+			else
+			{
+				builder.Add(result);
+			}
+		}
+
+		return model with
+		{
+			ZodSchemas = new(builder.ToImmutable()),
+		};
 	}
 
 	static GeneratorResult<SchemaSet> GetSchemasForGeneration(
@@ -74,6 +167,12 @@ static partial class SourceGenLibrary
 				: symbol.DeclaredAccessibility.ToTypeDeclarationAccessibility();
 			var zodSchemaAttribute = ZodSchemaAttributeData.FromAttributeData(symbol, out var attribute);
 			var customValidation = ResolveCustomValidationMethod(symbol, zodSchemaAttribute, attribute!);
+			var syncValidation = ResolveSyncValidationMethod(symbol, zodSchemaAttribute, attribute!);
+			var isValueType = symbol.TypeKind == TypeKind.Struct;
+			bool? generateIValidateOptions =
+				zodSchemaAttribute.GenerateIValidateOptions ? true
+				: zodSchemaAttribute.SuppressIValidateOptions ? false
+				: null;
 
 			schemas.Add(
 				new(
@@ -82,8 +181,11 @@ static partial class SourceGenLibrary
 					targetCanBeNull,
 					GetContainingTypes(symbol),
 					accessibility,
+					isValueType,
 					properties,
 					customValidation,
+					syncValidation,
+					generateIValidateOptions,
 					isPrimary
 				)
 			);
@@ -304,6 +406,11 @@ static partial class SourceGenLibrary
 		var isEnum =
 			TypeHelpers.UnwrapNullableType(originalPropertyType) is INamedTypeSymbol { TypeKind: TypeKind.Enum };
 
+		var compareViaCompareTo =
+			validationKind == PropertyValidationKind.Comparable
+			&& originalPropertyType is INamedTypeSymbol namedPropertyType
+			&& IsVersion(namedPropertyType);
+
 		return GeneratorResult<ZodPropertyDescriptor>.Create(
 			new(
 				propertyType,
@@ -316,6 +423,7 @@ static partial class SourceGenLibrary
 				elementTypeCanBeNull,
 				nestedSchemaType,
 				lengthAccessor,
+				compareViaCompareTo,
 				new(
 					requiredAttribute,
 					compareAttribute,
@@ -368,9 +476,16 @@ static partial class SourceGenLibrary
 		}
 
 		// If the original type is a source-defined complex type, we can generate a nested schema for it.
-		return originalType is INamedTypeSymbol namedType && IsSourceDefinedComplexType(namedType)
-			? PropertyValidationKind.Complex
-			: PropertyValidationKind.Unsupported;
+		if (originalType is INamedTypeSymbol namedType && IsSourceDefinedComplexType(namedType))
+			return PropertyValidationKind.Complex;
+
+		// Comparable structs/classes (TimeSpan, DateTime, DateTimeOffset, DateOnly, TimeOnly, Version, ...)
+		// can be range-validated without a nested schema.
+		if (originalType is INamedTypeSymbol comparableType && IsComparableRangeType(comparableType))
+			return PropertyValidationKind.Comparable;
+
+		// If the original type is an enum, we can validate it against allowed/denied values.
+		return PropertyValidationKind.Unsupported;
 	}
 
 	static TypeIdentity? GetCollectionElementTypeIdentity(ITypeSymbol propertyType)
@@ -716,50 +831,21 @@ static partial class SourceGenLibrary
 			);
 
 		if (
-			TypeHelpers.IsNamedType(propertyType, "System.DateTime")
-			&& rangeAttribute.Kind == RangeAttributeKind.Converted
+			rangeAttribute.Kind == RangeAttributeKind.Converted
+			&& rangeAttribute.Minimum is string minimum
+			&& rangeAttribute.Maximum is string maximum
+			&& propertyType is INamedTypeSymbol comparableType
+			&& IsComparableRangeType(comparableType)
+			&& TryBuildComparableBoundaryExpressions(
+				comparableType,
+				minimum,
+				maximum,
+				rangeAttribute.ParseLimitsInInvariantCulture,
+				out minimumExpression,
+				out maximumExpression
+			)
 		)
 		{
-			minimumExpression = BuildDateTimeParseExpression(
-				(string)rangeAttribute.Minimum!,
-				rangeAttribute.ParseLimitsInInvariantCulture
-			);
-			maximumExpression = BuildDateTimeParseExpression(
-				(string)rangeAttribute.Maximum!,
-				rangeAttribute.ParseLimitsInInvariantCulture
-			);
-			return true;
-		}
-
-		if (
-			TypeHelpers.IsNamedType(propertyType, "System.DateOnly")
-			&& rangeAttribute.Kind == RangeAttributeKind.Converted
-		)
-		{
-			minimumExpression = BuildDateOnlyParseExpression(
-				(string)rangeAttribute.Minimum!,
-				rangeAttribute.ParseLimitsInInvariantCulture
-			);
-			maximumExpression = BuildDateOnlyParseExpression(
-				(string)rangeAttribute.Maximum!,
-				rangeAttribute.ParseLimitsInInvariantCulture
-			);
-			return true;
-		}
-
-		if (
-			TypeHelpers.IsNamedType(propertyType, "System.TimeOnly")
-			&& rangeAttribute.Kind == RangeAttributeKind.Converted
-		)
-		{
-			minimumExpression = BuildTimeOnlyParseExpression(
-				(string)rangeAttribute.Minimum!,
-				rangeAttribute.ParseLimitsInInvariantCulture
-			);
-			maximumExpression = BuildTimeOnlyParseExpression(
-				(string)rangeAttribute.Maximum!,
-				rangeAttribute.ParseLimitsInInvariantCulture
-			);
 			return true;
 		}
 
@@ -767,6 +853,105 @@ static partial class SourceGenLibrary
 		maximumExpression = string.Empty;
 
 		return false;
+	}
+
+	static bool IsComparableRangeType(INamedTypeSymbol type)
+	{
+		// Explicit opt-in for comparable types that lack comparison operators or a
+		// culture-aware Parse overload (e.g. System.Version).
+		if (IsVersion(type))
+			return true;
+
+		// For other types, we require that they implement IComparable and have user-defined comparison operators.
+		return ImplementsIComparable(type) && HasComparisonOperators(type);
+	}
+
+	static bool IsVersion(INamedTypeSymbol type) => TypeHelpers.IsNamedType(type, "System.Version");
+
+	static bool ImplementsIComparable(INamedTypeSymbol type)
+	{
+		foreach (var iface in type.AllInterfaces)
+		{
+			if (iface.MetadataName is "IComparable" or "IComparable`1")
+				return true;
+		}
+
+		return false;
+	}
+
+	static bool HasComparisonOperators(INamedTypeSymbol type) =>
+		HasUserDefinedOperator(type, "op_LessThan") && HasUserDefinedOperator(type, "op_GreaterThan");
+
+	static bool HasUserDefinedOperator(INamedTypeSymbol type, string name)
+	{
+		foreach (var member in type.GetMembers(name))
+		{
+			if (member is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
+				return true;
+		}
+
+		return false;
+	}
+
+	static bool TryBuildComparableBoundaryExpressions(
+		INamedTypeSymbol propertyType,
+		string minimum,
+		string maximum,
+		bool invariantCulture,
+		out string minimumExpression,
+		out string maximumExpression
+	)
+	{
+		var typeName = propertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+		var cultureExpression = invariantCulture
+			? "global::System.Globalization.CultureInfo.InvariantCulture"
+			: "global::System.Globalization.CultureInfo.CurrentCulture";
+
+		// Prefer the culture-aware overload, then fall back to a culture-free single-argument
+		// Parse (e.g. System.Version).
+		string? invocationTemplate = null;
+		foreach (var member in propertyType.GetMembers("Parse"))
+		{
+			if (
+				member is IMethodSymbol { IsStatic: true } parseMethod
+				&& parseMethod.Parameters.Length == 2
+				&& parseMethod.Parameters[0].Type.SpecialType == SpecialType.System_String
+				&& parseMethod.Parameters[1].Type is INamedTypeSymbol { MetadataName: "IFormatProvider" }
+			)
+			{
+				invocationTemplate = $"{typeName}.Parse({{0}}, {cultureExpression})";
+				break;
+			}
+		}
+
+		if (invocationTemplate is null)
+		{
+			foreach (var member in propertyType.GetMembers("Parse"))
+			{
+				if (
+					member is IMethodSymbol { IsStatic: true } parseMethod
+					&& parseMethod.Parameters.Length == 1
+					&& parseMethod.Parameters[0].Type.SpecialType == SpecialType.System_String
+				)
+				{
+					invocationTemplate = $"{typeName}.Parse({{0}})";
+					break;
+				}
+			}
+		}
+
+		if (invocationTemplate is null)
+		{
+			minimumExpression = string.Empty;
+			maximumExpression = string.Empty;
+
+			return false;
+		}
+
+		minimumExpression = string.Format(CultureInfo.InvariantCulture, invocationTemplate, minimum.StringLiteral());
+		maximumExpression = string.Format(CultureInfo.InvariantCulture, invocationTemplate, maximum.StringLiteral());
+
+		return true;
 	}
 
 	static bool TryBuildNumericRangeBoundaryExpressions(
@@ -879,29 +1064,5 @@ static partial class SourceGenLibrary
 				$"global::System.Decimal.Parse({value.StringLiteral()}, global::System.Globalization.NumberStyles.Number, {cultureExpression})",
 			_ => string.Empty,
 		};
-	}
-
-	static string BuildDateTimeParseExpression(string value, bool invariantCulture)
-	{
-		var cultureExpression = invariantCulture
-			? "global::System.Globalization.CultureInfo.InvariantCulture"
-			: "global::System.Globalization.CultureInfo.CurrentCulture";
-		return $"global::System.DateTime.Parse({value.StringLiteral()}, {cultureExpression})";
-	}
-
-	static string BuildDateOnlyParseExpression(string value, bool invariantCulture)
-	{
-		var cultureExpression = invariantCulture
-			? "global::System.Globalization.CultureInfo.InvariantCulture"
-			: "global::System.Globalization.CultureInfo.CurrentCulture";
-		return $"global::System.DateOnly.Parse({value.StringLiteral()}, {cultureExpression})";
-	}
-
-	static string BuildTimeOnlyParseExpression(string value, bool invariantCulture)
-	{
-		var cultureExpression = invariantCulture
-			? "global::System.Globalization.CultureInfo.InvariantCulture"
-			: "global::System.Globalization.CultureInfo.CurrentCulture";
-		return $"global::System.TimeOnly.Parse({value.StringLiteral()}, {cultureExpression})";
 	}
 }

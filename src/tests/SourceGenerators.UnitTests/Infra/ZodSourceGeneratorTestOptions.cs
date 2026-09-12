@@ -15,6 +15,9 @@ public sealed record ZodSourceGeneratorTestOptions : SourceGeneratorTestOptions
 			typeof(RequiredAttribute),
 			typeof(System.Text.Json.JsonSerializer),
 			typeof(System.Text.RegularExpressions.Regex),
+			typeof(Schemas.RefineCtx<>),
+			typeof(Microsoft.Extensions.Options.IValidateOptions<>),
+			typeof(Microsoft.Extensions.Options.ValidateOptionsResult),
 		];
 		AdditionalNamespaces = [TypeLibraryGenerator.ZodSharpNamespace];
 		ExcludeGeneratedSourceHintNames = ["EmbeddedAttribute", "ZodSchemaAttribute"];

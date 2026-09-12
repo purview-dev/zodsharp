@@ -36,7 +36,7 @@ public abstract class ZodType<TOutput, TInput> : IZodSchema<TOutput, TInput>, IO
 		if (!parseResult.IsSuccess)
 			return parseResult;
 
-		var validatedValue = parseResult.Value!;
+		var validatedValue = parseResult.Value;
 
 		var rulesCount = _rules.Length;
 		if (rulesCount == 0)

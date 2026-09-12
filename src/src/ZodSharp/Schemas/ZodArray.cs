@@ -50,7 +50,7 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>
 				}
 			}
 			else
-				validatedItems.Add(itemResult.Value!);
+				validatedItems.Add(itemResult.Value);
 		}
 
 		if (errors.Count > 0)

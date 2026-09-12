@@ -14,6 +14,9 @@ public sealed record ZodAnalyzerTestOptions : AnalyzerTestOptions
 			typeof(Core.ValidationResult<>),
 			typeof(ValueTask),
 			typeof(CancellationToken),
+			typeof(Schemas.RefineCtx<>),
+			typeof(Microsoft.Extensions.Options.IValidateOptions<>),
+			typeof(Microsoft.Extensions.Options.ValidateOptionsResult),
 		];
 		AdditionalNamespaces = ["ZodSharp"];
 		AdditionalSources =
@@ -29,6 +32,9 @@ public sealed record ZodAnalyzerTestOptions : AnalyzerTestOptions
 					public bool GenerateParseMethod { get; init; } = true;
 					public bool EnableComposition { get; init; } = false;
 					public string? CustomValidationMethodName { get; init; }
+					public string? RefinementMethodName { get; init; }
+					public bool GenerateIValidateOptions { get; init; } = false;
+					public bool SuppressIValidateOptions { get; init; } = false;
 				}
 				""",
 		];

@@ -30,6 +30,13 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		DiagnosticLibrary.CustomValidationInvalidParameterModifier,
 		DiagnosticLibrary.ComparePropertyNotFound,
 		DiagnosticLibrary.DataAnnotationsReferenceNotFound,
+		DiagnosticLibrary.SyncValidationInvalidReturnType,
+		DiagnosticLibrary.SyncValidationInvalidParameterCount,
+		DiagnosticLibrary.SyncValidationInvalidStaticInstance,
+		DiagnosticLibrary.SyncValidationInaccessible,
+		DiagnosticLibrary.SyncValidationInvalidContextParameter,
+		DiagnosticLibrary.IValidateOptionsReferenceNotFound,
+		DiagnosticLibrary.IValidateOptionsValueTypeTarget,
 	];
 
 	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => s_supportedDiagnostics;
@@ -47,15 +54,18 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				compilationContext.Compilation,
 				TypeLibrary.System.ComponentModel.DataAnnotations.RequiredAttribute
 			);
+			var hasIValidateOptions =
+				compilationContext.Compilation.GetTypeByMetadataName("Microsoft.Extensions.Options.IValidateOptions`1")
+				is not null;
 
 			compilationContext.RegisterSymbolAction(
-				symbolContext => AnalyzeNamedType(symbolContext, hasDataAnnotations),
+				symbolContext => AnalyzeNamedType(symbolContext, hasDataAnnotations, hasIValidateOptions),
 				SymbolKind.NamedType
 			);
 		});
 	}
 
-	static void AnalyzeNamedType(SymbolAnalysisContext context, bool hasDataAnnotations)
+	static void AnalyzeNamedType(SymbolAnalysisContext context, bool hasDataAnnotations, bool hasIValidateOptions)
 	{
 		if (context.Symbol is not INamedTypeSymbol type)
 			return;
@@ -81,6 +91,30 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		);
 		foreach (var diagnosticInfo in customValidationResult.Diagnostics)
 			context.ReportDiagnostic(diagnosticInfo.ToDiagnostic());
+
+		var syncValidationResult = SourceGenLibrary.ResolveSyncValidationMethod(
+			type,
+			zodSchemaData,
+			zodSchemaAttribute!
+		);
+		foreach (var diagnosticInfo in syncValidationResult.Diagnostics)
+			context.ReportDiagnostic(diagnosticInfo.ToDiagnostic());
+
+		if (zodSchemaData.GenerateIValidateOptions == true)
+		{
+			if (!hasIValidateOptions)
+			{
+				context.ReportDiagnostic(
+					Diagnostic.Create(DiagnosticLibrary.IValidateOptionsReferenceNotFound, typeLocation, type.Name)
+				);
+			}
+			else if (type.TypeKind == TypeKind.Struct)
+			{
+				context.ReportDiagnostic(
+					Diagnostic.Create(DiagnosticLibrary.IValidateOptionsValueTypeTarget, typeLocation, type.Name)
+				);
+			}
+		}
 
 		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
 		{

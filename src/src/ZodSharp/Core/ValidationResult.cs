@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 namespace ZodSharp.Core;
 
@@ -12,15 +13,16 @@ public readonly record struct ValidationResult<T>
 	/// <summary>
 	/// Indicates whether the validation was successful.
 	/// </summary>
+	[MemberNotNullWhen(true, nameof(Value))]
 	public bool IsSuccess { get; }
 
 	/// <summary>
-	/// The validated value. Only valid when IsSuccess is true.
+	/// The validated value. Only valid when <see cref="IsSuccess"/> is <see langword="true"/>.
 	/// </summary>
 	public T? Value { get; }
 
 	/// <summary>
-	/// The validation errors. Only populated when IsSuccess is false.
+	/// The validation errors. Only populated when <see cref="IsSuccess"/> is <see langword="false"/>.
 	/// </summary>
 	public ImmutableArray<ValidationError> Errors { get; }
 
@@ -38,7 +40,7 @@ public readonly record struct ValidationResult<T>
 	/// <param name="lhs"></param>
 	/// <param name="rhs"></param>
 	/// <returns></returns>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
+	[SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
 	public static ValidationResult<T> Merge(ValidationResult<T> lhs, ValidationResult<T> rhs)
 	{
 		var isSuccess = lhs.IsSuccess && rhs.IsSuccess;
@@ -53,30 +55,30 @@ public readonly record struct ValidationResult<T>
 	/// </summary>
 	/// <returns>The validated value</returns>
 	/// <exception cref="ZodException">Thrown when validation fails</exception>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1024:Use properties where appropriate")]
-	public T GetValueOrThrow() => IsSuccess ? Value! : throw new ZodException(Errors);
+	[SuppressMessage("Design", "CA1024:Use properties where appropriate")]
+	public T GetValueOrThrow() => IsSuccess ? Value : throw new ZodException(Errors);
 
 	/// <summary>
 	/// Creates a successful validation result.
 	/// </summary>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
+	[SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
 	public static ValidationResult<T> Success(T value) => new(true, value, []);
 
 	/// <summary>
 	/// Creates a failed validation result with a single error.
 	/// </summary>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
+	[SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
 	public static ValidationResult<T> Failure(ValidationError error) => new(false, default, [error]);
 
 	/// <summary>
 	/// Creates a failed validation result with multiple errors.
 	/// </summary>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
+	[SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
 	public static ValidationResult<T> Failure(ImmutableArray<ValidationError> errors) => new(false, default, errors);
 
 	/// <summary>
 	/// Creates a failed validation result with multiple errors.
 	/// </summary>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
+	[SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
 	public static ValidationResult<T> Failure(IEnumerable<ValidationError> errors) => new(false, default, [.. errors]);
 }

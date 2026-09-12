@@ -47,6 +47,7 @@ partial class ZodSchemaGenerator
 			.Using("System")
 			.Using("System.Collections.Generic")
 			.Using("System.Collections.Immutable")
+			.Using("System.Linq")
 			.Using(TypeLibraryGenerator.ZodSharpCoreNamespace)
 			.NewLine();
 
@@ -102,6 +103,15 @@ partial class ZodSchemaGenerator
 			if (isPrimary)
 			{
 				GenerateValidatorAdapter(writer, outputContext.ZodSchema, cancellationToken);
+
+				if (
+					outputContext.ZodSchema.GenerateIValidateOptions == true
+					&& outputContext.Context.Capabilities.HasIValidateOptions
+					&& !outputContext.ZodSchema.IsValueType
+				)
+				{
+					GenerateIValidateOptionsValidator(writer, outputContext.ZodSchema, cancellationToken);
+				}
 			}
 
 			foreach (var block in wrapperBlocks)
@@ -154,6 +164,69 @@ partial class ZodSchemaGenerator
 				GenerateValidateAsyncMethod(body, schema, cancellationToken);
 			}
 		);
+	}
+
+	static void GenerateIValidateOptionsValidator(
+		CodeWriter writer,
+		ZodSchemaDescriptor schema,
+		CancellationToken cancellationToken
+	)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+
+		var validatorName = $"{schema.TargetType.Name}Validator";
+		var targetType = schema.TargetType.AsTypeReference();
+		var baseType = TypeLibrary
+			.Microsoft.Extensions.Options.IValidateOptions.MakeGeneric(schema.TargetType)
+			.AsTypeReference();
+		var validateOptionsResult = TypeLibrary.Microsoft.Extensions.Options.ValidateOptionsResult.AsTypeReference();
+		var nullableString = PurviewTypeLibrary.System.String.AsTypeReference().Nullable(writer);
+
+		writer.XmlSummary(
+			$"Validates {CodeWriter.XmlSee(schema.TargetType.Name)} via the source-generated schema, for use with Microsoft.Extensions.Options."
+		);
+
+		writer.Class(
+			new TypeDeclarationOptions(validatorName)
+			{
+				Accessibility = schema.TargetAccessibility,
+				IsSealed = true,
+				BaseType = baseType,
+			},
+			body =>
+				body.XmlSummary("Validates the options instance against the source-generated schema.")
+					.XmlParam("name", "The options name (unused by schema validation).")
+					.XmlParam("options", "The options instance to validate.")
+					.XmlReturn("A ValidateOptionsResult indicating success or the validation failure messages.")
+					.Method(
+						new MethodDeclarationOptions(
+							"Validate",
+							validateOptionsResult,
+							TypeDeclarationAccessibility.Public
+						)
+						{
+							Parameters =
+							[
+								new ParameterDeclarationOptions("name", nullableString),
+								new ParameterDeclarationOptions("options", targetType),
+							],
+						},
+						method =>
+						{
+							method.Assignment("var", "schemaResult", $"{schema.SchemaType.Name}.Validate(options)");
+							method.IfBlock(
+								"schemaResult.IsSuccess",
+								ifBody => ifBody.Return($"{validateOptionsResult}.Success")
+							);
+							method.NewLine();
+							method.Return(
+								$"{validateOptionsResult}.Fail(schemaResult.Errors.Select(static error => error.Message))"
+							);
+						}
+					)
+		);
+
+		writer.NewLine();
 	}
 
 	static void GenerateValidateAsyncMethod(
@@ -273,6 +346,8 @@ partial class ZodSchemaGenerator
 						GeneratePropertyValidation(writer, property.Value, cancellationToken);
 				}
 
+				GenerateSyncRefinement(schema, method);
+
 				method.IfBlock(
 					"errors is not null",
 					ifBody =>
@@ -294,6 +369,40 @@ partial class ZodSchemaGenerator
 		);
 
 		writer.NewLine();
+	}
+
+	static void GenerateSyncRefinement(ZodSchemaDescriptor schema, CodeWriter method)
+	{
+		var syncMethod = schema.SyncValidationMethod.Value;
+		if (!syncMethod.HasSyncValidation)
+			return;
+
+#pragma warning disable IDE0072 // Add missing cases
+		var invocation = syncMethod.InvocationKind switch
+		{
+			SyncValidationInvocationKind.WithRefineContext => "refineCtx",
+			_ => string.Empty,
+		};
+#pragma warning restore IDE0072 // Add missing cases
+
+		if (syncMethod.InvocationKind == SyncValidationInvocationKind.WithRefineContext)
+		{
+			var refineCtxType =
+				$"global::{TypeLibraryGenerator.ZodSharpSchemasNamespace}.RefineCtx<{schema.TargetType.AsTypeReference()}>";
+			method.Assignment(refineCtxType, "refineCtx", $"new(value, EmptyPath)");
+		}
+
+		method.Line();
+		method.Assignment("var", "refinementErrors", $"value.{syncMethod.MethodName}({invocation})");
+		using (method.IfBlockScope("refinementErrors is not null"))
+		{
+			method.Foreach(
+				"var refinementError in refinementErrors",
+				foreachBody => foreachBody.MethodCall("AddError", "ref errors", "refinementError")
+			);
+		}
+
+		method.NewLine();
 	}
 
 	static void GenerateParseMethod(CodeWriter writer, ZodSchemaDescriptor schema, CancellationToken cancellationToken)
@@ -447,6 +556,7 @@ partial class ZodSchemaGenerator
 		cancellationToken.ThrowIfCancellationRequested();
 
 		var propertyName = property.Name;
+		var displayName = property.DisplayName;
 		var attributes = property.ValidationAttributes;
 		CodeWriter.BlockScope? block = null;
 
@@ -461,7 +571,7 @@ partial class ZodSchemaGenerator
 			var errorMessage = string.Format(
 				CultureInfo.InvariantCulture,
 				required.ValidationAttribute.ErrorMessage ?? localErrorMessage,
-				propertyName
+				displayName
 			);
 			var comparison = isStringAndAllowEmptyStrings
 				? $"string.IsNullOrEmpty(value.{propertyName})"
@@ -493,7 +603,8 @@ partial class ZodSchemaGenerator
 				GenerateStringValidations(writer, property);
 				break;
 			case PropertyValidationKind.Numeric:
-				GenerateNumericValidations(writer, property);
+			case PropertyValidationKind.Comparable:
+				GenerateRangeValidations(writer, property);
 				break;
 			case PropertyValidationKind.Collection:
 				GenerateCollectionValidations(writer, property);

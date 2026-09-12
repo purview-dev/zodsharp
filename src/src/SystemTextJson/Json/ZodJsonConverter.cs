@@ -23,7 +23,7 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 			throw new JsonException($"Validation failed: {errorMessages}");
 		}
 
-		return result.Value!;
+		return result.Value;
 	}
 
 	public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
