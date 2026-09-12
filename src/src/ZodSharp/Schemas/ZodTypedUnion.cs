@@ -30,14 +30,14 @@ public class ZodTypedUnion<T1, T2>(IZodSchema<T1, T1> option1, IZodSchema<T2, T2
 		{
 			var result = option1.Validate(typed1);
 			if (result.IsSuccess)
-				return ValidationResult<Union<T1, T2>>.Success(Union<T1, T2>.Create(result.Value!));
+				return ValidationResult<Union<T1, T2>>.Success(Union<T1, T2>.Create(result.Value));
 		}
 
 		if (value is T2 typed2)
 		{
 			var result = option2.Validate(typed2);
 			if (result.IsSuccess)
-				return ValidationResult<Union<T1, T2>>.Success(Union<T1, T2>.Create(result.Value!));
+				return ValidationResult<Union<T1, T2>>.Success(Union<T1, T2>.Create(result.Value));
 		}
 
 		return ValidationResult<Union<T1, T2>>.Failure(

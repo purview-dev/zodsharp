@@ -58,4 +58,28 @@ namespace Testing
 		await Assert.That(allAttributeSource).Contains("class EmbeddedAttribute");
 		await Assert.That(allAttributeSource).Contains("class ZodSchemaAttribute");
 	}
+
+	[Test]
+	public async Task Generate_GivenAttributeFiles_ContainsRefinementMethodNameProperty(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source =
+			@"
+namespace Testing
+{
+	public class Empty { }
+}
+";
+
+		// Act
+		var driverResult = await GenerateAsync(source, cancellationToken);
+
+		// Assert — the generated attribute exposes the refinement method name property
+		var attributeSources = driverResult.AllSyntaxTrees.Select(static t => t.GetText().ToString()).ToList();
+		var allAttributeSource = string.Join("\n", attributeSources);
+
+		await Assert.That(allAttributeSource).Contains("RefinementMethodName");
+	}
 }

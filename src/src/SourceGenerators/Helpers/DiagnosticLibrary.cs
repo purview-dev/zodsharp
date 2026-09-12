@@ -185,4 +185,67 @@ static class DiagnosticLibrary
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true
 	);
+
+	public static readonly DiagnosticDescriptor SyncValidationInvalidReturnType = new(
+		id: "ZODSGEN022",
+		title: "Invalid synchronous refinement method return type",
+		messageFormat: "Synchronous refinement method '{0}' on schema type '{1}' must return 'IEnumerable<ValidationError>'",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor SyncValidationInvalidParameterCount = new(
+		id: "ZODSGEN023",
+		title: "Invalid synchronous refinement method parameter count",
+		messageFormat: "Synchronous refinement method '{0}' on schema type '{1}' must not have more than one parameter",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor SyncValidationInvalidStaticInstance = new(
+		id: "ZODSGEN024",
+		title: "Invalid synchronous refinement method static/instance form",
+		messageFormat: "Synchronous refinement method '{0}' on schema type '{1}' must be an instance method",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor SyncValidationInaccessible = new(
+		id: "ZODSGEN025",
+		title: "Inaccessible synchronous refinement method",
+		messageFormat: "Synchronous refinement method '{0}' on schema type '{1}' must be public or internal",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor SyncValidationInvalidContextParameter = new(
+		id: "ZODSGEN026",
+		title: "Invalid synchronous refinement method context parameter",
+		messageFormat: "Synchronous refinement method '{0}' on schema type '{1}' must have a 'RefineCtx<T>' parameter when one is supplied",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor IValidateOptionsReferenceNotFound = new(
+		id: "ZODSGEN027",
+		title: "Unable to find Microsoft.Extensions.Options reference",
+		messageFormat: "IValidateOptions generation was requested for '{0}' but a reference to Microsoft.Extensions.Options is required",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor IValidateOptionsValueTypeTarget = new(
+		id: "ZODSGEN028",
+		title: "IValidateOptions generation requires a reference type",
+		messageFormat: "IValidateOptions generation was requested for '{0}' but IValidateOptions<T> requires T to be a class",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
 }

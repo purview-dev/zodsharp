@@ -36,7 +36,7 @@ if (userResult.IsSuccess)
 {
 	Console.WriteLine("User validation: Success");
 	Console.WriteLine(
-		$"Validated user: {string.Join(", ", userResult.Value!.Select(static kvp => $"{kvp.Key}={kvp.Value}"))}"
+		$"Validated user: {string.Join(", ", userResult.Value.Select(static kvp => $"{kvp.Key}={kvp.Value}"))}"
 	);
 }
 else

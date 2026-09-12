@@ -30,11 +30,11 @@ public class ZodSuperRefinement<T>(IZodSchema<T> baseSchema, Action<RefineCtx<T>
 		if (!baseResult.IsSuccess)
 			return baseResult;
 
-		RefineCtx<T> ctx = new(baseResult.Value!, EmptyPath);
+		RefineCtx<T> ctx = new(baseResult.Value, EmptyPath);
 		refinement(ctx);
 
 		return ctx.HasIssues
 			? ValidationResult<T>.Failure(ctx.ToImmutable())
-			: ValidationResult<T>.Success(baseResult.Value!);
+			: ValidationResult<T>.Success(baseResult.Value);
 	}
 }

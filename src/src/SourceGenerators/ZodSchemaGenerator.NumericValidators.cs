@@ -6,7 +6,7 @@ namespace ZodSharp.SourceGenerators;
 
 partial class ZodSchemaGenerator
 {
-	static void GenerateNumericValidations(CodeWriter writer, ZodPropertyDescriptor property)
+	static void GenerateRangeValidations(CodeWriter writer, ZodPropertyDescriptor property)
 	{
 		var rangeAttribute = property.ValidationAttributes.Range;
 		if (!rangeAttribute.ShouldProcess || !rangeAttribute.Value.Exists)
@@ -33,14 +33,14 @@ partial class ZodSchemaGenerator
 			maximumDisplay.StringLiteral()
 		);
 
+		var comparisonExpression = property.CompareViaCompareTo
+			? $"{propertyValueName}.CompareTo({GetRangeMinimumFieldName(propertyName)}) {minComparison} 0 || {propertyValueName}.CompareTo({GetRangeMaximumFieldName(propertyName)}) {maxComparison} 0"
+			: $"{propertyValueName} {minComparison} {GetRangeMinimumFieldName(propertyName)} || {propertyValueName} {maxComparison} {GetRangeMaximumFieldName(propertyName)}";
+
 		using (writer.OpenBlockScope())
 		{
 			writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-			using (
-				writer.IfBlockScope(
-					$"{propertyValueName} {minComparison} {GetRangeMinimumFieldName(propertyName)} || {propertyValueName} {maxComparison} {GetRangeMaximumFieldName(propertyName)}"
-				)
-			)
+			using (writer.IfBlockScope(comparisonExpression))
 			{
 				WriteValidationError(
 					writer,

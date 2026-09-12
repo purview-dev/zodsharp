@@ -27,8 +27,8 @@ public class ZodRefinement<T>(IZodSchema<T> baseSchema, Func<T, bool> refinement
 			return baseResult;
 
 		// On success...
-		return refinement(baseResult.Value!)
-			? ValidationResult<T>.Success(baseResult.Value!)
+		return refinement(baseResult.Value)
+			? ValidationResult<T>.Success(baseResult.Value)
 			: ValidationResult<T>.Failure(
 				new ValidationError("refinement_failed", message ?? "Custom validation failed", [])
 			);

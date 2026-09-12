@@ -71,7 +71,7 @@ public class UnionPerformanceTests
 			{
 				var result = inner.Validate(typedValue);
 				return result.IsSuccess
-					? ValidationResult<object>.Success(result.Value!)
+					? ValidationResult<object>.Success(result.Value)
 					: ValidationResult<object>.Failure(result.Errors);
 			}
 

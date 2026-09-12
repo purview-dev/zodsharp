@@ -1,6 +1,6 @@
 {
   "name": "zodsharp",
-  "version": "2.0.0-prerelease.4",
+  "version": "2.0.0-prerelease.5",
   "private": true,
   "scripts": {
     "test": "vitest run",

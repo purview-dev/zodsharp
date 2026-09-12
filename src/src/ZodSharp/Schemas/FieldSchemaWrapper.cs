@@ -35,7 +35,7 @@ public sealed class FieldSchemaWrapper<T>(IZodSchema<T, T> inner) : IZodSchema<o
 		{
 			var result = inner.Validate(typedValue);
 			return result.IsSuccess
-				? ValidationResult<object>.Success(result.Value!)
+				? ValidationResult<object>.Success(result.Value)
 				: ValidationResult<object>.Failure(result.Errors);
 		}
 

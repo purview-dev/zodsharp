@@ -43,7 +43,7 @@ public static class CompiledValidator
 		return input =>
 		{
 			var result = compiledValidator(input);
-			return result.IsSuccess ? result.Value! : throw new ZodException(result.Errors);
+			return result.IsSuccess ? result.Value : throw new ZodException(result.Errors);
 		};
 	}
 }
