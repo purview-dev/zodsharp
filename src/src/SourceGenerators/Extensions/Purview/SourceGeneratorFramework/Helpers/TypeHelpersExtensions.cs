@@ -1,6 +1,6 @@
-using Microsoft.CodeAnalysis;
 using System.ComponentModel;
 using System.Text;
+using Microsoft.CodeAnalysis;
 using ZodSharp.SourceGenerators.Helpers;
 
 namespace Purview.SourceGeneratorFramework.Helpers;
