@@ -2,7 +2,7 @@
  * Generates JSON fixture files from the TS/Zod side.
  * These files are consumed by the C# cross-platform tests.
  *
- * Run: npx tsx src/ts/generate-fixtures.ts
+ * Run: bun run src/ts/generate-fixtures.ts
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";

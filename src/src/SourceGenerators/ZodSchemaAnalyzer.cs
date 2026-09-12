@@ -102,7 +102,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				{
 					var propertyLocation = GetMemberLocation(property);
 					diagnostic = Diagnostic.Create(
-						diagnosticInfo.Descriptor,
+						diagnostic.Descriptor,
 						propertyLocation,
 						diagnosticInfo.MessageArgs.ToArray()
 					);

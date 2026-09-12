@@ -171,7 +171,7 @@ partial class ZodSchemaGenerator
 		var valueType = schema.TargetType.AsTypeReference();
 		var cancellationTokenType = TypeLibraryGenerator.CancellationToken.AsTypeReference();
 
-		var methodDeclaration = new MethodDeclarationOptions(
+		MethodDeclarationOptions methodDeclaration = new(
 			"ValidateAsync",
 			returnType,
 			TypeDeclarationAccessibility.Public
@@ -235,7 +235,7 @@ partial class ZodSchemaGenerator
 		cancellationToken.ThrowIfCancellationRequested();
 
 		writer.XmlSummary("Validates an instance of the target type.");
-		var methodDeclaration = new MethodDeclarationOptions(
+		MethodDeclarationOptions methodDeclaration = new(
 			"Validate",
 			TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(schema.TargetType).AsTypeReference(),
 			TypeDeclarationAccessibility.Public
@@ -713,7 +713,7 @@ partial class ZodSchemaGenerator
 			TypeLibrary.ZodSharp.Core.ValidationError
 		);
 		var errorType = TypeLibrary.ZodSharp.Core.ValidationError.AsTypeReference();
-		var immutableArrayType = new TypeIdentity(typeof(System.Collections.Immutable.ImmutableArray));
+		TypeIdentity immutableArrayType = new(typeof(System.Collections.Immutable.ImmutableArray));
 		var typeParameterT = new TypeIdentity("T", null).AsTypeReference();
 
 		writer.Method(

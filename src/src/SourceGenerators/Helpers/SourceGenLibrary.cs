@@ -53,8 +53,8 @@ static partial class SourceGenLibrary
 			return default;
 
 		var schemas = ImmutableArray.CreateBuilder<ZodSchemaDescriptor>();
-		var seen = new HashSet<TypeIdentity>();
-		var queue = new Queue<(INamedTypeSymbol Symbol, bool IsPrimary)>();
+		HashSet<TypeIdentity> seen = [];
+		Queue<(INamedTypeSymbol Symbol, bool IsPrimary)> queue = new();
 		queue.Enqueue((root, true));
 
 		while (queue.Count > 0)
@@ -153,7 +153,7 @@ static partial class SourceGenLibrary
 	)
 	{
 		var results = ImmutableArray.CreateBuilder<GeneratorResult<ZodSchemaDescriptor>>();
-		var seen = new HashSet<TypeIdentity>();
+		HashSet<TypeIdentity> seen = [];
 		foreach (var set in sets)
 		{
 			if (!set.ShouldProcess)
@@ -197,7 +197,7 @@ static partial class SourceGenLibrary
 			originalPropertyType = nullableType.TypeArguments[0];
 		}
 
-		var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
+		var diagnostics = ImmutableArray.CreateBuilder<ReportableDiagnostic>();
 		var validationKind = GetPropertyValidationKind(propertyType, originalPropertyType);
 		var elementType =
 			validationKind == PropertyValidationKind.Collection
@@ -228,8 +228,9 @@ static partial class SourceGenLibrary
 				attribute is not null && propertyType.SpecialType != SpecialType.System_String
 					? GeneratorResult<RegularExpressionAttributeData>.Create(
 						regexData,
-						DiagnosticInfo.Create(
+						ReportableDiagnostic.Create(
 							DiagnosticLibrary.UnsupportedDataAnnotationsUsage,
+							true,
 							GetAttributeLocation(attribute),
 							property.Name
 						)
@@ -283,8 +284,9 @@ static partial class SourceGenLibrary
 			)
 			: GeneratorResult<RangeAttributeData>.Create(
 				rangeAttribute,
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.UnsupportedDataAnnotationsUsage,
+					true,
 					GetAttributeLocation(attribute),
 					property.Name
 				)
@@ -423,7 +425,7 @@ static partial class SourceGenLibrary
 		if (targetType is not INamedTypeSymbol namedType || !IsSourceDefinedComplexType(namedType))
 			return null;
 
-		var identity = new TypeIdentity(namedType);
+		TypeIdentity identity = new(namedType);
 		return identity with { Name = $"{identity.Name}Schema" };
 	}
 
@@ -471,11 +473,12 @@ static partial class SourceGenLibrary
 	static void AddUnsupportedDataAnnotationsUsage(
 		IPropertySymbol property,
 		AttributeData? attribute,
-		ImmutableArray<DiagnosticInfo>.Builder diagnostics
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	) =>
 		diagnostics.Add(
-			DiagnosticInfo.Create(
+			ReportableDiagnostic.Create(
 				DiagnosticLibrary.UnsupportedDataAnnotationsUsage,
+				true,
 				GetAttributeLocation(attribute),
 				property.Name
 			)
@@ -484,7 +487,7 @@ static partial class SourceGenLibrary
 	static void AddUnsupportedDataAnnotationsUsage(
 		IPropertySymbol property,
 		string attributeMetadataName,
-		ImmutableArray<DiagnosticInfo>.Builder diagnostics
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	) => AddUnsupportedDataAnnotationsUsage(property, FindAttribute(property, attributeMetadataName), diagnostics);
 
 	static void AddUnsupportedDataAnnotationsDiagnostics(
@@ -498,7 +501,7 @@ static partial class SourceGenLibrary
 		EmailAddressAttributeData emailAddressAttribute,
 		AllowedValuesAttributeData allowedValuesAttribute,
 		DeniedValuesAttributeData deniedValuesAttribute,
-		ImmutableArray<DiagnosticInfo>.Builder diagnostics
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	)
 	{
 		var isString = propertyType.SpecialType == SpecialType.System_String;
@@ -544,8 +547,9 @@ static partial class SourceGenLibrary
 		{
 			return GeneratorResult<LengthAttributeData>.Create(
 				lengthData,
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.UnsupportedLengthAttributeTarget,
+					true,
 					GetAttributeLocation(attribute),
 					property.Name
 				)
@@ -556,8 +560,9 @@ static partial class SourceGenLibrary
 		return lengthData.MinimumLength > lengthData.MaximumLength
 			? GeneratorResult<LengthAttributeData>.Create(
 				lengthData,
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.InvalidLengthAttribute,
+					true,
 					GetAttributeLocation(attribute),
 					property.Name
 				)
@@ -568,7 +573,7 @@ static partial class SourceGenLibrary
 	static void ValidateCompareProperty(
 		IPropertySymbol property,
 		CompareAttributeData compareAttribute,
-		ImmutableArray<DiagnosticInfo>.Builder diagnostics
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	)
 	{
 		if (!compareAttribute.Exists)
@@ -581,8 +586,9 @@ static partial class SourceGenLibrary
 		if (otherProperty is null)
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.ComparePropertyNotFound,
+					true,
 					GetAttributeLocation(FindAttribute(property, "CompareAttribute")),
 					property.Name,
 					compareAttribute.OtherProperty
@@ -617,7 +623,7 @@ static partial class SourceGenLibrary
 
 	static void ValidateErrorMessageResourceConfiguration(
 		IPropertySymbol property,
-		ImmutableArray<DiagnosticInfo>.Builder diagnostics
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	)
 	{
 		foreach (var attribute in property.GetAttributes())
@@ -650,8 +656,9 @@ static partial class SourceGenLibrary
 				continue;
 
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.InvalidDataAnnotationsErrorMessage,
+					true,
 					GetAttributeLocation(attribute),
 					property.Name
 				)

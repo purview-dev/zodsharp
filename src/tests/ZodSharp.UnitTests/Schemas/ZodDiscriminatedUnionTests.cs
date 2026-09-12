@@ -1,4 +1,4 @@
-﻿using ZodSharp.Core;
+using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
 
@@ -83,8 +83,8 @@ public class ZodDiscriminatedUnionTests
 
 	static ZodDiscriminatedUnion CreateUnion()
 	{
-		var userSchema = new ObjectPassThroughSchema();
-		var adminSchema = new ObjectPassThroughSchema();
+		ObjectPassThroughSchema userSchema = new();
+		ObjectPassThroughSchema adminSchema = new();
 
 		return Z.DiscriminatedUnion("type").Option("user", userSchema).Option("admin", adminSchema).Build();
 	}

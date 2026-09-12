@@ -92,7 +92,7 @@ public class ZodString : ZodType<string>
 	/// <returns>This schema for method chaining</returns>
 	public ZodString Regex(string pattern, string? message = null)
 	{
-		var regex = new Regex(pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
+		Regex regex = new(pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
 		return Regex(regex, message);
 	}
 
@@ -113,6 +113,11 @@ public class ZodString : ZodType<string>
 	/// </summary>
 	/// <param name="message">Optional error message</param>
 	/// <returns>This schema for method chaining</returns>
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Naming",
+		"PDS0004:Use correct acronym capitalization",
+		Justification = "Name is real"
+	)]
 	public ZodString Url(string? message = null)
 	{
 		AddRule(new UrlRule(message));
@@ -157,9 +162,9 @@ public class ZodString : ZodType<string>
 	/// </summary>
 	/// <param name="message">Optional error message</param>
 	/// <returns>This schema for method chaining</returns>
-	public ZodString Uuid(string? message = null)
+	public ZodString UUID(string? message = null)
 	{
-		AddRule(new UuidRule(message));
+		AddRule(new UUIDRule(message));
 		return this;
 	}
 

@@ -1,9 +1,11 @@
-using System.Text;
 using Microsoft.CodeAnalysis;
+using System.ComponentModel;
+using System.Text;
 using ZodSharp.SourceGenerators.Helpers;
 
 namespace Purview.SourceGeneratorFramework.Helpers;
 
+[EditorBrowsable(EditorBrowsableState.Never)]
 static class TypeHelpersExtensions
 {
 	extension(TypeHelpers)
@@ -41,7 +43,7 @@ static class TypeHelpersExtensions
 
 		public static string GetFullSchemaTypeName(INamedTypeSymbol typeSymbol)
 		{
-			var sb = new StringBuilder();
+			StringBuilder sb = new();
 			sb.Append("global::");
 
 			var namespaceName = typeSymbol.ContainingNamespace.ToDisplayString();
@@ -51,7 +53,7 @@ static class TypeHelpersExtensions
 				sb.Append('.');
 			}
 
-			var containingTypes = new List<INamedTypeSymbol>();
+			List<INamedTypeSymbol> containingTypes = [];
 			var current = typeSymbol.ContainingType;
 			while (current is not null)
 			{

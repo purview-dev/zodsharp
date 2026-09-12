@@ -78,7 +78,7 @@ public class ZodStringTests
 	[Arguments("550e8400-e29b-41d4-a716", false)]
 	public async Task StringUuid_GivenValue_ReturnsExpectedResult(string value, bool expected)
 	{
-		var result = Z.String().Uuid().Validate(value);
+		var result = Z.String().UUID().Validate(value);
 
 		await Assert.That(result.IsSuccess).IsEqualTo(expected);
 	}

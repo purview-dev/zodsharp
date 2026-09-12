@@ -18,7 +18,7 @@ public class ZodUnion(IReadOnlyList<IZodSchema<object, object>> options) : ZodTy
 	/// <returns>A validation result</returns>
 	protected override ValidationResult<object> ParseInternal(object value)
 	{
-		var allErrors = new List<ValidationError>();
+		List<ValidationError> allErrors = [];
 
 		foreach (var option in options)
 		{

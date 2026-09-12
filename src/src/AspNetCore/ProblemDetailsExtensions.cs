@@ -23,8 +23,8 @@ public static class ProblemDetailsExtensions
 		if (result.IsSuccess)
 			throw new InvalidOperationException("Cannot create ProblemDetails from a successful validation result.");
 
-		var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
-		var groupedMessages = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+		Dictionary<string, string[]> errors = new(StringComparer.Ordinal);
+		Dictionary<string, List<string>> groupedMessages = new(StringComparer.Ordinal);
 
 		foreach (var error in result.Errors)
 		{
@@ -41,7 +41,7 @@ public static class ProblemDetailsExtensions
 		foreach (var pair in groupedMessages)
 			errors[pair.Key] = [.. pair.Value];
 
-		var details = new HttpValidationProblemDetails(errors)
+		HttpValidationProblemDetails details = new(errors)
 		{
 			Title = "One or more validation errors occurred.",
 			Status = statusCode,
@@ -87,7 +87,7 @@ public static class ProblemDetailsExtensions
 		if (path.IsDefaultOrEmpty)
 			return string.Empty;
 
-		var builder = new System.Text.StringBuilder();
+		System.Text.StringBuilder builder = new();
 		for (var i = 0; i < path.Length; i++)
 		{
 			var segment = path[i];

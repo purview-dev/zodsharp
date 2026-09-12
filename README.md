@@ -55,6 +55,18 @@ dotnet add package Purview.ZodSharp.AspNetCore
 - **Purview.ZodSharp.NewtonsoftJson** — Newtonsoft.Json integration and JSON Schema import.
 - **Purview.ZodSharp.AspNetCore** — ASP.NET Core ProblemDetails integration.
 
+## TypeScript and fixture tooling
+
+This repo uses Bun for the TypeScript-side tooling. Bun can execute TypeScript files directly, so `tsx` is not required.
+
+```bash
+bun install
+bun run test
+bun run generate-fixtures
+```
+
+The fixture generator script is intentionally run via Bun rather than `npx tsx` or Node because it keeps the TypeScript workflow consistent with the repo's Bun-based setup.
+
 ## Differences from the original fork
 
 This repository is a fork of [guinhx/ZodSharp](https://github.com/guinhx/ZodSharp). Compared with the original, this version:

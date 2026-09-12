@@ -7,7 +7,7 @@ public class ZodSchemaGeneratedAttributeTests
 	[Test]
 	public async Task Attribute_TargetsModule_AndExposesTargetType()
 	{
-		var attr = new ZodSchemaGeneratedAttribute(typeof(string));
+		ZodSchemaGeneratedAttribute attr = new(typeof(string));
 		await Assert.That(attr.TargetType).IsEqualTo(typeof(string));
 	}
 

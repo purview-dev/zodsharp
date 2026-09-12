@@ -35,7 +35,7 @@ public class MemoryPerformanceTests
 	[Benchmark]
 	public ValidationResult<Dictionary<string, object?>> ValidateObject_Allocations()
 	{
-		var data = new Dictionary<string, object?> { { "name", "John" }, { "age", 30.0 } };
+		Dictionary<string, object?> data = new() { { "name", "John" }, { "age", 30.0 } };
 		return _objectSchema.Validate(data);
 	}
 
@@ -61,7 +61,7 @@ public class MemoryPerformanceTests
 	[Benchmark]
 	public void ValidateObject_ManyIterations()
 	{
-		var data = new Dictionary<string, object?> { { "name", "John" }, { "age", 30.0 } };
+		Dictionary<string, object?> data = new() { { "name", "John" }, { "age", 30.0 } };
 		for (var i = 0; i < 1000; i++)
 		{
 			_objectSchema.Validate(data);

@@ -6,9 +6,9 @@ namespace ZodSharp.Rules;
 /// Validation rule for UUID format.
 /// Uses struct to avoid allocations.
 /// </summary>
-public readonly record struct UuidRule : Core.IValidationRule<string>
+public readonly record struct UUIDRule : Core.IValidationRule<string>
 {
-	static readonly Regex UuidRegex = new(
+	static readonly Regex UUIDRegex = new(
 		@"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
 		RegexOptions.Compiled | RegexOptions.IgnoreCase,
 		TimeSpan.FromMilliseconds(100)
@@ -20,7 +20,7 @@ public readonly record struct UuidRule : Core.IValidationRule<string>
 	/// Initializes a new instance of the UuidRule struct.
 	/// </summary>
 	/// <param name="message">Optional error message</param>
-	public UuidRule(string? message = null)
+	public UUIDRule(string? message = null)
 	{
 		_message = message.OrNull();
 	}
@@ -30,7 +30,7 @@ public readonly record struct UuidRule : Core.IValidationRule<string>
 	/// </summary>
 	/// <param name="value">The value to validate</param>
 	/// <returns>True if valid, false otherwise</returns>
-	public bool IsValid(in string value) => !string.IsNullOrWhiteSpace(value) && UuidRegex.IsMatch(value);
+	public bool IsValid(in string value) => !string.IsNullOrWhiteSpace(value) && UUIDRegex.IsMatch(value);
 
 	/// <summary>
 	/// Gets the error message for a failed validation.

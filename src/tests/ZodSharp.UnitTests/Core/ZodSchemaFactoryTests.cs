@@ -7,7 +7,7 @@ public class ZodSchemaFactoryTests
 	[Test]
 	public async Task Register_And_Resolve_Roundtrips()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		factory.Register(new ZodSchemaValidator<string>(new ZodString().Min(2)));
 		var validator = factory.Resolve<string>();
 
@@ -20,14 +20,14 @@ public class ZodSchemaFactoryTests
 	[Test]
 	public async Task ResolveRequired_UnregisteredType_Throws()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		await Assert.That(() => factory.ResolveRequired<int>()).Throws<InvalidOperationException>();
 	}
 
 	[Test]
 	public async Task Resolve_UnregisteredType_ReturnsNull()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 
 		var sut = factory.Resolve<int>();
 
@@ -37,15 +37,15 @@ public class ZodSchemaFactoryTests
 	[Test]
 	public async Task Validate_UnregisteredType_Throws()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		await Assert.That(() => factory.Validate(42)).Throws<InvalidOperationException>();
 	}
 
 	[Test]
 	public async Task TryRegister_ReturnsFalse_OnDuplicate()
 	{
-		var factory = new ZodSchemaFactory();
-		var v = new ZodSchemaValidator<string>(new ZodString());
+		ZodSchemaFactory factory = new();
+		ZodSchemaValidator<string> v = new(new ZodString());
 		var first = factory.TryRegister(v);
 		var second = factory.TryRegister(v);
 		await Assert.That(first).IsTrue();
@@ -55,7 +55,7 @@ public class ZodSchemaFactoryTests
 	[Test]
 	public async Task Register_OverwritesExisting()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		factory.Register(new ZodSchemaValidator<string>(new ZodString().Min(5)));
 		factory.Register(new ZodSchemaValidator<string>(new ZodString().Min(1)));
 		var result = factory.Validate("a");
@@ -65,14 +65,14 @@ public class ZodSchemaFactoryTests
 	[Test]
 	public async Task IsRegistered_UnregisteredType_ReturnsFalse()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		await Assert.That(factory.IsRegistered<int>()).IsFalse();
 	}
 
 	[Test]
 	public async Task IsRegistered_RegisteredType_ReturnsTrue()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		factory.Register(new ZodSchemaValidator<string>(new ZodString()));
 		await Assert.That(factory.IsRegistered<string>()).IsTrue();
 	}

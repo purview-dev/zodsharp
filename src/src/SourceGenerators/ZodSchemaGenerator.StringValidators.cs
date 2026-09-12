@@ -81,13 +81,13 @@ partial class ZodSchemaGenerator
 			writer.NewLine();
 		}
 
-		GenerateUrlValidation(writer, property);
+		GenerateURLValidation(writer, property);
 		GeneratePhoneValidation(writer, property);
 		GenerateCreditCardValidation(writer, property);
 		GenerateBase64StringValidation(writer, property);
 	}
 
-	static void GenerateUrlValidation(CodeWriter writer, ZodPropertyDescriptor property)
+	static void GenerateURLValidation(CodeWriter writer, ZodPropertyDescriptor property)
 	{
 		var urlAttribute = property.ValidationAttributes.Url;
 		if (!urlAttribute.ShouldProcess || !urlAttribute.Value.Exists)

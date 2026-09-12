@@ -1,7 +1,7 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using ZodSharp.Core;
 using ZodSharp.Schemas;
 
@@ -38,7 +38,7 @@ public static class FromJsonSchemaParser
 			throw new ArgumentNullException(nameof(schema));
 		}
 
-		var ctx = new ConversionContext(schema, schema.Defs ?? schema.Definitions ?? []);
+		ConversionContext ctx = new(schema, schema.Defs ?? schema.Definitions ?? []);
 
 		return ConvertSchema(schema, ctx);
 	}
@@ -173,7 +173,7 @@ public static class FromJsonSchemaParser
 			{
 				"email" => stringSchema.Email(),
 				"uri" or "uri-reference" => stringSchema.Url(),
-				"uuid" or "guid" => stringSchema.Uuid(),
+				"uuid" or "guid" => stringSchema.UUID(),
 				_ => stringSchema, // Ignore unknown formats
 			};
 		}
@@ -220,7 +220,7 @@ public static class FromJsonSchemaParser
 	static IZodSchema<object, object> ConvertObjectSchema(JsonSchemaDefinition schema, ConversionContext ctx)
 	{
 		var builder = Z.Object();
-		var requiredSet = new HashSet<string>(schema.Required ?? []);
+		HashSet<string> requiredSet = [.. schema.Required ?? []];
 
 		if (schema.Properties != null)
 		{
@@ -584,8 +584,8 @@ public static class FromJsonSchemaParser
 			}
 
 			// Validate each item
-			var errors = new List<ValidationError>();
-			var validatedItems = new List<object?>();
+			List<ValidationError> errors = [];
+			List<object?> validatedItems = [];
 
 			for (var i = 0; i < items.Count; i++)
 			{

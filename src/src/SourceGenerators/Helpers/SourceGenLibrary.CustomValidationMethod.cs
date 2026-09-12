@@ -30,8 +30,9 @@ partial class SourceGenLibrary
 		{
 			return GeneratorResult<CustomValidationMethodData>.Create(
 				CustomValidationMethodData.None,
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationInvalidMethodName,
+					true,
 					zodSchemaAttribute,
 					methodName,
 					classSymbol.Name
@@ -55,8 +56,9 @@ partial class SourceGenLibrary
 				{
 					return GeneratorResult<CustomValidationMethodData>.Create(
 						CustomValidationMethodData.None,
-						DiagnosticInfo.Create(
+						ReportableDiagnostic.Create(
 							DiagnosticLibrary.CustomValidationMethodNotFound,
+							true,
 							GetAttributeLocation(zodSchemaAttribute, classSymbol),
 							methodName,
 							classSymbol.Name
@@ -80,8 +82,8 @@ partial class SourceGenLibrary
 			: CustomValidationInvocationKind.DefinedOnSchemaValidator;
 
 		// Validate each candidate and collect valid ones + diagnostics.
-		var validCandidates = new List<IMethodSymbol>();
-		var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
+		List<IMethodSymbol> validCandidates = [];
+		var diagnostics = ImmutableArray.CreateBuilder<ReportableDiagnostic>();
 		foreach (var candidate in candidates)
 		{
 			var isValid = ValidateMethodSignature(candidate, classSymbol, invocationKind, diagnostics);
@@ -102,8 +104,9 @@ partial class SourceGenLibrary
 			// Ambiguous — multiple valid overloads.
 			return GeneratorResult<CustomValidationMethodData>.Create(
 				CustomValidationMethodData.None,
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationAmbiguousOverloads,
+					true,
 					validCandidates[0].Locations.Length > 0 ? validCandidates[0].Locations[0] : null,
 					methodName,
 					classSymbol.Name
@@ -164,7 +167,7 @@ partial class SourceGenLibrary
 		IMethodSymbol method,
 		INamedTypeSymbol classSymbol,
 		CustomValidationInvocationKind invocationKind,
-		ImmutableArray<DiagnosticInfo>.Builder diagnostics
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	)
 	{
 		var typeName = classSymbol.Name;
@@ -175,8 +178,9 @@ partial class SourceGenLibrary
 		if (method.IsGenericMethod)
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationGenericMethod,
+					true,
 					methodLocation,
 					method.Name,
 					typeName
@@ -188,8 +192,9 @@ partial class SourceGenLibrary
 		if (method.IsAbstract)
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationAbstractMethod,
+					true,
 					methodLocation,
 					method.Name,
 					typeName
@@ -201,8 +206,9 @@ partial class SourceGenLibrary
 		if (method.PartialDefinitionPart is not null && method.PartialImplementationPart is null)
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationUnimplementedPartial,
+					true,
 					methodLocation,
 					method.Name,
 					typeName
@@ -212,8 +218,9 @@ partial class SourceGenLibrary
 		else if (method.IsPartialDefinition && method.PartialImplementationPart is null)
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationUnimplementedPartial,
+					false,
 					methodLocation,
 					method.Name,
 					typeName
@@ -225,8 +232,9 @@ partial class SourceGenLibrary
 		if (invocationKind == CustomValidationInvocationKind.StaticOnModelType && !method.IsStatic)
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationInvalidStaticInstance,
+					false,
 					methodLocation,
 					method.Name,
 					typeName
@@ -244,8 +252,9 @@ partial class SourceGenLibrary
 			)
 			{
 				diagnostics.Add(
-					DiagnosticInfo.Create(
+					ReportableDiagnostic.Create(
 						DiagnosticLibrary.CustomValidationInvalidParameterModifier,
+						false,
 						methodLocation,
 						method.Name,
 						typeName
@@ -259,8 +268,9 @@ partial class SourceGenLibrary
 		if (method.Parameters.Length != 2)
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationInvalidParameterCount,
+					true,
 					methodLocation,
 					method.Name,
 					typeName
@@ -276,8 +286,9 @@ partial class SourceGenLibrary
 		if (!TypeHelpers.IsSameType(firstParam.Type, classSymbol, comparer))
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationInvalidModelParameter,
+					true,
 					methodLocation,
 					method.Name,
 					typeName
@@ -290,8 +301,9 @@ partial class SourceGenLibrary
 		if (!TypeLibraryGenerator.CancellationToken.Equals(secondParam.Type))
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationInvalidCancellationToken,
+					false,
 					methodLocation,
 					method.Name,
 					typeName
@@ -306,8 +318,9 @@ partial class SourceGenLibrary
 		if (!string.Equals(expectedReturnTypeName, actualReturnTypeName, StringComparison.Ordinal))
 		{
 			diagnostics.Add(
-				DiagnosticInfo.Create(
+				ReportableDiagnostic.Create(
 					DiagnosticLibrary.CustomValidationInvalidReturnType,
+					false,
 					methodLocation,
 					method.Name,
 					typeName
@@ -322,8 +335,9 @@ partial class SourceGenLibrary
 			if (method.DeclaredAccessibility is Accessibility.Private or Accessibility.Protected)
 			{
 				diagnostics.Add(
-					DiagnosticInfo.Create(
+					ReportableDiagnostic.Create(
 						DiagnosticLibrary.CustomValidationInaccessible,
+						false,
 						methodLocation,
 						method.Name,
 						typeName

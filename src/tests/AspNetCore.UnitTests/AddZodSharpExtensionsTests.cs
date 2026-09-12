@@ -9,7 +9,7 @@ public class AddZodSharpExtensionsTests
 	[Test]
 	public async Task AddZodSharp_RegistersFactory_AndResolvesRegisteredValidator()
 	{
-		var services = new ServiceCollection();
+		ServiceCollection services = new();
 		services.AddZodSharp(static opts =>
 			opts.ConfigureFactory = static factory =>
 				factory.Register(new ZodSchemaValidator<string>(new ZodString().Min(2)))
@@ -23,7 +23,7 @@ public class AddZodSharpExtensionsTests
 	[Test]
 	public async Task AddZodSharp_WithNullConfigure_RegistersEmptyFactory()
 	{
-		var services = new ServiceCollection();
+		ServiceCollection services = new();
 		services.AddZodSharp();
 		var provider = services.BuildServiceProvider();
 		var factory = provider.GetRequiredService<IZodSchemaFactory>();
@@ -33,7 +33,7 @@ public class AddZodSharpExtensionsTests
 	[Test]
 	public async Task AddZodSharp_AutoRegistersGeneratedValidators_FromConfiguredAssemblies()
 	{
-		var services = new ServiceCollection();
+		ServiceCollection services = new();
 		services.AddZodSharp(static opts => opts.ScanAssemblies.Add(typeof(AddZodSharpExtensionsTests).Assembly));
 		var provider = services.BuildServiceProvider();
 		var factory = provider.GetRequiredService<IZodSchemaFactory>();

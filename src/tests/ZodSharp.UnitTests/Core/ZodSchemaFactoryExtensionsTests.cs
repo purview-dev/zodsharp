@@ -20,7 +20,7 @@ public class ZodSchemaFactoryExtensionsTests
 	[Test]
 	public async Task RegisterFromAssembly_ScansForZodSchemaGenerated_AndRegisters()
 	{
-		var factory = new ZodSchemaFactory();
+		ZodSchemaFactory factory = new();
 		factory.RegisterFromAssembly(typeof(ZodSchemaFactoryExtensionsTests).Assembly);
 		await Assert.That(factory.IsRegistered<SampleDto>()).IsTrue();
 		var result = factory.Validate(new SampleDto { Name = "x" });

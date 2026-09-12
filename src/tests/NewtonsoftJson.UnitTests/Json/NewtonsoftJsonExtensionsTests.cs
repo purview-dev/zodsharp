@@ -8,7 +8,7 @@ public class NewtonsoftJsonExtensionsTests
 	[Test]
 	public async Task DeserializeAndValidate_GivenValidJson_ReturnsSuccess()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 		var json = /*lang=json,strict*/
 			"""{"name":"John","age":30}""";
 
@@ -21,7 +21,7 @@ public class NewtonsoftJsonExtensionsTests
 	[Test]
 	public async Task DeserializeAndValidate_GivenMalformedJson_ReturnsJsonErrorFailure()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 
 		var result = schema.DeserializeAndValidate("{bad json");
 
@@ -32,7 +32,7 @@ public class NewtonsoftJsonExtensionsTests
 	[Test]
 	public async Task DeserializeAndValidate_GivenSchemaInvalidJson_ReturnsValidationFailure()
 	{
-		var schema = new TestUserSchema();
+		TestUserSchema schema = new();
 		var json = /*lang=json,strict*/
 			"""{"name":"","age":30}""";
 
@@ -45,8 +45,8 @@ public class NewtonsoftJsonExtensionsTests
 	[Test]
 	public async Task CreateValidatingConverter_GivenValidJson_DeserializesSuccessfully()
 	{
-		var schema = new TestUserSchema();
-		var settings = new JsonSerializerSettings { Converters = { schema.CreateValidatingConverter() } };
+		TestUserSchema schema = new();
+		JsonSerializerSettings settings = new() { Converters = { schema.CreateValidatingConverter() } };
 
 		var deserialized = JsonConvert.DeserializeObject<TestUser>(
 			/*lang=json,strict*/"""{"name":"John","age":30}""",
@@ -60,8 +60,8 @@ public class NewtonsoftJsonExtensionsTests
 	[Test]
 	public async Task CreateValidatingConverter_GivenInvalidData_ThrowsJsonSerializationException()
 	{
-		var schema = new TestUserSchema();
-		var settings = new JsonSerializerSettings { Converters = { schema.CreateValidatingConverter() } };
+		TestUserSchema schema = new();
+		JsonSerializerSettings settings = new() { Converters = { schema.CreateValidatingConverter() } };
 
 		var exception = Assert.Throws<JsonSerializationException>(() =>
 			JsonConvert.DeserializeObject<TestUser>( /*lang=json,strict*/

@@ -30,7 +30,7 @@ public class ZodSuperRefinement<T>(IZodSchema<T> baseSchema, Action<RefineCtx<T>
 		if (!baseResult.IsSuccess)
 			return baseResult;
 
-		var ctx = new RefineCtx<T>(baseResult.Value!, EmptyPath);
+		RefineCtx<T> ctx = new(baseResult.Value!, EmptyPath);
 		refinement(ctx);
 
 		return ctx.HasIssues

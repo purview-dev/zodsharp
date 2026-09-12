@@ -1,4 +1,4 @@
-﻿using ZodSharp.Core;
+using ZodSharp.Core;
 using ZodSharp.Expressions;
 using ZodSharp.Schemas;
 
@@ -32,7 +32,7 @@ static class AdvancedExamples
 		var urlResult = urlSchema.Validate("https://example.com");
 		Console.WriteLine($"URL validation: {urlResult.IsSuccess}");
 
-		var uuidSchema = Z.String().Uuid();
+		var uuidSchema = Z.String().UUID();
 		var uuidResult = uuidSchema.Validate("550e8400-e29b-41d4-a716-446655440000");
 		Console.WriteLine($"UUID validation: {uuidResult.IsSuccess}");
 
@@ -143,7 +143,7 @@ static class AdvancedExamples
 
 		var union = Z.DiscriminatedUnion("type").Option("user", userSchema).Option("admin", adminSchema).Build();
 
-		var userData = new Dictionary<string, object?> { { "type", "user" }, { "name", "John" } };
+		Dictionary<string, object?> userData = new() { { "type", "user" }, { "name", "John" } };
 
 		var unionResult = union.Validate(userData);
 		Console.WriteLine($"Discriminated union validation: {unionResult.IsSuccess}");
@@ -160,7 +160,7 @@ static class AdvancedExamples
 			Z.Object().Field("name", Z.String()).Field("subcategories", Z.Array(categorySchema!)).Build()
 		);
 
-		var categoryData = new Dictionary<string, object?>
+		Dictionary<string, object?> categoryData = new()
 		{
 			{ "name", "Electronics" },
 			{
@@ -236,7 +236,7 @@ static class AdvancedExamples
 		Console.WriteLine($"JSON validation: {result.IsSuccess}");
 
 		var converter = schema.CreateValidatingConverter();
-		var settings = new Newtonsoft.Json.JsonSerializerSettings { Converters = { converter } };
+		Newtonsoft.Json.JsonSerializerSettings settings = new() { Converters = { converter } };
 
 		try
 		{
@@ -290,7 +290,7 @@ static class AdvancedExamples
 	{
 		Console.WriteLine("--- Source Generator Examples ---");
 
-		var user = new User
+		User user = new()
 		{
 			Name = "John Doe",
 			Age = 30,

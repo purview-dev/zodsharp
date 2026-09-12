@@ -38,6 +38,11 @@ partial class TypeLibraryGenerator
 	static readonly TypeIdentity DeniedValuesAttribute = default;
 
 	[TypeRef(SystemDataAnnotations)]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Naming",
+		"PDS0004:Use correct acronym capitalization",
+		Justification = "Real name"
+	)]
 	static readonly TypeIdentity UrlAttribute = default;
 
 	[TypeRef(SystemDataAnnotations)]
