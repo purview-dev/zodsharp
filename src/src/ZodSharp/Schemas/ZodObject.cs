@@ -65,97 +65,151 @@ public class ZodObject(
 			);
 		}
 
-		var shapeCount = shape.Count;
-		List<ValidationError> errors = [with(shapeCount)];
-		Dictionary<string, object?> validatedObject = [with(shapeCount)];
+		List<ValidationError>? errors = null;
+		Dictionary<string, object?>? rebuilt = null;
 
 		foreach (var (key, schema) in shape)
+			ValidateField(value, key, schema, ref errors, ref rebuilt);
+
+		foreach (var (key, propertyValue) in value)
+			ValidateUnknownKey(value, key, propertyValue, ref errors, ref rebuilt);
+
+		if (errors is { Count: > 0 })
+			return ValidationResult<Dictionary<string, object?>>.Failure(errors);
+
+		// When every field passed through unchanged and nothing needed stripping or
+		// injecting, the input dictionary is already the validated result.
+		return rebuilt is not null
+			? ValidationResult<Dictionary<string, object?>>.Success(rebuilt)
+			: ValidationResult<Dictionary<string, object?>>.Success(value);
+	}
+
+	/// <summary>
+	/// Validates a single field from the shape against the input value, recording any
+	/// error or, when the validated value differs (transform/default), triggering a
+	/// rebuild of the output object.
+	/// </summary>
+	void ValidateField(
+		Dictionary<string, object?> value,
+		string key,
+		IZodSchema<object, object> schema,
+		ref List<ValidationError>? errors,
+		ref Dictionary<string, object?>? rebuilt
+	)
+	{
+		if (!value.TryGetValue(key, out var propertyValue))
 		{
-			if (!value.TryGetValue(key, out var propertyValue))
+			var allowsMissing =
+				!IsRequiredKey(key) && (IsOptionalKey(key) || schema is IOptionalSchema { IsOptional: true });
+
+			if (!allowsMissing)
 			{
-				var allowsMissing =
-					!IsRequiredKey(key) && (IsOptionalKey(key) || schema is IOptionalSchema { IsOptional: true });
-
-				if (!allowsMissing)
-				{
-					errors.Add(new ValidationError("missing_field", $"Required field '{key}' is missing", [key]));
-					continue;
-				}
-
-				if (schema is IOptionalSchema { ProvidesValueOnMissing: true })
-				{
-					var missingResult = schema.Validate(null!);
-					if (missingResult.IsSuccess && missingResult.Value is not null)
-						validatedObject[key] = missingResult.Value;
-				}
-
-				continue;
+				errors ??= [];
+				errors.Add(new ValidationError("missing_field", $"Required field '{key}' is missing", [key]));
+				return;
 			}
 
-			var result = schema.Validate(propertyValue!);
-
-			if (!result.IsSuccess)
+			if (schema is IOptionalSchema { ProvidesValueOnMissing: true })
 			{
-				foreach (var error in result.Errors)
+				var missingResult = schema.Validate(null!);
+				if (missingResult.IsSuccess && missingResult.Value is not null)
+					GetRebuilt(value, ref rebuilt)[key] = missingResult.Value;
+			}
+
+			return;
+		}
+
+		var result = schema.Validate(propertyValue!);
+
+		if (!result.IsSuccess)
+		{
+			errors ??= [];
+			foreach (var error in result.Errors)
+			{
+				var path = new string[error.Path.Length + 1];
+				path[0] = key;
+
+				error.Path.CopyTo(0, path, 1, error.Path.Length);
+				errors.Add(new(error.Code, error.Message, path, error.Parameters));
+			}
+
+			return;
+		}
+
+		if (!Equals(result.Value, propertyValue))
+			GetRebuilt(value, ref rebuilt)[key] = result.Value;
+	}
+
+	/// <summary>
+	/// Handles a key that is not part of the shape according to the unknown-key policy.
+	/// </summary>
+	void ValidateUnknownKey(
+		Dictionary<string, object?> value,
+		string key,
+		object? propertyValue,
+		ref List<ValidationError>? errors,
+		ref Dictionary<string, object?>? rebuilt
+	)
+	{
+		if (shape.ContainsKey(key))
+			return;
+
+		if (catchallSchema is not null)
+		{
+			var catchallResult = catchallSchema.Validate(propertyValue!);
+			if (!catchallResult.IsSuccess)
+			{
+				errors ??= [];
+				foreach (var error in catchallResult.Errors)
 				{
 					var path = new string[error.Path.Length + 1];
 					path[0] = key;
-
 					error.Path.CopyTo(0, path, 1, error.Path.Length);
 					errors.Add(new(error.Code, error.Message, path, error.Parameters));
 				}
 			}
 			else
 			{
-				validatedObject[key] = result.Value;
+				GetRebuilt(value, ref rebuilt)[key] = catchallResult.Value;
 			}
+
+			return;
 		}
 
-		// Handle unknown keys (keys not in the shape).
-		foreach (var (key, propertyValue) in value)
-		{
-			if (shape.ContainsKey(key))
-				continue;
-
-			if (catchallSchema is not null)
-			{
-				var catchallResult = catchallSchema.Validate(propertyValue!);
-				if (!catchallResult.IsSuccess)
-				{
-					foreach (var error in catchallResult.Errors)
-					{
-						var path = new string[error.Path.Length + 1];
-						path[0] = key;
-						error.Path.CopyTo(0, path, 1, error.Path.Length);
-						errors.Add(new(error.Code, error.Message, path, error.Parameters));
-					}
-				}
-				else
-				{
-					validatedObject[key] = catchallResult.Value;
-				}
-			}
-			else
-			{
 #pragma warning disable IDE0010 // Add missing cases
-				switch (unknownKeyPolicy)
-				{
-					case UnknownKeyPolicy.Passthrough:
-						validatedObject[key] = propertyValue;
-						break;
-					case UnknownKeyPolicy.Strict:
-						errors.Add(new ValidationError("unrecognized_key", $"Unrecognized key '{key}'", [key]));
-						break;
-					default:
-						break;
-				}
+		switch (unknownKeyPolicy)
+		{
+			case UnknownKeyPolicy.Passthrough:
+				break;
+			case UnknownKeyPolicy.Strict:
+				errors ??= [];
+				errors.Add(new ValidationError("unrecognized_key", $"Unrecognized key '{key}'", [key]));
+				break;
+			default:
+				// Strip: drop the unknown key by forcing the rebuilt copy.
+				GetRebuilt(value, ref rebuilt);
+				break;
+		}
 #pragma warning restore IDE0010 // Add missing cases
+	}
+
+	/// <summary>
+	/// Creates (once) a copy of the input containing only the shape keys. Unknown keys
+	/// are dropped as a side effect, which is exactly what strip semantics need.
+	/// </summary>
+	Dictionary<string, object?> GetRebuilt(Dictionary<string, object?> value, ref Dictionary<string, object?>? rebuilt)
+	{
+		if (rebuilt is null)
+		{
+			rebuilt = [with(shape.Count)];
+			foreach (var (key, propertyValue) in value)
+			{
+				if (shape.ContainsKey(key))
+					rebuilt[key] = propertyValue;
 			}
 		}
 
-		return errors.Count > 0
-			? ValidationResult<Dictionary<string, object?>>.Failure(errors)
-			: ValidationResult<Dictionary<string, object?>>.Success(validatedObject);
+		return rebuilt;
 	}
 
 	/// <summary>

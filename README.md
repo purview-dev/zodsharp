@@ -210,24 +210,24 @@ ZodSharp is designed for maximum performance with zero-allocation validation and
 
 **Typical validation times** (measured with the committed benchmark suite on .NET 10.0, Release mode, 13th Gen Intel Core i9-13900KF):
 
-- Boolean validation: **~3 ns** per validation (zero allocation)
-- Number validation: **~12 ns** per validation (zero allocation)
-- Simple string validation: **~43 ns** per validation (zero allocation)
-- Small string array (5 items): **~91 ns** per validation
-- Simple object (2 fields): **~136 ns** per validation
-- Deeply nested object (4 levels): **~337 ns** per validation
-- Medium object (6 fields): **~454 ns** per validation
-- Complex object (13 fields with nesting): **~1.1 μs** per validation
-- Wide object (50 fields): **~2.7 μs** per validation
-- Medium array (100 items): **~5.1 μs** per validation
-- Large array (1000 items): **~14.8 μs** per validation
+- Boolean validation: **~2 ns** per validation (zero allocation)
+- Number validation: **~11 ns** per validation (zero allocation)
+- Simple string validation: **~42 ns** per validation (zero allocation)
+- Small string array (5 items): **~57 ns** per validation (zero allocation)
+- Simple object (2 fields): **~90 ns** per validation (zero allocation)
+- Deeply nested object (4 levels): **~199 ns** per validation (zero allocation)
+- Medium object (6 fields): **~340 ns** per validation (zero allocation)
+- Complex object (13 fields with nesting): **~796 ns** per validation (zero allocation)
+- Wide object (50 fields): **~2.2 μs** per validation (zero allocation)
+- Medium array (100 items): **~4.6 μs** per validation (zero allocation)
+- Large array (1000 items): **~11.7 μs** per validation (zero allocation)
 
 **Memory efficiency**:
 
-- Zero allocations for simple validations (strings, numbers, booleans)
-- Minimal allocations for arrays and objects (only for error collections)
+- **Zero allocations for every valid-input path** — primitives, strings, arrays, objects, unions, and discriminated unions all validate without allocating when the input is valid
 - Struct-based rules avoid GC pressure
 - No reflection overhead in hot paths
+- Allocations only occur on the failure path (error collection) and inside string transforms (`ToLower`/`ToUpper`/`Trim` produce a new string)
 
 Full results for every suite are in the [performance README](src/src/Benchmarks/README.md).
 

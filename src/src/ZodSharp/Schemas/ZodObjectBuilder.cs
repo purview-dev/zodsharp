@@ -41,27 +41,7 @@ public sealed class ZodObjectBuilder
 
 		public bool ProvidesValueOnMissing => inner is IOptionalSchema o && o.ProvidesValueOnMissing;
 
-		public ValidationResult<object> Validate(object value)
-		{
-			if (value is null && inner is IAcceptsNull acceptsNull)
-				return acceptsNull.ValidateNull();
-
-			if (SchemaValueCoercion.TryCoerce<T>(value, out var typedValue))
-			{
-				var result = inner.Validate(typedValue);
-				return result.IsSuccess
-					? ValidationResult<object>.Success(result.Value)
-					: ValidationResult<object>.Failure(result.Errors);
-			}
-
-			return ValidationResult<object>.Failure(
-				new ValidationError(
-					"invalid_type",
-					$"Expected {SchemaValueCoercion.GetTypeDisplayName(typeof(T))}, but got {value?.GetType().Name ?? "null"}",
-					[]
-				)
-			);
-		}
+		public ValidationResult<object> Validate(object value) => SchemaValueCoercion.ValidateWrapped(inner, value);
 
 		public ValueTask<ValidationResult<object>> ValidateAsync(
 			object value,

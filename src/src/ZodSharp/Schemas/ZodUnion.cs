@@ -18,7 +18,7 @@ public class ZodUnion(IReadOnlyList<IZodSchema<object, object>> options) : ZodTy
 	/// <returns>A validation result</returns>
 	protected override ValidationResult<object> ParseInternal(object value)
 	{
-		List<ValidationError> allErrors = [];
+		List<ValidationError>? allErrors = null;
 
 		foreach (var option in options)
 		{
@@ -28,6 +28,7 @@ public class ZodUnion(IReadOnlyList<IZodSchema<object, object>> options) : ZodTy
 				return result;
 			}
 
+			allErrors ??= [];
 			allErrors.AddRange(result.Errors);
 		}
 
@@ -36,7 +37,7 @@ public class ZodUnion(IReadOnlyList<IZodSchema<object, object>> options) : ZodTy
 				"invalid_union",
 				"Value does not match any of the union options",
 				[],
-				new Dictionary<string, object?> { { "errors", allErrors } }
+				new Dictionary<string, object?> { { "errors", allErrors ?? [] } }
 			)
 		);
 	}

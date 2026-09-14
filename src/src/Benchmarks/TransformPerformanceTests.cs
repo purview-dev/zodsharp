@@ -15,6 +15,7 @@ public class TransformPerformanceTests
 	readonly ZodString _toUpperSchema;
 	readonly ZodString _trimSchema;
 	readonly ZodString _chainedTransformSchema;
+	readonly ZodString _transformWithValidationSchema;
 
 	public TransformPerformanceTests()
 	{
@@ -22,6 +23,7 @@ public class TransformPerformanceTests
 		_toUpperSchema = Z.String().ToUpper();
 		_trimSchema = Z.String().Trim();
 		_chainedTransformSchema = Z.String().Trim().ToLower();
+		_transformWithValidationSchema = Z.String().Min(5).Max(100).Trim().ToLower().Email();
 	}
 
 	[Benchmark]
@@ -37,9 +39,6 @@ public class TransformPerformanceTests
 	public ValidationResult<string> TransformChained() => _chainedTransformSchema.Validate("  HELLO WORLD  ");
 
 	[Benchmark]
-	public ValidationResult<string> TransformWithValidation()
-	{
-		var schema = Z.String().Min(5).Max(100).Trim().ToLower().Email();
-		return schema.Validate("  USER@EXAMPLE.COM  ");
-	}
+	public ValidationResult<string> TransformWithValidation() =>
+		_transformWithValidationSchema.Validate("  USER@EXAMPLE.COM  ");
 }
