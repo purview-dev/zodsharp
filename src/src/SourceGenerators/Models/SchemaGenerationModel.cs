@@ -39,6 +39,7 @@ readonly record struct LengthAccessor(string LengthExpression, string Origin, bo
 /// <param name="CustomValidationMethod">The custom validation method data, if any.</param>
 /// <param name="SyncValidationMethod">The synchronous refinement method data, if any.</param>
 /// <param name="GenerateIValidateOptions">Requested IValidateOptions generation: null = auto, true = force, false = opt out.</param>
+/// <param name="EnableComposition">Whether the value-first composition methods (ApplyAnd/ApplyOr/ApplyRefine) are generated.</param>
 /// <param name="IsPrimary">True if this is the primary schema for the target type, false if it is a secondary schema.</param>
 readonly record struct ZodSchemaDescriptor(
 	TypeIdentity TargetType,
@@ -51,6 +52,7 @@ readonly record struct ZodSchemaDescriptor(
 	GeneratorResult<CustomValidationMethodData> CustomValidationMethod,
 	GeneratorResult<SyncValidationMethodData> SyncValidationMethod,
 	bool? GenerateIValidateOptions,
+	bool EnableComposition,
 	bool IsPrimary
 );
 

@@ -16,8 +16,4 @@
 	<ItemGroup>
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
 	</ItemGroup>
-
-	<ItemGroup>
-		<None Include="..\..\..\README.md" Pack="true" PackagePath="\" />
-	</ItemGroup>
 </Project>

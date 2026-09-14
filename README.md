@@ -1,12 +1,11 @@
 # ZodSharp
 
 [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.svg)](https://www.nuget.org/packages/Purview.ZodSharp)
+[![Release](https://github.com/purview-dev/zodsharp/actions/workflows/release.yml/badge.svg)](https://github.com/purview-dev/zodsharp/actions/workflows/release.yml)
 
 **ZodSharp** is a high-performance schema validation library for C#, ported from TypeScript [Zod](https://github.com/colinhacks/zod). It features zero-allocation validation, struct-based rules, fluent API, and source generator support for maximum performance.
 
-This project is a fork of [guinhx/ZodSharp](https://github.com/guinhx/ZodSharp), maintained at [github.com/purview-dev/ZodSharp](https://github.com/purview-dev/ZodSharp) under the `Purview.*` package IDs.
-
-[![Release](https://github.com/purview-dev/ZodSharp/actions/workflows/release.yml/badge.svg)](https://github.com/purview-dev/ZodSharp/actions/workflows/release.yml)
+This project is a fork of [guinhx/ZodSharp](https://github.com/guinhx/ZodSharp), maintained at [github.com/purview-dev/zodsharp](https://github.com/purview-dev/zodsharp) under the `Purview.*` package IDs.
 
 ## Key Features
 
@@ -50,10 +49,10 @@ dotnet add package Purview.ZodSharp.AspNetCore
 <PackageReference Include="Purview.ZodSharp.AspNetCore" Version="2.0.0" />
 ```
 
-- **Purview.ZodSharp** — Core validation library and source generator (`[ZodSchema]`).
-- **Purview.ZodSharp.SystemTextJson** — System.Text.Json integration and JSON Schema import.
-- **Purview.ZodSharp.NewtonsoftJson** — Newtonsoft.Json integration and JSON Schema import.
-- **Purview.ZodSharp.AspNetCore** — ASP.NET Core ProblemDetails integration.
+- **Purview.ZodSharp** — Core validation library and source generator (`[ZodSchema]`). See its [package README](src/src/ZodSharp/Sdk/README.md).
+- **Purview.ZodSharp.SystemTextJson** — System.Text.Json integration and JSON Schema import. See its [package README](src/src/SystemTextJson/Sdk/README.md).
+- **Purview.ZodSharp.NewtonsoftJson** — Newtonsoft.Json integration and JSON Schema import. See its [package README](src/src/NewtonsoftJson/Sdk/README.md).
+- **Purview.ZodSharp.AspNetCore** — ASP.NET Core ProblemDetails integration. See its [package README](src/src/AspNetCore/Sdk/README.md).
 
 ## TypeScript and fixture tooling
 
@@ -232,7 +231,7 @@ ZodSharp implements several optimizations for maximum performance:
 
 - Validation rules implemented as `struct` to avoid allocations
 - Use of `Span<T>` and `ReadOnlySpan<T>` when appropriate
-- Object pooling for reusable schemas
+- Array pooling via `ArrayPool<T>` for zero-allocation helpers
 
 #### 2. Struct-based Rules
 
@@ -270,14 +269,14 @@ var schema = Z.String()
 
 ### Performance Benchmarks
 
-We maintain comprehensive performance tests in `src/tests/ZodSharp.Benchmarks`. Run them yourself:
+We maintain comprehensive performance tests in `src/src/Benchmarks`. Run them yourself:
 
 ```bash
 # Run all performance benchmarks
-dotnet run --project src/tests/ZodSharp.Benchmarks/ZodSharp.Benchmarks.csproj -c Release
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release
 
 # Run specific test suites
-dotnet run --project src/tests/ZodSharp.Benchmarks/ZodSharp.Benchmarks.csproj -c Release --filter "*MemoryPerformanceTests*"
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release --filter "*MemoryPerformanceTests*"
 ```
 
 **Key performance highlights**:
@@ -288,22 +287,21 @@ dotnet run --project src/tests/ZodSharp.Benchmarks/ZodSharp.Benchmarks.csproj -c
 - **Minimal GC pressure** with struct-based architecture
 - **Scalable** performance even with complex nested schemas
 
-See the [performance README](src/tests/ZodSharp.Benchmarks/README.md) for detailed benchmark results and optimization tips.
+See the [performance README](src/src/Benchmarks/README.md) for detailed benchmark results and optimization tips.
 
 ## Architecture
 
 ```
 src/
-├── ZodSharp/              # Core validation library
-│   ├── Core/              # Base interfaces and classes
-│   ├── Schemas/           # Schema implementations
-│   ├── Rules/             # Validation rules (structs)
-│   ├── JsonSchema/        # JSON Schema definition and export (ToJsonSchema)
-│   └── SourceGenerators/  # Compile-time [ZodSchema] generator
-├── SystemTextJson/        # System.Text.Json integration and JSON Schema import
-├── NewtonsoftJson/        # Newtonsoft.Json integration and JSON Schema import
-├── AspNetCore/            # ASP.NET Core ProblemDetails integration
-└── Examples.CLI/          # Usage examples
+├── src/
+│   ├── ZodSharp/              # Core validation library (Core, Schemas, Rules, JsonSchema)
+│   ├── SourceGenerators/      # Compile-time [ZodSchema] generator
+│   ├── SystemTextJson/        # System.Text.Json integration and JSON Schema import
+│   ├── NewtonsoftJson/        # Newtonsoft.Json integration and JSON Schema import
+│   ├── AspNetCore/            # ASP.NET Core ProblemDetails integration
+│   ├── Examples.CLI/          # Usage examples
+│   └── Benchmarks/   # BenchmarkDotNet performance suite
+└── tests/                     # TUnit test projects
 ```
 
 The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net8.0`, `net9.0` and `net10.0`.
@@ -368,7 +366,7 @@ ZodSharp ships separate integration packages for the two major .NET JSON librari
 #### System.Text.Json (`Purview.ZodSharp.SystemTextJson`)
 
 ```csharp
-using ZodSharp.Json;
+using ZodSharp;
 
 // Deserialize and validate from string
 var result = schema.DeserializeAndValidate(jsonString);
@@ -383,7 +381,7 @@ var converter = schema.CreateValidatingConverter();
 #### Newtonsoft.Json (`Purview.ZodSharp.NewtonsoftJson`)
 
 ```csharp
-using ZodSharp.Json;
+using ZodSharp;
 
 // Deserialize and validate from string
 var result = schema.DeserializeAndValidate(jsonString);
@@ -505,7 +503,7 @@ Generate zero-allocation validators at compile time:
 
 ```csharp
 using System.ComponentModel.DataAnnotations;
-using ZodSharp.SourceGenerators;
+using ZodSharp;
 
 [ZodSchema]
 public class User
@@ -623,7 +621,7 @@ Package versions are declared centrally in `Directory.Packages.props`. No `packa
 
 ## License
 
-MIT License - see the LICENSE file for details.
+MIT — the license is declared in the NuGet package metadata (`PackageLicenseExpression`) and in `package.json`.
 
 ## Contributing
 

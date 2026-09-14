@@ -13,8 +13,4 @@
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
-
-	<ItemGroup>
-		<None Include="..\..\..\README.md" Pack="true" PackagePath="\" />
-	</ItemGroup>
 </Project>

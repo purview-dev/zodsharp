@@ -2,13 +2,13 @@ set quiet
 
 root_folder := "src"
 solution := root_folder / "ZodSharp.slnx"
-perf_tests_project := root_folder / "tests" / "ZodSharp.PerformanceTests" / "ZodSharp.PerformanceTests.csproj"
+perf_tests_project := root_folder / "src" / "Benchmarks" / "Benchmarks.csproj"
 build_configuration := "Debug"
 artifacts_folder := "./artifacts"
-default_test_filter := "/*/*/*/*/"
+default_test_filter := "/*/*/*/*"
 
 pipeline_feed := "https://api.nuget.org/v3/index.json"
-pipeline_tool := ".tools/purview-build/purview-build"
+pipeline_tool := ".tools/purview-build/purview-build" + if os() == "windows" { ".exe" } else { "" }
 
 [private]
 default:
@@ -60,31 +60,31 @@ pipeline-tests *args:
     echo "Running tests pipeline..."
     "{{ pipeline_tool }}" --Build:RunTests=true --Release:Mode=None {{ args }}
 
-# Build and test with the specified configuration, defaulting to "Release"
+# Build and test with the specified configuration, defaulting to "Debug"
 [group('Build and Test')]
 build *args:
     echo "Building {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
     dotnet build {{ solution }} -c {{ build_configuration }} {{ args }}
 
-# Build and test with the specified configuration, defaulting to "Release"
+# Clean the solution with the specified configuration, defaulting to "Debug"
 [group('Build and Test')]
 clean *args:
     echo "Cleaning {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
     dotnet clean {{ solution }} -c {{ build_configuration }} {{ args }}
 
-# Run the performance tests with the specified configuration, defaulting to "Release"
+# Run the performance benchmarks with the specified configuration, defaulting to "Debug"
 [group('Build and Test')]
 perf-tests *args:
-    echo "Running performance tests for {{ BLUE }}{{ perf_tests_project }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
-    dotnet run --project {{ perf_tests_project }} -c {{ build_configuration }} {{ args }}
+    echo "Running performance tests for {{ BLUE }}{{ perf_tests_project }}{{ NORMAL }}"
+    dotnet run --project {{ perf_tests_project }} -c Release {{ args }}
 
-# Run tests with the specified configuration, defaulting to "Release"
+# Run tests with the specified configuration, defaulting to "Debug"
 [group('Build and Test')]
 test filter=default_test_filter *args:
     echo "Running tests for {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }} and filter {{ GREEN }}{{ filter }}{{ NORMAL }}"
     dotnet test {{ solution }} -c {{ build_configuration }} --treenode-filter "{{ filter }}" {{ args }}
 
-# Run tests with the specified configuration, defaulting to "Release"
+# Restore dependencies for the solution
 [group('Build and Test')]
 restore *args:
     echo "Restoring dependencies for {{ BLUE }}{{ solution }}{{ NORMAL }}"

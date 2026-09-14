@@ -30,7 +30,7 @@ public sealed record ZodAnalyzerTestOptions : AnalyzerTestOptions
 					public string? SchemaName { get; init; }
 					public bool GenerateValidateMethod { get; init; } = true;
 					public bool GenerateParseMethod { get; init; } = true;
-					public bool EnableComposition { get; init; } = false;
+					public bool EnableComposition { get; init; } = true;
 					public string? CustomValidationMethodName { get; init; }
 					public string? RefinementMethodName { get; init; }
 					public bool GenerateIValidateOptions { get; init; } = false;
