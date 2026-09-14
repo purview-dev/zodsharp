@@ -34,7 +34,6 @@
 	</PropertyGroup>
 
 	<ItemGroup Label="NuGet package assets" Condition="'$(IsPackable)' == 'true'">
-		<None Include="$(MSBuildThisFileDirectory)/../README.md" Pack="true" PackagePath="\" />
 		<None Include="$(MSBuildThisFileDirectory)/../assets/images/purview-logo.png" Link="Sdk/purview-logo.png" />
 	</ItemGroup>
 </Project>
