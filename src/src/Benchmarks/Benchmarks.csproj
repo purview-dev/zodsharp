@@ -6,6 +6,7 @@
 		<RootNamespace>ZodSharp</RootNamespace>
 		<NoWarn>$(NoWarn);CA1303;CA1707;CA1822;CA1515;</NoWarn>
 		<OutputType>Exe</OutputType>
+		<IsPackable>false</IsPackable>
 		<!-- Do not change this, as BenchmarkDotNet relies on the assembly name -->
 		<AssemblyName>Benchmarks</AssemblyName>
 	</PropertyGroup>

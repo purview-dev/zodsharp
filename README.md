@@ -275,8 +275,8 @@ We maintain comprehensive performance tests in `src/src/Benchmarks`. Run them yo
 # Run all performance benchmarks
 dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release
 
-# Run specific test suites
-dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release --filter "*MemoryPerformanceTests*"
+# Run specific test suites (the `--` passes the filter to BenchmarkDotNet)
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -- --filter "*MemoryPerformanceTests*"
 ```
 
 **Key performance highlights**:
