@@ -26,27 +26,7 @@ public sealed class FieldSchemaWrapper<T>(IZodSchema<T, T> inner) : IZodSchema<o
 	public static IZodSchema<object, object> Wrap(IZodSchema<T, T> schema) => new FieldSchemaWrapper<T>(schema);
 
 	/// <inheritdoc/>
-	public ValidationResult<object> Validate(object value)
-	{
-		if (value is null && inner is IAcceptsNull acceptsNull)
-			return acceptsNull.ValidateNull();
-
-		if (SchemaValueCoercion.TryCoerce<T>(value, out var typedValue))
-		{
-			var result = inner.Validate(typedValue);
-			return result.IsSuccess
-				? ValidationResult<object>.Success(result.Value)
-				: ValidationResult<object>.Failure(result.Errors);
-		}
-
-		return ValidationResult<object>.Failure(
-			new ValidationError(
-				"invalid_type",
-				$"Expected {SchemaValueCoercion.GetTypeDisplayName(typeof(T))}, but got {value?.GetType().Name ?? "null"}",
-				[]
-			)
-		);
-	}
+	public ValidationResult<object> Validate(object value) => SchemaValueCoercion.ValidateWrapped(inner, value);
 
 	/// <inheritdoc/>
 	public ValueTask<ValidationResult<object>> ValidateAsync(

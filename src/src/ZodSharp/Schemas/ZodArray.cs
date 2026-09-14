@@ -33,14 +33,15 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>
 			);
 		}
 
-		List<ValidationError> errors = [with(value.Length)];
-		List<T> validatedItems = [with(value.Length)];
+		List<ValidationError>? errors = null;
+		List<T>? rebuilt = null;
 
 		for (var i = 0; i < value.Length; i++)
 		{
 			var itemResult = elementSchema.Validate(value[i]);
 			if (!itemResult.IsSuccess)
 			{
+				errors ??= [];
 				foreach (var error in itemResult.Errors)
 				{
 					var path = new string[error.Path.Length + 1];
@@ -50,32 +51,61 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>
 				}
 			}
 			else
-				validatedItems.Add(itemResult.Value);
+			{
+				var itemValue = itemResult.Value;
+				if (rebuilt is null && !SameValue(itemValue, value[i]))
+				{
+					rebuilt = [with(value.Length)];
+					for (var j = 0; j < i; j++)
+						rebuilt.Add(value[j]);
+				}
+
+				rebuilt?.Add(itemValue);
+			}
 		}
 
-		if (errors.Count > 0)
+		if (errors is { Count: > 0 })
 			return ValidationResult<T[]>.Failure(errors);
 
-		// When no errors...
-		return _minLength.HasValue && validatedItems.Count < _minLength.Value
-				? ValidationResult<T[]>.Failure(
-					new ValidationError(
-						"too_small",
-						_errorMessage
-							?? $"Array must have at least {_minLength.Value} elements, but got {validatedItems.Count}",
-						EmptyPath
-					)
+		var count = value.Length;
+		if (_minLength.HasValue && count < _minLength.Value)
+		{
+			return ValidationResult<T[]>.Failure(
+				new ValidationError(
+					"too_small",
+					_errorMessage ?? $"Array must have at least {_minLength.Value} elements, but got {count}",
+					EmptyPath
 				)
-			: _maxLength.HasValue && validatedItems.Count > _maxLength.Value
-				? ValidationResult<T[]>.Failure(
-					new ValidationError(
-						"too_big",
-						_errorMessage
-							?? $"Array must have at most {_maxLength.Value} elements, but got {validatedItems.Count}",
-						EmptyPath
-					)
+			);
+		}
+
+		if (_maxLength.HasValue && count > _maxLength.Value)
+		{
+			return ValidationResult<T[]>.Failure(
+				new ValidationError(
+					"too_big",
+					_errorMessage ?? $"Array must have at most {_maxLength.Value} elements, but got {count}",
+					EmptyPath
 				)
-			: ValidationResult<T[]>.Success([.. validatedItems]);
+			);
+		}
+
+		// When every element passed through unchanged, the input array is already
+		// the validated result, so reuse it instead of copying.
+		return rebuilt is not null ? ValidationResult<T[]>.Success([.. rebuilt]) : ValidationResult<T[]>.Success(value);
+	}
+
+	/// <summary>
+	/// Returns <see langword="true"/> when two element values are interchangeable,
+	/// i.e. no transform produced a different value. Reference types compare by
+	/// reference; value types by value (so a freshly boxed value still matches).
+	/// </summary>
+	static bool SameValue(T left, T right)
+	{
+		if (typeof(T).IsValueType)
+			return EqualityComparer<T>.Default.Equals(left, right);
+
+		return ReferenceEquals(left, right);
 	}
 
 	/// <summary>

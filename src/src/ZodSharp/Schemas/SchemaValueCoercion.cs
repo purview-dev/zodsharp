@@ -1,4 +1,5 @@
 using System.Globalization;
+using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
 
@@ -10,6 +11,57 @@ namespace ZodSharp.Schemas;
 static class SchemaValueCoercion
 {
 	static readonly Type DoubleType = typeof(double);
+
+	/// <summary>
+	/// Validates a value coming through a typed-to-untyped schema wrapper, reusing the
+	/// original boxed <paramref name="value"/> when the inner schema produced an equal
+	/// value so value-typed fields do not allocate a fresh box per validation.
+	/// </summary>
+	public static ValidationResult<object> ValidateWrapped<T>(IZodSchema<T, T> inner, object? value)
+	{
+		if (value is null && inner is IAcceptsNull acceptsNull)
+			return acceptsNull.ValidateNull();
+
+		if (value is T typedValue)
+		{
+			var result = inner.Validate(typedValue);
+			if (!result.IsSuccess)
+				return ValidationResult<object>.Failure(result.Errors);
+
+			// Reuse the original boxed value when the schema did not transform it.
+			return SameValue(typedValue, result.Value)
+				? ValidationResult<object>.Success(value)
+				: ValidationResult<object>.Success(result.Value);
+		}
+
+		if (TryCoerce<T>(value, out var coerced))
+		{
+			var result = inner.Validate(coerced);
+			return result.IsSuccess
+				? ValidationResult<object>.Success(result.Value)
+				: ValidationResult<object>.Failure(result.Errors);
+		}
+
+		return ValidationResult<object>.Failure(
+			new ValidationError(
+				"invalid_type",
+				$"Expected {GetTypeDisplayName(typeof(T))}, but got {value?.GetType().Name ?? "null"}",
+				[]
+			)
+		);
+	}
+
+	/// <summary>
+	/// Returns <see langword="true"/> when two values are interchangeable: reference
+	/// types compare by reference, value types by value.
+	/// </summary>
+	static bool SameValue<T>(T left, T right)
+	{
+		if (typeof(T).IsValueType)
+			return EqualityComparer<T>.Default.Equals(left, right);
+
+		return ReferenceEquals(left, right);
+	}
 
 	/// <summary>
 	/// Attempts to coerce <paramref name="value"/> to <typeparamref name="T"/>.

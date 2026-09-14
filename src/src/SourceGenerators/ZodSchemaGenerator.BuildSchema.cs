@@ -97,7 +97,8 @@ partial class ZodSchemaGenerator
 				GenerateValidateMethod(writer, outputContext.ZodSchema, cancellationToken);
 				GenerateParseMethod(writer, outputContext.ZodSchema, cancellationToken);
 
-				GenerateCompositionMethods(writer, outputContext.ZodSchema, cancellationToken);
+				if (outputContext.ZodSchema.EnableComposition)
+					GenerateCompositionMethods(writer, outputContext.ZodSchema, cancellationToken);
 			}
 
 			if (isPrimary)

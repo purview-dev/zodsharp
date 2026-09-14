@@ -5,13 +5,13 @@
 		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
 		<!--
 			Keep compiler-facing Roslyn packages aligned with the minimum supported by
-			Purview.SourceGeneratorFramework. Roslyn 4.13 uses the .NET 8 Immutable baseline,
+			Purview.SourceGeneratorFramework. Roslyn 5.x uses the .NET 8 Immutable baseline,
 			allowing the generator assembly to be referenced by net8.0-net10.0 test projects.
 		-->
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.66.27</TUnitVersion>
-		<PurviewSourceGenFramework>1.0.0-prerelease.39</PurviewSourceGenFramework>
+		<PurviewSourceGenFramework>1.0.0-prerelease.42</PurviewSourceGenFramework>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
 	</PropertyGroup>
 	<ItemGroup>

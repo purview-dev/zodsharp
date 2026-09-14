@@ -186,6 +186,7 @@ static partial class SourceGenLibrary
 					customValidation,
 					syncValidation,
 					generateIValidateOptions,
+					zodSchemaAttribute.EnableComposition,
 					isPrimary
 				)
 			);

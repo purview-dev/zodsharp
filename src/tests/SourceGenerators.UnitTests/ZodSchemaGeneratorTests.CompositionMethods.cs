@@ -30,6 +30,32 @@ namespace Testing
 	}
 
 	[Test]
+	public async Task CompositionMethods_GivenDisabledComposition_AreNotGenerated(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source =
+			@"
+namespace Testing
+{
+	[ZodSchema(EnableComposition = false)]
+	public class NoComposeModel
+	{
+		public string? Name { get; set; }
+	}
+}
+";
+
+		// Act
+		var driverResult = await GenerateAsync(source, cancellationToken);
+		var generatedSource = driverResult.GetSource("NoComposeModelSchema");
+
+		// Assert
+		await Assert.That(generatedSource).DoesNotContain("ApplyAnd");
+		await Assert.That(generatedSource).DoesNotContain("ApplyOr");
+		await Assert.That(generatedSource).DoesNotContain("ApplyRefine");
+	}
+
+	[Test]
 	public async Task CompositionMethods_GivenValidValue_ApplyRefineSucceeds(CancellationToken cancellationToken)
 	{
 		// Arrange

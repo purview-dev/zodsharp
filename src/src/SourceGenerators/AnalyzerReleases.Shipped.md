@@ -20,12 +20,12 @@
 | ZODSGEN008 | ZodSharp.SourceGenerator | Error | Invalid return type for custom validation method |
 | ZODSGEN009 | ZodSharp.SourceGenerator | Error | Invalid custom validation method parameter count |
 | ZODSGEN010 | ZodSharp.SourceGenerator | Error | Invalid custom validation model parameter |
-| ZODSGEN011 | ZodSharp.SourceGenerator | Error | Missing or invalid CancellationToken parmaeter |
+| ZODSGEN011 | ZodSharp.SourceGenerator | Error | Missing or invalid CancellationToken parameter |
 | ZODSGEN012 | ZodSharp.SourceGenerator | Error | Generic custom validation method unsupported |
 | ZODSGEN013 | ZodSharp.SourceGenerator | Error | Custom validation method must be static when defined on model type |
 | ZODSGEN014 | ZodSharp.SourceGenerator | Error | Inaccessible custom validation method |
 | ZODSGEN015 | ZodSharp.SourceGenerator | Error | Ambiguous custom validation method overloads |
 | ZODSGEN016 | ZodSharp.SourceGenerator | Error | Invalid custom validation method name |
-| ZODSGEN017 | ZodSharp.SourceGenerator | Error | Invalid abstract custom validation method unsupported |
+| ZODSGEN017 | ZodSharp.SourceGenerator | Error | Abstract custom validation method unsupported |
 | ZODSGEN018 | ZodSharp.SourceGenerator | Error | Partial custom validation method has not been implemented |
-| ZODSGEN019 | ZodSharp.SourceGenerator | Error | Invalidte custom validation method parameter modifier |
+| ZODSGEN019 | ZodSharp.SourceGenerator | Error | Invalid custom validation method parameter modifier |
