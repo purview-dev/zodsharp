@@ -76,9 +76,10 @@ DataAnnotations attributes such as `[Required]`, `[Length]`, `[StringLength]`, `
 var jsonSchema = Z.ToJsonSchema(userSchema, new ToJsonSchemaOptions { Title = "User" });
 ```
 
-## Further reading
+## Documentation
 
-For the complete API surface, performance notes, and cross-platform TypeScript/Zod interop see the [repository README](https://github.com/purview-dev/zodsharp/blob/main/README.md).
+- [Homepage](https://purview.dev/projects/zodsharp/)
+- [Documentation](https://purview.dev/docs/zodsharp/)
 
 ## License
 
