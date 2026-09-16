@@ -54,9 +54,10 @@ var result = schema.Validate(data);
 
 This lets you share schemas defined in TypeScript/Zod with your .NET backend. (Export via `Z.ToJsonSchema` lives in the core package.)
 
-## Further reading
+## Documentation
 
-For the full API, cross-platform TypeScript/Zod interop, and performance notes see the [repository README](https://github.com/purview-dev/zodsharp/blob/main/README.md).
+- [Homepage](https://purview.dev/projects/zodsharp/)
+- [Documentation](https://purview.dev/docs/zodsharp/)
 
 ## License
 

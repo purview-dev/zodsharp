@@ -20,13 +20,19 @@
 		<TargetFrameworks>$(ZodSharpNetTargetFrameworks)</TargetFrameworks>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(IsPackable)' == 'true'">
+	<PropertyGroup Label="Purview site URL metadata">
+		<PurviewHomepage>https://purview.dev/</PurviewHomepage>
+		<PurviewProjectUrl>$(PurviewHomepage)projects/zodsharp/</PurviewProjectUrl>
+		<PurviewDocsUrl>$(PurviewHomepage)docs/zodsharp/</PurviewDocsUrl>
+	</PropertyGroup>
+
+	<PropertyGroup Label="NuGet package metadata" Condition="'$(IsPackable)' == 'true'">
 		<Authors>ZodSharp Contributors;Purview-Dev Contributors</Authors>
-		<PackageProjectUrl>https://github.com/purview-dev/zodsharp</PackageProjectUrl>
 		<Company>Purview.dev</Company>
-		<PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+		<PackageProjectUrl>$(PurviewProjectUrl)</PackageProjectUrl>
 		<RepositoryUrl>$(RepositoryUrl)</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageIcon>purview-logo.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
