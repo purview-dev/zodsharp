@@ -1,9 +1,9 @@
-# ZodSharp
+# Purview.ZodSharp
 
 [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.svg)](https://www.nuget.org/packages/Purview.ZodSharp)
 [![Release](https://github.com/purview-dev/zodsharp/actions/workflows/release.yml/badge.svg)](https://github.com/purview-dev/zodsharp/actions/workflows/release.yml)
 
-**ZodSharp** is a high-performance schema validation library for C#, ported from TypeScript [Zod](https://github.com/colinhacks/zod). It features zero-allocation validation, struct-based rules, fluent API, and source generator support for maximum performance.
+**Purview.ZodSharp** is a high-performance schema validation library for C#, ported from TypeScript [Zod](https://github.com/colinhacks/zod). It features zero-allocation validation, struct-based rules, fluent API, and source generator support for maximum performance.
 
 This project is a fork of [guinhx/ZodSharp](https://github.com/guinhx/ZodSharp), maintained at [github.com/purview-dev/zodsharp](https://github.com/purview-dev/zodsharp) under the `Purview.*` package IDs.
 
@@ -208,7 +208,7 @@ if (!result.IsSuccess)
 
 ## Performance
 
-ZodSharp is designed for maximum performance with zero-allocation validation and struct-based rules. Here's what makes it fast:
+Purview.ZodSharp is designed for maximum performance with zero-allocation validation and struct-based rules. Here's what makes it fast:
 
 ### Performance Characteristics
 
@@ -237,7 +237,7 @@ Full results for every suite are in the [performance README](src/src/Benchmarks/
 
 ### Performance Optimizations
 
-ZodSharp implements several optimizations for maximum performance:
+Purview.ZodSharp implements several optimizations for maximum performance:
 
 #### 1. Zero-allocation Validation
 
@@ -373,7 +373,7 @@ var result = schema.Validate(null); // "unknown"
 
 ### JSON Integration
 
-ZodSharp ships separate integration packages for the two major .NET JSON libraries.
+Purview.ZodSharp ships separate integration packages for the two major .NET JSON libraries.
 
 #### System.Text.Json (`Purview.ZodSharp.SystemTextJson`)
 
@@ -410,11 +410,11 @@ var converter = schema.CreateValidatingConverter();
 
 ### JSON Schema Interoperability
 
-Share schemas between TypeScript (Zod) and C# (ZodSharp) using JSON Schema. This enables infinite interoperability, allowing you to define a schema in one language and reuse it in another.
+Share schemas between TypeScript (Zod) and C# (Purview.ZodSharp) using JSON Schema. This enables infinite interoperability, allowing you to define a schema in one language and reuse it in another.
 
 The export API (`Z.ToJsonSchema`) lives in the core `Purview.ZodSharp` package. The import API (`Z.FromJsonSchema`) is provided by the JSON integration package you choose — either `Purview.ZodSharp.SystemTextJson` or `Purview.ZodSharp.NewtonsoftJson`.
 
-#### Export to JSON Schema (ZodSharp -> JSON Schema)
+#### Export to JSON Schema (Purview.ZodSharp -> JSON Schema)
 
 ```csharp
 var userSchema = Z.Object()
@@ -440,7 +440,7 @@ using ZodSharp.JsonSchema;
 var newtonsoftJson = JsonConvert.SerializeObject(jsonSchema, JsonSchemaSerializerOptions.Default);
 ```
 
-#### Import from JSON Schema (JSON Schema -> ZodSharp)
+#### Import from JSON Schema (JSON Schema -> Purview.ZodSharp)
 
 Add either `Purview.ZodSharp.SystemTextJson` or `Purview.ZodSharp.NewtonsoftJson` to your project, then:
 
@@ -454,7 +454,7 @@ var jsonSchemaString = @"{
     ""required"": [""name"", ""email""]
 }";
 
-// Parse into ZodSharp schema
+// Parse into Purview.ZodSharp schema
 var userSchema = Z.FromJsonSchema(jsonSchemaString);
 
 // Validate data
@@ -478,7 +478,7 @@ const jsonSchema = z.toJSONSchema(UserSchema);
 // Send jsonSchema to backend...
 ```
 
-**Backend (C#/ZodSharp):**
+**Backend (C#/Purview.ZodSharp):**
 
 ```csharp
 // Receive jsonSchema...

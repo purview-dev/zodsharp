@@ -3,8 +3,8 @@
  *
  * These tests verify that:
  * 1. Zod validates the shared fixtures correctly (produces a manifest).
- * 2. JSON produced by ZodSharp (C#) can be parsed by Zod and vice-versa.
- * 3. The validation outcomes match between Zod and ZodSharp for the same data.
+ * 2. JSON produced by Purview.ZodSharp (C#) can be parsed by Zod and vice-versa.
+ * 3. The validation outcomes match between Zod and Purview.ZodSharp for the same data.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";

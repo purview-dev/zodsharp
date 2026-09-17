@@ -1,6 +1,6 @@
 # JSON Schema Export
 
-Export a ZodSharp schema to a JSON Schema (Draft 2020-12) definition with `Z.ToJsonSchema`, which lives in the core `Purview.ZodSharp` package.
+Export a Purview.ZodSharp schema to a JSON Schema (Draft 2020-12) definition with `Z.ToJsonSchema`, which lives in the core `Purview.ZodSharp` package.
 
 ```csharp
 using ZodSharp;
@@ -67,4 +67,4 @@ var json = JsonConvert.SerializeObject(jsonSchema, JsonSchemaSerializerOptions.D
 
 ## Round-trip
 
-Import the exported definition back into ZodSharp with `Z.FromJsonSchema` from an integration package — see [JSON Schema Import](JsonSchema-Import.md) and the round-trip example in the example app (`JsonSchemaExamples`).
+Import the exported definition back into Purview.ZodSharp with `Z.FromJsonSchema` from an integration package — see [JSON Schema Import](JsonSchema-Import.md) and the round-trip example in the example app (`JsonSchemaExamples`).

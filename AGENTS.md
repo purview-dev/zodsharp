@@ -6,7 +6,7 @@ If another instruction file (for example `.github/copilot-instructions.md`) conf
 
 ## Repository overview
 
-ZodSharp is a high-performance schema validation library for C#, ported from TypeScript [Zod](https://github.com/colinhacks/zod). It uses struct-based rules and `Span<T>` to minimise allocations, and ships a compile-time source generator for maximum performance.
+Purview.ZodSharp is a high-performance schema validation library for C#, ported from TypeScript [Zod](https://github.com/colinhacks/zod). It uses struct-based rules and `Span<T>` to minimise allocations, and ships a compile-time source generator for maximum performance.
 
 - Fork of [guinhx/ZodSharp](https://github.com/guinhx/ZodSharp), maintained at `purview-dev/zodsharp`.
 - Public API namespaces are `ZodSharp.*`; packages and assemblies are published under the `Purview.ZodSharp.*` package IDs.
@@ -102,7 +102,7 @@ Keep `purview-build.json`'s `PackValidation` requirements in sync with any packa
 
 ## Cross-platform fixtures
 
-Schemas and fixtures shared between TypeScript/Zod and C#/ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume; the C# cross-platform tests write output to `src/tests/cross-platform/output/`, which the vitest tests (`tests/ts/cross-platform.test.ts`) read. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
+Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume; the C# cross-platform tests write output to `src/tests/cross-platform/output/`, which the vitest tests (`tests/ts/cross-platform.test.ts`) read. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
 
 ## Commit conventions
 

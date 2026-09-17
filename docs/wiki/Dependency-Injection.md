@@ -1,6 +1,6 @@
 # Dependency Injection
 
-ZodSharp can resolve validators through an `IZodSchemaFactory` registry, and can validate options objects through `IValidateOptions<T>`.
+Purview.ZodSharp can resolve validators through an `IZodSchemaFactory` registry, and can validate options objects through `IValidateOptions<T>`.
 
 ## IZodSchemaFactory
 
