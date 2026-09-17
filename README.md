@@ -114,8 +114,12 @@ var urlSchema = Z.String().Url();
 var urlResult = urlSchema.Validate("https://example.com");
 
 // UUID validation
-var uuidSchema = Z.String().Uuid();
+var uuidSchema = Z.String().UUID();
 var uuidResult = uuidSchema.Validate("550e8400-e29b-41d4-a716-446655440000");
+
+// Version-specific UUID validation (e.g. RFC 9562 version 7)
+var uuidV7Schema = Z.String().UUID(UuidVersion.V7);
+var uuidV7Result = uuidV7Schema.Validate("0192b4c1-7a9b-7f5e-9a3c-2d4e6f8a0b1c");
 
 // String transformations
 var trimmedSchema = Z.String().Trim();

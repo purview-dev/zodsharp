@@ -74,11 +74,38 @@ public class ZodStringTests
 
 	[Test]
 	[Arguments("550e8400-e29b-41d4-a716-446655440000", true)]
+	[Arguments("550e8400-e29b-11d4-a716-446655440000", true)]
+	[Arguments("0192b4c1-7a9b-7f5e-9a3c-2d4e6f8a0b1c", true)]
+	[Arguments("550E8400-E29B-41D4-A716-446655440000", true)]
+	[Arguments("00000000-0000-0000-0000-000000000000", true)]
+	[Arguments("ffffffff-ffff-ffff-ffff-ffffffffffff", true)]
+	[Arguments("550e8400-e29b-01d4-a716-446655440000", false)]
+	[Arguments("550e8400-e29b-91d4-a716-446655440000", false)]
+	[Arguments("550e8400-e29b-f1d4-a716-446655440000", false)]
+	[Arguments("550e8400-e29b-41d4-0716-446655440000", false)]
+	[Arguments("550e8400-e29b-41d4-5716-446655440000", false)]
+	[Arguments("550e8400-e29b-41d4-c716-446655440000", false)]
+	[Arguments("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF", false)]
 	[Arguments("not-a-uuid", false)]
 	[Arguments("550e8400-e29b-41d4-a716", false)]
 	public async Task StringUuid_GivenValue_ReturnsExpectedResult(string value, bool expected)
 	{
 		var result = Z.String().UUID().Validate(value);
+
+		await Assert.That(result.IsSuccess).IsEqualTo(expected);
+	}
+
+	[Test]
+	[Arguments(UuidVersion.V7, "0192b4c1-7a9b-7f5e-9a3c-2d4e6f8a0b1c", true)]
+	[Arguments(UuidVersion.V7, "550e8400-e29b-41d4-a716-446655440000", false)]
+	[Arguments(UuidVersion.V7, "0192b4c1-7a9b-7f5e-03a3-2d4e6f8a0b1c", false)]
+	[Arguments(UuidVersion.V4, "550e8400-e29b-41d4-a716-446655440000", true)]
+	[Arguments(UuidVersion.V4, "00000000-0000-0000-0000-000000000000", false)]
+	[Arguments(UuidVersion.V4, "ffffffff-ffff-ffff-ffff-ffffffffffff", false)]
+	[Arguments(UuidVersion.V8, "550e8400-e29b-81d4-a716-446655440000", true)]
+	public async Task StringUuid_GivenVersion_ReturnsExpectedResult(UuidVersion version, string value, bool expected)
+	{
+		var result = Z.String().UUID(version).Validate(value);
 
 		await Assert.That(result.IsSuccess).IsEqualTo(expected);
 	}

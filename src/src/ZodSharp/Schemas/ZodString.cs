@@ -158,13 +158,26 @@ public class ZodString : ZodType<string>
 	}
 
 	/// <summary>
-	/// Adds a UUID format validation.
+	/// Adds a UUID format validation. Accepts RFC 9562 versions 1-8 with the RFC
+	/// variant nibble, plus the nil and max UUIDs.
 	/// </summary>
 	/// <param name="message">Optional error message</param>
 	/// <returns>This schema for method chaining</returns>
 	public ZodString UUID(string? message = null)
 	{
 		AddRule(new UUIDRule(message));
+		return this;
+	}
+
+	/// <summary>
+	/// Adds a UUID format validation requiring a specific RFC 9562 version.
+	/// </summary>
+	/// <param name="version">The required UUID version</param>
+	/// <param name="message">Optional error message</param>
+	/// <returns>This schema for method chaining</returns>
+	public ZodString UUID(UuidVersion version, string? message = null)
+	{
+		AddRule(new UUIDRule(version, message));
 		return this;
 	}
 
