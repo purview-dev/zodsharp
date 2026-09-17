@@ -18,7 +18,7 @@ ZodSharp is a high-performance schema validation library for C#, ported from Typ
 assets/                Package assets (purview-logo.png) referenced by Directory.Build.props
 src/
   ZodSharp.slnx        Solution entry point
-  Directory.Build.props / Directory.Build.targets   Purview.DotNetProjectSdk imports
+  Directory.Build.props / Directory.Build.targets   Purview.BuildSdk imports
   src/
     ZodSharp/          Core validation library + JSON Schema export (Z.ToJsonSchema)
     SourceGenerators/  Compile-time [ZodSchema] generator (netstandard2.0, Roslyn)
@@ -32,18 +32,18 @@ src/
     cross-platform/    Output directory shared between the C# and TS cross-platform tests
 src/ts/                TypeScript (Zod) schema + fixture generation; consumed by C# and vitest tests
 tests/ts/              Vitest cross-platform tests
-.agents/               Skills/prompts bundled from Purview.DotNetProjectSdk and Purview.SourceGeneratorFramework
+.agents/               Skills/prompts bundled from Purview.BuildSdk and Purview.SourceGeneratorFramework
 ```
 
 ## Build system
 
-The build is driven by `Purview.DotNetProjectSdk`, imported via `src/Directory.Build.props` (`Sdk.props`) and `src/Directory.Build.targets` (`Sdk.targets`). Key configuration:
+The build is driven by `Purview.BuildSdk`, imported via `src/Directory.Build.props` (`Sdk.props`) and `src/Directory.Build.targets` (`Sdk.targets`). Key configuration:
 
 - `NamespacePrefix` is `ZodSharp`.
 - Package version comes from `package.json` (SDK version detection).
 - Package identities are `Purview.ZodSharp.*`; the SDK derives `AssemblyName`/`PackageId` from `RootNamespace` unless overridden explicitly.
 - Package versions are managed centrally in `Directory.Packages.props` (Central Package Management).
-- `global.json` pins the `Purview.DotNetProjectSdk` MSBuild SDK version.
+- `global.json` pins the `Purview.BuildSdk` MSBuild SDK version.
 - Pack layout for all packages is validated by `purview-build.json` (`PackValidation.RequiredContent`).
 
 Consult `.agents/skills/sdk-configuration-reference/SKILL.md`, `.agents/skills/sdk-project-behavior-and-detection/SKILL.md`, and `.agents/skills/project-placement-defaults/SKILL.md` before changing build/SDK configuration or adding/moving projects.

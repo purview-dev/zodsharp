@@ -13,7 +13,7 @@
 		<NoWarn>$(NoWarn);CA1031;CA1510;</NoWarn>
 	</PropertyGroup>
 
-	<Import Sdk="Purview.DotNetProjectSdk" Project="Sdk.props" />
+	<Import Sdk="Purview.BuildSdk" Project="Sdk.props" />
 
 	<PropertyGroup Condition="'$(IsTestProject)' == 'true' OR '$(OutputType)' == 'Exe'">
 		<TargetFramework></TargetFramework>
