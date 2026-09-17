@@ -1,6 +1,6 @@
 # Release Flow
 
-ZodSharp releases are driven by the shared [purview-dev/build](https://github.com/purview-dev/build) pipeline through the GitHub Actions workflows in `.github/workflows/`.
+Purview.ZodSharp releases are driven by the shared [purview-dev/build](https://github.com/purview-dev/build) pipeline through the GitHub Actions workflows in `.github/workflows/`.
 
 ## Versioning
 

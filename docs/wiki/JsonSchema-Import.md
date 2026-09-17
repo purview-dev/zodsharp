@@ -1,6 +1,6 @@
 # JSON Schema Import
 
-Import a JSON Schema into a ZodSharp schema with `Z.FromJsonSchema`. This API is provided by the JSON integration packages — reference either `Purview.ZodSharp.SystemTextJson` or `Purview.ZodSharp.NewtonsoftJson` (both expose the same surface).
+Import a JSON Schema into a Purview.ZodSharp schema with `Z.FromJsonSchema`. This API is provided by the JSON integration packages — reference either `Purview.ZodSharp.SystemTextJson` or `Purview.ZodSharp.NewtonsoftJson` (both expose the same surface).
 
 ```csharp
 using ZodSharp;

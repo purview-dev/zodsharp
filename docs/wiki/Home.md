@@ -1,6 +1,6 @@
-# ZodSharp Wiki
+# Purview.ZodSharp Wiki
 
-ZodSharp is a high-performance schema validation library for C#, ported from TypeScript [Zod](https://github.com/colinhacks/zod). It uses struct-based rules and `Span<T>` to minimise allocations, ships a fluent API that mirrors Zod, exports and imports JSON Schema, and includes a compile-time source generator for maximum performance.
+Purview.ZodSharp is a high-performance schema validation library for C#, ported from TypeScript [Zod](https://github.com/colinhacks/zod). It uses struct-based rules and `Span<T>` to minimise allocations, ships a fluent API that mirrors Zod, exports and imports JSON Schema, and includes a compile-time source generator for maximum performance.
 
 This wiki is the project documentation hub for the core API, source generator, JSON integration packages, and the cross-platform TypeScript tooling. It is a fork of [guinhx/ZodSharp](https://github.com/guinhx/ZodSharp), maintained under the `Purview.*` package IDs.
 
