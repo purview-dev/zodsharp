@@ -39,7 +39,7 @@ var result = userSchema.Validate(userData);
 - `type` — `string` / `number` / `integer` / `boolean` / `null` / `object` / `array`.
 - `enum` → `ZodUnion` of literals (a single member becomes a literal); `const` → literal.
 - `anyOf` / `oneOf` → `ZodUnion`; `allOf` → first schema.
-- String constraints — `minLength`, `maxLength`, `pattern`, and `format` (`email`, `uri`, `uuid`).
+- String constraints — `minLength`, `maxLength`, `pattern`, and `format` (`email`, `uri`, `uuid`). The `uuid`/`guid` format maps to the versionless `.UUID()`; JSON Schema has no versioned `uuid` format, so a versioned `.UUID(UuidVersion.V7)` schema exports back as plain `format: "uuid"`.
 - Numeric constraints — `minimum`, `maximum`, `multipleOf`; `integer` additionally applies `.Int()`.
 - Objects — `required` and optional fields via `Z.Object().Field(...)`.
 - Arrays — `items`, `minItems`, `maxItems`.

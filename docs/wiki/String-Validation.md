@@ -22,7 +22,8 @@ var result = schema.Validate("user@example.com");
 | `Phone` | `Phone(string? message)` | `PhoneRule` — digits plus `() .+-`, at least one digit |
 | `CreditCard` | `CreditCard(string? message)` | `CreditCardRule` — Luhn algorithm |
 | `Base64String` | `Base64String(string? message)` | `Base64StringRule` — `Convert.FromBase64String` |
-| `UUID` | `UUID(string? message)` | `UUIDRule` — `xxxxxxxx-xxxx-...` regex |
+| `UUID` | `UUID(string? message)` | `UUIDRule` — char-scan, RFC 9562 versions 1-8, variant nibble `8-9/a-b`, plus nil and max |
+| `UUID` | `UUID(UuidVersion version, string? message)` | `UUIDRule` — requires a specific version (e.g. `V7`), variant nibble `8-9/a-b`, nil/max rejected |
 | `StartsWith` | `StartsWith(string prefix, string? message)` | `StartsWithRule` — ordinal comparison |
 | `EndsWith` | `EndsWith(string suffix, string? message)` | `EndsWithRule` — ordinal comparison |
 | `ToLower` | `ToLower()` | wraps a transform (`ToLowerInvariant`), returns a `ZodString` |
@@ -41,6 +42,8 @@ var email = Z.String().Email().Validate("user@example.com");
 var url = Z.String().Url().Validate("https://example.com");
 
 var uuid = Z.String().UUID().Validate("550e8400-e29b-41d4-a716-446655440000");
+
+var uuidV7 = Z.String().UUID(UuidVersion.V7).Validate("0192b4c1-7a9b-7f5e-9a3c-2d4e6f8a0b1c");
 
 var prefix = Z.String().StartsWith("https://");
 var suffix = Z.String().EndsWith(".com");

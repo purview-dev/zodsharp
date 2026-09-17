@@ -98,6 +98,24 @@ All valid-input paths are zero-allocation:
 | ValidateObject_Allocations | 94.28 ns | 2.06 |
 | ValidateArray_Allocations | 1,180.24 ns | 25.82 |
 
+## UUID validation (`UuidPerformanceTests`)
+
+UUID validation uses a zero-allocation char-scan (version nibble at position 14, variant nibble at position 19) instead of a regex. Measured against the previous compiled regex:
+
+| Scenario | Mean | Allocated |
+|---|---|---|
+| Rule_CharScan_Valid (`.UUID()`) | 21.99 ns | 0 B |
+| Rule_LegacyRegex_Valid (previous implementation) | 27.50 ns | 0 B |
+| Rule_CharScan_Invalid | < 1 ns | 0 B |
+| Rule_LegacyRegex_Invalid | 14.22 ns | 0 B |
+| Rule_CharScan_Nil | 20.67 ns | 0 B |
+| Rule_CharScanV7_Valid (`.UUID(UuidVersion.V7)`) | 20.89 ns | 0 B |
+| Rule_CharScanV7_Mismatch | 20.11 ns | 0 B |
+| Schema_UUID_Valid | 29.80 ns | 0 B |
+| Schema_UUIDV7_Valid | 26.64 ns | 0 B |
+
+The char-scan is ~20% faster than the previous regex on the valid path, is version-aware at no extra cost, and rejects wrong-length strings in under a nanosecond.
+
 ## Optimizations that make it fast
 
 1. **Struct-based rules** — every rule is a `readonly record struct` implementing `IValidationRule<T>`, so there is no per-validation object allocation.

@@ -10,7 +10,7 @@
 		-->
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
-		<TUnitVersion>1.66.27</TUnitVersion>
+		<TUnitVersion>1.68.4</TUnitVersion>
 		<PurviewSourceGenFramework>1.0.0-prerelease.42</PurviewSourceGenFramework>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
 	</PropertyGroup>

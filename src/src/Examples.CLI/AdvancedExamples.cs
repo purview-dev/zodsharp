@@ -36,6 +36,10 @@ static class AdvancedExamples
 		var uuidResult = uuidSchema.Validate("550e8400-e29b-41d4-a716-446655440000");
 		Console.WriteLine($"UUID validation: {uuidResult.IsSuccess}");
 
+		var uuidV7Schema = Z.String().UUID(UuidVersion.V7);
+		var uuidV7Result = uuidV7Schema.Validate("0192b4c1-7a9b-7f5e-9a3c-2d4e6f8a0b1c");
+		Console.WriteLine($"UUID v7 validation: {uuidV7Result.IsSuccess}");
+
 		var prefixSchema = Z.String().StartsWith("https://");
 		var prefixResult = prefixSchema.Validate("https://example.com");
 		Console.WriteLine($"StartsWith validation: {prefixResult.IsSuccess}");
