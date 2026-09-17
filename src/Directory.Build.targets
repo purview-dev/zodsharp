@@ -12,5 +12,5 @@
 			>10.0.10</MicrosoftExtensionsDependencyInjectionAbstractionsVersion>-->
 	</PropertyGroup>
 
-	<Import Sdk="Purview.DotNetProjectSdk" Project="Sdk.targets" />
+	<Import Sdk="Purview.BuildSdk" Project="Sdk.targets" />
 </Project>
