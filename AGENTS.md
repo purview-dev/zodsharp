@@ -15,7 +15,7 @@ Purview.ZodSharp is a high-performance schema validation library for C#, ported 
 ## Repository layout
 
 ```
-assets/                Package assets (purview-logo.png) referenced by Directory.Build.props
+assets/                Package assets (purview-logo-light.png) referenced by Directory.Build.props
 src/
   ZodSharp.slnx        Solution entry point
   Directory.Build.props / Directory.Build.targets   Purview.BuildSdk imports
@@ -96,7 +96,7 @@ The generator and analyzer are built with `Purview.SourceGeneratorFramework`:
 
 ## Packing and package READMEs
 
-Each package ships its own `README.md`, placed in the project's `Sdk/` folder (for example `src/src/ZodSharp/Sdk/README.md`). The SDK's `PurviewAutoSdkPack` automatically maps `Sdk/*.md` to the package root and `Sdk/buildTransitive/**` to `buildTransitive/`, and the repo-root `README.md` is skipped when a package already packs its own README. Packages also ship `purview-logo.png` (linked via `src/Directory.Build.props`) and the core package ships `buildTransitive/Purview.ZodSharp.props`.
+Each package ships its own `README.md`, placed in the project's `Sdk/` folder (for example `src/src/ZodSharp/Sdk/README.md`). The SDK's `PurviewAutoSdkPack` automatically maps `Sdk/*.md` to the package root and `Sdk/buildTransitive/**` to `buildTransitive/`, and the repo-root `README.md` is skipped when a package already packs its own README. Packages also ship `purview-logo-light.png` (linked via `src/Directory.Build.props`) and the core package ships `buildTransitive/Purview.ZodSharp.props`.
 
 Keep `purview-build.json`'s `PackValidation` requirements in sync with any packaging change.
 
@@ -114,4 +114,4 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 - Relevant tests pass.
 - `just lint-check` (CSharpier) reports no formatting changes.
 - Generated code is deterministic and reviewable; no scope leaks in `CodeWriter` output.
-- Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo.png`).
+- Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`).
