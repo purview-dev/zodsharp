@@ -1,12 +1,12 @@
 # Cross-Platform Interop
 
-ZodSharp ships a cross-platform fixture pipeline that proves the C# implementation agrees with TypeScript/Zod. The TypeScript side runs on [Bun](https://bun.sh); the C# side runs under the TUnit test suite.
+Purview.ZodSharp ships a cross-platform fixture pipeline that proves the C# implementation agrees with TypeScript/Zod. The TypeScript side runs on [Bun](https://bun.sh); the C# side runs under the TUnit test suite.
 
 ## The schema
 
 Both sides define the same user schema — TypeScript `UserSchema` in `src/ts/schema.ts` and the C# `CrossPlatformUserSchema` in `src/tests/SystemTextJson.UnitTests/CrossPlatformFixtures.cs` (mirrored by `NewtonsoftJson.UnitTests`):
 
-| Field | Zod (TS) | ZodSharp (C#) |
+| Field | Zod (TS) | Purview.ZodSharp (C#) |
 |---|---|---|
 | `name` | `z.string().min(1)` | min-length 1 |
 | `age` | `z.number().int().min(0).max(120)` | `0..120` integer |

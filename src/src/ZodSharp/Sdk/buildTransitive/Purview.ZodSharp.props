@@ -1,7 +1,7 @@
 <Project>
 	<ItemGroup Label="Compiler Visible SDK Properties">
 		<CompilerVisibleProperty Include="DisableZodSharpSourceGenerator">
-			<Description>Specifies whether to disable ZodSharp source generators.</Description>
+			<Description>Specifies whether to disable Purview.ZodSharp source generators.</Description>
 		</CompilerVisibleProperty>
 	</ItemGroup>
 </Project>

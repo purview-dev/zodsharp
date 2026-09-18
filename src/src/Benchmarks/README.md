@@ -1,6 +1,6 @@
-# ZodSharp Performance Benchmarks
+# Purview.ZodSharp Performance Benchmarks
 
-BenchmarkDotNet performance suite for ZodSharp. This is a `net10.0` console application; every suite uses `[MemoryDiagnoser]` plus a `[SimpleJob]` profile so time and allocation data are captured together.
+BenchmarkDotNet performance suite for Purview.ZodSharp. This is a `net10.0` console application; every suite uses `[MemoryDiagnoser]` plus a `[SimpleJob]` profile so time and allocation data are captured together.
 
 ## Structure
 

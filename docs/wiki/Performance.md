@@ -1,6 +1,6 @@
 # Performance
 
-ZodSharp is designed for maximum performance: validation rules are `readonly record struct`s, hot paths use `Span<T>`, and the source generator emits direct typed codegen with no reflection. The committed BenchmarkDotNet suite measures every scenario.
+Purview.ZodSharp is designed for maximum performance: validation rules are `readonly record struct`s, hot paths use `Span<T>`, and the source generator emits direct typed codegen with no reflection. The committed BenchmarkDotNet suite measures every scenario.
 
 ## Running the benchmarks
 
