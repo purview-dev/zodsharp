@@ -21,7 +21,7 @@
 				"analyzers/dotnet/cs/Purview.ZodSharp.SourceGenerators.dll",
 				"buildTransitive/Purview.ZodSharp.props",
 				"README.md",
-				"purview-logo.png"
+				"purview-logo-light.png"
 			],
 			"purview.zodsharp.aspnetcore": [
 				"lib/net10.0/Purview.ZodSharp.AspNetCore.dll",
@@ -31,7 +31,7 @@
 				"lib/net8.0/Purview.ZodSharp.AspNetCore.dll",
 				"lib/net8.0/Purview.ZodSharp.AspNetCore.xml",
 				"README.md",
-				"purview-logo.png"
+				"purview-logo-light.png"
 			],
 			"purview.zodsharp.newtonsoftjson": [
 				"lib/net10.0/Purview.ZodSharp.NewtonsoftJson.dll",
@@ -41,7 +41,7 @@
 				"lib/net8.0/Purview.ZodSharp.NewtonsoftJson.dll",
 				"lib/net8.0/Purview.ZodSharp.NewtonsoftJson.xml",
 				"README.md",
-				"purview-logo.png"
+				"purview-logo-light.png"
 			],
 			"purview.zodsharp.systemtextjson": [
 				"lib/net10.0/Purview.ZodSharp.SystemTextJson.dll",
@@ -51,7 +51,7 @@
 				"lib/net8.0/Purview.ZodSharp.SystemTextJson.dll",
 				"lib/net8.0/Purview.ZodSharp.SystemTextJson.xml",
 				"README.md",
-				"purview-logo.png"
+				"purview-logo-light.png"
 			]
 		},
 		"ForbiddenContent": {}

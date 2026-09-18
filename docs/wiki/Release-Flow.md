@@ -18,7 +18,7 @@ Package identities are `Purview.ZodSharp.*` (core, SystemTextJson, NewtonsoftJso
 Both consume `purview-build.json`:
 
 - `Build` — solution (`src/ZodSharp.slnx`), test root (`src/tests`), patterns (`*Tests.csproj`), filter (`/*/*/*/*`).
-- `PackValidation` — requires symbol packages/files and validates `RequiredContent` per package (per-TFM DLL + XML, analyzer assemblies and `buildTransitive/Purview.ZodSharp.props` for the core package, `README.md` and `purview-logo.png` for every package).
+- `PackValidation` — requires symbol packages/files and validates `RequiredContent` per package (per-TFM DLL + XML, analyzer assemblies and `buildTransitive/Purview.ZodSharp.props` for the core package, `README.md` and `purview-logo-light.png` for every package).
 - `Release.Mode` — `None` for PR/local runs.
 
 ## Pipeline commands
