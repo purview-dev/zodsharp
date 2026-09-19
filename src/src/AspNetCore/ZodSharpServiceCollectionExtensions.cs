@@ -36,4 +36,26 @@ public static class ZodSharpServiceCollectionExtensions
 
 		return services;
 	}
+
+	/// <summary>
+	/// Registers <see cref="ZodExceptionHandler"/> as an <see cref="Microsoft.AspNetCore.Diagnostics.IExceptionHandler"/>
+	/// and configures <see cref="ZodProblemDetailsOptions"/>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Requires <c>app.UseExceptionHandler()</c> in the request pipeline for the handler to be invoked.
+	/// </para>
+	/// </remarks>
+	public static IServiceCollection AddZodSharpProblemDetails(
+		this IServiceCollection services,
+		Action<ZodProblemDetailsOptions>? configure = null
+	)
+	{
+		if (configure is not null)
+			services.Configure(configure);
+
+		services.AddExceptionHandler<ZodExceptionHandler>();
+
+		return services;
+	}
 }
