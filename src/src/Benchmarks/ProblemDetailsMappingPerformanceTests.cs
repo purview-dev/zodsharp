@@ -7,7 +7,7 @@ namespace ZodSharp;
 
 /// <summary>
 /// Performance and allocation profile for converting a thrown <see cref="ZodException"/> into
-/// <see cref="Microsoft.AspNetCore.Http.HttpValidationProblemDetails"/>.
+/// <see cref="HttpValidationProblemDetails"/>.
 /// </summary>
 [MemoryDiagnoser]
 [SimpleJob(launchCount: 1, warmupCount: 3, iterationCount: 5)]

@@ -119,8 +119,7 @@ public class ZodExceptionHandlerTests
 
 	static DefaultHttpContext NewContext()
 	{
-		DefaultHttpContext httpContext = new();
-		httpContext.TraceIdentifier = "trace-1";
+		DefaultHttpContext httpContext = new() { TraceIdentifier = "trace-1" };
 		httpContext.Response.Body = new MemoryStream();
 		return httpContext;
 	}

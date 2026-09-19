@@ -28,10 +28,10 @@ public class ErrorTypeRegistryTests
 		registry.Register(new ErrorType("duplicate"));
 
 		// Act
-		var act = () => registry.Register(new ErrorType("duplicate"));
+		void IAct() => registry.Register(new ErrorType("duplicate"));
 
 		// Assert
-		await Assert.That(act).Throws<InvalidOperationException>();
+		await Assert.That(IAct).Throws<InvalidOperationException>();
 	}
 
 	[Test]

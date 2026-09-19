@@ -21,5 +21,11 @@
 			ReferenceOutputAssembly="false"
 			OutputItemType="Analyzer"
 		/>
+		<ProjectReference
+			Include="../AspNetCore.SourceGenerators/AspNetCore.SourceGenerators.csproj"
+			PrivateAssets="all"
+			ReferenceOutputAssembly="false"
+			OutputItemType="Analyzer"
+		/>
 	</ItemGroup>
 </Project>

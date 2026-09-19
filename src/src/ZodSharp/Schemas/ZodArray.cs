@@ -105,6 +105,7 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>
 		if (typeof(T).IsValueType)
 			return EqualityComparer<T>.Default.Equals(left, right);
 
+		// Reference types are interchangeable only when they are the same instance.
 		return ReferenceEquals(left, right);
 	}
 

@@ -9,6 +9,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Reference the real ErrorType type so the test compilation does not rely on a stub. -->
+		<ProjectReference Include="..\..\src\AspNetCore\AspNetCore.csproj" />
 		<ProjectReference Include="..\..\src\AspNetCore.Analyzers\AspNetCore.Analyzers.csproj" />
 	</ItemGroup>
 </Project>

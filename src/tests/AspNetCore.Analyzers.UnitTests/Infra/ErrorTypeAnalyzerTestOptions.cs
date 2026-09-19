@@ -5,21 +5,16 @@ public sealed record ErrorTypeAnalyzerTestOptions : AnalyzerTestOptions
 	public ErrorTypeAnalyzerTestOptions()
 	{
 		AdditionalNamespaces = ["ZodSharp.AspNetCore"];
+		AdditionalAssemblyTypes = [typeof(ErrorType)];
+		// The generator emits this attribute at compile time; the analyzer-only harness
+		// provides the same surface so the analyzer can resolve it.
 		AdditionalSources =
 		[
 			"""
 				namespace ZodSharp.AspNetCore;
 
-				public sealed record ErrorType(
-					string Code,
-					string? Description = null,
-					int HttpStatus = 400,
-					string? Title = null,
-					string? Type = null,
-					string? MessageFormat = null)
-				{
-					public System.Collections.Generic.IReadOnlyList<string> Parameters { get; init; } = [];
-				}
+				[global::System.AttributeUsage(global::System.AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
+				public sealed class ErrorTypeAttribute : global::System.Attribute { }
 				""",
 		];
 	}
