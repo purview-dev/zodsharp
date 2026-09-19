@@ -55,7 +55,7 @@ app.UseExceptionHandler();
 Register an `ErrorType` and map error codes to HTTP statuses and formatted messages:
 
 ```csharp
-public static class ConcurrentErrorType
+public static partial class ConcurrentErrorType
 {
     public static readonly ErrorType SaveFailed = new(
         Code: "aggregate_save_failed",
@@ -74,6 +74,31 @@ A `ValidationError` carrying `parameters` such as `["AggregateId"] = "agg-123"` 
 `409 Conflict` response whose message reads `Aggregate 'agg-123' (of type Invoice) failed to save`. The
 analyzer `ZODSASP001` (bundled with the package) warns when a `MessageFormat` placeholder is not declared
 in `Parameters`.
+
+### Generated `Create` / `Throw` helpers
+
+Because the class above is `partial`, the bundled source generator adds strongly typed helpers derived
+from the declared `Parameters`:
+
+```csharp
+// ValidationError with the code, the formatted message, and the named parameters:
+var error = ConcurrentErrorType.CreateSaveFailed("agg-123", "Invoice");
+
+// ZodException carrying that ValidationError:
+ConcurrentErrorType.ThrowSaveFailed("agg-123", "Invoice");
+
+// Path and structured issue metadata can be populated too:
+var error = ConcurrentErrorType.CreateSaveFailed(
+    "agg-123",
+    "Invoice",
+    path: ["order", "items", "[0]"],
+    origin: "collection",
+    minimum: 1,
+    maximum: 10,
+    inclusive: true);
+```
+
+The analyzer `ZODSASP002` warns when an `ErrorType` field's containing class is not declared `partial`.
 
 ## Documentation
 

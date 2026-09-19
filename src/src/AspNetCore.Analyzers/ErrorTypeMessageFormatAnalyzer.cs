@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace ZodSharp.AspNetCore.Analyzers;
 
@@ -22,16 +22,12 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 
 	static readonly Regex s_placeholderRegex = new(@"\{([A-Za-z_][A-Za-z0-9_]*)\}", RegexOptions.Compiled);
 
-	static readonly DiagnosticDescriptor s_descriptor = new(
-		id: DiagnosticId,
-		title: "MessageFormat placeholder is not declared in Parameters",
-		messageFormat: "MessageFormat placeholder '{0}' is not declared in ErrorType.Parameters",
-		category: "ZodSharp.AspNetCore",
-		defaultSeverity: DiagnosticSeverity.Warning,
-		isEnabledByDefault: true
-	);
+	static readonly ImmutableArray<DiagnosticDescriptor> s_supportedDiagnostics =
+	[
+		DiagnosticLibrary.MessageFormatPlaceholderNotDeclared,
+	];
 
-	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [s_descriptor];
+	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => s_supportedDiagnostics;
 
 	public override void Initialize(AnalysisContext context)
 	{
@@ -41,49 +37,36 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 		context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
 		context.EnableConcurrentExecution();
 
-		context.RegisterSyntaxNodeAction(
-			AnalyzeObjectCreation,
-			Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectCreationExpression,
-			Microsoft.CodeAnalysis.CSharp.SyntaxKind.ImplicitObjectCreationExpression
-		);
+		context.RegisterCompilationStartAction(compilationContext =>
+		{
+			var errorType = compilationContext.Compilation.GetTypeByMetadataName(ErrorTypeMetadataName);
+			if (errorType is null)
+				return;
+
+			compilationContext.RegisterOperationAction(
+				operationContext => AnalyzeObjectCreation(operationContext, errorType),
+				OperationKind.ObjectCreation
+			);
+		});
 	}
 
-	static void AnalyzeObjectCreation(SyntaxNodeAnalysisContext context)
+	static void AnalyzeObjectCreation(OperationAnalysisContext context, INamedTypeSymbol errorType)
 	{
-		if (
-			context.SemanticModel.GetSymbolInfo(context.Node, context.CancellationToken).Symbol
-			is not IMethodSymbol ctor
-		)
+		if (context.Operation is not IObjectCreationOperation creation)
 			return;
 
-		if (ctor.ContainingType?.ToDisplayString() != ErrorTypeMetadataName)
+		if (!SymbolEqualityComparer.Default.Equals(creation.Type, errorType))
 			return;
 
-		var argumentList = context.Node switch
-		{
-			ObjectCreationExpressionSyntax objectCreation => objectCreation.ArgumentList,
-			ImplicitObjectCreationExpressionSyntax implicitCreation => implicitCreation.ArgumentList,
-			_ => null,
-		};
-
-		if (argumentList is null)
+		if (GetArgumentValue(creation, "MessageFormat") is not string messageFormat)
 			return;
 
-		var messageFormatExpression = FindMemberExpression(argumentList, ctor, "MessageFormat");
-		var messageFormat = GetConstantString(
-			context.SemanticModel,
-			messageFormatExpression,
-			context.CancellationToken
-		);
-		if (messageFormat is null)
-			return;
-
-		var declaredParameters = TryGetDeclaredParameters(
-			context.SemanticModel,
-			FindMemberExpression(argumentList, ctor, "Parameters"),
-			context.CancellationToken
-		);
+		var declaredParameters = GetDeclaredParameters(creation);
 		if (declaredParameters is null)
+			return;
+
+		var location = GetArgumentLocation(creation, "MessageFormat");
+		if (location is null)
 			return;
 
 		var placeholders = s_placeholderRegex
@@ -92,106 +75,104 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 			.Select(static m => m.Groups[1].Value)
 			.Distinct(StringComparer.Ordinal);
 
-		var location = messageFormatExpression!.GetLocation();
 		foreach (var placeholder in placeholders)
 		{
 			if (!declaredParameters.Contains(placeholder))
-				context.ReportDiagnostic(Diagnostic.Create(s_descriptor, location, placeholder));
+			{
+				context.ReportDiagnostic(
+					Diagnostic.Create(DiagnosticLibrary.MessageFormatPlaceholderNotDeclared, location, placeholder)
+				);
+			}
 		}
 	}
 
-	static ExpressionSyntax? FindMemberExpression(
-		ArgumentListSyntax argumentList,
-		IMethodSymbol ctor,
-		string memberName
-	)
+	static object? GetArgumentValue(IObjectCreationOperation creation, string parameterName)
 	{
-		for (var i = 0; i < argumentList.Arguments.Count; i++)
+		foreach (var argument in creation.Arguments)
 		{
-			var argument = argumentList.Arguments[i];
-			if (argument.NameColon is not null)
-			{
-				if (argument.NameColon.Name.Identifier.ValueText == memberName)
-					return argument.Expression;
-
+			if (argument.Parameter?.Name != parameterName)
 				continue;
-			}
 
-			if (i < ctor.Parameters.Length && ctor.Parameters[i].Name == memberName)
-				return argument.Expression;
-		}
-
-		var initializer = argumentList.Parent switch
-		{
-			ObjectCreationExpressionSyntax objectCreation => objectCreation.Initializer,
-			ImplicitObjectCreationExpressionSyntax implicitCreation => implicitCreation.Initializer,
-			_ => null,
-		};
-
-		if (initializer is null)
-			return null;
-
-		foreach (var element in initializer.Expressions)
-		{
-			if (
-				element is AssignmentExpressionSyntax assignment
-				&& assignment.Left is IdentifierNameSyntax identifier
-				&& identifier.Identifier.ValueText == memberName
-			)
-			{
-				return assignment.Right;
-			}
+			return UnwrapConversion(argument.Value).ConstantValue.Value;
 		}
 
 		return null;
 	}
 
-	static string? GetConstantString(
-		SemanticModel semanticModel,
-		ExpressionSyntax? expression,
-		CancellationToken cancellationToken
-	)
+	static Location? GetArgumentLocation(IObjectCreationOperation creation, string parameterName)
 	{
-		if (expression is null)
-			return null;
+		foreach (var argument in creation.Arguments)
+		{
+			if (argument.Parameter?.Name == parameterName)
+				return argument.Syntax.GetLocation();
+		}
 
-		var constant = semanticModel.GetConstantValue(expression, cancellationToken);
-		return constant.HasValue && constant.Value is string value ? value : null;
+		return null;
 	}
 
 	/// <summary>
-	/// Returns the declared parameter names, an empty set when the argument is omitted, or
+	/// Returns the declared parameter names, an empty set when the initializer is omitted, or
 	/// <c>null</c> when the expression is present but not analyzable (analysis is skipped).
 	/// </summary>
-	static HashSet<string>? TryGetDeclaredParameters(
-		SemanticModel semanticModel,
-		ExpressionSyntax? expression,
-		CancellationToken cancellationToken
-	)
+	static HashSet<string>? GetDeclaredParameters(IObjectCreationOperation creation)
 	{
-		if (expression is null)
+		if (creation.Initializer is null)
 			return [];
 
-		var elements = expression switch
+		foreach (var initializer in creation.Initializer.Initializers)
 		{
-			CollectionExpressionSyntax collection => collection
-				.Elements.OfType<ExpressionElementSyntax>()
-				.Select(static element => element.Expression),
-			ImplicitArrayCreationExpressionSyntax implicitArray => implicitArray.Initializer.Expressions,
-			ArrayCreationExpressionSyntax array => array.Initializer?.Expressions,
-			_ => null,
-		};
-
-		if (elements is null)
-			return null;
-
-		HashSet<string> names = new(StringComparer.Ordinal);
-		foreach (var element in elements)
-		{
-			if (GetConstantString(semanticModel, element, cancellationToken) is { } value)
-				names.Add(value);
+			if (
+				initializer is ISimpleAssignmentOperation
+				{
+					Target: IPropertyReferenceOperation { Property.Name: "Parameters" },
+				} assignment
+			)
+				return ExtractStrings(assignment.Value);
 		}
 
-		return names;
+		return [];
 	}
+
+	static HashSet<string>? ExtractStrings(IOperation operation)
+	{
+		operation = UnwrapConversion(operation);
+
+		switch (operation)
+		{
+			case IArrayCreationOperation array when array.Initializer is not null:
+			{
+				HashSet<string> names = new(StringComparer.Ordinal);
+				foreach (var element in array.Initializer.ElementValues)
+				{
+					if (UnwrapConversion(element).ConstantValue.Value is string value)
+						names.Add(value);
+				}
+
+				return names;
+			}
+
+			case ICollectionExpressionOperation collection:
+			{
+				HashSet<string> names = new(StringComparer.Ordinal);
+				foreach (var element in collection.Elements)
+				{
+					if (element is ISpreadOperation)
+						continue;
+
+					if (UnwrapConversion(element).ConstantValue.Value is string value)
+						names.Add(value);
+				}
+
+				return names;
+			}
+
+			default:
+				return null;
+		}
+	}
+
+	static IOperation UnwrapConversion(IOperation operation) =>
+		operation is IConversionOperation { IsImplicit: true } conversion
+			? UnwrapConversion(conversion.Operand)
+			: operation;
 }

@@ -31,6 +31,7 @@
 				"lib/net8.0/Purview.ZodSharp.AspNetCore.dll",
 				"lib/net8.0/Purview.ZodSharp.AspNetCore.xml",
 				"analyzers/dotnet/cs/Purview.ZodSharp.AspNetCore.Analyzers.dll",
+				"analyzers/dotnet/cs/Purview.ZodSharp.AspNetCore.SourceGenerators.dll",
 				"README.md",
 				"purview-logo-light.png"
 			],

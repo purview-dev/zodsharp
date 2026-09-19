@@ -50,6 +50,7 @@ public readonly record struct UUIDRule : Core.IValidationRule<string>
 		if (_version is UuidVersion version)
 			return value[14] == (char)('0' + (int)version) && IsValidVariant(value[19]);
 
+		// No specific version required; just check that the version and variant are valid.
 		return IsValidVersionless(value);
 	}
 
@@ -78,6 +79,7 @@ public readonly record struct UUIDRule : Core.IValidationRule<string>
 		if (version is < '1' or > '8')
 			return false;
 
+		// Check that the variant is valid (8, 9, a, b).
 		return IsValidVariant(value[19]);
 	}
 

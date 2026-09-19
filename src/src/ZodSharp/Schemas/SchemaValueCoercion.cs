@@ -60,6 +60,7 @@ static class SchemaValueCoercion
 		if (typeof(T).IsValueType)
 			return EqualityComparer<T>.Default.Equals(left, right);
 
+		// Reference types are interchangeable only when they are the same instance.
 		return ReferenceEquals(left, right);
 	}
 

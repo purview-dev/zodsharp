@@ -4,7 +4,7 @@ namespace ZodSharp.AspNetCore;
 
 /// <summary>
 /// A code-keyed registry of <see cref="ErrorType"/> definitions that allows users to register
-/// error types once and resolve them by <see cref="ZodSharp.Core.ValidationError.Code"/> when
+/// error types once and resolve them by <see cref="Core.ValidationError.Code"/> when
 /// building ProblemDetails responses.
 /// </summary>
 public sealed class ErrorTypeRegistry

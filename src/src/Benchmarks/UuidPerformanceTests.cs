@@ -14,10 +14,10 @@ namespace ZodSharp;
 [SimpleJob(launchCount: 1, warmupCount: 3, iterationCount: 5)]
 public class UuidPerformanceTests
 {
-	static readonly string ValidUuidV4 = "550e8400-e29b-41d4-a716-446655440000";
-	static readonly string ValidUuidV7 = "0192b4c1-7a9b-7f5e-9a3c-2d4e6f8a0b1c";
-	static readonly string InvalidUuid = "550e8400-e29b-41d4-a716";
-	static readonly string NilUuid = "00000000-0000-0000-0000-000000000000";
+	const string ValidUuidV4 = "550e8400-e29b-41d4-a716-446655440000";
+	const string ValidUuidV7 = "0192b4c1-7a9b-7f5e-9a3c-2d4e6f8a0b1c";
+	const string InvalidUuid = "550e8400-e29b-41d4-a716";
+	const string NilUuid = "00000000-0000-0000-0000-000000000000";
 
 	static readonly Regex LegacyUuidRegex = new(
 		@"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",

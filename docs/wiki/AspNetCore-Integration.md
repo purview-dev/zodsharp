@@ -94,8 +94,9 @@ then let the mapper derive the status code, title, detail, and formatted message
 ```csharp
 using ZodSharp.AspNetCore;
 
-public static class ConcurrentErrorType
+public static partial class ConcurrentErrorType
 {
+    [ErrorType]
     public static readonly ErrorType SaveFailed = new(
         Code: "aggregate_save_failed",
         Description: "The aggregate could not be saved.",
@@ -125,6 +126,39 @@ throw new ZodException([
         }),
 ]);
 ```
+
+### Generated `Create` / `Throw` helpers
+
+Marking the field with `[ErrorType]` and the containing class `partial` lets the bundled source
+generator turn each field into strongly typed static helpers. For the field above it generates
+`ConcurrentErrorType.CreateSaveFailed(...)` and `ConcurrentErrorType.ThrowSaveFailed(...)` with one
+named parameter per entry in `Parameters`:
+
+```csharp
+// Returns a ValidationError with the code, the formatted message, and the named parameters.
+var error = ConcurrentErrorType.CreateSaveFailed("agg-123", "Invoice");
+
+// Throws a ZodException carrying the same ValidationError.
+ConcurrentErrorType.ThrowSaveFailed("agg-123", "Invoice");
+
+// The path and structured issue metadata can be populated too:
+var error = ConcurrentErrorType.CreateSaveFailed(
+    "agg-123",
+    "Invoice",
+    path: ["order", "items", "[0]"],
+    origin: "collection",
+    minimum: 1,
+    maximum: 10,
+    inclusive: true);
+```
+
+The generated `Create` builds the `parameters` dictionary and sets the message from
+`ErrorType.FormatMessage`, so `error.Message` already reads
+`Aggregate 'agg-123' (of type Invoice) failed to save` and mapping through the registry produces the
+`409 Conflict` response described below. The analyzers `ZODSASP001`/`ZODSASP002`/`ZODSASP003`
+(bundled with the package) warn when a `MessageFormat` placeholder is not declared in `Parameters`,
+when an `[ErrorType]` field's containing class is not `partial`, or when the field is not
+`static readonly`.
 
 Produces a `409 Conflict` `HttpValidationProblemDetails` with:
 

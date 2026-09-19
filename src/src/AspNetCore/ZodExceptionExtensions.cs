@@ -14,7 +14,7 @@ public static class ZodExceptionExtensions
 	/// </summary>
 	public static HttpValidationProblemDetails ToHttpValidationProblemDetails(
 		this ZodException exception,
-		int statusCode = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest
+		int statusCode = StatusCodes.Status400BadRequest
 	)
 	{
 		ArgumentNullException.ThrowIfNull(exception);
@@ -34,7 +34,7 @@ public static class ZodExceptionExtensions
 	public static HttpValidationProblemDetails ToHttpValidationProblemDetails(
 		this ZodException exception,
 		ErrorTypeRegistry registry,
-		int statusCode = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest
+		int statusCode = StatusCodes.Status400BadRequest
 	)
 	{
 		ArgumentNullException.ThrowIfNull(exception);
@@ -49,7 +49,7 @@ public static class ZodExceptionExtensions
 	public static HttpValidationProblemDetails ToHttpValidationProblemDetails(
 		this ZodException exception,
 		Func<string, ErrorType?> lookup,
-		int statusCode = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest
+		int statusCode = StatusCodes.Status400BadRequest
 	)
 	{
 		ArgumentNullException.ThrowIfNull(exception);
@@ -62,7 +62,7 @@ public static class ZodExceptionExtensions
 	/// </summary>
 	public static ValidationProblemDetails ToValidationProblemDetails(
 		this ZodException exception,
-		int statusCode = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest
+		int statusCode = StatusCodes.Status400BadRequest
 	)
 	{
 		var details = exception.ToHttpValidationProblemDetails(statusCode);
@@ -76,7 +76,7 @@ public static class ZodExceptionExtensions
 	public static ValidationProblemDetails ToValidationProblemDetails(
 		this ZodException exception,
 		ErrorTypeRegistry registry,
-		int statusCode = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest
+		int statusCode = StatusCodes.Status400BadRequest
 	)
 	{
 		var details = exception.ToHttpValidationProblemDetails(registry, statusCode);
@@ -90,7 +90,7 @@ public static class ZodExceptionExtensions
 	public static ValidationProblemDetails ToValidationProblemDetails(
 		this ZodException exception,
 		Func<string, ErrorType?> lookup,
-		int statusCode = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest
+		int statusCode = StatusCodes.Status400BadRequest
 	)
 	{
 		var details = exception.ToHttpValidationProblemDetails(lookup, statusCode);

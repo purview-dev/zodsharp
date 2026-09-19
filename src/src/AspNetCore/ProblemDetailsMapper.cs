@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
@@ -49,7 +48,7 @@ static class ProblemDetailsMapper
 
 			var message =
 				formatMessages && errorType?.MessageFormat is not null
-					? FormatMessage(errorType.MessageFormat, error.Parameters)
+					? errorType.FormatMessage(error.Parameters)
 					: error.Message;
 
 			messages.Add(message);
@@ -130,80 +129,5 @@ static class ProblemDetailsMapper
 				details.Extensions[JsonNamingPolicy.CamelCase.ConvertName(pair.Key)] = pair.Value;
 			}
 		}
-	}
-
-	static string FormatMessage(string format, IReadOnlyDictionary<string, object?>? parameters)
-	{
-		if (parameters is null || parameters.Count == 0)
-			return format;
-
-		// Single pass over the format string; only allocate a builder when a placeholder
-		// actually substitutes. Placeholders must be `{Identifier}`; `{{`/`{0}` never match,
-		// and names without a matching parameter value are left as-is.
-		StringBuilder? builder = null;
-		var start = 0;
-
-		for (var i = 0; i < format.Length; i++)
-		{
-			if (format[i] != '{' || i + 1 >= format.Length || !IsIdentifierStart(format[i + 1]))
-				continue;
-
-			var close = format.IndexOf('}', i + 1);
-			if (close < 0)
-				break;
-
-			if (!IsIdentifierTail(format, i + 2, close))
-			{
-				i = close;
-				continue;
-			}
-
-			var name = format.AsSpan(i + 1, close - i - 1);
-
-			object? value = null;
-			var found = false;
-			foreach (var pair in parameters)
-			{
-				if (pair.Key.AsSpan().SequenceEqual(name))
-				{
-					value = pair.Value;
-					found = true;
-					break;
-				}
-			}
-
-			if (!found || value is null)
-			{
-				i = close;
-				continue;
-			}
-
-			builder ??= new StringBuilder(format.Length + 8);
-			builder.Append(format, start, i - start);
-			builder.Append(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
-
-			start = close + 1;
-			i = close;
-		}
-
-		if (builder is null)
-			return format;
-
-		builder.Append(format, start, format.Length - start);
-		return builder.ToString();
-	}
-
-	static bool IsIdentifierStart(char c) => c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or '_';
-
-	static bool IsIdentifierTail(string format, int start, int end)
-	{
-		for (var i = start; i < end; i++)
-		{
-			var c = format[i];
-			if (c is not ((>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '_'))
-				return false;
-		}
-
-		return true;
 	}
 }
