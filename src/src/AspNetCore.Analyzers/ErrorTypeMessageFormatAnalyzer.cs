@@ -1,8 +1,8 @@
+using System.Collections.Immutable;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
-using System.Collections.Immutable;
-using System.Text.RegularExpressions;
 
 namespace ZodSharp.AspNetCore.Analyzers;
 
@@ -140,31 +140,31 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 		switch (operation)
 		{
 			case IArrayCreationOperation array when array.Initializer is not null:
+			{
+				HashSet<string> names = new(StringComparer.Ordinal);
+				foreach (var element in array.Initializer.ElementValues)
 				{
-					HashSet<string> names = new(StringComparer.Ordinal);
-					foreach (var element in array.Initializer.ElementValues)
-					{
-						if (UnwrapConversion(element).ConstantValue.Value is string value)
-							names.Add(value);
-					}
-
-					return names;
+					if (UnwrapConversion(element).ConstantValue.Value is string value)
+						names.Add(value);
 				}
+
+				return names;
+			}
 
 			case ICollectionExpressionOperation collection:
+			{
+				HashSet<string> names = new(StringComparer.Ordinal);
+				foreach (var element in collection.Elements)
 				{
-					HashSet<string> names = new(StringComparer.Ordinal);
-					foreach (var element in collection.Elements)
-					{
-						if (element is ISpreadOperation)
-							continue;
+					if (element is ISpreadOperation)
+						continue;
 
-						if (UnwrapConversion(element).ConstantValue.Value is string value)
-							names.Add(value);
-					}
-
-					return names;
+					if (UnwrapConversion(element).ConstantValue.Value is string value)
+						names.Add(value);
 				}
+
+				return names;
+			}
 
 			default:
 				return null;
