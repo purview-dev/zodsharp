@@ -13,6 +13,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+		<ProjectReference Include="..\AspNetCore\AspNetCore.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<AssemblyName>Purview.ZodSharp.AspNetCore.Analyzers.UnitTests</AssemblyName>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+		<PackageReference Include="Purview.SourceGeneratorFramework.Testing.TUnit" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\AspNetCore.Analyzers\AspNetCore.Analyzers.csproj" />
+	</ItemGroup>
+</Project>

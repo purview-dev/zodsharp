@@ -13,4 +13,13 @@
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference
+			Include="../AspNetCore.Analyzers/AspNetCore.Analyzers.csproj"
+			PrivateAssets="all"
+			ReferenceOutputAssembly="false"
+			OutputItemType="Analyzer"
+		/>
+	</ItemGroup>
 </Project>

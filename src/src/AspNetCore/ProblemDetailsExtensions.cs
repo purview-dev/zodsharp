@@ -20,46 +20,42 @@ public static class ProblemDetailsExtensions
 		int statusCode = StatusCodes.Status400BadRequest
 	)
 	{
-		if (result.IsSuccess)
-			throw new InvalidOperationException("Cannot create ProblemDetails from a successful validation result.");
+		EnsureFailed(result);
+		return ProblemDetailsMapper.Build(
+			result.Errors,
+			statusCode,
+			registry: null,
+			lookup: null,
+			formatMessages: false
+		);
+	}
 
-		Dictionary<string, string[]> errors = new(StringComparer.Ordinal);
-		Dictionary<string, List<string>> groupedMessages = new(StringComparer.Ordinal);
+	/// <summary>
+	/// Converts a failed validation result into <see cref="HttpValidationProblemDetails" />, resolving
+	/// <see cref="ErrorType"/>s from the supplied registry to derive the status code, title, and messages.
+	/// </summary>
+	public static HttpValidationProblemDetails ToHttpValidationProblemDetails<T>(
+		this ValidationResult<T> result,
+		ErrorTypeRegistry registry,
+		int statusCode = StatusCodes.Status400BadRequest
+	)
+	{
+		EnsureFailed(result);
+		return ProblemDetailsMapper.Build(result.Errors, statusCode, registry, lookup: null, formatMessages: true);
+	}
 
-		foreach (var error in result.Errors)
-		{
-			var key = ToProblemDetailsKey(error.Path);
-			if (!groupedMessages.TryGetValue(key, out var messages))
-			{
-				messages = [];
-				groupedMessages[key] = messages;
-			}
-
-			messages.Add(error.Message);
-		}
-
-		foreach (var pair in groupedMessages)
-			errors[pair.Key] = [.. pair.Value];
-
-		HttpValidationProblemDetails details = new(errors)
-		{
-			Title = "One or more validation errors occurred.",
-			Status = statusCode,
-		};
-		details.Extensions["issues"] = result
-			.Errors.Select(static error => new ValidationIssue
-			{
-				Code = error.Code,
-				Origin = error.Origin,
-				Minimum = error.Minimum,
-				Maximum = error.Maximum,
-				Inclusive = error.Inclusive,
-				Path = [.. error.Path],
-				Message = error.Message,
-			})
-			.ToArray();
-
-		return details;
+	/// <summary>
+	/// Converts a failed validation result into <see cref="HttpValidationProblemDetails" />, resolving
+	/// <see cref="ErrorType"/>s through the supplied lookup to derive the status code, title, and messages.
+	/// </summary>
+	public static HttpValidationProblemDetails ToHttpValidationProblemDetails<T>(
+		this ValidationResult<T> result,
+		Func<string, ErrorType?> lookup,
+		int statusCode = StatusCodes.Status400BadRequest
+	)
+	{
+		EnsureFailed(result);
+		return ProblemDetailsMapper.Build(result.Errors, statusCode, registry: null, lookup, formatMessages: true);
 	}
 
 	/// <summary>
@@ -71,7 +67,45 @@ public static class ProblemDetailsExtensions
 	)
 	{
 		var details = result.ToHttpValidationProblemDetails(statusCode);
-		return new(details.Errors)
+		return ToValidationProblemDetails(details);
+	}
+
+	/// <summary>
+	/// Converts a failed validation result into <see cref="ValidationProblemDetails" />, resolving
+	/// <see cref="ErrorType"/>s from the supplied registry.
+	/// </summary>
+	public static ValidationProblemDetails ToValidationProblemDetails<T>(
+		this ValidationResult<T> result,
+		ErrorTypeRegistry registry,
+		int statusCode = StatusCodes.Status400BadRequest
+	)
+	{
+		var details = result.ToHttpValidationProblemDetails(registry, statusCode);
+		return ToValidationProblemDetails(details);
+	}
+
+	/// <summary>
+	/// Converts a failed validation result into <see cref="ValidationProblemDetails" />, resolving
+	/// <see cref="ErrorType"/>s through the supplied lookup.
+	/// </summary>
+	public static ValidationProblemDetails ToValidationProblemDetails<T>(
+		this ValidationResult<T> result,
+		Func<string, ErrorType?> lookup,
+		int statusCode = StatusCodes.Status400BadRequest
+	)
+	{
+		var details = result.ToHttpValidationProblemDetails(lookup, statusCode);
+		return ToValidationProblemDetails(details);
+	}
+
+	static void EnsureFailed<T>(ValidationResult<T> result)
+	{
+		if (result.IsSuccess)
+			throw new InvalidOperationException("Cannot create ProblemDetails from a successful validation result.");
+	}
+
+	internal static ValidationProblemDetails ToValidationProblemDetails(HttpValidationProblemDetails details) =>
+		new(details.Errors)
 		{
 			Title = details.Title,
 			Status = details.Status,
@@ -80,31 +114,12 @@ public static class ProblemDetailsExtensions
 			Instance = details.Instance,
 			Extensions = { ["issues"] = details.Extensions["issues"] },
 		};
-	}
-
-	static string ToProblemDetailsKey(System.Collections.Immutable.ImmutableArray<string> path)
-	{
-		if (path.IsDefaultOrEmpty)
-			return string.Empty;
-
-		System.Text.StringBuilder builder = new();
-		for (var i = 0; i < path.Length; i++)
-		{
-			var segment = path[i];
-			if (i > 0 && !segment.StartsWith('['))
-				builder = builder.Append('.');
-
-			builder = builder.Append(segment);
-		}
-
-		return builder.ToString();
-	}
 }
 
 /// <summary>
 /// Serializable structured validation issue metadata included in ProblemDetails extensions.
 /// </summary>
-public sealed class ValidationIssue
+public readonly record struct ValidationIssue
 {
 	/// <summary>
 	/// The issue code.
@@ -141,4 +156,12 @@ public sealed class ValidationIssue
 	/// The human-readable issue message.
 	/// </summary>
 	public required string Message { get; init; }
+
+	/// <summary>
+	/// The additional error parameters carried by the validation error (for example aggregate ids).
+	/// </summary>
+	[System.Text.Json.Serialization.JsonIgnore(
+		Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+	)]
+	public IReadOnlyDictionary<string, object?>? Parameters { get; init; }
 }

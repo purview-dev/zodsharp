@@ -30,6 +30,7 @@
 				"lib/net9.0/Purview.ZodSharp.AspNetCore.xml",
 				"lib/net8.0/Purview.ZodSharp.AspNetCore.dll",
 				"lib/net8.0/Purview.ZodSharp.AspNetCore.xml",
+				"analyzers/dotnet/cs/Purview.ZodSharp.AspNetCore.Analyzers.dll",
 				"README.md",
 				"purview-logo-light.png"
 			],

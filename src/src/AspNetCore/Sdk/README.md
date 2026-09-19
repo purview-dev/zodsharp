@@ -38,6 +38,43 @@ A `ValidationProblemDetails` overload is also available:
 var problem = result.ToValidationProblemDetails();
 ```
 
+## Exception handling
+
+Thrown `ZodException`s (e.g. from a value object's strict deserialization) are converted automatically by
+an `IExceptionHandler`:
+
+```csharp
+builder.Services.AddZodSharpProblemDetails();
+
+var app = builder.Build();
+app.UseExceptionHandler();
+```
+
+## Mapping error types to status codes
+
+Register an `ErrorType` and map error codes to HTTP statuses and formatted messages:
+
+```csharp
+public static class ConcurrentErrorType
+{
+    public static readonly ErrorType SaveFailed = new(
+        Code: "aggregate_save_failed",
+        Description: "The aggregate could not be saved.",
+        HttpStatus: StatusCodes.Status409Conflict,
+        MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save")
+    {
+        Parameters = ["AggregateId", "AggregateType"]
+    };
+}
+
+ErrorTypeRegistry.Default.Register(ConcurrentErrorType.SaveFailed);
+```
+
+A `ValidationError` carrying `parameters` such as `["AggregateId"] = "agg-123"` is then surfaced as a
+`409 Conflict` response whose message reads `Aggregate 'agg-123' (of type Invoice) failed to save`. The
+analyzer `ZODSASP001` (bundled with the package) warns when a `MessageFormat` placeholder is not declared
+in `Parameters`.
+
 ## Documentation
 
 - [Homepage](https://purview.dev/projects/zodsharp/)
