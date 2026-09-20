@@ -12,7 +12,7 @@ sealed record ErrorTypeFieldModel(
 	bool IsAbstract,
 	bool IsSealed,
 	string FieldName,
-	EquatableArray<string> Parameters
+	EquatableArray<ErrorTypeParameterModel> Parameters
 )
 {
 	/// <summary>

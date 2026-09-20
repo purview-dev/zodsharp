@@ -44,9 +44,10 @@ public readonly record struct ValidationError
 	public bool? Inclusive { get; }
 
 	/// <summary>
-	/// Additional error parameters
+	/// Additional error parameters. Typed container that also exposes the raw values through
+	/// <see cref="ErrorTypeParameters.Get{T}"/> and <c>IReadOnlyDictionary&lt;string, object?&gt;</c>.
 	/// </summary>
-	public IReadOnlyDictionary<string, object?>? Parameters { get; }
+	public ErrorTypeParameters? Parameters { get; }
 
 	/// <summary>
 	/// Initializes a new instance of the ValidationError struct.
@@ -73,7 +74,7 @@ public readonly record struct ValidationError
 		Code = code;
 		Message = message;
 		Path = path is null ? [] : ImmutableArray.Create(path);
-		Parameters = parameters;
+		Parameters = Wrap(parameters);
 		Origin = origin;
 		Minimum = minimum;
 		Maximum = maximum;
@@ -116,10 +117,15 @@ public readonly record struct ValidationError
 		Code = code;
 		Message = message;
 		Path = path;
-		Parameters = parameters;
+		Parameters = Wrap(parameters);
 		Origin = origin;
 		Minimum = minimum;
 		Maximum = maximum;
 		Inclusive = inclusive;
 	}
+
+	static ErrorTypeParameters? Wrap(IReadOnlyDictionary<string, object?>? parameters) =>
+		parameters is ErrorTypeParameters typed ? typed
+		: parameters is null ? null
+		: ErrorTypeParameters.Create(parameters);
 }

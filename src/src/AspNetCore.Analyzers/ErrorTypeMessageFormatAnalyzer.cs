@@ -116,6 +116,17 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 	/// </summary>
 	static HashSet<string>? GetDeclaredParameters(IObjectCreationOperation creation)
 	{
+		// `Parameters` may be supplied as a constructor argument (the canonical form) or assigned
+		// in an object initializer.
+		foreach (var argument in creation.Arguments)
+		{
+			if (argument.ArgumentKind != ArgumentKind.Explicit)
+				continue;
+
+			if (argument.Parameter?.Name == "Parameters")
+				return ExtractStrings(argument.Value);
+		}
+
 		if (creation.Initializer is null)
 			return [];
 
@@ -143,10 +154,7 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 			{
 				HashSet<string> names = new(StringComparer.Ordinal);
 				foreach (var element in array.Initializer.ElementValues)
-				{
-					if (UnwrapConversion(element).ConstantValue.Value is string value)
-						names.Add(value);
-				}
+					AddParameterName(element, names);
 
 				return names;
 			}
@@ -155,13 +163,7 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 			{
 				HashSet<string> names = new(StringComparer.Ordinal);
 				foreach (var element in collection.Elements)
-				{
-					if (element is ISpreadOperation)
-						continue;
-
-					if (UnwrapConversion(element).ConstantValue.Value is string value)
-						names.Add(value);
-				}
+					AddParameterName(element, names);
 
 				return names;
 			}
@@ -170,6 +172,38 @@ public sealed class ErrorTypeMessageFormatAnalyzer : DiagnosticAnalyzer
 				return null;
 		}
 	}
+
+	static void AddParameterName(IOperation element, HashSet<string> names)
+	{
+		if (element is ISpreadOperation)
+			return;
+
+		// Target-typed `new(...)` collection elements arrive wrapped in an implicit conversion.
+		element = UnwrapConversion(element);
+
+		// A declared parameter is `new ErrorTypeParameter("OrderId", typeof(string))`; the name is
+		// the first constructor argument.
+		if (
+			element is IObjectCreationOperation creation
+			&& creation.Arguments.Length > 0
+			&& creation.Arguments[0] is { Parameter.Name: "Name" } nameArgument
+			&& UnwrapConversion(nameArgument.Value).ConstantValue.Value is string name
+		)
+			names.Add(name);
+		else if (
+			element is IInvocationOperation { TargetMethod.Name: "Param" } invocation
+			&& IsErrorTypeParam(invocation.TargetMethod)
+			&& invocation.Arguments.Length > 0
+			&& UnwrapConversion(invocation.Arguments[0].Value).ConstantValue.Value is string paramName
+		)
+			names.Add(paramName);
+		else if (element.ConstantValue.Value is string legacy)
+			names.Add(legacy);
+	}
+
+	static bool IsErrorTypeParam(IMethodSymbol method) =>
+		method.ContainingType?.Name == "ErrorType"
+		&& method.ContainingType?.ContainingNamespace?.ToDisplayString() == "ZodSharp.AspNetCore";
 
 	static IOperation UnwrapConversion(IOperation operation) =>
 		operation is IConversionOperation { IsImplicit: true } conversion

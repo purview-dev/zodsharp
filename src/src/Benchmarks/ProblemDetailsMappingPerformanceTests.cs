@@ -61,7 +61,11 @@ public class ProblemDetailsMappingPerformanceTests
 				MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save"
 			)
 			{
-				Parameters = ["AggregateId", "AggregateType"],
+				Parameters =
+				[
+					new ErrorTypeParameter("AggregateId", typeof(string)),
+					new ErrorTypeParameter("AggregateType", typeof(string)),
+				],
 			}
 		);
 

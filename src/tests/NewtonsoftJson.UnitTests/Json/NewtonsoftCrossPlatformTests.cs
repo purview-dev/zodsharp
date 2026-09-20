@@ -35,7 +35,8 @@ public class NewtonsoftCrossPlatformTests
 		"src",
 		"tests",
 		"cross-platform",
-		"output"
+		"output",
+		$"{Guid.NewGuid()}"
 	);
 	static readonly string ManifestPath = Path.Combine(FixturesDir, "manifest.json");
 

@@ -21,7 +21,7 @@ static class DiagnosticLibrary
 	public static readonly DiagnosticDescriptor InvalidParameters = new(
 		id: "ZODSASP101",
 		title: "Unable to extract ErrorType parameters",
-		messageFormat: "The Parameters of ErrorType field '{0}' in '{1}' could not be extracted; only string collection literals are supported",
+		messageFormat: "The Parameters of ErrorType field '{0}' in '{1}' could not be extracted; only ErrorTypeParameter collection literals with a constant name and typeof, or ErrorType.Param<T> invocations, are supported",
 		category: Category,
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true

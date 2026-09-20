@@ -12,6 +12,8 @@ public sealed record ErrorTypeGeneratorTestOptions : SourceGeneratorTestOptions
 		AdditionalAssemblyTypes =
 		[
 			typeof(ErrorType),
+			typeof(ErrorTypeParameter),
+			typeof(ErrorTypeParameters),
 			typeof(ValidationError),
 			typeof(ZodException),
 			typeof(ImmutableArray),
