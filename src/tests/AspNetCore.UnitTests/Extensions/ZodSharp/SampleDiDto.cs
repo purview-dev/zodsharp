@@ -1,6 +1,6 @@
 using ZodSharp.Core;
 
-namespace ZodSharp.AspNetCore;
+namespace ZodSharp;
 
 sealed class SampleDiDto
 {
