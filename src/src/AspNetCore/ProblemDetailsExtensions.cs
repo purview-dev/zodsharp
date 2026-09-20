@@ -163,5 +163,5 @@ public readonly record struct ValidationIssue
 	[System.Text.Json.Serialization.JsonIgnore(
 		Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
 	)]
-	public IReadOnlyDictionary<string, object?>? Parameters { get; init; }
+	public ErrorTypeParameters? Parameters { get; init; }
 }

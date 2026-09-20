@@ -48,7 +48,7 @@ public class ZodExceptionHandlerTests
 				MessageFormat: "Aggregate '{AggregateId}' failed to save"
 			)
 			{
-				Parameters = ["AggregateId"],
+				Parameters = [new ErrorTypeParameter("AggregateId", typeof(string))],
 			}
 		);
 		var options = Microsoft.Extensions.Options.Options.Create(new ZodProblemDetailsOptions { Registry = registry });
@@ -78,6 +78,9 @@ public class ZodExceptionHandlerTests
 			.That(root.GetProperty("errors").GetProperty("")[0].GetString())
 			.IsEqualTo("Aggregate 'agg-123' failed to save");
 		await Assert.That(root.GetProperty("aggregateId").GetString()).IsEqualTo("agg-123");
+		await Assert
+			.That(root.GetProperty("issues")[0].GetProperty("parameters").GetProperty("AggregateId").GetString())
+			.IsEqualTo("agg-123");
 	}
 
 	[Test]

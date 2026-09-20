@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using ZodSharp.Core;
 
 namespace ZodSharp.AspNetCore;
 
@@ -15,7 +16,11 @@ public class ErrorTypeFormatMessageTests
 			MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save"
 		)
 		{
-			Parameters = ["OrderId", "AggregateType"],
+			Parameters =
+			[
+				new ErrorTypeParameter("OrderId", typeof(string)),
+				new ErrorTypeParameter("AggregateType", typeof(string)),
+			],
 		};
 
 		// Act
@@ -28,6 +33,37 @@ public class ErrorTypeFormatMessageTests
 	}
 
 	[Test]
+	public async Task GivenMessageFormat_TypedParametersOverload_FormatsPlaceholders()
+	{
+		// Arrange
+		ErrorType errorType = new(
+			"aggregate_save_failed",
+			Description: "Save failed.",
+			HttpStatus: StatusCodes.Status409Conflict,
+			MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save"
+		)
+		{
+			Parameters =
+			[
+				new ErrorTypeParameter("OrderId", typeof(string)),
+				new ErrorTypeParameter("AggregateType", typeof(string)),
+			],
+		};
+		var parameters = ErrorTypeParameters.Create(
+			errorType.Parameters,
+			new Dictionary<string, object?> { ["OrderId"] = "ord-1", ["AggregateType"] = "Order" }
+		);
+
+		// Act
+		var message = errorType.FormatMessage(parameters);
+
+		// Assert
+		await Assert.That(message).IsEqualTo("Order 'ord-1' (of type Order) failed to save");
+		await Assert.That(parameters.Get<string>("OrderId")).IsEqualTo("ord-1");
+		await Assert.That(parameters.GetDeclaredType("AggregateType")).IsEqualTo(typeof(string));
+	}
+
+	[Test]
 	public async Task GivenMessageFormat_MissingParameterLeavesPlaceholderAsIs()
 	{
 		// Arrange
@@ -36,7 +72,11 @@ public class ErrorTypeFormatMessageTests
 			MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save"
 		)
 		{
-			Parameters = ["AggregateId", "AggregateType"],
+			Parameters =
+			[
+				new ErrorTypeParameter("AggregateId", typeof(string)),
+				new ErrorTypeParameter("AggregateType", typeof(string)),
+			],
 		};
 
 		// Act

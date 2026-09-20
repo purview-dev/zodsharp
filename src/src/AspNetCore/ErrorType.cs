@@ -1,12 +1,13 @@
 using System.Globalization;
 using System.Text;
+using ZodSharp.Core;
 
 namespace ZodSharp.AspNetCore;
 
 /// <summary>
 /// Defines a user-facing error type that maps a validation error code to an HTTP status code,
 /// optional title/type metadata, and an optional message template whose named placeholders are
-/// substituted from the error's <see cref="Core.ValidationError.Parameters"/>.
+/// substituted from the error's <see cref="ValidationError.Parameters"/>.
 /// </summary>
 /// <param name="Code">The validation error code this error type maps to.</param>
 /// <param name="Description">An optional human-readable description of the error.</param>
@@ -19,8 +20,12 @@ namespace ZodSharp.AspNetCore;
 /// <param name="MessageFormat">
 /// An optional message template with named placeholders (for example
 /// <c>"Aggregate '{AggregateId}' (of type {AggregateType}) failed to save"</c>). Placeholders are
-/// substituted from <see cref="Core.ValidationError.Parameters"/>; placeholders without a
+/// substituted from <see cref="ValidationError.Parameters"/>; placeholders without a
 /// matching value are left as-is so templating gaps stay visible.
+/// </param>
+/// <param name="Parameters">
+/// The named placeholders expected by <see cref="MessageFormat"/>
+/// together with their expected value types (for example <c>new("AggregateId", typeof(string))</c>).
 /// </param>
 /// <example>
 /// <code>
@@ -31,15 +36,17 @@ namespace ZodSharp.AspNetCore;
 ///         Code: "aggregate_save_failed",
 ///         Description: "The aggregate could not be saved.",
 ///         HttpStatus: StatusCodes.Status409Conflict,
-///         MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save")
-///     {
-///         Parameters = ["AggregateId", "AggregateType"]
-///     };
+///         MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
+///         Parameters:
+///         [
+///             new("AggregateId", typeof(string)),
+///             new("AggregateType", typeof(string))
+///         ]);
 /// }
 /// </code>
 /// Marking the field with <c>[ErrorType]</c> and declaring the containing class <c>partial</c>
 /// lets the bundled source generator add <c>CreateSaveFailed</c>/<c>ThrowSaveFailed</c> helpers
-/// with one named parameter per declared parameter.
+/// with one strongly typed parameter per declared parameter.
 /// </example>
 public sealed record ErrorType(
 	string Code,
@@ -47,13 +54,34 @@ public sealed record ErrorType(
 	int HttpStatus = Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest,
 	string? Title = null,
 	string? Type = null,
-	string? MessageFormat = null
+	string? MessageFormat = null,
+	IReadOnlyList<ErrorTypeParameter>? Parameters = null
 )
 {
 	/// <summary>
-	/// The named placeholders expected by <see cref="MessageFormat"/> (for example "AggregateId").
+	/// Creates an error type parameter with the specified name and type.
 	/// </summary>
-	public IReadOnlyList<string> Parameters { get; init; } = [];
+	/// <typeparam name="T">The type represented by the parameter.</typeparam>
+	/// <param name="name">The name of the parameter.</param>
+	/// <returns>The created error type parameter.</returns>
+	public static ErrorTypeParameter Param<T>(string name)
+	{
+		ArgumentException.ThrowIfNullOrEmpty(name);
+
+		return new(name, typeof(T));
+	}
+
+	/// <summary>
+	/// Formats <see cref="MessageFormat"/> using the supplied typed parameter values. Placeholders
+	/// that have no matching value are left as-is so templating gaps stay visible. When
+	/// <see cref="MessageFormat"/> is <c>null</c>, falls back to <see cref="Description"/> and then
+	/// to <see cref="Code"/>.
+	/// </summary>
+	/// <param name="parameters">
+	/// The typed parameter values (for example the error's <see cref="ValidationError.Parameters"/>).
+	/// </param>
+	public string FormatMessage(ErrorTypeParameters? parameters) =>
+		FormatMessage((IReadOnlyDictionary<string, object?>?)parameters);
 
 	/// <summary>
 	/// Formats <see cref="MessageFormat"/> using the supplied named parameter values. Placeholders
@@ -62,8 +90,7 @@ public sealed record ErrorType(
 	/// to <see cref="Code"/>.
 	/// </summary>
 	/// <param name="parameters">
-	/// The named parameter values (for example the error's
-	/// <see cref="Core.ValidationError.Parameters"/>).
+	/// The named parameter values (for example the error's <see cref="ValidationError.Parameters"/>).
 	/// </param>
 	public string FormatMessage(IReadOnlyDictionary<string, object?>? parameters)
 	{

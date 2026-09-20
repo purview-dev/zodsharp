@@ -17,10 +17,12 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 				Code: "aggregate_save_failed",
 				Description: "The order could not be saved because it was modified concurrently.",
 				HttpStatus: 409,
-				MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save")
-			{
-				Parameters = ["OrderId", "AggregateType"]
-			};
+				MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save",
+				Parameters:
+				[
+					new ErrorTypeParameter("OrderId", typeof(string)),
+					new ErrorTypeParameter("AggregateType", typeof(string))
+				]);
 		}
 		""";
 
@@ -39,7 +41,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 		await Assert.That(result).HasNoErrorDiagnostics();
 		var query = result.Generated();
 
-		var nullableObject = query.MakeNullable(TypeReference.Create<object>());
+		var stringType = TypeReference.Create<string>();
 		var nullableString = query.MakeNullable(TypeReference.Create<string>());
 		var nullableStringArray = query.MakeNullable(TypeReference.Create<string>().MakeArray());
 		var nullableInt = query.MakeNullable(TypeReference.Create<int>());
@@ -49,15 +51,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			.That(query)
 			.HasGeneratedMethod(
 				"CreateSaveFailed",
-				[
-					nullableObject,
-					nullableObject,
-					nullableStringArray,
-					nullableString,
-					nullableInt,
-					nullableInt,
-					nullableBool,
-				]
+				[stringType, stringType, nullableStringArray, nullableString, nullableInt, nullableInt, nullableBool]
 			);
 		await Assert
 			.That(query)
@@ -67,15 +61,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			.That(query)
 			.HasGeneratedMethod(
 				"ThrowSaveFailed",
-				[
-					nullableObject,
-					nullableObject,
-					nullableStringArray,
-					nullableString,
-					nullableInt,
-					nullableInt,
-					nullableBool,
-				]
+				[stringType, stringType, nullableStringArray, nullableString, nullableInt, nullableInt, nullableBool]
 			);
 
 		var throwMethod = query.GetMethod("ThrowSaveFailed").Node;
@@ -97,6 +83,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 		// Assert
 		await Assert.That(generated).ContainsGeneratedCode("[\"OrderId\"] = orderId,");
 		await Assert.That(generated).ContainsGeneratedCode("[\"AggregateType\"] = aggregateType,");
+		await Assert.That(generated).ContainsGeneratedCode("ErrorTypeParameters.Create(errorType.Parameters,");
 		await Assert.That(generated).ContainsGeneratedCode("errorType.FormatMessage(");
 		await Assert.That(generated).ContainsGeneratedCode("throw new ZodException([CreateSaveFailed(");
 	}
@@ -132,7 +119,60 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 		await Assert
 			.That(generated)
 			.ContainsGeneratedCode(
-				"global::System.Collections.Generic.Dictionary<string, object?> parameters = new(0)"
+				"ErrorTypeParameters.Create(errorType.Parameters, new global::System.Collections.Generic.Dictionary<string, object?>"
+			);
+	}
+
+	[Test]
+	public async Task GivenTypedParameters_GeneratesStronglyTypedSignature(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source = """
+			using System.Collections.Generic;
+
+			namespace Testing;
+
+			public static partial class SizedErrorType
+			{
+				[ErrorType]
+				public static readonly ErrorType OutOfRange = new(
+					Code: "out_of_range",
+					MessageFormat: "'{Field}' must be between {Minimum} and {Maximum} but got {Actual} (tags: {Tags})",
+					Parameters:
+					[
+						new ErrorTypeParameter("Field", typeof(string)),
+						new ErrorTypeParameter("Minimum", typeof(int?)),
+						new ErrorTypeParameter("Actual", typeof(decimal)),
+						new ErrorTypeParameter("Tags", typeof(string[])),
+						new ErrorTypeParameter("Ids", typeof(List<string>))
+					]);
+			}
+			""";
+
+		// Act
+		var result = await GenerateAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasNoErrorDiagnostics();
+		var query = result.Generated();
+		var nullableInt = query.MakeNullable(TypeReference.Create<int>());
+
+		await Assert
+			.That(query)
+			.HasGeneratedMethod(
+				"CreateOutOfRange",
+				[
+					TypeReference.Create<string>(),
+					nullableInt,
+					TypeReference.Create<decimal>(),
+					TypeReference.Create<string>().MakeArray(),
+					TypeReference.Create<List<string>>(),
+					query.MakeNullable(TypeReference.Create<string>().MakeArray()),
+					query.MakeNullable(TypeReference.Create<string>()),
+					nullableInt,
+					nullableInt,
+					query.MakeNullable(TypeReference.Create<bool>()),
+				]
 			);
 	}
 
@@ -150,10 +190,12 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 				[ErrorType]
 				public static readonly ErrorType TooShort = new(
 					Code: "too_small",
-					MessageFormat: "'{Field}' must be at least {Minimum} characters.")
-				{
-					Parameters = ["Field", "Minimum"]
-				};
+					MessageFormat: "'{Field}' must be at least {Minimum} characters.",
+					Parameters:
+					[
+						new ErrorTypeParameter("Field", typeof(string)),
+						new ErrorTypeParameter("Minimum", typeof(int))
+					]);
 			}
 			""";
 
@@ -175,6 +217,92 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 	}
 
 	[Test]
+	public async Task GivenPositionalParametersArgument_GeneratesCreateAndThrowMethods(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			namespace Testing;
+
+			public static partial class ConcurrentErrorType
+			{
+				[ErrorType]
+				public static readonly ErrorType SaveFailed = new(
+					"aggregate_save_failed",
+					null,
+					409,
+					null,
+					null,
+					"Order '{OrderId}' failed to save",
+					[new ErrorTypeParameter("OrderId", typeof(string))]);
+			}
+			""";
+
+		// Act
+		var result = await GenerateAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasNoErrorDiagnostics();
+		var query = result.Generated();
+		var stringType = TypeReference.Create<string>();
+		var nullableString = query.MakeNullable(stringType);
+		var nullableStringArray = query.MakeNullable(stringType.MakeArray());
+		var nullableInt = query.MakeNullable(TypeReference.Create<int>());
+		var nullableBool = query.MakeNullable(TypeReference.Create<bool>());
+
+		await Assert
+			.That(query)
+			.HasGeneratedMethod(
+				"CreateSaveFailed",
+				[stringType, nullableStringArray, nullableString, nullableInt, nullableInt, nullableBool]
+			);
+		await Assert.That(query).HasGeneratedMethod("ThrowSaveFailed");
+	}
+
+	[Test]
+	public async Task GivenParamInvocationParameters_GeneratesCreateAndThrowMethods(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source = """
+			namespace Testing;
+
+			public static partial class ConcurrentErrorType
+			{
+				[ErrorType]
+				public static readonly ErrorType SaveFailed = new(
+					Code: "aggregate_save_failed",
+					MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save",
+					Parameters:
+					[
+						new ErrorTypeParameter("OrderId", typeof(string)),
+						ErrorType.Param<string>("AggregateType")
+					]);
+			}
+			""";
+
+		// Act
+		var result = await GenerateAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasNoErrorDiagnostics();
+		var query = result.Generated();
+		var stringType = TypeReference.Create<string>();
+		var nullableString = query.MakeNullable(stringType);
+		var nullableStringArray = query.MakeNullable(stringType.MakeArray());
+		var nullableInt = query.MakeNullable(TypeReference.Create<int>());
+		var nullableBool = query.MakeNullable(TypeReference.Create<bool>());
+
+		await Assert
+			.That(query)
+			.HasGeneratedMethod(
+				"CreateSaveFailed",
+				[stringType, stringType, nullableStringArray, nullableString, nullableInt, nullableInt, nullableBool]
+			);
+		await Assert.That(query).HasGeneratedMethod("ThrowSaveFailed");
+	}
+
+	[Test]
 	public async Task GivenNonPartialContainingClass_DoesNotGenerate(CancellationToken cancellationToken)
 	{
 		// Arrange
@@ -188,7 +316,11 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 					Code: "aggregate_save_failed",
 					HttpStatus: 409)
 				{
-					Parameters = ["OrderId", "AggregateType"]
+					Parameters =
+					[
+						new ErrorTypeParameter("OrderId", typeof(string)),
+						new ErrorTypeParameter("AggregateType", typeof(string))
+					]
 				};
 			}
 			""";

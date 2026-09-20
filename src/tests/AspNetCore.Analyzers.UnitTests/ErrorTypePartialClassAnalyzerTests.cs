@@ -15,7 +15,11 @@ public class ErrorTypePartialClassAnalyzerTests : ErrorTypePartialClassAnalyzerT
 				[ErrorType]
 				public static readonly ErrorType SaveFailed = new(Code: "aggregate_save_failed")
 				{
-					Parameters = ["OrderId", "AggregateType"]
+					Parameters =
+					[
+						new ErrorTypeParameter("OrderId", typeof(string)),
+						new ErrorTypeParameter("AggregateType", typeof(string))
+					]
 				};
 			}
 			""";
@@ -36,7 +40,11 @@ public class ErrorTypePartialClassAnalyzerTests : ErrorTypePartialClassAnalyzerT
 				[ErrorType]
 				public static readonly ErrorType SaveFailed = new(Code: "aggregate_save_failed")
 				{
-					Parameters = ["OrderId", "AggregateType"]
+					Parameters =
+					[
+						new ErrorTypeParameter("OrderId", typeof(string)),
+						new ErrorTypeParameter("AggregateType", typeof(string))
+					]
 				};
 			}
 			""";

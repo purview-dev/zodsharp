@@ -61,13 +61,26 @@ public static partial class ConcurrentErrorType
         Code: "aggregate_save_failed",
         Description: "The aggregate could not be saved.",
         HttpStatus: StatusCodes.Status409Conflict,
-        MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save")
-    {
-        Parameters = ["AggregateId", "AggregateType"]
-    };
+        MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
+        Parameters:
+        [
+            new("AggregateId", typeof(string)),
+            new("AggregateType", typeof(string))
+        ]);
 }
 
 ErrorTypeRegistry.Default.Register(ConcurrentErrorType.SaveFailed);
+```
+
+Parameters can also be declared with the `ErrorType.Param<T>("Name")` helper instead of an explicit
+`typeof(...)`; the analyzer and source generator handle both forms the same way:
+
+```csharp
+Parameters:
+[
+    new("AggregateId", typeof(string)),
+    ErrorType.Param<string>("AggregateType")
+]
 ```
 
 A `ValidationError` carrying `parameters` such as `["AggregateId"] = "agg-123"` is then surfaced as a
@@ -78,10 +91,11 @@ in `Parameters`.
 ### Generated `Create` / `Throw` helpers
 
 Because the class above is `partial`, the bundled source generator adds strongly typed helpers derived
-from the declared `Parameters`:
+from the declared `Parameters` — each parameter is emitted with its declared `typeof(...)` type, or the
+`ErrorType.Param<T>` generic type argument:
 
 ```csharp
-// ValidationError with the code, the formatted message, and the named parameters:
+// ValidationError with the code, the formatted message, and the typed parameters:
 var error = ConcurrentErrorType.CreateSaveFailed("agg-123", "Invoice");
 
 // ZodException carrying that ValidationError:
@@ -97,6 +111,10 @@ var error = ConcurrentErrorType.CreateSaveFailed(
     maximum: 10,
     inclusive: true);
 ```
+
+The generated helpers construct a typed `ErrorTypeParameters` instance (exposed through
+`ValidationError.Parameters`) whose values are validated against the declared types and can be read back
+through `Get<T>(name)`.
 
 The analyzer `ZODSASP002` warns when an `ErrorType` field's containing class is not declared `partial`.
 

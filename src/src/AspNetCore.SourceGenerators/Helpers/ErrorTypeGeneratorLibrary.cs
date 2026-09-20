@@ -76,7 +76,7 @@ static class ErrorTypeGeneratorLibrary
 				containing.IsAbstract && !containing.IsStatic,
 				containing.IsSealed && !containing.IsStatic,
 				field.Name,
-				new EquatableArray<string>(parameters)
+				new EquatableArray<ErrorTypeParameterModel>(parameters)
 			)
 		);
 	}
@@ -85,26 +85,20 @@ static class ErrorTypeGeneratorLibrary
 	/// Extracts the declared <c>Parameters</c> from the field initializer. Returns <c>null</c>
 	/// when a <c>Parameters</c> member is present but cannot be statically analysed.
 	/// </summary>
-	static ImmutableArray<string>? ExtractParameters(
+	static ImmutableArray<ErrorTypeParameterModel>? ExtractParameters(
 		ExpressionSyntax? initializer,
 		GeneratorAttributeSyntaxContext context,
 		CancellationToken cancellationToken
 	)
 	{
-		if (initializer is null)
+		if (initializer is not BaseObjectCreationExpressionSyntax creation)
 			return [];
 
-		var objectInitializer = initializer switch
-		{
-			ObjectCreationExpressionSyntax objectCreation => objectCreation.Initializer,
-			ImplicitObjectCreationExpressionSyntax implicitCreation => implicitCreation.Initializer,
-			_ => null,
-		};
-
-		if (objectInitializer is null)
-			return [];
-
-		var parametersExpression = FindParametersExpression(objectInitializer);
+		// `Parameters` may be supplied as a constructor argument (the canonical form) or assigned
+		// in an object initializer.
+		var parametersExpression =
+			FindParametersArgument(creation, context, cancellationToken)?.Expression
+			?? FindParametersExpression(creation.Initializer);
 		if (parametersExpression is null)
 			return [];
 
@@ -112,19 +106,247 @@ static class ErrorTypeGeneratorLibrary
 		if (elements is null)
 			return null;
 
-		var builder = ImmutableArray.CreateBuilder<string>();
+		var builder = ImmutableArray.CreateBuilder<ErrorTypeParameterModel>();
 		foreach (var element in elements)
 		{
-			var constant = context.SemanticModel.GetConstantValue(element, cancellationToken);
-			if (constant.HasValue && constant.Value is string value)
-				builder.Add(value);
+			if (!TryExtractParameter(element, context, cancellationToken, out var parameter))
+				return null;
+
+			builder.Add(parameter);
 		}
 
 		return builder.ToImmutable();
 	}
 
-	static ExpressionSyntax? FindParametersExpression(InitializerExpressionSyntax objectInitializer)
+	/// <summary>
+	/// Returns the constructor argument bound to the <c>Parameters</c> parameter, or <c>null</c>
+	/// when none is supplied. Matches both the named (<c>Parameters:</c>) and positional forms.
+	/// </summary>
+	static ArgumentSyntax? FindParametersArgument(
+		BaseObjectCreationExpressionSyntax creation,
+		GeneratorAttributeSyntaxContext context,
+		CancellationToken cancellationToken
+	)
 	{
+		var argumentList = creation.ArgumentList;
+		if (argumentList is null)
+			return null;
+
+		if (context.SemanticModel.GetSymbolInfo(creation, cancellationToken).Symbol is not IMethodSymbol constructor)
+			return null;
+
+		var positionalIndex = 0;
+		foreach (var argument in argumentList.Arguments)
+		{
+			if (argument.NameColon is null)
+			{
+				if (
+					positionalIndex < constructor.Parameters.Length
+					&& constructor.Parameters[positionalIndex] is { Name: "Parameters" }
+				)
+					return argument;
+
+				positionalIndex++;
+				continue;
+			}
+
+			foreach (var parameter in constructor.Parameters)
+			{
+				if (parameter.Name == argument.NameColon.Name.Identifier.ValueText && parameter.Name == "Parameters")
+					return argument;
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Parses a single parameter declaration into a value-equatable <see cref="ErrorTypeParameterModel"/>.
+	/// Supports <c>new ErrorTypeParameter("Name", typeof(T))</c>, target-typed
+	/// <c>new("Name", typeof(T))</c>, and <c>ErrorType.Param&lt;T&gt;("Name")</c>. Returns
+	/// <c>false</c> when the element is not a statically-analysable declaration.
+	/// </summary>
+	static bool TryExtractParameter(
+		ExpressionSyntax element,
+		GeneratorAttributeSyntaxContext context,
+		CancellationToken cancellationToken,
+		out ErrorTypeParameterModel parameter
+	)
+	{
+		if (!TryExtractParameterNameAndType(element, context, cancellationToken, out var name, out var type))
+		{
+			parameter = default;
+			return false;
+		}
+
+		if (!TryGetParameterType(type, out var identity, out var isNullable, out var arrayRank))
+		{
+			parameter = default;
+			return false;
+		}
+
+		parameter = new ErrorTypeParameterModel(name, identity, isNullable, arrayRank);
+		return true;
+	}
+
+	/// <summary>
+	/// Resolves the declared name and type for a recognised parameter declaration form.
+	/// </summary>
+	static bool TryExtractParameterNameAndType(
+		ExpressionSyntax element,
+		GeneratorAttributeSyntaxContext context,
+		CancellationToken cancellationToken,
+		out string name,
+		out ITypeSymbol type
+	)
+	{
+		switch (element)
+		{
+			case ObjectCreationExpressionSyntax { ArgumentList: { } named } creation
+				when IsErrorTypeParameter(creation.Type, context):
+				return TryExtractConstructorArguments(named.Arguments, context, cancellationToken, out name, out type);
+
+			case ImplicitObjectCreationExpressionSyntax { ArgumentList: { } implicitNamed }:
+				return TryExtractConstructorArguments(
+					implicitNamed.Arguments,
+					context,
+					cancellationToken,
+					out name,
+					out type
+				);
+
+			case InvocationExpressionSyntax invocation:
+				return TryExtractParamInvocation(invocation, context, cancellationToken, out name, out type);
+
+			default:
+				name = null!;
+				type = null!;
+				return false;
+		}
+	}
+
+	/// <summary>
+	/// Resolves <c>new ErrorTypeParameter("Name", typeof(T))</c> from its constructor arguments.
+	/// </summary>
+	static bool TryExtractConstructorArguments(
+		SeparatedSyntaxList<ArgumentSyntax> arguments,
+		GeneratorAttributeSyntaxContext context,
+		CancellationToken cancellationToken,
+		out string name,
+		out ITypeSymbol type
+	)
+	{
+		name = null!;
+		type = null!;
+
+		if (arguments is not { Count: >= 2 } args)
+			return false;
+
+		var nameConstant = context.SemanticModel.GetConstantValue(args[0].Expression, cancellationToken);
+		if (!nameConstant.HasValue || nameConstant.Value is not string nameValue)
+			return false;
+
+		if (args[1].Expression is not TypeOfExpressionSyntax typeOf)
+			return false;
+
+		var typeInfo = context.SemanticModel.GetTypeInfo(typeOf.Type, cancellationToken);
+		if (typeInfo.Type is null)
+			return false;
+
+		name = nameValue;
+		type = typeInfo.Type;
+		return true;
+	}
+
+	/// <summary>
+	/// Resolves <c>ErrorType.Param&lt;T&gt;("Name")</c> from its generic type argument.
+	/// </summary>
+	static bool TryExtractParamInvocation(
+		InvocationExpressionSyntax invocation,
+		GeneratorAttributeSyntaxContext context,
+		CancellationToken cancellationToken,
+		out string name,
+		out ITypeSymbol type
+	)
+	{
+		name = null!;
+		type = null!;
+
+		if (context.SemanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+			return false;
+
+		var errorType = context.SemanticModel.Compilation.GetTypeByMetadataName(ErrorTypeMetadataName);
+		if (
+			errorType is null
+			|| method.Name != "Param"
+			|| !SymbolEqualityComparer.Default.Equals(method.ContainingType, errorType)
+		)
+			return false;
+
+		if (invocation.ArgumentList.Arguments is not { Count: >= 1 } args)
+			return false;
+
+		var nameConstant = context.SemanticModel.GetConstantValue(args[0].Expression, cancellationToken);
+		if (!nameConstant.HasValue || nameConstant.Value is not string nameValue)
+			return false;
+
+		if (method.TypeArguments.Length != 1)
+			return false;
+
+		name = nameValue;
+		type = method.TypeArguments[0];
+		return true;
+	}
+
+	static bool IsErrorTypeParameter(TypeSyntax typeSyntax, GeneratorAttributeSyntaxContext context)
+	{
+		var type = context.SemanticModel.GetTypeInfo(typeSyntax).Type as INamedTypeSymbol;
+		return type is not null
+			&& type.Name == "ErrorTypeParameter"
+			&& type.ContainingNamespace?.ToDisplayString() == "ZodSharp.Core";
+	}
+
+	/// <summary>
+	/// Resolves a <c>typeof(...)</c> argument into the value-equatable components needed to emit its
+	/// type reference: the underlying <see cref="TypeIdentity"/> (nullable value types unwrapped),
+	/// whether it is <c>Nullable&lt;T&gt;</c>, and the array rank. Returns <c>false</c> when the
+	/// symbol cannot be represented.
+	/// </summary>
+	static bool TryGetParameterType(ITypeSymbol type, out TypeIdentity identity, out bool isNullable, out int arrayRank)
+	{
+		isNullable = false;
+		arrayRank = 0;
+
+		if (type is IArrayTypeSymbol arrayType)
+		{
+			if (!TryGetParameterType(arrayType.ElementType, out identity, out isNullable, out _))
+				return false;
+
+			arrayRank = arrayType.Rank;
+			return true;
+		}
+
+		if (
+			type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+			&& nullable.TypeArguments[0] is INamedTypeSymbol underlying
+		)
+		{
+			isNullable = true;
+			type = underlying;
+		}
+
+		if (!TypeIdentity.TryCreate(type, out identity))
+			return false;
+
+		// We don't support nullable reference types because they are not represented in the emitted
+		return true;
+	}
+
+	static ExpressionSyntax? FindParametersExpression(InitializerExpressionSyntax? objectInitializer)
+	{
+		if (objectInitializer is null)
+			return null;
+
 		foreach (var element in objectInitializer.Expressions)
 		{
 			if (
@@ -150,6 +372,9 @@ static class ErrorTypeGeneratorLibrary
 				.Select(static element => element.Expression),
 			ImplicitArrayCreationExpressionSyntax implicitArray => implicitArray.Initializer.Expressions,
 			ArrayCreationExpressionSyntax array => array.Initializer?.Expressions ?? [],
+			ObjectCreationExpressionSyntax { Initializer: { } initializer } => initializer.Expressions,
+			ImplicitObjectCreationExpressionSyntax { Initializer: { } implicitInitializer } =>
+				implicitInitializer.Expressions,
 			_ => null,
 		};
 	}

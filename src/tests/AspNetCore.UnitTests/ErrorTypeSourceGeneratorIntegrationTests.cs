@@ -10,11 +10,14 @@ public static partial class ConcurrentErrorType
 		Code: "aggregate_save_failed",
 		Description: "The order could not be saved because it was modified concurrently.",
 		HttpStatus: StatusCodes.Status409Conflict,
-		MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save"
-	)
-	{
-		Parameters = ["OrderId", "AggregateType"],
-	};
+		MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save",
+		Parameters: new List<ErrorTypeParameter>
+		{
+			new("OrderId", typeof(string)),
+			ErrorType.Param<string>("AggregateType"),
+			//new ("AggregateType", typeof(string)),
+		}
+	);
 }
 
 public class ErrorTypeSourceGeneratorIntegrationTests
@@ -31,6 +34,8 @@ public class ErrorTypeSourceGeneratorIntegrationTests
 		await Assert.That(error.Parameters).IsNotNull();
 		await Assert.That(error.Parameters!["OrderId"]).IsEqualTo("ord-42");
 		await Assert.That(error.Parameters!["AggregateType"]).IsEqualTo("Order");
+		await Assert.That(error.Parameters!.Get<string>("OrderId")).IsEqualTo("ord-42");
+		await Assert.That(error.Parameters!.GetDeclaredType("OrderId")).IsEqualTo(typeof(string));
 		await Assert.That(error.Message).IsEqualTo("Order 'ord-42' (of type Order) failed to save");
 	}
 

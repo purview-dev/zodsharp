@@ -660,3 +660,4 @@ sketch
 BenchmarkDotNet.Artifacts/
 
 .tools/purview-build/**
+src/tests/cross-platform/

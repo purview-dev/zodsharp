@@ -16,7 +16,11 @@ public class ErrorTypeGeneratorCacheTests : ErrorTypeGeneratorTestBase
 				Code: "aggregate_save_failed",
 				HttpStatus: 409)
 			{
-				Parameters = ["OrderId", "AggregateType"]
+				Parameters =
+				[
+					new ErrorTypeParameter("OrderId", typeof(string)),
+					new ErrorTypeParameter("AggregateType", typeof(string))
+				]
 			};
 		}
 		""";
@@ -31,7 +35,10 @@ public class ErrorTypeGeneratorCacheTests : ErrorTypeGeneratorTestBase
 				Code: "aggregate_save_failed",
 				HttpStatus: 409)
 			{
-				Parameters = ["OrderId"]
+				Parameters =
+				[
+					new ErrorTypeParameter("OrderId", typeof(string))
+				]
 			};
 		}
 		""";

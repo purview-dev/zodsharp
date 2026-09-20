@@ -1,11 +1,13 @@
+using ZodSharp.Core;
+
 namespace ZodSharp.AspNetCore.Analyzers.Infra;
 
 public sealed record ErrorTypeAnalyzerTestOptions : AnalyzerTestOptions
 {
 	public ErrorTypeAnalyzerTestOptions()
 	{
-		AdditionalNamespaces = ["ZodSharp.AspNetCore"];
-		AdditionalAssemblyTypes = [typeof(ErrorType)];
+		AdditionalNamespaces = ["ZodSharp.AspNetCore", "ZodSharp.Core"];
+		AdditionalAssemblyTypes = [typeof(ErrorType), typeof(ErrorTypeParameter)];
 		// The generator emits this attribute at compile time; the analyzer-only harness
 		// provides the same surface so the analyzer can resolve it.
 		AdditionalSources =

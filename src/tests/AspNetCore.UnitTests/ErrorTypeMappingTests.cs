@@ -18,7 +18,11 @@ public class ErrorTypeMappingTests
 				MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save"
 			)
 			{
-				Parameters = ["AggregateId", "AggregateType"],
+				Parameters =
+				[
+					new ErrorTypeParameter("AggregateId", typeof(string)),
+					new ErrorTypeParameter("AggregateType", typeof(string)),
+				],
 			}
 		);
 		ZodException exception = new([
@@ -123,7 +127,11 @@ public class ErrorTypeMappingTests
 				MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save"
 			)
 			{
-				Parameters = ["AggregateId", "AggregateType"],
+				Parameters =
+				[
+					new ErrorTypeParameter("AggregateId", typeof(string)),
+					new ErrorTypeParameter("AggregateType", typeof(string)),
+				],
 			}
 		);
 		ZodException exception = new([
@@ -156,7 +164,11 @@ public class ErrorTypeMappingTests
 				MessageFormat: "'{Field}' must be at least {Minimum} characters."
 			)
 			{
-				Parameters = ["Field", "Minimum"],
+				Parameters =
+				[
+					new ErrorTypeParameter("Field", typeof(string)),
+					new ErrorTypeParameter("Minimum", typeof(int)),
+				],
 			}
 		);
 		var result = ValidationResult<string>.Failure(

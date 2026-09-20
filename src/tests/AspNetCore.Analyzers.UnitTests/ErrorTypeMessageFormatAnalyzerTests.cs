@@ -17,10 +17,8 @@ public partial class ErrorTypeMessageFormatAnalyzerTests : ErrorTypeAnalyzerTest
 				public static readonly ErrorType SaveFailed = new(
 					Code: "aggregate_save_failed",
 					HttpStatus: 409,
-					MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save")
-				{
-					Parameters = ["AggregateId"]
-				};
+					MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
+					Parameters: [new ErrorTypeParameter("AggregateId", typeof(string))]);
 			}
 			""";
 
@@ -40,10 +38,63 @@ public partial class ErrorTypeMessageFormatAnalyzerTests : ErrorTypeAnalyzerTest
 				public static readonly ErrorType SaveFailed = new(
 					Code: "aggregate_save_failed",
 					HttpStatus: 409,
-					MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save")
-				{
-					Parameters = ["AggregateId", "AggregateType"]
-				};
+					MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
+					Parameters:
+					[
+						new ErrorTypeParameter("AggregateId", typeof(string)),
+						new ErrorTypeParameter("AggregateType", typeof(string))
+					]);
+			}
+			""";
+
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		await Assert.That(result).HasNoDiagnostics();
+	}
+
+	[Test]
+	public async Task GivenMessageFormat_WithTargetTypedParametersDeclared_HasNoDiagnostics(
+		CancellationToken cancellationToken
+	)
+	{
+		const string source = """
+			namespace Testing;
+
+			public static class ConcurrentErrorType
+			{
+				public static readonly ErrorType SaveFailed = new(
+					Code: "aggregate_save_failed",
+					Description: "The order could not be saved because it was modified concurrently.",
+					HttpStatus: StatusCodes.Status409Conflict,
+					MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save",
+					Parameters: [new("OrderId", typeof(string)), new("AggregateType", typeof(string))]);
+			}
+			""";
+
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		await Assert.That(result).HasNoDiagnostics();
+	}
+
+	[Test]
+	public async Task GivenMessageFormat_WithParamInvocationParametersDeclared_HasNoDiagnostics(
+		CancellationToken cancellationToken
+	)
+	{
+		const string source = """
+			namespace Testing;
+
+			public static class ConcurrentErrorType
+			{
+				public static readonly ErrorType SaveFailed = new(
+					Code: "aggregate_save_failed",
+					HttpStatus: 409,
+					MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save",
+					Parameters:
+					[
+						new ErrorTypeParameter("OrderId", typeof(string)),
+						ErrorType.Param<string>("AggregateType")
+					]);
 			}
 			""";
 
@@ -82,7 +133,7 @@ public partial class ErrorTypeMessageFormatAnalyzerTests : ErrorTypeAnalyzerTest
 					Code: "saved",
 					MessageFormat: "The value {{Value}} is fine.")
 				{
-					Parameters = ["Value"]
+					Parameters = [new ErrorTypeParameter("Value", typeof(string))]
 				};
 			}
 			""";

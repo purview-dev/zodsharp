@@ -101,15 +101,31 @@ public static partial class ConcurrentErrorType
         Code: "aggregate_save_failed",
         Description: "The aggregate could not be saved.",
         HttpStatus: StatusCodes.Status409Conflict,
-        MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save")
-    {
-        Parameters = ["AggregateId", "AggregateType"]
-    };
+        MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
+        Parameters:
+        [
+            new("AggregateId", typeof(string)),
+            new("AggregateType", typeof(string))
+        ]);
 }
 
 // Register once at startup:
 ErrorTypeRegistry.Default.Register(ConcurrentErrorType.SaveFailed);
 ```
+
+Parameters can also be declared with the `ErrorType.Param<T>("Name")` helper instead of an explicit
+`typeof(...)`:
+
+```csharp
+Parameters:
+[
+    new("AggregateId", typeof(string)),
+    ErrorType.Param<string>("AggregateType")
+]
+```
+
+Both the bundled `ZODSASP001` analyzer and the source generator treat `ErrorType.Param<T>` entries
+exactly like any other declared parameter, so placeholder checking and helper generation are unchanged.
 
 When an error carries that code, the response status, title, and message are derived automatically:
 
@@ -132,10 +148,11 @@ throw new ZodException([
 Marking the field with `[ErrorType]` and the containing class `partial` lets the bundled source
 generator turn each field into strongly typed static helpers. For the field above it generates
 `ConcurrentErrorType.CreateSaveFailed(...)` and `ConcurrentErrorType.ThrowSaveFailed(...)` with one
-named parameter per entry in `Parameters`:
+strongly typed parameter per entry in `Parameters` (the declared `typeof(...)` type, or the
+`ErrorType.Param<T>` generic type argument):
 
 ```csharp
-// Returns a ValidationError with the code, the formatted message, and the named parameters.
+// Returns a ValidationError with the code, the formatted message, and the typed parameters.
 var error = ConcurrentErrorType.CreateSaveFailed("agg-123", "Invoice");
 
 // Throws a ZodException carrying the same ValidationError.
@@ -152,7 +169,8 @@ var error = ConcurrentErrorType.CreateSaveFailed(
     inclusive: true);
 ```
 
-The generated `Create` builds the `parameters` dictionary and sets the message from
+The generated `Create` builds a typed `ErrorTypeParameters` instance (validated against the declared
+parameter types and exposed through `ValidationError.Parameters`) and sets the message from
 `ErrorType.FormatMessage`, so `error.Message` already reads
 `Aggregate 'agg-123' (of type Invoice) failed to save` and mapping through the registry produces the
 `409 Conflict` response described below. The analyzers `ZODSASP001`/`ZODSASP002`/`ZODSASP003`
