@@ -2,11 +2,12 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using ZodSharp.Core;
 
 namespace ZodSharp.AspNetCore;
 
 /// <summary>
-/// An <see cref="IExceptionHandler"/> that converts a thrown <see cref="Core.ZodException"/>
+/// An <see cref="IExceptionHandler"/> that converts a thrown <see cref="ZodException"/>
 /// into a standard <see cref="HttpValidationProblemDetails"/> response,
 /// resolving <see cref="ErrorType"/>s from the configured <see cref="ZodProblemDetailsOptions.Registry"/>.
 /// </summary>
@@ -40,7 +41,7 @@ public sealed class ZodExceptionHandler : IExceptionHandler
 	{
 		ArgumentNullException.ThrowIfNull(httpContext);
 
-		if (exception is not Core.ZodException zodException)
+		if (exception is not ZodException zodException)
 			return false;
 
 		var defaultStatusCode =

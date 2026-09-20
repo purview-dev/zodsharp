@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ZodSharp.Core;
 using ZodSharp.Schemas;
 
-namespace ZodSharp.AspNetCore;
+namespace ZodSharp;
 
 public class AddZodSharpExtensionsTests
 {

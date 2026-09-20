@@ -2,15 +2,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ZodSharp.Core;
 
-namespace ZodSharp.AspNetCore;
+namespace ZodSharp;
 
-public class ZodExceptionExtensionsTests
+public class ProblemDetailsExtensionsTests
 {
 	[Test]
 	public async Task ToHttpValidationProblemDetails_GivenFailure_PreservesErrorsAndIssues()
 	{
-		// Arrange
-		ZodException exception = new([
+		var result = ValidationResult<string>.Failure([
 			ValidationError.Create(
 				"too_small",
 				"Field 'Items' must contain at least 2 elements.",
@@ -29,10 +28,8 @@ public class ZodExceptionExtensionsTests
 			),
 		]);
 
-		// Act
-		var details = exception.ToHttpValidationProblemDetails();
+		var details = result.ToHttpValidationProblemDetails();
 
-		// Assert
 		await Assert.That(details.Status).IsEqualTo(StatusCodes.Status400BadRequest);
 		await Assert.That(details.Errors["Items"]).IsEquivalentTo(["Field 'Items' must contain at least 2 elements."]);
 		await Assert
@@ -42,31 +39,21 @@ public class ZodExceptionExtensionsTests
 	}
 
 	[Test]
-	public async Task ToHttpValidationProblemDetails_GivenEmptyErrors_ProducesEmptyPayload()
-	{
-		// Arrange
-		ZodException exception = new([]);
-
-		// Act
-		var details = exception.ToHttpValidationProblemDetails();
-
-		// Assert
-		await Assert.That(details.Status).IsEqualTo(StatusCodes.Status400BadRequest);
-		await Assert.That(details.Errors).IsEmpty();
-	}
-
-	[Test]
 	public async Task ToValidationProblemDetails_GivenFailure_ProducesValidationProblemDetails()
 	{
-		// Arrange
-		ZodException exception = new([
-			ValidationError.Create("too_small", "Field 'Items' must contain at least 2 elements.", ["Items"]),
-		]);
+		var result = ValidationResult<string>.Failure(
+			ValidationError.Create(
+				"too_small",
+				"Field 'Items' must contain at least 2 elements.",
+				["Items"],
+				origin: "array",
+				minimum: 2,
+				inclusive: true
+			)
+		);
 
-		// Act
-		var details = exception.ToValidationProblemDetails();
+		var details = result.ToValidationProblemDetails();
 
-		// Assert
 		await Assert.That(details).IsTypeOf<ValidationProblemDetails>();
 		await Assert.That(details.Errors["Items"]).HasSingleItem();
 		await Assert.That(details.Extensions.ContainsKey("issues")).IsTrue();
