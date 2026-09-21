@@ -4,6 +4,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\Examples.CLI\Examples.CLI.csproj" />
 		<ProjectReference Include="..\..\src\AspNetCore\AspNetCore.csproj" />
 		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
 	</ItemGroup>

@@ -51,14 +51,17 @@ builder.Services.AddZodSharpFactory(factory => factory.RegisterFromAssembly(type
 > [!IMPORTANT]
 > The factory is registered only if one is not already present (`TryAdd` semantics): the **first** `AddZodSharpFactory` (or `AddZodSharp`) call wins, and any later calls — including their `configure` callbacks — are ignored. State is never overwritten, so calling it more than once is safe.
 
-The `Purview.ZodSharp.AspNetCore` package offers the richer `AddZodSharp` with `ScanAssemblies` — see [ASP.NET Core Integration](AspNetCore-Integration.md).
+The `Purview.ZodSharp.AspNetCore` package offers the richer `AddZodSharp` with exact assembly scans,
+assembly-graph scans, loaded-assembly scans, and additive assembly-contribution helpers — see
+[ASP.NET Core Integration](AspNetCore-Integration.md).
 
 ### Choosing a registration method
 
 | Method | Package | Registers | Use when |
 |---|---|---|---|
 | `AddZodSharpFactory(configure)` | core `Purview.ZodSharp` | singleton `IZodSchemaFactory` | Any .NET host (console, worker, library, web) where you want manual control — you register validators yourself in the `configure` callback. |
-| `AddZodSharp(options)` | `Purview.ZodSharp.AspNetCore` | singleton `IZodSchemaFactory` + auto-registers generated validators from `options.ScanAssemblies` | ASP.NET Core apps that want assembly auto-discovery of source-generated validators. |
+| `AddZodSharp(options)` | `Purview.ZodSharp.AspNetCore` | singleton `IZodSchemaFactory` + auto-registers generated validators from configured assembly sources | ASP.NET Core apps that want factory registration plus optional assembly-source configuration. |
+| `AddZodSharpAssembly(...)`, `AddZodSharpAssemblyGraph(...)`, `AddZodSharpLoadedAssemblies()` | `Purview.ZodSharp.AspNetCore` | additive generated-validator assembly source contributions | Modular ASP.NET Core apps where deeper layers or implementation packages contribute schema assemblies without central coordination. |
 | `AddZodSharpProblemDetails(...)` | `Purview.ZodSharp.AspNetCore` | `ZodExceptionHandler` + ProblemDetails services only — does **not** register the factory | Mapping thrown `ZodException`s to `ProblemDetails` automatically; pair it with one of the factory registrations above when you also need DI validator resolution. |
 | `AddZodSchemaOptionsValidator<T>(...)` | core `Purview.ZodSharp` | singleton `IValidateOptions<T>` | Validating options objects; requires a factory registered first via `AddZodSharpFactory` or `AddZodSharp`. |
 

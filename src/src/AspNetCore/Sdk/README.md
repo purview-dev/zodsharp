@@ -59,15 +59,33 @@ validator from the configured assemblies:
 builder.Services.AddZodSharp(options =>
 {
     options.ScanAssemblies.Add(typeof(UserDto).Assembly);
+    options.ScanAssemblyGraphs.Add(typeof(Program).Assembly);
+    options.ScanLoadedAssemblies = true;
 });
 ```
 
 The factory is registered only if one is not already present — the first `AddZodSharp` (or
-`AddZodSharpFactory`) call wins and later calls are ignored, so state is never overwritten.
+`AddZodSharpFactory`) call wins and later `AddZodSharp` configure callbacks are ignored, so state is
+never overwritten.
+
+For modular apps, assembly contributions can also be added independently before building the provider:
+
+```csharp
+builder.Services.AddZodSharp();
+builder.Services.AddZodSharpAssembly(typeof(UserDto).Assembly);
+builder.Services.AddZodSharpAssemblyGraph(typeof(Program).Assembly);
+builder.Services.AddZodSharpLoadedAssemblies();
+```
+
+- `ScanAssemblies` / `AddZodSharpAssembly(...)` scan exact assemblies.
+- `ScanAssemblyGraphs` / `AddZodSharpAssemblyGraph(...)` scan the root assembly plus its referenced assemblies.
+- `ScanLoadedAssemblies` / `AddZodSharpLoadedAssemblies()` scan the assemblies currently loaded into the application domain.
+- Exact, graph, and loaded-assembly contributions are additive before the service provider is built.
 
 When to use which registration:
 
-- `AddZodSharp` (this package) — ASP.NET Core apps; auto-discovers generated validators via `ScanAssemblies`.
+- `AddZodSharp` (this package) — ASP.NET Core apps; registers the factory and can auto-discover generated validators.
+- `AddZodSharpAssembly(...)` / `AddZodSharpAssemblyGraph(...)` / `AddZodSharpLoadedAssemblies()` (this package) — modular ASP.NET Core apps; contribute generated-validator assembly sources additively.
 - `AddZodSharpFactory` (core package) — any .NET host; you register validators manually in the `configure` callback.
 - `AddZodSharpProblemDetails` (this package) — exception handling and ProblemDetails services only; it does **not** register the factory.
 - `AddZodSchemaOptionsValidator<T>` (core package) — options validation via `IValidateOptions<T>`; requires a factory registered first.
