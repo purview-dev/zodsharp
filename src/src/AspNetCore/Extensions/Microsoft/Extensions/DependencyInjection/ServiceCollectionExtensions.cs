@@ -1,10 +1,6 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using ZodSharp.AspNetCore;
 using ZodSharp.Core;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -41,6 +37,25 @@ public static class ServiceCollectionExtensions
 		}
 
 		/// <summary>
+		/// Registers the assembly containing <typeparamref name="T"/> for scanning for generated validators.
+		/// </summary>
+		/// <typeparam name="T">The type whose assembly is scanned for generated validators.</typeparam>
+		/// <returns>The <see cref="IServiceCollection"/> instance for chaining.</returns>
+		public IServiceCollection AddZodSharpAssembly<T>() => AddZodSharpAssembly(services, typeof(T).Assembly);
+
+		/// <summary>
+		/// Adds the ZodSharp assembly containing the specified type to the service collection.
+		/// </summary>
+		/// <param name="type">The type whose assembly is added.</param>
+		/// <returns>The same service collection for chaining additional registrations.</returns>
+		public IServiceCollection AddZodSharpAssembly(Type type)
+		{
+			ArgumentNullException.ThrowIfNull(type);
+
+			return AddZodSharpAssembly(services, type.Assembly);
+		}
+
+		/// <summary>
 		/// Registers a specific assembly to scan for generated validators.
 		/// </summary>
 		public IServiceCollection AddZodSharpAssembly(Assembly assembly)
@@ -51,6 +66,29 @@ public static class ServiceCollectionExtensions
 			services.TryAddSingleton<IZodSchemaFactory>(CreateFactory);
 
 			return services;
+		}
+
+		/// <summary>
+		/// Registers the assembly containing <typeparamref name="T"/> and its referenced assemblies for scanning for
+		/// generated validators.
+		/// </summary>
+		/// <remarks>The root assembly and all directly or indirectly referenced assemblies are scanned for generated
+		/// validators.</remarks>
+		/// <typeparam name="T">The type whose assembly graph is scanned for generated validators.</typeparam>
+		/// <returns>The <see cref="IServiceCollection"/> instance for chaining.</returns>
+		public IServiceCollection AddZodSharpAssemblyGraph<T>() =>
+			AddZodSharpAssemblyGraph(services, typeof(T).Assembly);
+
+		/// <summary>
+		/// Registers the ZodSharp assembly graph for the assembly containing the specified type.
+		/// </summary>
+		/// <param name="type">The type whose assembly contains the ZodSharp definitions to register.</param>
+		/// <returns>The service collection for chaining additional registrations.</returns>
+		public IServiceCollection AddZodSharpAssemblyGraph(Type type)
+		{
+			ArgumentNullException.ThrowIfNull(type);
+
+			return AddZodSharpAssemblyGraph(services, type.Assembly);
 		}
 
 		/// <summary>
