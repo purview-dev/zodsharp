@@ -245,27 +245,46 @@ Mapping rules:
 builder.Services.AddZodSharp(options =>
 {
     options.ScanAssemblies.Add(typeof(UserDto).Assembly);
+    options.ScanAssemblyGraphs.Add(typeof(Program).Assembly);
+    options.ScanLoadedAssemblies = true;
 });
 ```
 
-`AddZodSharp(Action<ZodSchemaFactoryOptions>? configure)` registers `IZodSchemaFactory` as a singleton, applies `options.ConfigureFactory`, and calls `factory.RegisterFromAssembly(assembly)` for each entry in `options.ScanAssemblies`. This auto-discovers source-generated `[assembly: ZodSchemaGenerated(typeof(...))]` registrations.
+`AddZodSharp(Action<ZodSchemaFactoryOptions>? configure)` registers `IZodSchemaFactory` as a singleton, applies `options.ConfigureFactory`, and calls `factory.RegisterFromAssembly(assembly)` for each distinct assembly discovered from the configured assembly sources. This auto-discovers source-generated `[assembly: ZodSchemaGenerated(typeof(...))]` registrations.
 
 `ZodSchemaFactoryOptions`:
 
 - `List<Assembly> ScanAssemblies` — assemblies to scan for generated schemas.
+- `List<Assembly> ScanAssemblyGraphs` — root assemblies whose referenced assembly graphs should be scanned for generated schemas.
+- `bool ScanLoadedAssemblies` — whether to scan all currently loaded assemblies for generated schemas.
 - `Action<IZodSchemaFactory>? ConfigureFactory` — additional factory configuration.
+
+For modular registration, the package also exposes additive assembly-contribution helpers:
+
+```csharp
+builder.Services.AddZodSharp();
+builder.Services.AddZodSharpAssembly(typeof(UserDto).Assembly);
+builder.Services.AddZodSharpAssemblyGraph(typeof(Program).Assembly);
+builder.Services.AddZodSharpLoadedAssemblies();
+```
+
+- `AddZodSharpAssembly(Assembly)` contributes an exact assembly scan.
+- `AddZodSharpAssemblyGraph(Assembly)` contributes the root assembly plus its referenced assemblies.
+- `AddZodSharpLoadedAssemblies()` contributes a scan across assemblies currently loaded into the application domain.
 
 > [!IMPORTANT]
 > The factory is registered only if one is not already present (`TryAdd` semantics): the **first**
 > `AddZodSharp` (or `AddZodSharpFactory`) call wins, and any later calls — including their
-> `ScanAssemblies`/`ConfigureFactory` settings — are ignored. State is never overwritten, so calling
-> it more than once is safe.
+> `ScanAssemblies`/`ScanAssemblyGraphs`/`ScanLoadedAssemblies`/`ConfigureFactory` settings — are ignored.
+> State is never overwritten, so calling it more than once is safe. The additive assembly-contribution
+> helpers above still contribute before the service provider is built.
 
 ### Choosing a registration method
 
 | Method | Package | Registers | Use when |
 |---|---|---|---|
-| `AddZodSharp(options)` | `Purview.ZodSharp.AspNetCore` | singleton `IZodSchemaFactory` + auto-registers generated validators from `options.ScanAssemblies` | ASP.NET Core apps that want assembly auto-discovery of source-generated validators. |
+| `AddZodSharp(options)` | `Purview.ZodSharp.AspNetCore` | singleton `IZodSchemaFactory` + auto-registers generated validators from configured assembly sources | ASP.NET Core apps that want factory registration plus optional assembly-source configuration. |
+| `AddZodSharpAssembly(...)`, `AddZodSharpAssemblyGraph(...)`, `AddZodSharpLoadedAssemblies()` | `Purview.ZodSharp.AspNetCore` | additive generated-validator assembly source contributions | Modular ASP.NET Core apps where deeper layers or implementation packages contribute their own schema assemblies. |
 | `AddZodSharpFactory(configure)` | core `Purview.ZodSharp` | singleton `IZodSchemaFactory` | Any .NET host where you want manual control — register validators yourself in the `configure` callback. |
 | `AddZodSharpProblemDetails(...)` | `Purview.ZodSharp.AspNetCore` | `ZodExceptionHandler` + ProblemDetails services only — does **not** register the factory | Mapping thrown `ZodException`s to `ProblemDetails`; pair it with `AddZodSharp` when you also need DI validator resolution. |
 | `AddZodSchemaOptionsValidator<T>(...)` | core `Purview.ZodSharp` | singleton `IValidateOptions<T>` | Validating options objects; requires a factory registered first via `AddZodSharp` or `AddZodSharpFactory`. |
