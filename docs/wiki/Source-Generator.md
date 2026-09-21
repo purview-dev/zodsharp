@@ -52,8 +52,8 @@ All options are optional.
 | `GenerateValidateMethod` | `true` | Reserved — `Validate` is always emitted. |
 | `GenerateParseMethod` | `true` | Reserved — `Parse` is always emitted. |
 | `EnableComposition` | `true` | Emits `ApplyAnd`, `ApplyOr`, `ApplyRefine` value-first composition methods. |
-| `CustomValidationMethodName` | `null` | Name of an async custom validation method; default lookup name `CustomValidationAsync`. |
-| `RefinementMethodName` | `null` | Name of a synchronous refinement method; default lookup name `Validate` (an instance method on the model). |
+| `CustomValidationMethodName` | `null` | Name of an async custom validation method; default lookup name `CustomValidationAsync`. Mutually exclusive with the synchronous refinement method. |
+| `RefinementMethodName` | `null` | Name of a synchronous refinement method; default lookup name `Validate` (an instance method on the model). Mutually exclusive with the async custom validation method. |
 | `GenerateIValidateOptions` | `false` | Force `IValidateOptions<T>` generation. |
 | `SuppressIValidateOptions` | `false` | Opt out even when auto-detection would enable it. |
 
@@ -78,8 +78,16 @@ public partial class UserSchemaValidator
 Requirements:
 
 - Signature `ValueTask<ValidationResult<T>> Name(T value, CancellationToken ct)`.
-- A method declared on the model type must be `static`; a method on the generated `{TypeName}SchemaValidator` partial may be an instance method.
-- The generated `ValidateAsync` runs the synchronous `Validate`, then awaits the custom method, and merges the error sets.
+- Default lookup name `CustomValidationAsync` unless overridden with
+  `CustomValidationMethodName` on the `[ZodSchema]` attribute.
+- A method declared on the model type must be `static`; a method on the generated
+  `{TypeName}SchemaValidator` partial may be an instance method.
+- The generated `ValidateAsync` runs the synchronous `Validate`, then awaits the custom method, and
+  merges the error sets.
+
+> [!WARNING]
+> The async custom validation method is mutually exclusive with the synchronous refinement method. A
+> model must declare exactly one of the two — declaring both is an error (ZODSGEN029).
 
 ## Synchronous refinement
 
@@ -99,7 +107,18 @@ public class Order
 }
 ```
 
-Parameterless or `IEnumerable<ValidationError> Validate(RefineCtx<Order> ctx)` variants are supported.
+Requirements:
+
+- The method must be an **instance** method on the model type (it is invoked on the value being
+  validated). A `static` method is an error (ZODSGEN024).
+- Default lookup name `Validate` unless overridden with `RefinementMethodName` on the `[ZodSchema]`
+  attribute.
+- Parameterless or `IEnumerable<ValidationError> Validate(RefineCtx<Order> ctx)` variants are
+  supported.
+
+> [!WARNING]
+> The synchronous refinement method is mutually exclusive with the async custom validation method. A
+> model must declare exactly one of the two — declaring both is an error (ZODSGEN029).
 
 ## IValidateOptions support
 

@@ -248,4 +248,58 @@ static class DiagnosticLibrary
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true
 	);
+
+	public static readonly DiagnosticDescriptor AmbiguousValidationMethods = new(
+		id: "ZODSGEN029",
+		title: "Synchronous refinement and async custom validation methods are mutually exclusive",
+		messageFormat: "The type '{0}' declares both a synchronous refinement method ('{1}') and an async custom validation method ('{2}'); only one may be used",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor MessageFormatPlaceholderNotDeclared = new(
+		id: "ZODSASP001",
+		title: "MessageFormat placeholder is not declared in Parameters",
+		messageFormat: "MessageFormat placeholder '{0}' is not declared in ErrorType.Parameters",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor ErrorTypeContainingTypeNotPartial = new(
+		id: "ZODSASP002",
+		title: "Error type containing type must be partial",
+		messageFormat: "The containing type '{0}' must be declared 'partial' so that Create/Throw methods can be generated",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor ErrorTypeFieldInvalid = new(
+		id: "ZODSASP003",
+		title: "ErrorType field must be static readonly",
+		messageFormat: "The ErrorType field '{0}' must be declared 'static readonly' for Create/Throw methods to be generated",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor ErrorTypeUnhandledException = new(
+		id: "ZODSASP100",
+		title: "Unhandled exception in the ErrorType source generator",
+		messageFormat: "The ErrorType source generator failed for '{0}': {1}",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor ErrorTypeInvalidParameters = new(
+		id: "ZODSASP101",
+		title: "Unable to extract ErrorType parameters",
+		messageFormat: "The Parameters of ErrorType field '{0}' in '{1}' could not be extracted; only ErrorTypeParameter collection literals with a constant name and typeof, or ErrorType.Param<T> invocations, are supported",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
 }

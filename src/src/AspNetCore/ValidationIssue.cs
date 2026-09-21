@@ -13,6 +13,11 @@ public readonly record struct ValidationIssue
 	public required string Code { get; init; }
 
 	/// <summary>
+	/// The optional category the issue belongs to.
+	/// </summary>
+	public string? Category { get; init; }
+
+	/// <summary>
 	/// The issue origin category.
 	/// </summary>
 	public string? Origin { get; init; }

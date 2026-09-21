@@ -90,9 +90,12 @@ static class AttributeGenHelper
 							"Optional name of a custom asynchronous validation method to invoke",
 							"after synchronous validation. When set, the generator looks for a",
 							"method with the signature:",
-							"<c>static ValueTask&lt;ValidationResult&lt;T&gt;&gt; MethodName(T value, CancellationToken cancellationToken)</c>",
+							"<c>ValueTask&lt;ValidationResult&lt;T&gt;&gt; MethodName(T value, CancellationToken cancellationToken)</c>",
+							"declared as a static method on the model type or an instance method on the",
+							"generated <c>{TypeName}SchemaValidator</c> partial.",
 							"If null, the default name <c>CustomValidationAsync</c> is used.",
-							"No diagnostic is reported when the default name has no matching method."
+							"No diagnostic is reported when the default name has no matching method.",
+							"Mutually exclusive with <c>RefinementMethodName</c> (ZODSGEN029)."
 						)
 						.Property(
 							new(
@@ -108,11 +111,12 @@ static class AttributeGenHelper
 					body.XmlSummary(
 							"Optional name of a synchronous refinement method to invoke",
 							"during synchronous validation. When set, the generator looks for an",
-							"instance method with the signature:",
+							"instance method on the model type with the signature:",
 							"<c>IEnumerable&lt;ValidationError&gt; MethodName()</c> or",
 							"<c>IEnumerable&lt;ValidationError&gt; MethodName(RefineCtx&lt;T&gt; ctx)</c>.",
 							"If null, the default name <c>Validate</c> is used.",
-							"No diagnostic is reported when the default name has no matching method."
+							"No diagnostic is reported when the default name has no matching method.",
+							"Mutually exclusive with <c>CustomValidationMethodName</c> (ZODSGEN029)."
 						)
 						.Property(
 							new(

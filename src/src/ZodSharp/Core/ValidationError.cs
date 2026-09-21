@@ -14,6 +14,12 @@ public readonly record struct ValidationError
 	public string Code { get; }
 
 	/// <summary>
+	/// The optional category the error belongs to. A broad grouping that can span many specific
+	/// codes (e.g. code "invalid_tenant_id" and category "invalid_value").
+	/// </summary>
+	public string? Category { get; }
+
+	/// <summary>
 	/// The error message
 	/// </summary>
 	public string Message { get; }
@@ -60,6 +66,7 @@ public readonly record struct ValidationError
 	/// <param name="minimum">The inclusive minimum bound for structured size issues.</param>
 	/// <param name="maximum">The inclusive maximum bound for structured size issues.</param>
 	/// <param name="inclusive">Whether the structured bound is inclusive.</param>
+	/// <param name="category">The optional category the error belongs to.</param>
 	public ValidationError(
 		string code,
 		string message,
@@ -68,10 +75,12 @@ public readonly record struct ValidationError
 		string? origin = null,
 		int? minimum = null,
 		int? maximum = null,
-		bool? inclusive = null
+		bool? inclusive = null,
+		string? category = null
 	)
 	{
 		Code = code;
+		Category = category;
 		Message = message;
 		Path = path is null ? [] : ImmutableArray.Create(path);
 		Parameters = Wrap(parameters);
@@ -92,6 +101,7 @@ public readonly record struct ValidationError
 	/// <param name="minimum">The inclusive minimum bound for structured size issues.</param>
 	/// <param name="maximum">The inclusive maximum bound for structured size issues.</param>
 	/// <param name="inclusive">Whether the structured bound is inclusive.</param>
+	/// <param name="category">The optional category the error belongs to.</param>
 	public static ValidationError Create(
 		string code,
 		string message,
@@ -100,8 +110,9 @@ public readonly record struct ValidationError
 		string? origin = null,
 		int? minimum = null,
 		int? maximum = null,
-		bool? inclusive = null
-	) => new(code, message, path.IsDefault ? [] : path, parameters, origin, minimum, maximum, inclusive);
+		bool? inclusive = null,
+		string? category = null
+	) => new(code, message, path.IsDefault ? [] : path, parameters, origin, minimum, maximum, inclusive, category);
 
 	ValidationError(
 		string code,
@@ -111,10 +122,12 @@ public readonly record struct ValidationError
 		string? origin,
 		int? minimum,
 		int? maximum,
-		bool? inclusive
+		bool? inclusive,
+		string? category
 	)
 	{
 		Code = code;
+		Category = category;
 		Message = message;
 		Path = path;
 		Parameters = Wrap(parameters);

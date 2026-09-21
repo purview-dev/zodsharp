@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using ZodSharp.Core;
 
 namespace ZodSharp.AspNetCore;
 
@@ -15,7 +16,7 @@ public sealed class ZodProblemDetailsOptions
 
 	/// <summary>
 	/// When <c>true</c>, an error's message is formatted from the matched <see cref="ErrorType.MessageFormat"/>
-	/// using the error's <see cref="Core.ValidationError.Parameters"/>. Defaults to <c>true</c>.
+	/// using the error's <see cref="ValidationError.Parameters"/>. Defaults to <c>true</c>.
 	/// </summary>
 	public bool FormatMessages { get; set; } = true;
 
@@ -23,7 +24,7 @@ public sealed class ZodProblemDetailsOptions
 	/// An optional escape hatch that takes complete control of the response status code. When set, its
 	/// result overrides the highest matched <see cref="ErrorType.HttpStatus"/>.
 	/// </summary>
-	public Func<ImmutableArray<Core.ValidationError>, int>? StatusCodeSelector { get; set; }
+	public Func<ImmutableArray<ValidationError>, int>? StatusCodeSelector { get; set; }
 
 	/// <summary>
 	/// Registers an <see cref="ErrorType"/> with the configured <see cref="Registry"/>.

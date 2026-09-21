@@ -12,9 +12,10 @@ public class ErrorTypeMappingTests
 		ErrorTypeRegistry registry = new();
 		registry.Register(
 			new ErrorType(
-				"aggregate_save_failed",
-				"The aggregate could not be saved.",
-				StatusCodes.Status409Conflict,
+				Code: "aggregate_save_failed",
+				Category: "invalid_value",
+				Description: "The aggregate could not be saved.",
+				HttpStatus: StatusCodes.Status409Conflict,
 				MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save"
 			)
 			{

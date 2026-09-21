@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ZodSharp.Core;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -11,12 +12,16 @@ public static class ServiceCollectionExtensions
 		/// Registers <see cref="IZodSchemaFactory"/> as a singleton, applies configuration,
 		/// and auto-registers source-generated validators from the configured assemblies.
 		/// </summary>
+		/// <remarks>
+		/// The factory is registered only if one is not already present — repeated calls (with any
+		/// <c>configure</c> callback) are ignored so earlier registrations are never overwritten.
+		/// </remarks>
 		public IServiceCollection AddZodSharp(Action<ZodSchemaFactoryOptions>? configure = null)
 		{
 			ZodSchemaFactoryOptions options = new();
 			configure?.Invoke(options);
 
-			services.AddSingleton<IZodSchemaFactory>(sp =>
+			services.TryAddSingleton<IZodSchemaFactory>(sp =>
 			{
 				ZodSchemaFactory factory = new();
 				options.ConfigureFactory?.Invoke(factory);

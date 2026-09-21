@@ -35,6 +35,12 @@ public static partial class TypeLibraryGenerator
 	[TypeRef(ZodSharpCoreNamespace)]
 	static readonly TypeIdentity ValidationError = default;
 
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity ErrorType = default;
+
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity ErrorTypeAttribute = default;
+
 	[TypeRef(ZodSharpSchemasNamespace)]
 	static readonly TypeIdentity RefineCtx = default;
 
@@ -43,4 +49,7 @@ public static partial class TypeLibraryGenerator
 
 	[TypeRef("Microsoft.Extensions.Options")]
 	static readonly TypeIdentity ValidateOptionsResult = default;
+
+	[TypeRef("System.Diagnostics.CodeAnalysis")]
+	static readonly TypeIdentity DoesNotReturnAttribute = default;
 }

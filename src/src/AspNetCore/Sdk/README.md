@@ -50,17 +50,46 @@ var app = builder.Build();
 app.UseExceptionHandler();
 ```
 
-## Mapping error types to status codes
+## Dependency injection
 
-Register an `ErrorType` and map error codes to HTTP statuses and formatted messages:
+`AddZodSharp` registers `IZodSchemaFactory` as a singleton and auto-registers every source-generated
+validator from the configured assemblies:
 
 ```csharp
+builder.Services.AddZodSharp(options =>
+{
+    options.ScanAssemblies.Add(typeof(UserDto).Assembly);
+});
+```
+
+The factory is registered only if one is not already present — the first `AddZodSharp` (or
+`AddZodSharpFactory`) call wins and later calls are ignored, so state is never overwritten.
+
+When to use which registration:
+
+- `AddZodSharp` (this package) — ASP.NET Core apps; auto-discovers generated validators via `ScanAssemblies`.
+- `AddZodSharpFactory` (core package) — any .NET host; you register validators manually in the `configure` callback.
+- `AddZodSharpProblemDetails` (this package) — exception handling and ProblemDetails services only; it does **not** register the factory.
+- `AddZodSchemaOptionsValidator<T>` (core package) — options validation via `IValidateOptions<T>`; requires a factory registered first.
+
+## Mapping error types to status codes
+
+The `ErrorType` factory (`ErrorType`, the `[ErrorType]` attribute, its source generator, and the
+`ZODSASP001`/`ZODSASP002`/`ZODSASP003` analyzers) is part of the core `Purview.ZodSharp` package.
+This package adds the `ErrorTypeRegistry` and maps error codes to HTTP statuses and formatted messages:
+
+```csharp
+using ZodSharp.AspNetCore;
+using ZodSharp.Core;
+
 public static partial class ConcurrentErrorType
 {
+    [ErrorType]
     public static readonly ErrorType SaveFailed = new(
         Code: "aggregate_save_failed",
+        Category: "invalid_value",
         Description: "The aggregate could not be saved.",
-        HttpStatus: StatusCodes.Status409Conflict,
+        HttpStatus: 409,
         MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
         Parameters:
         [
@@ -71,6 +100,11 @@ public static partial class ConcurrentErrorType
 
 ErrorTypeRegistry.Default.Register(ConcurrentErrorType.SaveFailed);
 ```
+
+`HttpStatus` is stored on `ErrorType` purely for convenience — only this ASP.NET Core integration reads
+it when deriving the ProblemDetails response status. The optional `Category` is a broad grouping that
+can span many specific codes; the generated helpers copy it onto each `ValidationError` and it is
+surfaced on the serialized `ValidationIssue` in the `issues` extension.
 
 Parameters can also be declared with the `ErrorType.Param<T>("Name")` helper instead of an explicit
 `typeof(...)`; the analyzer and source generator handle both forms the same way:
@@ -85,14 +119,14 @@ Parameters:
 
 A `ValidationError` carrying `parameters` such as `["AggregateId"] = "agg-123"` is then surfaced as a
 `409 Conflict` response whose message reads `Aggregate 'agg-123' (of type Invoice) failed to save`. The
-analyzer `ZODSASP001` (bundled with the package) warns when a `MessageFormat` placeholder is not declared
-in `Parameters`.
+analyzer `ZODSASP001` (shipped with the core package) warns when a `MessageFormat` placeholder is not
+declared in `Parameters`.
 
 ### Generated `Create` / `Throw` helpers
 
-Because the class above is `partial`, the bundled source generator adds strongly typed helpers derived
-from the declared `Parameters` — each parameter is emitted with its declared `typeof(...)` type, or the
-`ErrorType.Param<T>` generic type argument:
+Because the class above is `partial`, the source generator bundled with the core package adds strongly
+typed helpers derived from the declared `Parameters` — each parameter is emitted with its declared
+`typeof(...)` type, or the `ErrorType.Param<T>` generic type argument:
 
 ```csharp
 // ValidationError with the code, the formatted message, and the typed parameters:
@@ -116,7 +150,8 @@ The generated helpers construct a typed `ErrorTypeParameters` instance (exposed 
 `ValidationError.Parameters`) whose values are validated against the declared types and can be read back
 through `Get<T>(name)`.
 
-The analyzer `ZODSASP002` warns when an `ErrorType` field's containing class is not declared `partial`.
+The analyzer `ZODSASP002` (shipped with the core package) warns when an `ErrorType` field's containing
+class is not declared `partial`.
 
 ## Documentation
 

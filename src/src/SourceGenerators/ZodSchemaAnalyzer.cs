@@ -37,6 +37,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		DiagnosticLibrary.SyncValidationInvalidContextParameter,
 		DiagnosticLibrary.IValidateOptionsReferenceNotFound,
 		DiagnosticLibrary.IValidateOptionsValueTypeTarget,
+		DiagnosticLibrary.AmbiguousValidationMethods,
 	];
 
 	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => s_supportedDiagnostics;
@@ -99,6 +100,21 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		);
 		foreach (var diagnosticInfo in syncValidationResult.Diagnostics)
 			context.ReportDiagnostic(diagnosticInfo.ToDiagnostic());
+
+		// A model may declare either a synchronous refinement method or an async custom
+		// validation method, but not both.
+		if (customValidationResult.Value.HasCustomValidation && syncValidationResult.Value.HasSyncValidation)
+		{
+			context.ReportDiagnostic(
+				Diagnostic.Create(
+					DiagnosticLibrary.AmbiguousValidationMethods,
+					typeLocation,
+					type.Name,
+					syncValidationResult.Value.MethodName,
+					customValidationResult.Value.MethodName
+				)
+			);
+		}
 
 		if (zodSchemaData.GenerateIValidateOptions == true)
 		{
