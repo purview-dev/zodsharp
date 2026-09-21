@@ -13,8 +13,6 @@
 	</Folder>
 	<Folder Name="/tests/">
 		<Project Path="tests/AspNetCore.UnitTests/AspNetCore.UnitTests.csproj" />
-		<Project Path="tests/AspNetCore.Analyzers.UnitTests/AspNetCore.Analyzers.UnitTests.csproj" />
-		<Project Path="tests/AspNetCore.SourceGenerators.UnitTests/AspNetCore.SourceGenerators.UnitTests.csproj" />
 		<Project Path="tests/NewtonsoftJson.UnitTests/NewtonsoftJson.UnitTests.csproj" />
 		<Project Path="tests/SourceGenerators.UnitTests/SourceGenerators.UnitTests.csproj" />
 		<Project Path="tests/SystemTextJson.UnitTests/SystemTextJson.UnitTests.csproj" />
@@ -22,8 +20,6 @@
 	</Folder>
 	<Folder Name="/src/">
 		<Project Path="src/AspNetCore/AspNetCore.csproj" />
-		<Project Path="src/AspNetCore.Analyzers/AspNetCore.Analyzers.csproj" />
-		<Project Path="src/AspNetCore.SourceGenerators/AspNetCore.SourceGenerators.csproj" />
 		<Project Path="src/NewtonsoftJson/NewtonsoftJson.csproj" />
 		<Project Path="src/SourceGenerators/SourceGenerators.csproj" />
 		<Project Path="src/SystemTextJson/SystemTextJson.csproj" />

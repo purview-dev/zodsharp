@@ -863,7 +863,7 @@ partial class ZodSchemaGenerator
 						foreachBody.MethodCall(
 							"AddError",
 							"ref errors",
-							$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create(error.Code, error.Message, {immutableArrayType}.Create(prefix).AddRange(error.Path), error.Parameters, error.Origin, error.Minimum, error.Maximum, error.Inclusive)"
+							$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create(error.Code, error.Message, {immutableArrayType}.Create(prefix).AddRange(error.Path), error.Parameters, error.Origin, error.Minimum, error.Maximum, error.Inclusive, error.Category)"
 						)
 				)
 		);
@@ -891,7 +891,7 @@ partial class ZodSchemaGenerator
 						foreachBody.MethodCall(
 							"AddError",
 							"ref errors",
-							$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create(error.Code, error.Message, {immutableArrayType}.Create(prefix, index.ToString()).AddRange(error.Path), error.Parameters, error.Origin, error.Minimum, error.Maximum, error.Inclusive)"
+							$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create(error.Code, error.Message, {immutableArrayType}.Create(prefix, index.ToString()).AddRange(error.Path), error.Parameters, error.Origin, error.Minimum, error.Maximum, error.Inclusive, error.Category)"
 						)
 				)
 		);

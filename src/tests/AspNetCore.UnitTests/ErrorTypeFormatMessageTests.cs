@@ -117,6 +117,7 @@ public class ErrorTypeFormatMessageTests
 	}
 
 	[Test]
+#pragma warning disable ZODSASP001 // Intentionally uses an undeclared placeholder to exercise the passthrough path.
 	public async Task GivenMessageFormatWithNullParameters_ReturnsFormatUnchanged()
 	{
 		// Arrange
@@ -128,4 +129,5 @@ public class ErrorTypeFormatMessageTests
 		// Assert
 		await Assert.That(message).IsEqualTo("Save of '{AggregateId}' failed.");
 	}
+#pragma warning restore ZODSASP001
 }

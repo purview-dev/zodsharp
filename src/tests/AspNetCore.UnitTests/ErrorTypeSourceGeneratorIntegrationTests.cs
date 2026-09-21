@@ -8,6 +8,7 @@ public static partial class ConcurrentErrorType
 	[ErrorType]
 	public static readonly ErrorType SaveFailed = new(
 		Code: "aggregate_save_failed",
+		Category: "invalid_value",
 		Description: "The order could not be saved because it was modified concurrently.",
 		HttpStatus: StatusCodes.Status409Conflict,
 		MessageFormat: "Order '{OrderId}' (of type {AggregateType}) failed to save",
@@ -30,6 +31,7 @@ public class ErrorTypeSourceGeneratorIntegrationTests
 
 		// Assert
 		await Assert.That(error.Code).IsEqualTo("aggregate_save_failed");
+		await Assert.That(error.Category).IsEqualTo("invalid_value");
 		await Assert.That(error.Path).IsEquivalentTo(["orderId"]);
 		await Assert.That(error.Parameters).IsNotNull();
 		await Assert.That(error.Parameters!["OrderId"]).IsEqualTo("ord-42");
@@ -55,6 +57,11 @@ public class ErrorTypeSourceGeneratorIntegrationTests
 		await Assert
 			.That(details.Errors[string.Empty])
 			.IsEquivalentTo(["Order 'ord-42' (of type Order) failed to save"]);
+
+		var issues = (ValidationIssue[])details.Extensions["issues"]!;
+		await Assert.That(issues).HasSingleItem();
+		await Assert.That(issues[0].Code).IsEqualTo("aggregate_save_failed");
+		await Assert.That(issues[0].Category).IsEqualTo("invalid_value");
 	}
 
 	[Test]

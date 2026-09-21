@@ -70,6 +70,73 @@ var adult = UserSchema.ApplyRefine(user, u => u.Age >= 18, "Must be adult");
 
 DataAnnotations attributes such as `[Required]`, `[Length]`, `[StringLength]`, `[MinLength]`, `[MaxLength]`, `[Range]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and `[Compare]` are validated with direct, typed codegen (no reflection).
 
+## Error factory
+
+`ErrorType` lets you define a user-facing error (code, optional category, description, optional
+message template with named placeholders, and — purely for convenience — an HTTP status code) and the
+bundled source generator turns each `[ErrorType]` field in a `partial` class into strongly typed
+`Create`/`Throw` helpers:
+
+```csharp
+using ZodSharp.Core;
+
+public static partial class ConcurrentErrorType
+{
+    [ErrorType]
+    public static readonly ErrorType SaveFailed = new(
+        Code: "aggregate_save_failed",
+        Category: "invalid_value",
+        Description: "The aggregate could not be saved.",
+        HttpStatus: 409,
+        MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
+        Parameters:
+        [
+            new("AggregateId", typeof(string)),
+            ErrorType.Param<string>("AggregateType")
+        ]);
+}
+
+// Returns a ValidationError with the code, category, the formatted message, and the typed parameters:
+var error = ConcurrentErrorType.CreateSaveFailed("agg-123", "Invoice");
+
+// Throws a ZodException carrying the same ValidationError:
+ConcurrentErrorType.ThrowSaveFailed("agg-123", "Invoice");
+```
+
+The generated `Create` sets `ValidationError.Category` from the error type's `Category` — a broad
+grouping that can span many specific codes (for example code `invalid_tenant_id` with category
+`invalid_value`).
+
+The bundled `ZODSASP001`/`ZODSASP002`/`ZODSASP003` analyzers warn when a `MessageFormat` placeholder
+is not declared in `Parameters`, when the containing class is not `partial`, or when the field is not
+`static readonly`. The `Purview.ZodSharp.AspNetCore` package consumes this factory to map errors to
+`ProblemDetails` responses.
+
+## Dependency injection
+
+`AddZodSharpFactory` registers `IZodSchemaFactory` as a singleton. The factory is registered only if
+one is not already present — the first call wins and later calls (including their `configure`
+callbacks) are ignored, so state is never overwritten:
+
+```csharp
+builder.Services.AddZodSharpFactory(factory => factory.RegisterFromAssembly(typeof(User).Assembly));
+```
+
+`AddZodSchemaOptionsValidator<T>` registers an `IValidateOptions<T>` that resolves the factory and
+validates `T` when options are instantiated. The factory must already be registered. When no validator
+exists for `T`, the default `MissingValidatorBehavior.Throw` throws via `ResolveRequired<T>`; pass
+`MissingValidatorBehavior.Ignore` to pass through untouched:
+
+```csharp
+builder.Services.AddZodSharpFactory(factory => factory.RegisterFromAssembly(typeof(UserOptions).Assembly));
+builder.Services.AddZodSchemaOptionsValidator<UserOptions>();
+
+// Or chain through the options builder, optionally failing at startup:
+builder.Services.AddOptions<UserOptions>().AddZodSchemaValidator().ValidateOnStart();
+```
+
+The `Purview.ZodSharp.AspNetCore` package offers `AddZodSharp` with assembly auto-discovery.
+
 ## JSON Schema export
 
 ```csharp

@@ -31,6 +31,7 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN026 | Synchronous refinement's single parameter must be `RefineCtx<T>` matching the model |
 | ZODSGEN027 | `IValidateOptions` requested but `Microsoft.Extensions.Options` reference is missing |
 | ZODSGEN028 | `IValidateOptions` requested on a struct (requires a class) |
+| ZODSGEN029 | A model declares both a synchronous refinement method and an async custom validation method (only one is allowed) |
 
 ## Suppressing
 

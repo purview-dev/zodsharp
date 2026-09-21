@@ -168,6 +168,13 @@ static partial class SourceGenLibrary
 			var zodSchemaAttribute = ZodSchemaAttributeData.FromAttributeData(symbol, out var attribute);
 			var customValidation = ResolveCustomValidationMethod(symbol, zodSchemaAttribute, attribute!);
 			var syncValidation = ResolveSyncValidationMethod(symbol, zodSchemaAttribute, attribute!);
+
+			// A model may declare either a synchronous refinement method or an async custom
+			// validation method, but not both (reported as ZODSGEN029 by the analyzer). When both
+			// are present, fall back to the synchronous refinement so the emitted validator does
+			// not reference two competing validation methods.
+			if (customValidation.Value.HasCustomValidation && syncValidation.Value.HasSyncValidation)
+				customValidation = CustomValidationMethodData.None;
 			var isValueType = symbol.TypeKind == TypeKind.Struct;
 			bool? generateIValidateOptions =
 				zodSchemaAttribute.GenerateIValidateOptions ? true

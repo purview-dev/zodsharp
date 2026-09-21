@@ -38,6 +38,7 @@ Both throw `InvalidOperationException` when the result `IsSuccess`. The structur
 public sealed class ValidationIssue
 {
     public required string Code { get; init; }
+    public string? Category { get; init; }
     public string? Origin { get; init; }
     public int? Minimum { get; init; }
     public int? Maximum { get; init; }
@@ -77,8 +78,9 @@ var app = builder.Build();
 app.UseExceptionHandler();
 ```
 
-`AddZodSharpProblemDetails(Action<ZodProblemDetailsOptions>? configure)` registers
-`ZodExceptionHandler` and configures `ZodProblemDetailsOptions`:
+`AddZodSharpProblemDetails(Action<ZodProblemDetailsOptions>? configure = null, Action<ProblemDetailsOptions>? problemDetails = null)`
+registers `ZodExceptionHandler`, calls `services.AddProblemDetails(problemDetails)`, and configures
+`ZodProblemDetailsOptions`:
 
 - `ErrorTypeRegistry Registry` — resolves error codes to `ErrorType`s. Defaults to
   `ErrorTypeRegistry.Default`.
@@ -86,21 +88,35 @@ app.UseExceptionHandler();
 - `Func<ImmutableArray<ValidationError>, int>? StatusCodeSelector` — an escape hatch that takes complete
   control of the response status code.
 
+> [!NOTE]
+> `AddZodSharpProblemDetails` only wires up exception handling and ProblemDetails services — it does
+> **not** register `IZodSchemaFactory`. If you also want DI-based validator resolution, register the
+> factory separately with `AddZodSharp` (below) or the core `AddZodSharpFactory`.
+
 ## Mapping error types to status codes
 
-Register an `ErrorType` (code, description, HTTP status, and optional message template) in a registry,
-then let the mapper derive the status code, title, detail, and formatted messages automatically:
+The `ErrorType` factory lives in the core `Purview.ZodSharp` package: `ErrorType`, the
+`[ErrorType]` attribute, the source generator that emits `Create`/`Throw` helpers, and the
+`ZODSASP001`/`ZODSASP002`/`ZODSASP003` analyzers are all shipped with it and are usable without any
+ASP.NET Core dependency. The `Purview.ZodSharp.AspNetCore` package adds the `ErrorTypeRegistry`
+and the ProblemDetails mapping on top.
+
+Register an `ErrorType` (code, optional category, description, HTTP status, and optional message
+template) in a registry, then let the mapper derive the status code, title, detail, and formatted
+messages automatically:
 
 ```csharp
 using ZodSharp.AspNetCore;
+using ZodSharp.Core;
 
 public static partial class ConcurrentErrorType
 {
     [ErrorType]
     public static readonly ErrorType SaveFailed = new(
         Code: "aggregate_save_failed",
+        Category: "invalid_value",
         Description: "The aggregate could not be saved.",
-        HttpStatus: StatusCodes.Status409Conflict,
+        HttpStatus: 409,
         MessageFormat: "Aggregate '{AggregateId}' (of type {AggregateType}) failed to save",
         Parameters:
         [
@@ -113,6 +129,12 @@ public static partial class ConcurrentErrorType
 ErrorTypeRegistry.Default.Register(ConcurrentErrorType.SaveFailed);
 ```
 
+`HttpStatus` is kept on `ErrorType` purely for convenience; the core library does not use it — only the
+ASP.NET Core integration reads it when building ProblemDetails responses. The optional `Category` is a
+broad grouping that can span many specific codes (for example code `invalid_tenant_id` with category
+`invalid_value`); the generated helpers copy it onto each `ValidationError`, and it is surfaced on the
+serialized `ValidationIssue` in the `issues` extension.
+
 Parameters can also be declared with the `ErrorType.Param<T>("Name")` helper instead of an explicit
 `typeof(...)`:
 
@@ -124,8 +146,9 @@ Parameters:
 ]
 ```
 
-Both the bundled `ZODSASP001` analyzer and the source generator treat `ErrorType.Param<T>` entries
-exactly like any other declared parameter, so placeholder checking and helper generation are unchanged.
+Both the bundled `ZODSASP001` analyzer and the source generator (shipped with the core package)
+treat `ErrorType.Param<T>` entries exactly like any other declared parameter, so placeholder checking
+and helper generation are unchanged.
 
 When an error carries that code, the response status, title, and message are derived automatically:
 
@@ -145,11 +168,11 @@ throw new ZodException([
 
 ### Generated `Create` / `Throw` helpers
 
-Marking the field with `[ErrorType]` and the containing class `partial` lets the bundled source
-generator turn each field into strongly typed static helpers. For the field above it generates
-`ConcurrentErrorType.CreateSaveFailed(...)` and `ConcurrentErrorType.ThrowSaveFailed(...)` with one
-strongly typed parameter per entry in `Parameters` (the declared `typeof(...)` type, or the
-`ErrorType.Param<T>` generic type argument):
+Marking the field with `[ErrorType]` and the containing class `partial` lets the source generator
+bundled with the core package turn each field into strongly typed static helpers. For the field above
+it generates `ConcurrentErrorType.CreateSaveFailed(...)` and
+`ConcurrentErrorType.ThrowSaveFailed(...)` with one strongly typed parameter per entry in
+`Parameters` (the declared `typeof(...)` type, or the `ErrorType.Param<T>` generic type argument):
 
 ```csharp
 // Returns a ValidationError with the code, the formatted message, and the typed parameters.
@@ -174,8 +197,8 @@ parameter types and exposed through `ValidationError.Parameters`) and sets the m
 `ErrorType.FormatMessage`, so `error.Message` already reads
 `Aggregate 'agg-123' (of type Invoice) failed to save` and mapping through the registry produces the
 `409 Conflict` response described below. The analyzers `ZODSASP001`/`ZODSASP002`/`ZODSASP003`
-(bundled with the package) warn when a `MessageFormat` placeholder is not declared in `Parameters`,
-when an `[ErrorType]` field's containing class is not `partial`, or when the field is not
+(shipped with the core package) warn when a `MessageFormat` placeholder is not declared in
+`Parameters`, when an `[ErrorType]` field's containing class is not `partial`, or when the field is not
 `static readonly`.
 
 Produces a `409 Conflict` `HttpValidationProblemDetails` with:
@@ -207,7 +230,7 @@ Mapping rules:
 - **Title / Type / Detail** — taken from the highest-status matched `ErrorType`; otherwise defaulted.
 - **Message** — `MessageFormat` named placeholders (for example `{AggregateId}`) are substituted from
   `ValidationError.Parameters`. Placeholders without a matching value are left as-is so templating gaps
-  stay visible. The analyzer `ZODSASP001` (bundled with the package) warns at compile time when a
+  stay visible. The analyzer `ZODSASP001` (shipped with the core package) warns at compile time when a
   `MessageFormat` placeholder is not declared in `Parameters`.
 - **Parameters** — the error's `ValidationError.Parameters` are surfaced both per-issue in the `issues`
   extension and merged (camel-cased) into the top-level ProblemDetails extensions for client correlation.
@@ -231,5 +254,20 @@ builder.Services.AddZodSharp(options =>
 
 - `List<Assembly> ScanAssemblies` — assemblies to scan for generated schemas.
 - `Action<IZodSchemaFactory>? ConfigureFactory` — additional factory configuration.
+
+> [!IMPORTANT]
+> The factory is registered only if one is not already present (`TryAdd` semantics): the **first**
+> `AddZodSharp` (or `AddZodSharpFactory`) call wins, and any later calls — including their
+> `ScanAssemblies`/`ConfigureFactory` settings — are ignored. State is never overwritten, so calling
+> it more than once is safe.
+
+### Choosing a registration method
+
+| Method | Package | Registers | Use when |
+|---|---|---|---|
+| `AddZodSharp(options)` | `Purview.ZodSharp.AspNetCore` | singleton `IZodSchemaFactory` + auto-registers generated validators from `options.ScanAssemblies` | ASP.NET Core apps that want assembly auto-discovery of source-generated validators. |
+| `AddZodSharpFactory(configure)` | core `Purview.ZodSharp` | singleton `IZodSchemaFactory` | Any .NET host where you want manual control — register validators yourself in the `configure` callback. |
+| `AddZodSharpProblemDetails(...)` | `Purview.ZodSharp.AspNetCore` | `ZodExceptionHandler` + ProblemDetails services only — does **not** register the factory | Mapping thrown `ZodException`s to `ProblemDetails`; pair it with `AddZodSharp` when you also need DI validator resolution. |
+| `AddZodSchemaOptionsValidator<T>(...)` | core `Purview.ZodSharp` | singleton `IValidateOptions<T>` | Validating options objects; requires a factory registered first via `AddZodSharp` or `AddZodSharpFactory`. |
 
 See [Dependency Injection](Dependency-Injection.md) for the underlying factory and options-validation wiring.

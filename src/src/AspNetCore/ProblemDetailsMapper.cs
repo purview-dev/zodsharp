@@ -56,6 +56,7 @@ static class ProblemDetailsMapper
 			issues[issueIndex++] = new ValidationIssue
 			{
 				Code = error.Code,
+				Category = error.Category,
 				Origin = error.Origin,
 				Minimum = error.Minimum,
 				Maximum = error.Maximum,

@@ -11,3 +11,9 @@ ZODSGEN025 | ZodSharp.SourceGenerator | Error | Synchronous refinement method mu
 ZODSGEN026 | ZodSharp.SourceGenerator | Error | Synchronous refinement method context parameter must be RefineCtx<T>
 ZODSGEN027 | ZodSharp.SourceGenerator | Error | IValidateOptions generation requires a reference to Microsoft.Extensions.Options
 ZODSGEN028 | ZodSharp.SourceGenerator | Error | IValidateOptions generation requires a reference type
+ZODSGEN029 | ZodSharp.SourceGenerator | Error | Synchronous refinement and async custom validation methods are mutually exclusive
+ZODSASP001 | ZodSharp.SourceGenerator | Warning | MessageFormat placeholder is not declared in Parameters
+ZODSASP002 | ZodSharp.SourceGenerator | Warning | Error type containing type must be partial
+ZODSASP003 | ZodSharp.SourceGenerator | Warning | ErrorType field must be static readonly
+ZODSASP100 | ZodSharp.SourceGenerator | Error | Unhandled exception in the ErrorType source generator
+ZODSASP101 | ZodSharp.SourceGenerator | Error | ErrorType Parameters could not be extracted

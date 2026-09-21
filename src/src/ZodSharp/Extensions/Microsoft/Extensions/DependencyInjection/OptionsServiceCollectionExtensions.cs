@@ -12,24 +12,24 @@ namespace Microsoft.Extensions.DependencyInjection;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class OptionsServiceCollectionExtensions
 {
-	/// <summary>
-	/// Registers a generic <see cref="IValidateOptions{T}"/> singleton that resolves the
-	/// source-generated schema validator for <typeparamref name="T"/> from the registered
-	/// <see cref="IZodSchemaFactory"/>.
-	/// </summary>
-	/// <typeparam name="T">The options type to validate.</typeparam>
-	/// <param name="services">The service collection.</param>
-	/// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
-	public static IServiceCollection AddZodSchemaOptionsValidator<T>(this IServiceCollection services)
-		where T : class
+	extension<TOptions>(OptionsBuilder<TOptions> builder)
+		where TOptions : class
 	{
-		if (services is null)
-			throw new ArgumentNullException(nameof(services));
+		/// <summary>
+		/// Registers a generic <see cref="IValidateOptions{T}"/> singleton that resolves the
+		/// source-generated schema validator for <typeparamref name="TOptions"/> from the registered
+		/// <see cref="IZodSchemaFactory"/>.
+		/// </summary>
+		/// <param name="missingValidatorBehavior">How to behave when no validator is registered for <typeparamref name="TOptions"/>.</param>
+		/// <returns>The <see cref="OptionsBuilder{TOptions}"/> for chaining.</returns>
+		/// <seealso cref="ServiceCollectionExtensions.AddZodSchemaOptionsValidator{T}(IServiceCollection, MissingValidatorBehavior)"/>
+		public OptionsBuilder<TOptions> AddZodSchemaValidator(
+			MissingValidatorBehavior missingValidatorBehavior = MissingValidatorBehavior.Throw
+		)
+		{
+			builder.Services.AddZodSchemaOptionsValidator<TOptions>(missingValidatorBehavior);
 
-		services.AddSingleton<IValidateOptions<T>>(sp => new ZodSchemaOptionsValidator<T>(
-			sp.GetRequiredService<IZodSchemaFactory>()
-		));
-
-		return services;
+			return builder;
+		}
 	}
 }
