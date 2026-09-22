@@ -5,6 +5,7 @@
 		<File Path="../global.json" />
 		<File Path="../nuget.config" />
 		<File Path="../package.json" />
+		<File Path="../purview-build.json" />
 		<File Path="Directory.Build.props" />
 		<File Path="Directory.Build.targets" />
 	</Folder>
