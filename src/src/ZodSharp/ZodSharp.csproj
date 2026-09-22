@@ -11,6 +11,13 @@
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<PackageTags>zod;validation;schema</PackageTags>
 		<NoWarn>$(NoWarn);NU5118</NoWarn>
+		<!--
+			The source generator is packed as a self-contained (merged) assembly through
+			Purview.SourceGeneratorFramework's GetPurviewMergedAnalyzerFile, so the default
+			GASF-based analyzer packing (which would also ship the loose framework DLL) is disabled.
+		-->
+		<PackProjectReferencedSourceGenerators>false</PackProjectReferencedSourceGenerators>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackZodSchemaGenerator</TargetsForTfmSpecificContentInPackage>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -26,4 +33,27 @@
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
 		<PackageReference Include="Microsoft.Extensions.Options" />
 	</ItemGroup>
+
+	<!--
+		Packs the merged, self-contained source generator under analyzers/dotnet/cs. The
+		SourceGenerators project references Purview.SourceGeneratorFramework, whose build target
+		GetPurviewMergedAnalyzerFile produces the merged assembly (framework implementation
+		internalized) and returns it without touching the project's bin output, so in-repo tests keep
+		the unmerged generator.
+	-->
+	<Target Name="PackZodSchemaGenerator" Label="Packs the self-contained ZodSharp source generator.">
+		<MSBuild
+			Projects="../SourceGenerators/SourceGenerators.csproj"
+			Targets="GetPurviewMergedAnalyzerFile"
+			Properties="Configuration=$(Configuration)"
+			RemoveProperties="TargetFramework;TargetFrameworks;RuntimeIdentifier;SelfContained"
+		>
+			<Output TaskParameter="TargetOutputs" ItemName="_PurviewZodSharpMergedGenerator" />
+		</MSBuild>
+		<ItemGroup>
+			<TfmSpecificPackageFile Include="@(_PurviewZodSharpMergedGenerator)">
+				<PackagePath>analyzers/dotnet/cs/</PackagePath>
+			</TfmSpecificPackageFile>
+		</ItemGroup>
+	</Target>
 </Project>
