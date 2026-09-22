@@ -16,7 +16,6 @@
 				"lib/net9.0/Purview.ZodSharp.xml",
 				"lib/net8.0/Purview.ZodSharp.dll",
 				"lib/net8.0/Purview.ZodSharp.xml",
-				"analyzers/dotnet/cs/Purview.SourceGeneratorFramework.dll",
 				"analyzers/dotnet/cs/Purview.ZodSharp.SourceGenerators.dll",
 				"buildTransitive/Purview.ZodSharp.props",
 				"README.md",
