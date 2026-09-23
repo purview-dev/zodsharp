@@ -42,6 +42,13 @@ pipeline-release *args:
     echo "Running release pipeline..."
     "{{ pipeline_tool }}" --Release:Mode=NuGet {{ args }}
 
+# Run the pipeline through pack + validate (restore, build, lint, tests, pack, validate pack contents) without publishing/releasing
+[group('Pipeline')]
+pipeline-pack-validate *args:
+    just ensure-pipeline-tool
+    echo "Running pack + validate pipeline..."
+    "{{ pipeline_tool }}" --Build:RunPack=true --Build:ValidatePack=true --Release:Mode=None {{ args }}
+
 # Run the release pipeline (restore, build, lint, tests, pack, local nuget publish)
 # Note: `just` runs recipes through the shell, which strips backslashes from unquoted arguments.
 # Use the LOCAL_NUGET_FEED_PATH environment variable or forward slashes, e.g.

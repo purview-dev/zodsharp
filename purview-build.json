@@ -10,46 +10,30 @@
 		"RequireSymbolFiles": true,
 		"RequiredContent": {
 			"purview.zodsharp": [
-				"lib/net10.0/Purview.ZodSharp.dll",
-				"lib/net10.0/Purview.ZodSharp.xml",
-				"lib/net9.0/Purview.ZodSharp.dll",
-				"lib/net9.0/Purview.ZodSharp.xml",
-				"lib/net8.0/Purview.ZodSharp.dll",
-				"lib/net8.0/Purview.ZodSharp.xml",
 				"analyzers/dotnet/cs/Purview.ZodSharp.SourceGenerators.dll",
 				"buildTransitive/Purview.ZodSharp.props",
-				"README.md",
-				"purview-logo-light.png"
+				"lib/$(TFM)/Purview.ZodSharp.dll",
+				"lib/$(TFM)/Purview.ZodSharp.xml",
+				"purview-logo-light.png",
+				"README.md"
 			],
 			"purview.zodsharp.aspnetcore": [
-				"lib/net10.0/Purview.ZodSharp.AspNetCore.dll",
-				"lib/net10.0/Purview.ZodSharp.AspNetCore.xml",
-				"lib/net9.0/Purview.ZodSharp.AspNetCore.dll",
-				"lib/net9.0/Purview.ZodSharp.AspNetCore.xml",
-				"lib/net8.0/Purview.ZodSharp.AspNetCore.dll",
-				"lib/net8.0/Purview.ZodSharp.AspNetCore.xml",
-				"README.md",
-				"purview-logo-light.png"
+				"lib/$(TFM)/Purview.ZodSharp.AspNetCore.dll",
+				"lib/$(TFM)/Purview.ZodSharp.AspNetCore.xml",
+				"purview-logo-light.png",
+				"README.md"
 			],
 			"purview.zodsharp.newtonsoftjson": [
-				"lib/net10.0/Purview.ZodSharp.NewtonsoftJson.dll",
-				"lib/net10.0/Purview.ZodSharp.NewtonsoftJson.xml",
-				"lib/net9.0/Purview.ZodSharp.NewtonsoftJson.dll",
-				"lib/net9.0/Purview.ZodSharp.NewtonsoftJson.xml",
-				"lib/net8.0/Purview.ZodSharp.NewtonsoftJson.dll",
-				"lib/net8.0/Purview.ZodSharp.NewtonsoftJson.xml",
-				"README.md",
-				"purview-logo-light.png"
+				"lib/$(TFM)/Purview.ZodSharp.NewtonsoftJson.dll",
+				"lib/$(TFM)/Purview.ZodSharp.NewtonsoftJson.xml",
+				"purview-logo-light.png",
+				"README.md"
 			],
 			"purview.zodsharp.systemtextjson": [
-				"lib/net10.0/Purview.ZodSharp.SystemTextJson.dll",
-				"lib/net10.0/Purview.ZodSharp.SystemTextJson.xml",
-				"lib/net9.0/Purview.ZodSharp.SystemTextJson.dll",
-				"lib/net9.0/Purview.ZodSharp.SystemTextJson.xml",
-				"lib/net8.0/Purview.ZodSharp.SystemTextJson.dll",
-				"lib/net8.0/Purview.ZodSharp.SystemTextJson.xml",
-				"README.md",
-				"purview-logo-light.png"
+				"lib/$(TFM)/Purview.ZodSharp.SystemTextJson.dll",
+				"lib/$(TFM)/Purview.ZodSharp.SystemTextJson.xml",
+				"purview-logo-light.png",
+				"README.md"
 			]
 		},
 		"ForbiddenContent": {}
