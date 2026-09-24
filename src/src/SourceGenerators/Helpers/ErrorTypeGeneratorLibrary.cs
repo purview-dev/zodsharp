@@ -308,7 +308,7 @@ static class ErrorTypeGeneratorLibrary
 
 	/// <summary>
 	/// Resolves a <c>typeof(...)</c> argument into the value-equatable components needed to emit its
-	/// type reference: the underlying <see cref="TypeIdentity"/> (nullable value types unwrapped),
+	/// type reference: the underlying <c>TypeIdentity</c> (nullable value types unwrapped),
 	/// whether it is <c>Nullable&lt;T&gt;</c>, and the array rank. Returns <c>false</c> when the
 	/// symbol cannot be represented.
 	/// </summary>
