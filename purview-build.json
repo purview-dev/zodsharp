@@ -36,7 +36,9 @@
 				"README.md"
 			]
 		},
-		"ForbiddenContent": {}
+		"ForbiddenContent": {
+			"*": ["analyzers/**/Purview.SourceGeneratorFramework.dll"]
+		}
 	},
 	"Release": {
 		"Mode": "None"
