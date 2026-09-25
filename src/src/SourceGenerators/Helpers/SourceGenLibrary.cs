@@ -145,6 +145,7 @@ static partial class SourceGenLibrary
 		if (context.SemanticModel.GetDeclaredSymbol(context.TargetNode, cancellationToken) is not INamedTypeSymbol root)
 			return default;
 
+		ExternalSchemaResolver externalSchemas = new(context.SemanticModel.Compilation);
 		var schemas = ImmutableArray.CreateBuilder<ZodSchemaDescriptor>();
 		HashSet<TypeIdentity> seen = [];
 		Queue<(INamedTypeSymbol Symbol, bool IsPrimary)> queue = new();
@@ -153,13 +154,19 @@ static partial class SourceGenLibrary
 		while (queue.Count > 0)
 		{
 			var (symbol, isPrimary) = queue.Dequeue();
+
+			// Never emit a schema for a type this compilation does not own: the declaring assembly has
+			// already generated one, and a second copy surfaces as CS0436 in this compilation.
+			if (!isPrimary && !externalSchemas.IsSchemaOwnedByThisCompilation(symbol))
+				continue;
+
 			TypeIdentity target = new(symbol);
 			if (!seen.Add(target))
 				continue;
 
 			var schema = target with { Name = $"{target.Name}Schema" };
 			var targetCanBeNull = TypeHelpers.CanBeNull(symbol);
-			var properties = GetZodProperties(symbol);
+			var properties = GetZodProperties(symbol, externalSchemas);
 			var accessibility = symbol.ContainingType is null
 				? symbol.DeclaredAccessibility == Accessibility.Public
 					? TypeDeclarationAccessibility.Public
@@ -206,11 +213,11 @@ static partial class SourceGenLibrary
 						m.DeclaredAccessibility == Accessibility.Public
 						&& !m.IsStatic
 						&& !m.IsIndexer
-						&& (TypeHelpers.HasDataAnnotationAttribute(m) || IsPropertyWithNestedSchema(m))
+						&& (TypeHelpers.HasDataAnnotationAttribute(m) || IsPropertyWithNestedSchema(m, externalSchemas))
 					)
 			)
 			{
-				if (TryGetNestedSchemaType(property, out var nested))
+				if (TryGetNestedSchemaType(property, externalSchemas, out var nested))
 					queue.Enqueue((nested, false));
 			}
 		}
@@ -218,7 +225,7 @@ static partial class SourceGenLibrary
 		return GeneratorResult<SchemaSet>.Create(new SchemaSet(schemas.ToImmutable()));
 	}
 
-	static bool IsPropertyWithNestedSchema(IPropertySymbol property)
+	static bool IsPropertyWithNestedSchema(IPropertySymbol property, ExternalSchemaResolver externalSchemas)
 	{
 		var propertyType = TypeHelpers.UnwrapNullableType(property.Type);
 		if (propertyType is IArrayTypeSymbol arrayType)
@@ -233,7 +240,7 @@ static partial class SourceGenLibrary
 		}
 
 		propertyType = TypeHelpers.UnwrapNullableType(propertyType);
-		return propertyType is INamedTypeSymbol nested && IsSourceDefinedComplexType(nested);
+		return propertyType is INamedTypeSymbol nested && externalSchemas.IsSchemaOwnedByThisCompilation(nested);
 	}
 
 	static EquatableArray<TypeDeclarationOptions> GetContainingTypes(INamedTypeSymbol typeSymbol)
@@ -279,19 +286,25 @@ static partial class SourceGenLibrary
 		return new(results.ToImmutable());
 	}
 
-	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>> GetZodProperties(INamedTypeSymbol symbol)
+	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>> GetZodProperties(
+		INamedTypeSymbol symbol,
+		ExternalSchemaResolver externalSchemas
+	)
 	{
 		var properties = symbol
 			.GetMembers()
 			.OfType<IPropertySymbol>()
 			.Where(property => property.DeclaredAccessibility == Accessibility.Public)
-			.Select(static property => GetValidatablePropertyDescriptor(property))
+			.Select(property => GetValidatablePropertyDescriptor(property, externalSchemas))
 			.ToImmutableArray();
 
 		return new(properties);
 	}
 
-	internal static GeneratorResult<ZodPropertyDescriptor> GetValidatablePropertyDescriptor(IPropertySymbol property)
+	internal static GeneratorResult<ZodPropertyDescriptor> GetValidatablePropertyDescriptor(
+		IPropertySymbol property,
+		ExternalSchemaResolver? externalSchemas = null
+	)
 	{
 		var propertyType = CreateTypeIdentity(property.Type);
 		var originalPropertyType = property.Type;
@@ -308,7 +321,7 @@ static partial class SourceGenLibrary
 		}
 
 		var diagnostics = ImmutableArray.CreateBuilder<ReportableDiagnostic>();
-		var validationKind = GetPropertyValidationKind(propertyType, originalPropertyType);
+		var validationKind = GetPropertyValidationKind(propertyType, originalPropertyType, externalSchemas);
 		var elementType =
 			validationKind == PropertyValidationKind.Collection
 				? GetCollectionElementTypeIdentity(originalPropertyType)
@@ -317,7 +330,7 @@ static partial class SourceGenLibrary
 			validationKind == PropertyValidationKind.Collection
 			&& elementType is not null
 			&& TypeHelpers.CanBeNull(GetCollectionElementTypeSymbol(originalPropertyType) ?? originalPropertyType);
-		var nestedSchemaType = GetNestedSchemaTypeIdentity(property, validationKind);
+		var nestedSchemaType = GetNestedSchemaTypeIdentity(property, validationKind, externalSchemas);
 		var lengthAccessor = ClassifyLengthAccessor(originalPropertyType);
 		var displayName = GetDisplayName(property);
 
@@ -466,7 +479,11 @@ static partial class SourceGenLibrary
 		return new TypeIdentity(typeSymbol);
 	}
 
-	static PropertyValidationKind GetPropertyValidationKind(TypeIdentity propertyType, ITypeSymbol originalType)
+	static PropertyValidationKind GetPropertyValidationKind(
+		TypeIdentity propertyType,
+		ITypeSymbol originalType,
+		ExternalSchemaResolver? externalSchemas
+	)
 	{
 		if (propertyType.SpecialType == SpecialType.System_String)
 			return PropertyValidationKind.String;
@@ -483,8 +500,9 @@ static partial class SourceGenLibrary
 			return PropertyValidationKind.Collection;
 		}
 
-		// If the original type is a source-defined complex type, we can generate a nested schema for it.
-		if (originalType is INamedTypeSymbol namedType && IsSourceDefinedComplexType(namedType))
+		// A type declared here can have a nested schema generated for it; a type declared by another
+		// assembly is validated through the schema that assembly already generated for it.
+		if (originalType is INamedTypeSymbol namedType && HasNestedSchema(namedType, externalSchemas))
 			return PropertyValidationKind.Complex;
 
 		// Comparable structs/classes (TimeSpan, DateTime, DateTimeOffset, DateOnly, TimeOnly, Version, ...)
@@ -538,19 +556,41 @@ static partial class SourceGenLibrary
 			: null;
 	}
 
-	static TypeIdentity? GetNestedSchemaTypeIdentity(IPropertySymbol property, PropertyValidationKind validationKind)
+	static TypeIdentity? GetNestedSchemaTypeIdentity(
+		IPropertySymbol property,
+		PropertyValidationKind validationKind,
+		ExternalSchemaResolver? externalSchemas
+	)
 	{
 		var targetType =
 			validationKind == PropertyValidationKind.Collection
 				? GetCollectionElementTypeSymbol(property.Type)
 				: property.Type;
 
-		if (targetType is not INamedTypeSymbol namedType || !IsSourceDefinedComplexType(namedType))
+		if (targetType is not INamedTypeSymbol namedType)
 			return null;
 
-		TypeIdentity identity = new(namedType);
+		if (externalSchemas is null)
+			return IsSchemaDefinedInSource(namedType) ? SchemaIdentityFor(namedType) : null;
+
+		if (externalSchemas.IsSchemaOwnedByThisCompilation(namedType))
+			return SchemaIdentityFor(namedType);
+
+		// The assembly declaring the type already generated this schema: reference it rather than
+		// emitting a second copy with the same fully-qualified name.
+		return externalSchemas.TryGetExistingSchema(namedType, out var existingSchema) ? existingSchema : null;
+	}
+
+	static TypeIdentity SchemaIdentityFor(INamedTypeSymbol type)
+	{
+		TypeIdentity identity = new(type);
 		return identity with { Name = $"{identity.Name}Schema" };
 	}
+
+	static bool HasNestedSchema(INamedTypeSymbol type, ExternalSchemaResolver? externalSchemas) =>
+		externalSchemas is null
+			? IsSchemaDefinedInSource(type)
+			: externalSchemas.IsSchemaOwnedByThisCompilation(type) || externalSchemas.TryGetExistingSchema(type, out _);
 
 	static LengthAccessor ClassifyLengthAccessor(ITypeSymbol propertyType)
 	{
@@ -789,13 +829,19 @@ static partial class SourceGenLibrary
 		}
 	}
 
-	static bool IsSourceDefinedComplexType(INamedTypeSymbol type) =>
+	// Fallback used when no resolver is available (the analyzer call path): a type declared in source is
+	// the type this compilation owns.
+	static bool IsSchemaDefinedInSource(INamedTypeSymbol type) =>
 		type.Locations.Any(static location => location.IsInSource)
 		&& type.TypeKind is TypeKind.Class or TypeKind.Struct
 		&& !type.IsAbstract
 		&& !type.IsStatic;
 
-	static bool TryGetNestedSchemaType(IPropertySymbol property, out INamedTypeSymbol nested)
+	static bool TryGetNestedSchemaType(
+		IPropertySymbol property,
+		ExternalSchemaResolver externalSchemas,
+		out INamedTypeSymbol nested
+	)
 	{
 		var propertyType = TypeHelpers.UnwrapNullableType(property.Type);
 		if (propertyType is IArrayTypeSymbol array)
@@ -811,7 +857,7 @@ static partial class SourceGenLibrary
 
 		propertyType = TypeHelpers.UnwrapNullableType(propertyType);
 		nested = propertyType as INamedTypeSymbol ?? null!;
-		return nested is not null && IsSourceDefinedComplexType(nested);
+		return nested is not null && externalSchemas.IsSchemaOwnedByThisCompilation(nested);
 	}
 
 	static bool TryBuildRangeBoundaryExpressions(

@@ -59,14 +59,22 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				compilationContext.Compilation.GetTypeByMetadataName("Microsoft.Extensions.Options.IValidateOptions`1")
 				is not null;
 
+			ExternalSchemaResolver externalSchemas = new(compilationContext.Compilation);
+
 			compilationContext.RegisterSymbolAction(
-				symbolContext => AnalyzeNamedType(symbolContext, hasDataAnnotations, hasIValidateOptions),
+				symbolContext =>
+					AnalyzeNamedType(symbolContext, hasDataAnnotations, hasIValidateOptions, externalSchemas),
 				SymbolKind.NamedType
 			);
 		});
 	}
 
-	static void AnalyzeNamedType(SymbolAnalysisContext context, bool hasDataAnnotations, bool hasIValidateOptions)
+	static void AnalyzeNamedType(
+		SymbolAnalysisContext context,
+		bool hasDataAnnotations,
+		bool hasIValidateOptions,
+		ExternalSchemaResolver externalSchemas
+	)
 	{
 		if (context.Symbol is not INamedTypeSymbol type)
 			return;
@@ -144,7 +152,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				continue;
 			}
 
-			var propertyResult = SourceGenLibrary.GetValidatablePropertyDescriptor(property);
+			var propertyResult = SourceGenLibrary.GetValidatablePropertyDescriptor(property, externalSchemas);
 			foreach (var diagnosticInfo in propertyResult.Diagnostics)
 			{
 				var diagnostic = diagnosticInfo.ToDiagnostic();
