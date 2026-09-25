@@ -40,6 +40,12 @@ readonly record struct LengthAccessor(string LengthExpression, string Origin, bo
 /// <param name="SyncValidationMethod">The synchronous refinement method data, if any.</param>
 /// <param name="GenerateIValidateOptions">Requested IValidateOptions generation: null = auto, true = force, false = opt out.</param>
 /// <param name="EnableComposition">Whether the value-first composition methods (ApplyAnd/ApplyOr/ApplyRefine) are generated.</param>
+/// <param name="GenerateValidateMethod">Whether the static <c>Validate</c> method is generated.</param>
+/// <param name="GenerateParseMethod">Whether the static <c>Parse</c> method is generated (requires <c>Validate</c>).</param>
+/// <param name="TypeRules">
+/// Rules bound to the target type itself (type-level <c>[ZodRule]</c>-mapped attributes). They are
+/// evaluated against the whole value with an empty path.
+/// </param>
 /// <param name="IsPrimary">True if this is the primary schema for the target type, false if it is a secondary schema.</param>
 readonly record struct ZodSchemaDescriptor(
 	TypeIdentity TargetType,
@@ -53,6 +59,9 @@ readonly record struct ZodSchemaDescriptor(
 	GeneratorResult<SyncValidationMethodData> SyncValidationMethod,
 	bool? GenerateIValidateOptions,
 	bool EnableComposition,
+	bool GenerateValidateMethod,
+	bool GenerateParseMethod,
+	EquatableArray<CustomRuleDescriptor> TypeRules,
 	bool IsPrimary
 );
 
@@ -68,7 +77,8 @@ readonly record struct ZodPropertyDescriptor(
 	TypeIdentity? NestedSchemaType,
 	LengthAccessor LengthAccessor,
 	bool CompareViaCompareTo,
-	ValidationAttributes ValidationAttributes
+	ValidationAttributes ValidationAttributes,
+	EquatableArray<CustomRuleDescriptor> CustomRules
 );
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(

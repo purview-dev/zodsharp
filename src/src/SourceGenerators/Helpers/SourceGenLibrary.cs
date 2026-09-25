@@ -164,15 +164,23 @@ static partial class SourceGenLibrary
 			if (!seen.Add(target))
 				continue;
 
-			var schema = target with { Name = $"{target.Name}Schema" };
+			var zodSchemaAttribute = ZodSchemaAttributeData.FromAttributeData(symbol, out var attribute);
+			var schemaName = zodSchemaAttribute.SchemaName is { Length: > 0 } customSchemaName
+				? customSchemaName
+				: $"{target.Name}Schema";
+			var schema = target with { Name = schemaName };
 			var targetCanBeNull = TypeHelpers.CanBeNull(symbol);
 			var properties = GetZodProperties(symbol, externalSchemas);
+
+			// Type-level rules ([ZodRule]-mapped attributes on the target itself) validate the whole value
+			// rather than a property, which is what makes a scalar value object validatable as a unit.
+			var typeRuleDiagnostics = ImmutableArray.CreateBuilder<ReportableDiagnostic>();
+			var typeRules = CustomRuleResolver.Resolve(symbol, symbol, typeRuleDiagnostics);
 			var accessibility = symbol.ContainingType is null
 				? symbol.DeclaredAccessibility == Accessibility.Public
 					? TypeDeclarationAccessibility.Public
 					: TypeDeclarationAccessibility.Internal
 				: symbol.DeclaredAccessibility.ToTypeDeclarationAccessibility();
-			var zodSchemaAttribute = ZodSchemaAttributeData.FromAttributeData(symbol, out var attribute);
 			var customValidation = ResolveCustomValidationMethod(symbol, zodSchemaAttribute, attribute!);
 			var syncValidation = ResolveSyncValidationMethod(symbol, zodSchemaAttribute, attribute!);
 
@@ -188,6 +196,12 @@ static partial class SourceGenLibrary
 				: zodSchemaAttribute.SuppressIValidateOptions ? false
 				: null;
 
+			// Nested complex types discovered without a [ZodSchema] attribute default to emitting both
+			// methods (the attribute's [Property(DefaultValue = true)] defaults only apply when the
+			// attribute is actually present; ZodSchemaAttributeData.Empty carries default(bool)).
+			var generateValidateMethod = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateValidateMethod;
+			var generateParseMethod = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateParseMethod;
+
 			schemas.Add(
 				new(
 					target,
@@ -201,6 +215,9 @@ static partial class SourceGenLibrary
 					syncValidation,
 					generateIValidateOptions,
 					zodSchemaAttribute.EnableComposition,
+					generateValidateMethod,
+					generateParseMethod,
+					typeRules,
 					isPrimary
 				)
 			);
@@ -294,7 +311,9 @@ static partial class SourceGenLibrary
 		var properties = symbol
 			.GetMembers()
 			.OfType<IPropertySymbol>()
-			.Where(property => property.DeclaredAccessibility == Accessibility.Public)
+			.Where(property =>
+				property.DeclaredAccessibility == Accessibility.Public && !property.IsStatic && !property.IsIndexer
+			)
 			.Select(property => GetValidatablePropertyDescriptor(property, externalSchemas))
 			.ToImmutableArray();
 
@@ -427,6 +446,8 @@ static partial class SourceGenLibrary
 		var isEnum =
 			TypeHelpers.UnwrapNullableType(originalPropertyType) is INamedTypeSymbol { TypeKind: TypeKind.Enum };
 
+		var customRules = CustomRuleResolver.Resolve(property, originalPropertyType, diagnostics);
+
 		var compareViaCompareTo =
 			validationKind == PropertyValidationKind.Comparable
 			&& originalPropertyType is INamedTypeSymbol namedPropertyType
@@ -462,7 +483,8 @@ static partial class SourceGenLibrary
 					allowedValuesAttribute,
 					lengthAttribute,
 					rangeAttributeResult
-				)
+				),
+				customRules
 			),
 			diagnostics.ToImmutable()
 		);
@@ -594,18 +616,21 @@ static partial class SourceGenLibrary
 
 	static LengthAccessor ClassifyLengthAccessor(ITypeSymbol propertyType)
 	{
-		if (propertyType.SpecialType == SpecialType.System_String || propertyType is IArrayTypeSymbol)
+		if (propertyType.SpecialType == SpecialType.System_String)
+			return new("propertyValue.Length", "string", true);
+
+		if (propertyType is IArrayTypeSymbol)
 			return new("propertyValue.Length", "array", true);
 
 		if (propertyType is INamedTypeSymbol namedType)
 		{
 			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.Generic.ICollection))
-				return new("propertyValue.Count", "array", true);
+				return new("propertyValue.Count", "collection", true);
 
 			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.IEnumerable))
 				return new(
 					"global::ZodSharp.Optimizations.CollectionCountHelper.GetCount(propertyValue)",
-					"array",
+					"collection",
 					true
 				);
 		}
@@ -837,7 +862,7 @@ static partial class SourceGenLibrary
 		&& !type.IsAbstract
 		&& !type.IsStatic;
 
-	static bool TryGetNestedSchemaType(
+	internal static bool TryGetNestedSchemaType(
 		IPropertySymbol property,
 		ExternalSchemaResolver externalSchemas,
 		out INamedTypeSymbol nested

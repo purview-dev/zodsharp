@@ -49,7 +49,7 @@ public class ZodNumberTests
 	[Test]
 	[Arguments(10.0, true)]
 	[Arguments(0.1, true)]
-	[Arguments(0.0, true)]
+	[Arguments(0.0, false)]
 	[Arguments(-1.0, false)]
 	public async Task NumberPositive_GivenValue_ReturnsExpectedResult(double value, bool expected)
 	{
@@ -61,11 +61,33 @@ public class ZodNumberTests
 	[Test]
 	[Arguments(-5.0, true)]
 	[Arguments(-0.1, true)]
-	[Arguments(0.0, true)]
+	[Arguments(0.0, false)]
 	[Arguments(5.0, false)]
 	public async Task NumberNegative_GivenValue_ReturnsExpectedResult(double value, bool expected)
 	{
 		var result = Z.Number().Negative().Validate(value);
+
+		await Assert.That(result.IsSuccess).IsEqualTo(expected);
+	}
+
+	[Test]
+	[Arguments(0.0, true)]
+	[Arguments(5.0, true)]
+	[Arguments(-0.1, false)]
+	public async Task NumberNonNegative_GivenValue_ReturnsExpectedResult(double value, bool expected)
+	{
+		var result = Z.Number().NonNegative().Validate(value);
+
+		await Assert.That(result.IsSuccess).IsEqualTo(expected);
+	}
+
+	[Test]
+	[Arguments(0.0, true)]
+	[Arguments(-5.0, true)]
+	[Arguments(0.1, false)]
+	public async Task NumberNonPositive_GivenValue_ReturnsExpectedResult(double value, bool expected)
+	{
+		var result = Z.Number().NonPositive().Validate(value);
 
 		await Assert.That(result.IsSuccess).IsEqualTo(expected);
 	}
@@ -82,11 +104,32 @@ public class ZodNumberTests
 	}
 
 	[Test]
+	[Arguments(0.3, true)]
+	[Arguments(0.3000000001, false)]
+	[Arguments(-0.3, true)]
+	public async Task NumberMultipleOf_GivenFractionalDivisor_HandlesFloatingPointRounding(double value, bool expected)
+	{
+		var result = Z.Number().MultipleOf(0.1).Validate(value);
+
+		await Assert.That(result.IsSuccess).IsEqualTo(expected);
+	}
+
+	[Test]
 	public async Task NumberMultipleOf_GivenZeroDivisor_ThrowsArgumentException()
 	{
 		var exception = Assert.Throws<ArgumentException>(static () => Z.Number().MultipleOf(0));
 
 		await Assert.That(exception).IsNotNull();
+	}
+
+	[Test]
+	[Arguments(double.PositiveInfinity, false)]
+	[Arguments(double.NaN, false)]
+	public async Task NumberMultipleOf_GivenNonFiniteValue_ReturnsFailure(double value, bool expected)
+	{
+		var result = Z.Number().MultipleOf(10).Validate(value);
+
+		await Assert.That(result.IsSuccess).IsEqualTo(expected);
 	}
 
 	[Test]

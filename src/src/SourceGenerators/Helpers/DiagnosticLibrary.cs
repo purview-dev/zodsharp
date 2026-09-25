@@ -258,6 +258,42 @@ static class DiagnosticLibrary
 		isEnabledByDefault: true
 	);
 
+	public static readonly DiagnosticDescriptor UnsupportedCustomRuleTarget = new(
+		id: "ZODSGEN030",
+		title: "Custom rule does not support the property type",
+		messageFormat: "The rule '{0}' configured by attribute '{1}' does not implement IValidationRule<T> for property type '{2}'",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor UnmappableCustomRuleArgument = new(
+		id: "ZODSGEN031",
+		title: "Unable to map a custom rule argument",
+		messageFormat: "Unable to map a value for constructor parameter '{0}' of rule '{1}' from attribute '{2}'",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor UnsupportedRuleAttributeGeneration = new(
+		id: "ZODSGEN032",
+		title: "Unable to generate a validation attribute for a custom rule",
+		messageFormat: "Unable to generate a validation attribute for rule '{0}': {1}",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor RuleAttributeWithoutSchema = new(
+		id: "ZODSGEN033",
+		title: "Rule attribute is applied to a type that gets no generated schema",
+		messageFormat: "The attribute '{0}' on '{1}' is mapped to a validation rule, but no schema is generated for '{1}', so the rule will not run. Apply [ZodSchema] to the type or reference it as a complex property of a schema.",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
 	public static readonly DiagnosticDescriptor MessageFormatPlaceholderNotDeclared = new(
 		id: "ZODSASP001",
 		title: "MessageFormat placeholder is not declared in Parameters",

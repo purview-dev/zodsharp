@@ -17,11 +17,16 @@ partial class ZodSchemaGenerator
 		var writer = outputContext.Context.CreateCodeWriter();
 
 		GenerateSchemaClass(outputContext, writer, isPrimary, context.CancellationToken);
-		context.AddSource($"{outputContext.ZodSchema.TargetType.Name}Schema.g.cs", writer);
+		context.AddSource($"{outputContext.ZodSchema.SchemaType.Name}.g.cs", writer);
 
 		context.CancellationToken.ThrowIfCancellationRequested();
 
 		if (!isPrimary || outputContext.ZodSchema.ContainingTypes.Count > 0)
+			return;
+
+		// The registration marker advertises a validator that assembly scanning can resolve; without
+		// the generated Validate method there is nothing to register.
+		if (!outputContext.ZodSchema.GenerateValidateMethod)
 			return;
 
 		var registrationWriter = outputContext.Context.CreateCodeWriter();
@@ -30,7 +35,7 @@ partial class ZodSchemaGenerator
 			$"[assembly: global::{TypeLibrary.ZodSharp.Core.ZodSchemaGeneratedAttribute.MetadataFullName}(typeof({outputContext.ZodSchema.TargetType.AsTypeReference()}))]"
 		);
 
-		context.AddSource($"{outputContext.ZodSchema.TargetType.Name}SchemaRegistration.g.cs", registrationWriter);
+		context.AddSource($"{outputContext.ZodSchema.SchemaType.Name}Registration.g.cs", registrationWriter);
 	}
 
 	static void GenerateSchemaClass(
@@ -92,16 +97,22 @@ partial class ZodSchemaGenerator
 
 				GeneratePathFields(writer, outputContext.ZodSchema, cancellationToken);
 				GenerateStaticAttributeFields(writer, outputContext.ZodSchema, cancellationToken);
-				GenerateValidationHelpers(writer, cancellationToken);
 
-				GenerateValidateMethod(writer, outputContext.ZodSchema, cancellationToken);
-				GenerateParseMethod(writer, outputContext.ZodSchema, cancellationToken);
+				if (outputContext.ZodSchema.GenerateValidateMethod)
+				{
+					GenerateValidationHelpers(writer, cancellationToken);
 
-				if (outputContext.ZodSchema.EnableComposition)
-					GenerateCompositionMethods(writer, outputContext.ZodSchema, cancellationToken);
+					GenerateValidateMethod(writer, outputContext.ZodSchema, cancellationToken);
+
+					if (outputContext.ZodSchema.GenerateParseMethod)
+						GenerateParseMethod(writer, outputContext.ZodSchema, cancellationToken);
+
+					if (outputContext.ZodSchema.EnableComposition)
+						GenerateCompositionMethods(writer, outputContext.ZodSchema, cancellationToken);
+				}
 			}
 
-			if (isPrimary)
+			if (isPrimary && outputContext.ZodSchema.GenerateValidateMethod)
 			{
 				GenerateValidatorAdapter(writer, outputContext.ZodSchema, cancellationToken);
 
@@ -128,7 +139,7 @@ partial class ZodSchemaGenerator
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
-		var adapterName = $"{schema.TargetType.Name}SchemaValidator";
+		var adapterName = $"{schema.SchemaType.Name}Validator";
 		var baseType = TypeLibrary.ZodSharp.Core.IZodSchemaValidator.MakeGeneric(schema.TargetType).AsTypeReference();
 
 		writer.XmlSummary(
@@ -346,6 +357,8 @@ partial class ZodSchemaGenerator
 					if (property.ShouldProcess)
 						GeneratePropertyValidation(writer, property.Value, cancellationToken);
 				}
+
+				GenerateTypeRuleValidations(writer, schema);
 
 				GenerateSyncRefinement(schema, method);
 
@@ -618,6 +631,8 @@ partial class ZodSchemaGenerator
 			default:
 				break;
 		}
+
+		GenerateCustomRuleValidations(writer, property);
 	}
 
 	static void GenerateCompareValidation(CodeWriter writer, ZodPropertyDescriptor property)

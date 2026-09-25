@@ -32,6 +32,10 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN027 | `IValidateOptions` requested but `Microsoft.Extensions.Options` reference is missing |
 | ZODSGEN028 | `IValidateOptions` requested on a struct (requires a class) |
 | ZODSGEN029 | A model declares both a synchronous refinement method and an async custom validation method (only one is allowed) |
+| ZODSGEN030 | A custom rule mapped through `[ZodRule(typeof(...))]` does not implement `IValidationRule<T>` for the property type (including an unbound generic rule that cannot be closed with it) |
+| ZODSGEN031 | A custom rule constructor parameter could not be mapped from the attribute (`[ZodRule]`) |
+| ZODSGEN032 | A validation attribute could not be generated for a rule marked `[ZodRule]` |
+| ZODSGEN033 | (warning) A rule-mapped attribute is applied to a type that gets no generated schema (no `[ZodSchema]` and not reachable as a complex property), so the rule never runs |
 
 ## Suppressing
 

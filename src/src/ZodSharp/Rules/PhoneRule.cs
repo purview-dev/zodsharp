@@ -6,7 +6,7 @@ namespace ZodSharp.Rules;
 /// allows digits and the characters () . + -, and requires at least one digit.
 /// Uses struct to avoid allocations.
 /// </summary>
-public readonly record struct PhoneRule : Core.IValidationRule<string>
+public readonly record struct PhoneRule : Core.IValidationRule<string>, Core.IStringValidationRule
 {
 	readonly string? _message;
 
@@ -24,9 +24,16 @@ public readonly record struct PhoneRule : Core.IValidationRule<string>
 	/// </summary>
 	/// <param name="value">The value to validate</param>
 	/// <returns>True if valid, false otherwise</returns>
-	public bool IsValid(in string value)
+	public bool IsValid(in string value) => value is not null && IsValid(value.AsSpan());
+
+	/// <summary>
+	/// Validates that the span is a valid phone number without materialising a string.
+	/// </summary>
+	/// <param name="value">The value to validate</param>
+	/// <returns>True if valid, false otherwise</returns>
+	public bool IsValid(ReadOnlySpan<char> value)
 	{
-		if (string.IsNullOrWhiteSpace(value))
+		if (value.IsWhiteSpace())
 			return false;
 
 		const string additionalChars = "() .+-";
@@ -55,4 +62,11 @@ public readonly record struct PhoneRule : Core.IValidationRule<string>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in string value) => _message ?? $"Invalid phone number format: {value}";
+
+	/// <summary>
+	/// Gets the error message for a failed span validation.
+	/// </summary>
+	/// <param name="value">The value that failed validation</param>
+	/// <returns>The error message</returns>
+	public string GetErrorMessage(ReadOnlySpan<char> value) => _message ?? $"Invalid phone number format: {value}";
 }

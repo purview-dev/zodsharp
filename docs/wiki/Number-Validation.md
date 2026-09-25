@@ -16,19 +16,24 @@ var result = schema.Validate(30.0);
 | `Min` | `Min(double minValue)` | `MinValueRule<double>` — `Value must be at least ...` |
 | `Max` | `Max(double maxValue)` | `MaxValueRule<double>` |
 | `Int` | `Int()` | `IntRule` — `value == Math.Truncate(value)` |
-| `Positive` | `Positive()` | `MinValueRule<double>(0.0)` |
-| `Negative` | `Negative()` | `MaxValueRule<double>(0.0)` |
-| `MultipleOf` | `MultipleOf(double divisor, string? message)` | `MultipleOfRule` — throws `ArgumentException` for a zero divisor; tolerance-based |
+| `Positive` | `Positive()` | `GreaterThanRule<double>(0.0)` — strictly greater than zero |
+| `Negative` | `Negative()` | `LessThanRule<double>(0.0)` — strictly less than zero |
+| `NonNegative` | `NonNegative()` | `MinValueRule<double>(0.0)` — greater than or equal to zero |
+| `NonPositive` | `NonPositive()` | `MaxValueRule<double>(0.0)` — less than or equal to zero |
+| `MultipleOf` | `MultipleOf(double divisor, string? message)` | `MultipleOfRule` — throws `ArgumentException` for a zero divisor; relative-tolerance comparison (`1e-12`) |
 | `Finite` | `Finite(string? message)` | `FiniteRule` — `double.IsFinite` |
 | `Safe` | `Safe(string? message)` | `SafeIntegerRule` — integer within `int.MinValue`..`int.MaxValue` |
 
 ## Examples
 
 ```csharp
-var positive = Z.Number().Positive();
-var negative = Z.Number().Negative();
+var positive = Z.Number().Positive();       // > 0
+var negative = Z.Number().Negative();       // < 0
+var nonNegative = Z.Number().NonNegative(); // >= 0
+var nonPositive = Z.Number().NonPositive(); // <= 0
 
 var multipleOf = Z.Number().MultipleOf(10); // multiples of 10
+var fractional = Z.Number().MultipleOf(0.1); // 0.3 is accepted (floating-point tolerance)
 var finite = Z.Number().Finite();           // rejects Infinity / NaN
 var safe = Z.Number().Safe();               // safe integer range
 var whole = Z.Number().Int();               // no fractional part

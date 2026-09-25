@@ -6,7 +6,7 @@ namespace ZodSharp.Rules;
 /// Validation rule for regex pattern matching.
 /// Uses struct to avoid allocations.
 /// </summary>
-public readonly record struct RegexRule : Core.IValidationRule<string>
+public readonly record struct RegexRule : Core.IValidationRule<string>, Core.IStringValidationRule
 {
 	readonly Regex _pattern;
 	readonly string? _message;
@@ -38,10 +38,24 @@ public readonly record struct RegexRule : Core.IValidationRule<string>
 	public bool IsValid(in string value) => _pattern.IsMatch(value);
 
 	/// <summary>
+	/// Validates that the span matches the regex pattern without materialising a string.
+	/// </summary>
+	/// <param name="value">The value to validate</param>
+	/// <returns>True if valid, false otherwise</returns>
+	public bool IsValid(ReadOnlySpan<char> value) => _pattern.IsMatch(value);
+
+	/// <summary>
 	/// Gets the error message for a failed validation.
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in string value) =>
 		_message ?? $"String does not match the required pattern: {_pattern}";
+
+	/// <summary>
+	/// Gets the error message for a failed span validation.
+	/// </summary>
+	/// <param name="value">The value that failed validation</param>
+	/// <returns>The error message</returns>
+	public string GetErrorMessage(ReadOnlySpan<char> value) => GetErrorMessage(value.ToString());
 }

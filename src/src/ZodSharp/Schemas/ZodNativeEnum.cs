@@ -18,17 +18,17 @@ public class ZodNativeEnum<TEnum>() : ZodType<TEnum>
 {
 	static readonly string[] EmptyPath = [];
 
+	// Resolving the defined members once per closed generic type avoids the per-validation
+	// Enum.IsDefined reflection path.
+	static readonly HashSet<TEnum> DefinedValues = [.. Enum.GetValues<TEnum>()];
+
 	/// <summary>
 	/// Validates that the value is a defined enum member.
 	/// </summary>
 	/// <param name="value">The value to validate.</param>
 	/// <returns>A validation result.</returns>
 	protected override ValidationResult<TEnum> ParseInternal(TEnum value) =>
-#if NET5_0_OR_GREATER
-		Enum.IsDefined(value)
-#else
-		Enum.IsDefined(typeof(TEnum), value)
-#endif
+		DefinedValues.Contains(value)
 			? ValidationResult<TEnum>.Success(value)
 			: ValidationResult<TEnum>.Failure(
 				new ValidationError(

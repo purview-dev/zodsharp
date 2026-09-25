@@ -64,10 +64,18 @@ public abstract class ZodType<TOutput, TInput> : IZodSchema<TOutput, TInput>, IO
 	/// Validates the input value asynchronously.
 	/// Equivalent to Zod's safeParseAsync method.
 	/// </summary>
+	/// <param name="value">The input value to validate.</param>
+	/// <param name="cancellationToken">A token that cancels the validation before it starts.</param>
+	/// <returns>A validation result.</returns>
+	/// <exception cref="OperationCanceledException">Thrown when the token is already cancelled.</exception>
 	public ValueTask<ValidationResult<TOutput>> ValidateAsync(
 		TInput value,
 		CancellationToken cancellationToken = default
-	) => new(Validate(value));
+	)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		return new(Validate(value));
+	}
 
 	/// <summary>
 	/// Parses the input value to the output type.
@@ -76,13 +84,44 @@ public abstract class ZodType<TOutput, TInput> : IZodSchema<TOutput, TInput>, IO
 	protected abstract ValidationResult<TOutput> ParseInternal(TInput value);
 
 	/// <summary>
-	/// Adds a validation rule to this schema.
+	/// Adds a validation rule to this schema. Rules are evaluated after the schema's
+	/// <see cref="ParseInternal"/> hook succeeds; a failing rule produces a
+	/// <see cref="ValidationError"/> with code <c>"validation_failed"</c> and an empty path.
 	/// </summary>
-	protected ZodType<TOutput, TInput> AddRule(IValidationRule<TOutput> rule)
+	/// <param name="rule">The rule to add. Implementations are expected to be structs to avoid allocations.</param>
+	/// <returns>This schema for method chaining.</returns>
+	/// <exception cref="ArgumentNullException">Thrown when <paramref name="rule"/> is null.</exception>
+	public virtual ZodType<TOutput, TInput> AddRule(IValidationRule<TOutput> rule)
 	{
+		ArgumentNullException.ThrowIfNull(rule);
 		_rules = _rules.Add(rule);
 		return this;
 	}
+
+	/// <summary>
+	/// Adds a validation rule using the fluent, strongly typed form.
+	/// </summary>
+	/// <typeparam name="TRule">The rule type.</typeparam>
+	/// <param name="rule">The rule to add.</param>
+	/// <returns>This schema for method chaining.</returns>
+	/// <remarks>
+	/// Convenience wrapper over <see cref="AddRule(IValidationRule{TOutput})"/> that keeps the concrete
+	/// rule type in the chain, mirroring the built-in fluent rule methods (for example
+	/// <c>Z.String().Min(3)</c>).
+	/// </remarks>
+	public ZodType<TOutput, TInput> Rule<TRule>(TRule rule)
+		where TRule : IValidationRule<TOutput>
+	{
+		if (rule is null)
+			throw new ArgumentNullException(nameof(rule));
+
+		return AddRule(rule);
+	}
+
+	/// <summary>
+	/// Gets the number of rules accumulated on this schema.
+	/// </summary>
+	protected int RuleCount => _rules.Length;
 
 	/// <summary>
 	/// Sets the description of this schema.

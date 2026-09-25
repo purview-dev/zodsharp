@@ -6,6 +6,11 @@ namespace ZodSharp.Rules;
 /// </summary>
 public readonly record struct MultipleOfRule : Core.IValidationRule<double>
 {
+	/// <summary>
+	/// The relative tolerance applied when comparing the quotient to its nearest integer.
+	/// </summary>
+	const double RelativeTolerance = 1e-12;
+
 	readonly double _divisor;
 	readonly string? _message;
 
@@ -30,8 +35,16 @@ public readonly record struct MultipleOfRule : Core.IValidationRule<double>
 	/// <returns>True if valid, false otherwise</returns>
 	public bool IsValid(in double value)
 	{
-		var remainder = Math.Abs(value % _divisor);
-		return remainder < double.Epsilon || Math.Abs(remainder - _divisor) < double.Epsilon;
+		if (double.IsNaN(value) || double.IsInfinity(value))
+			return false;
+
+		// Floating-point division is inexact (for example 0.3 / 0.1 == 2.9999999999999996),
+		// so compare the quotient against its nearest integer using a relative tolerance
+		// instead of testing the raw remainder.
+		var quotient = value / _divisor;
+		var nearestInteger = Math.Round(quotient);
+		var tolerance = RelativeTolerance * Math.Max(1.0, Math.Abs(quotient));
+		return Math.Abs(quotient - nearestInteger) <= tolerance;
 	}
 
 	/// <summary>

@@ -7,6 +7,11 @@ namespace ZodSharp.SourceGenerators;
 /// Source generator that creates optimized validators for classes marked with [ZodSchema].
 /// Uses IIncrementalGenerator for better performance and incremental compilation support.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	"Maintainability",
+	"CA1506:Avoid excessive class coupling",
+	Justification = "The generator intentionally composes the framework emitters, the schema model and the rule library."
+)]
 [Generator]
 public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 {
@@ -58,6 +63,17 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 						spc.ReportDiagnostic(diagnostic.ToDiagnostic());
 					}
 				}
+			}
+		);
+
+		context.RegisterSourceOutput(
+			generationValueProviders.Combine(GetRuleAttributeProvider(context).Collect()),
+			static (spc, pair) =>
+			{
+				if (pair.Left.Context.Settings.IsSourceGeneratorDisabled)
+					return;
+
+				EmitRuleAttributes(spc, pair.Left, pair.Right);
 			}
 		);
 	}

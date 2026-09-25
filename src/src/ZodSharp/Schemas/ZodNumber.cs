@@ -57,20 +57,42 @@ public class ZodNumber : ZodType<double>
 	}
 
 	/// <summary>
-	/// Adds a positive number validation.
+	/// Adds a strictly positive number validation (value must be greater than zero).
+	/// Equivalent to Zod's <c>z.number().positive()</c>.
 	/// </summary>
 	/// <returns>This schema for method chaining</returns>
 	public ZodNumber Positive()
+	{
+		AddRule(new GreaterThanRule<double>(0.0));
+		return this;
+	}
+
+	/// <summary>
+	/// Adds a strictly negative number validation (value must be less than zero).
+	/// Equivalent to Zod's <c>z.number().negative()</c>.
+	/// </summary>
+	/// <returns>This schema for method chaining</returns>
+	public ZodNumber Negative()
+	{
+		AddRule(new LessThanRule<double>(0.0));
+		return this;
+	}
+
+	/// <summary>
+	/// Adds a non-negative number validation (value must be greater than or equal to zero).
+	/// </summary>
+	/// <returns>This schema for method chaining</returns>
+	public ZodNumber NonNegative()
 	{
 		AddRule(new MinValueRule<double>(0.0));
 		return this;
 	}
 
 	/// <summary>
-	/// Adds a negative number validation.
+	/// Adds a non-positive number validation (value must be less than or equal to zero).
 	/// </summary>
 	/// <returns>This schema for method chaining</returns>
-	public ZodNumber Negative()
+	public ZodNumber NonPositive()
 	{
 		AddRule(new MaxValueRule<double>(0.0));
 		return this;

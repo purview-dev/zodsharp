@@ -74,7 +74,12 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>
 				new ValidationError(
 					"too_small",
 					_errorMessage ?? $"Array must have at least {_minLength.Value} elements, but got {count}",
-					EmptyPath
+					EmptyPath,
+					parameters: null,
+					origin: "array",
+					minimum: _minLength.Value,
+					maximum: _maxLength,
+					inclusive: true
 				)
 			);
 		}
@@ -85,7 +90,12 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>
 				new ValidationError(
 					"too_big",
 					_errorMessage ?? $"Array must have at most {_maxLength.Value} elements, but got {count}",
-					EmptyPath
+					EmptyPath,
+					parameters: null,
+					origin: "array",
+					minimum: _minLength,
+					maximum: _maxLength.Value,
+					inclusive: true
 				)
 			);
 		}

@@ -4,7 +4,7 @@ namespace ZodSharp.Rules;
 /// Validation rule for UUID format.
 /// Uses struct to avoid allocations.
 /// </summary>
-public readonly record struct UUIDRule : Core.IValidationRule<string>
+public readonly record struct UUIDRule : Core.IValidationRule<string>, Core.IStringValidationRule
 {
 	readonly string? _message;
 	readonly UuidVersion? _version;
@@ -39,9 +39,16 @@ public readonly record struct UUIDRule : Core.IValidationRule<string>
 	/// </summary>
 	/// <param name="value">The value to validate</param>
 	/// <returns>True if valid, false otherwise</returns>
-	public bool IsValid(in string value)
+	public bool IsValid(in string value) => value is not null && IsValid(value.AsSpan());
+
+	/// <summary>
+	/// Validates that the span is a valid UUID without materialising a string.
+	/// </summary>
+	/// <param name="value">The value to validate</param>
+	/// <returns>True if valid, false otherwise</returns>
+	public bool IsValid(ReadOnlySpan<char> value)
 	{
-		if (string.IsNullOrWhiteSpace(value) || value.Length != 36)
+		if (value.IsWhiteSpace() || value.Length != 36)
 			return false;
 
 		if (!HasValidStructure(value))
@@ -59,7 +66,19 @@ public readonly record struct UUIDRule : Core.IValidationRule<string>
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
-	public string GetErrorMessage(in string value) =>
+	public string GetErrorMessage(in string value) => GetErrorMessageCore(value);
+
+	/// <summary>
+	/// Gets the error message for a failed span validation.
+	/// </summary>
+	/// <param name="value">The value that failed validation</param>
+	/// <returns>The error message</returns>
+	public string GetErrorMessage(ReadOnlySpan<char> value) => GetErrorMessageCore(value.ToString());
+
+	const string NilUuid = "00000000-0000-0000-0000-000000000000";
+	const string MaxUuid = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+
+	string GetErrorMessageCore(string value) =>
 		_message
 		?? (
 			_version is UuidVersion version
@@ -67,12 +86,12 @@ public readonly record struct UUIDRule : Core.IValidationRule<string>
 				: $"Invalid UUID format: {value}"
 		);
 
-	static bool IsValidVersionless(string value)
+	static bool IsValidVersionless(ReadOnlySpan<char> value)
 	{
 		// nil and max are allowed regardless of version/variant (Zod parity).
-		if (value == "00000000-0000-0000-0000-000000000000")
+		if (value.SequenceEqual(NilUuid))
 			return true;
-		if (value == "ffffffff-ffff-ffff-ffff-ffffffffffff")
+		if (value.SequenceEqual(MaxUuid))
 			return true;
 
 		var version = value[14];
@@ -83,7 +102,7 @@ public readonly record struct UUIDRule : Core.IValidationRule<string>
 		return IsValidVariant(value[19]);
 	}
 
-	static bool HasValidStructure(string value)
+	static bool HasValidStructure(ReadOnlySpan<char> value)
 	{
 		if (value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-')
 			return false;

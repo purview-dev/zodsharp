@@ -22,6 +22,7 @@ This wiki is the project documentation hub for the core API, source generator, J
 - [Arrays and Other Schemas](Arrays-and-Other-Schemas.md)
 - [Unions and Discriminated Unions](Unions-and-Discriminated-Unions.md)
 - [Composition and Transforms](Composition-and-Transforms.md)
+- [Custom Rules](Custom-Rules.md)
 - [Compiled Validators and Caching](Compiled-Validators-and-Caching.md)
 - [Dependency Injection](Dependency-Injection.md)
 

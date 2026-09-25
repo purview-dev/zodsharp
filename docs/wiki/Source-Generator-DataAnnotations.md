@@ -38,7 +38,7 @@ Size attributes generate direct `Length` or `Count` access when possible:
 Structured size failures expose the same metadata as the runtime API:
 
 - `Code`: `too_small` or `too_big`.
-- `Origin`: `string` for strings, `array` for arrays and collections.
+- `Origin`: `string` for strings, `array` for arrays, `collection` for countable/`IEnumerable` collections.
 - `Minimum` / `Maximum`: the inclusive bound.
 - `Inclusive`: `true`.
 - `Path`: the property path.
@@ -60,7 +60,7 @@ var result = BasketSchema.Validate(new Basket { Items = ["apple"] });
 ```
 
 > [!NOTE]
-> Today the generator reports `Origin = "array"` for both arrays and collections; there is no `"collection"` origin in generated code.
+> The generator reports `Origin = "array"` for arrays and `Origin = "collection"` for countable/`IEnumerable` collections.
 
 ## Range
 
@@ -85,3 +85,7 @@ Misuse is reported at compile time rather than silently ignored:
 - `[Compare]` referencing an unknown property → ZODSGEN020.
 
 See [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the full list.
+
+## Custom attributes
+
+The same pipeline honours custom rules exposed as validation attributes. Mark the attribute with `[ZodRule(typeof(MyRule))]` (or mark the rule itself with `[ZodRule]` to have the attribute generated), and properties annotated with it are validated through the rule. See [Custom Rules](Custom-Rules.md).

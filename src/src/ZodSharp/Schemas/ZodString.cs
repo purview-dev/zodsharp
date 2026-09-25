@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using ZodSharp.Core;
 using ZodSharp.Rules;
@@ -12,6 +13,33 @@ public class ZodString : ZodType<string>
 {
 	static readonly string[] EmptyPath = [];
 
+	// Rules that also implement IStringValidationRule, so ValidateSpan/IsValidSpan can validate the
+	// incoming span without materialising a string. When any rule lacks the span contract the list is
+	// abandoned and span validation falls back to the string path.
+	ImmutableArray<IStringValidationRule> _spanRules = [];
+	bool _spanRulesSupported = true;
+
+	/// <summary>
+	/// Gets whether span validation can bypass materialising the input string.
+	/// </summary>
+	protected virtual bool SupportsSpanValidation => true;
+
+	/// <inheritdoc/>
+	public override ZodType<string, string> AddRule(IValidationRule<string> rule)
+	{
+		base.AddRule(rule);
+
+		if (_spanRulesSupported)
+		{
+			if (rule is IStringValidationRule spanRule)
+				_spanRules = _spanRules.Add(spanRule);
+			else
+				_spanRulesSupported = false;
+		}
+
+		return this;
+	}
+
 	/// <summary>
 	/// Parses and validates a string value.
 	/// </summary>
@@ -25,20 +53,67 @@ public class ZodString : ZodType<string>
 			: ValidationResult<string>.Success(value);
 
 	/// <summary>
-	/// Validates a ReadOnlySpan of characters without allocating a string.
+	/// Validates a <see cref="ReadOnlySpan{T}"/> of characters using the accumulated rules' span path.
 	/// </summary>
-	/// <param name="value">The span to validate</param>
-	/// <returns>A validation result</returns>
+	/// <param name="value">The span to validate.</param>
+	/// <returns>A validation result. The returned value is a string, so a successful validation still allocates once.</returns>
+	/// <remarks>
+	/// When every accumulated rule implements <see cref="IStringValidationRule"/> the input is never
+	/// materialised; otherwise the span is converted to a string and validated through
+	/// <c>Validate</c>. Use <see cref="IsValidSpan"/> when no validated value is
+	/// needed: it does not allocate on success.
+	/// </remarks>
 	public ValidationResult<string> ValidateSpan(ReadOnlySpan<char> value)
 	{
-		if (value.IsEmpty && value.Length == 0)
+		// Transforms (and any rule without the span contract) must run through the string pipeline so the
+		// produced value is preserved.
+		if (!SupportsSpanRules)
+			return Validate(value.ToString());
+
+		return IsValidSpan(value, out var errors)
+			? ValidationResult<string>.Success(value.ToString())
+			: ValidationResult<string>.Failure(errors);
+	}
+
+	/// <summary>
+	/// Validates a span without materialising the input string.
+	/// </summary>
+	/// <param name="value">The span to validate.</param>
+	/// <param name="errors">The validation errors when the span is invalid; empty when it is valid.</param>
+	/// <returns><see langword="true"/> when the span is valid.</returns>
+	/// <remarks>
+	/// This is the allocation-free span entry point: it validates the span directly when every rule
+	/// implements <see cref="IStringValidationRule"/>, and otherwise falls back to the string path once.
+	/// </remarks>
+	public bool IsValidSpan(ReadOnlySpan<char> value, out ImmutableArray<ValidationError> errors)
+	{
+		errors = [];
+
+		if (!SupportsSpanRules)
 		{
-			return ValidationResult<string>.Success(string.Empty);
+			var result = Validate(value.ToString());
+			errors = result.Errors;
+			return result.IsSuccess;
 		}
 
-		var str = value.ToString();
-		return Validate(str);
+		ImmutableArray<ValidationError>.Builder? builder = null;
+		foreach (var rule in _spanRules)
+		{
+			if (rule.IsValid(value))
+				continue;
+
+			builder ??= ImmutableArray.CreateBuilder<ValidationError>();
+			builder.Add(new ValidationError("validation_failed", rule.GetErrorMessage(value), EmptyPath));
+		}
+
+		if (builder is null)
+			return true;
+
+		errors = builder.ToImmutable();
+		return false;
 	}
+
+	bool SupportsSpanRules => _spanRulesSupported && SupportsSpanValidation && _spanRules.Length == RuleCount;
 
 	/// <summary>
 	/// Adds a minimum length validation.
@@ -238,6 +313,8 @@ public class ZodString : ZodType<string>
 
 	class ZodStringWrapper(ZodTransform<string, string> transform) : ZodString
 	{
+		protected override bool SupportsSpanValidation => false;
+
 		protected override ValidationResult<string> ParseInternal(string value) => transform.Validate(value);
 	}
 }

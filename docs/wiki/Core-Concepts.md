@@ -18,7 +18,7 @@ ValidationResult<TOutput> result = schema.Validate(value);
 | `Validate(TInput value)` | Returns a `ValidationResult<TOutput>`. Never throws. |
 | `SafeParse(TInput value)` | Alias of `Validate`. |
 | `Parse(TInput value)` | Returns the validated `TOutput`, or throws `ZodException` on failure (via `GetValueOrThrow()`). |
-| `ValidateAsync(TInput value, CancellationToken)` | `ValueTask` wrapper around `Validate`. The pipeline is synchronous; this exists for interface symmetry and the source generator's custom async validation. |
+| `ValidateAsync(TInput value, CancellationToken)` | `ValueTask` wrapper around `Validate`. The pipeline is synchronous; the token is observed before validation and throws `OperationCanceledException` when already cancelled. Genuinely async work only happens in the source generator's custom async validation. |
 
 ## ValidationResult<T>
 
@@ -64,7 +64,8 @@ catch (ZodException ex)
 
 - Schemas are classes deriving from `ZodType<TOutput, TInput>`; the fluent methods return `this` (or a wrapping schema) so chains read naturally.
 - Rules are `readonly record struct` implementations of `IValidationRule<T>` (`bool IsValid(in T value)`, `string GetErrorMessage(in T value)`) — zero allocation.
-- `ValidateSpan(ReadOnlySpan<char> value)` is available on `ZodString` for span-based validation.
+- Custom rules can be attached with the public `AddRule`/`Rule` methods and surfaced as DataAnnotations-style attributes; see [Custom Rules](Custom-Rules.md).
+- `ValidateSpan(ReadOnlySpan<char> value)` is available on `ZodString` for span-based validation; use `IsValidSpan(value, out errors)` for an allocation-free check.
 - A schema's `Description` is set with `.Describe("...")`.
 
 ## Composition model

@@ -27,6 +27,18 @@ public static partial class TypeLibraryGenerator
 	static readonly TypeIdentity IZodSchemaValidator = default;
 
 	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity IValidationRule = default;
+
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity IZodRule = default;
+
+	[TypeRef(ZodSharpCoreNamespace)]
+	static readonly TypeIdentity ZodRuleAttribute = default;
+
+	[TypeRef("System")]
+	static readonly TypeIdentity AttributeUsageAttribute = default;
+
+	[TypeRef(ZodSharpCoreNamespace)]
 	static readonly TypeIdentity ValidationResult = default;
 
 	[TypeRef(ZodSharpCoreNamespace)]

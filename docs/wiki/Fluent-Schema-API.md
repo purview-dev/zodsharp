@@ -46,7 +46,11 @@ Each schema type has its own page:
 
 - `IZodSchema<TOutput, TInput>` — `Validate` / `ValidateAsync`; `IZodSchema<T>` is the convenience form where input equals output.
 - `IZodSchemaValidator` (marker) and `IZodSchemaValidator<T>` — the DI-facing adapter surface (see [Dependency Injection](Dependency-Injection.md)).
-- `IValidationRule<T>` — the rule contract implemented by every struct rule.
+- `IValidationRule<T>` — the rule contract implemented by every struct rule. `ZodType<TOutput, TInput>.AddRule(rule)` and `Rule<TRule>(rule)` are public, so custom rules can be attached to any schema. `ZodString` also exposes `IsValidSpan`/`ValidateSpan` for span-based string validation, and string rules that implement `IStringValidationRule` participate in the span path.
+- `IZodRule` — implemented by rules that own their error identity (`Code`/`Origin`). When a mapped rule implements it, the generator prefers the rule's values over the attribute's, so one attribute can produce a per-member error code.
+- `IStringValidationRule` — the span-based counterpart of `IValidationRule<string>`.
+
+See [Custom Rules](Custom-Rules.md) for defining, attaching, and mapping rules (including generic rules).
 
 ## Convenience composition on any schema
 

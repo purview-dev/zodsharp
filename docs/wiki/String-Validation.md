@@ -29,10 +29,11 @@ var result = schema.Validate("user@example.com");
 | `ToLower` | `ToLower()` | wraps a transform (`ToLowerInvariant`), returns a `ZodString` |
 | `ToUpper` | `ToUpper()` | wraps a transform (`ToUpperInvariant`) |
 | `Trim` | `Trim()` | wraps a transform (`Trim`) |
-| `ValidateSpan` | `ValidateSpan(ReadOnlySpan<char> value)` | zero-allocation span validation |
+| `ValidateSpan` | `ValidateSpan(ReadOnlySpan<char> value)` | validates the span directly; a successful result materialises the value string |
+| `IsValidSpan` | `IsValidSpan(ReadOnlySpan<char> value, out ImmutableArray<ValidationError> errors)` | allocation-free on success; materialises the input only when a rule or transform has no span path |
 
 > [!NOTE]
-> `ToLower`, `ToUpper`, and `Trim` produce a new string on every validation — these are the only string validations that allocate on a successful path.
+> `ToLower`, `ToUpper`, and `Trim` produce a new string on every validation. `IsValidSpan` does not allocate when the value is valid; `ValidateSpan` allocates once because its result carries a `string`.
 
 ## Examples
 
@@ -62,4 +63,8 @@ Rules produce `ValidationError` entries with code `validation_failed` and an emp
 
 ## Span validation
 
-`ValidateSpan(ReadOnlySpan<char> value)` avoids string allocations on the validation path. An empty span validates successfully as `""`.
+`ValidateSpan(ReadOnlySpan<char> value)` validates the span directly using the rules' `IStringValidationRule` implementations; it materialises a `string` only for the returned value (and only falls back to the string pipeline for schemas with transforms or rules without a span implementation). `IsValidSpan(ReadOnlySpan<char> value, out ImmutableArray<ValidationError> errors)` is the allocation-free entry point when the value is not needed. An empty span is validated by the rules like an empty string.
+
+## Custom rules
+
+Custom rules implement `IValidationRule<string>` and can be attached with `Z.String().Rule(new MyRule())`. Implement `IStringValidationRule` as well to keep them on the span path. They can also be exposed as DataAnnotations-style attributes; see [Custom Rules](Custom-Rules.md).

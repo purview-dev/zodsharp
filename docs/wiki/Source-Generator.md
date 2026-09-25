@@ -30,8 +30,8 @@ For a `[ZodSchema]` target type `{TypeName}`, the generator emits:
 
 | Artifact | Shape |
 |---|---|
-| `{TypeName}Schema` | static partial class — the validator; access mirrors the target (public/internal/private for private nested types); contains `Validate`, `Parse`, and (when composition is enabled) `ApplyAnd`, `ApplyOr`, `ApplyRefine` |
-| `{TypeName}SchemaValidator` | `partial class {TypeName}SchemaValidator : IZodSchemaValidator<{TypeName}>` — DI-friendly adapter with `Validate` / `ValidateAsync`; emitted only for the primary schema |
+| `{TypeName}Schema` | static partial class — the validator; access mirrors the target (public/internal/private for private nested types); the name is overridable with `SchemaName`; contains `Validate`, `Parse`, and (when composition is enabled) `ApplyAnd`, `ApplyOr`, `ApplyRefine` |
+| `{TypeName}SchemaValidator` | `partial class {TypeName}SchemaValidator : IZodSchemaValidator<{TypeName}>` — DI-friendly adapter with `Validate` / `ValidateAsync`; emitted only for the primary schema, and named `{SchemaName}Validator` when `SchemaName` is set |
 | `{TypeName}Validator` | `sealed partial class {TypeName}Validator : IValidateOptions<{TypeName}>` — emitted only when `IValidateOptions` support is enabled (and the target is a class) |
 | `[assembly: ZodSchemaGenerated(typeof({TypeName}))]` | registration marker consumed by `IZodSchemaFactory` assembly scanning; emitted only for primary, non-nested schemas |
 
@@ -48,9 +48,9 @@ All options are optional.
 
 | Property | Default | Purpose |
 |---|---|---|
-| `SchemaName` | `null` | Reserved — the schema class is always named `{TypeName}Schema`. |
-| `GenerateValidateMethod` | `true` | Reserved — `Validate` is always emitted. |
-| `GenerateParseMethod` | `true` | Reserved — `Parse` is always emitted. |
+| `SchemaName` | `null` | Overrides the generated schema class name (default `{TypeName}Schema`). The DI adapter becomes `{SchemaName}Validator`. |
+| `GenerateValidateMethod` | `true` | Set to `false` to omit `Validate` (and the members that depend on it). |
+| `GenerateParseMethod` | `true` | Set to `false` to omit `Parse`. `Parse` requires `Validate`, so it is also omitted when `GenerateValidateMethod = false`. |
 | `EnableComposition` | `true` | Emits `ApplyAnd`, `ApplyOr`, `ApplyRefine` value-first composition methods. |
 | `CustomValidationMethodName` | `null` | Name of an async custom validation method; default lookup name `CustomValidationAsync`. Mutually exclusive with the synchronous refinement method. |
 | `RefinementMethodName` | `null` | Name of a synchronous refinement method; default lookup name `Validate` (an instance method on the model). Mutually exclusive with the async custom validation method. |
@@ -58,7 +58,7 @@ All options are optional.
 | `SuppressIValidateOptions` | `false` | Opt out even when auto-detection would enable it. |
 
 > [!NOTE]
-> `SchemaName`, `GenerateValidateMethod`, and `GenerateParseMethod` are parsed by the attribute but not yet honoured by the generator — the class is always `{TypeName}Schema` with `Validate` and `Parse`.
+> `Parse`, the value-first composition methods (`ApplyAnd`/`ApplyOr`/`ApplyRefine`), the `IZodSchemaValidator` adapter and the `IValidateOptions` validator all depend on `Validate`. Setting `GenerateValidateMethod = false` omits them together.
 
 ## Custom async validation
 
@@ -144,4 +144,4 @@ MSBuild switches:
 - Nested complex types are discovered recursively and get their own generated `{TypeName}Schema`, even when the nested type does not itself carry `[ZodSchema]`.
 - Nullable properties are null-guarded before value-set/type validation; a nullable target rejects `null` with `invalid_type`.
 
-See [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md) for the attribute coverage and structured issue shape, and [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the `ZODSGEN*` diagnostics.
+See [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md) for the attribute coverage and structured issue shape, [Custom Rules](Custom-Rules.md) for extending validation with your own rules and attributes, and [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the `ZODSGEN*` diagnostics.

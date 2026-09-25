@@ -54,4 +54,24 @@ public class ZodTypeTests
 		await Assert.That(exception).IsNotNull();
 		await Assert.That(exception.Errors).Count().IsEqualTo(1);
 	}
+
+	[Test]
+	public async Task ValidateAsync_GivenCancelledToken_ThrowsOperationCanceledException()
+	{
+		using CancellationTokenSource cts = new();
+		await cts.CancelAsync();
+
+		await Assert
+			.That(async () => await Z.String().Min(3).ValidateAsync("value", cts.Token))
+			.ThrowsExactly<OperationCanceledException>();
+	}
+
+	[Test]
+	public async Task ValidateAsync_GivenValidValue_ReturnsValidationResult()
+	{
+		var result = await Z.String().Min(3).ValidateAsync("value", CancellationToken.None);
+
+		await Assert.That(result.IsSuccess).IsTrue();
+		await Assert.That(result.Value).IsEqualTo("value");
+	}
 }

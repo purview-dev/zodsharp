@@ -70,6 +70,107 @@ var adult = UserSchema.ApplyRefine(user, u => u.Age >= 18, "Must be adult");
 
 DataAnnotations attributes such as `[Required]`, `[Length]`, `[StringLength]`, `[MinLength]`, `[MaxLength]`, `[Range]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and `[Compare]` are validated with direct, typed codegen (no reflection).
 
+## Custom rules
+
+A rule is any struct implementing `ZodSharp.Core.IValidationRule<T>`; attach it to a schema with the public `Rule`/`AddRule` API, or expose it as a DataAnnotations-style attribute that the source generator honours exactly like the built-ins:
+
+```csharp
+using System;
+using System.ComponentModel.DataAnnotations;
+using ZodSharp;
+using ZodSharp.Core;
+
+public readonly record struct NoWhitespaceRule(string? Message = null) : IValidationRule<string>
+{
+    public bool IsValid(in string value) => value.IndexOf(' ') < 0;
+    public string GetErrorMessage(in string value) => Message ?? "Whitespace is not allowed.";
+}
+
+[ZodRule(typeof(NoWhitespaceRule), Code = "invalid_string", Origin = "string")]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+public sealed class NoWhitespaceAttribute : ValidationAttribute
+{
+    public string? Message { get; set; }
+}
+
+// Fluent usage:
+var schema = Z.String().Rule(new NoWhitespaceRule());
+
+[ZodSchema]
+public class User
+{
+    [Required]
+    [NoWhitespace(Message = "No spaces allowed.")]
+    public string Name { get; set; } = string.Empty;
+}
+```
+
+Marking the rule itself with the parameterless `[ZodRule]` makes the generator emit a matching `NoWhitespaceAttribute` whose properties mirror the rule's constructor parameters.
+
+Rules can be **generic**: map the unbound generic rule type and the generator closes it with the property type, so one rule serves every primitive. Implementing `IZodRule` lets the rule supply a per-member error code:
+
+```csharp
+public readonly record struct NotEmptyRule<T>(string? Code = null, string? Message = null)
+    : IValidationRule<T>, IZodRule
+    where T : struct, IEquatable<T>
+{
+    public bool IsValid(in T value) => !value.Equals(default(T));
+    public string GetErrorMessage(in T value) => Message ?? "Value must not be empty.";
+    string? IZodRule.Code => Code;
+    string? IZodRule.Origin => "value_object";
+}
+
+[ZodRule(typeof(NotEmptyRule<>))]
+public sealed class NotEmptyAttribute : ValidationAttribute
+{
+    public string? Code { get; set; }
+    public string? Message { get; set; }
+}
+
+[ZodSchema]
+public partial record struct AssetId
+{
+    [NotEmpty(Code = "invalid_asset_id", Message = "AssetId must not be empty.")]
+    public Guid Value { get; init; }
+}
+```
+
+`[NotEmpty]` on a `Guid` property emits `NotEmptyRule<Guid>`; on an `int` property it emits `NotEmptyRule<int>`. See the [Custom Rules](https://purview.dev/docs/zodsharp/custom-rules/) page for the full precedence rules and the scalar value-object walkthrough.
+
+## Type-level rules (validating the value object)
+
+Rules can be attached to the **`[ZodSchema]` type itself**; they validate the whole value with an empty path, which is the right shape for a scalar whose single value *is* the value object:
+
+```csharp
+public readonly record struct NotEmptyRule<TSelf>(string? Code = null, string? Message = null)
+    : IValidationRule<TSelf>, IZodRule
+    where TSelf : IScalarValueObject<TSelf, Guid>
+{
+    public bool IsValid(in TSelf value) => value.Value != Guid.Empty;
+    public string GetErrorMessage(in TSelf value) => Message ?? "Value must not be empty.";
+    string? IZodRule.Code => Code;
+    string? IZodRule.Origin => "value_object";
+}
+
+[ZodRule(typeof(NotEmptyRule<>))]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property)]
+public sealed class NotEmptyAttribute : ValidationAttribute
+{
+    public string? Code { get; set; }
+    public string? Message { get; set; }
+}
+
+[Scalar]
+[ZodSchema]
+[NotEmpty(Code = "invalid_asset_id", Message = "AssetId must not be empty.")]
+public readonly partial record struct AssetId
+{
+    public Guid Value { get; init; }
+}
+```
+
+The generated validator runs the rule against the value object (`NotEmptyRule<AssetId>`) and reports `Code`, `Message`, and `Origin` with an empty path. A rule attribute on a type that gets no schema is ignored, and the analyzer warns (`ZODSGEN033`) rather than failing silently.
+
 ## Error factory
 
 `ErrorType` lets you define a user-facing error (code, optional category, description, optional

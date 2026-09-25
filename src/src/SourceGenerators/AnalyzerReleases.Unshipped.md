@@ -12,6 +12,10 @@ ZODSGEN026 | ZodSharp.SourceGenerator | Error | Synchronous refinement method co
 ZODSGEN027 | ZodSharp.SourceGenerator | Error | IValidateOptions generation requires a reference to Microsoft.Extensions.Options
 ZODSGEN028 | ZodSharp.SourceGenerator | Error | IValidateOptions generation requires a reference type
 ZODSGEN029 | ZodSharp.SourceGenerator | Error | Synchronous refinement and async custom validation methods are mutually exclusive
+ZODSGEN030 | ZodSharp.SourceGenerator | Error | Custom rule does not implement IValidationRule<T> for the property type (or an unbound generic rule cannot be closed with it)
+ZODSGEN031 | ZodSharp.SourceGenerator | Error | Unable to map an attribute value to a custom rule constructor parameter
+ZODSGEN032 | ZodSharp.SourceGenerator | Error | Unable to generate a validation attribute for a custom rule
+ZODSGEN033 | ZodSharp.SourceGenerator | Warning | Rule attribute is applied to a type that gets no generated schema
 ZODSASP001 | ZodSharp.SourceGenerator | Warning | MessageFormat placeholder is not declared in Parameters
 ZODSASP002 | ZodSharp.SourceGenerator | Warning | Error type containing type must be partial
 ZODSASP003 | ZodSharp.SourceGenerator | Warning | ErrorType field must be static readonly

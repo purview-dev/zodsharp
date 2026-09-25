@@ -50,4 +50,42 @@ public class ZodArrayTests
 
 		await Assert.That(result.IsSuccess).IsTrue();
 	}
+
+	[Test]
+	public async Task ArrayMin_GivenTooFewItems_ReturnsStructuredTooSmallIssue()
+	{
+		var result = Z.Array(Z.Number()).Min(2).Validate([1.0]);
+
+		await Assert.That(result.IsSuccess).IsFalse();
+		var error = result.Errors[0];
+		await Assert.That(error.Code).IsEqualTo("too_small");
+		await Assert.That(error.Origin).IsEqualTo("array");
+		await Assert.That(error.Minimum).IsEqualTo(2);
+		await Assert.That(error.Inclusive).IsTrue();
+	}
+
+	[Test]
+	public async Task ArrayMax_GivenTooManyItems_ReturnsStructuredTooBigIssue()
+	{
+		var result = Z.Array(Z.Number()).Max(2).Validate([1.0, 2.0, 3.0]);
+
+		await Assert.That(result.IsSuccess).IsFalse();
+		var error = result.Errors[0];
+		await Assert.That(error.Code).IsEqualTo("too_big");
+		await Assert.That(error.Origin).IsEqualTo("array");
+		await Assert.That(error.Maximum).IsEqualTo(2);
+		await Assert.That(error.Inclusive).IsTrue();
+	}
+
+	[Test]
+	public async Task ArrayLength_GivenWrongCount_ReturnsStructuredBounds()
+	{
+		var result = Z.Array(Z.Number()).Length(2).Validate([1.0]);
+
+		await Assert.That(result.IsSuccess).IsFalse();
+		var error = result.Errors[0];
+		await Assert.That(error.Code).IsEqualTo("too_small");
+		await Assert.That(error.Minimum).IsEqualTo(2);
+		await Assert.That(error.Maximum).IsEqualTo(2);
+	}
 }

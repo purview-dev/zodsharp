@@ -90,13 +90,16 @@ Numbers are indicative; re-run on your own hardware for local planning.
 
 ## Memory (`MemoryPerformanceTests`)
 
-All valid-input paths are zero-allocation:
+All valid-input paths for the core schema types are zero-allocation:
 
 | Scenario | Mean | Ratio |
 |---|---|---|
 | ValidateString_Allocations (baseline) | 45.82 ns | 1.00 |
 | ValidateObject_Allocations | 94.28 ns | 2.06 |
 | ValidateArray_Allocations | 1,180.24 ns | 25.82 |
+
+> [!NOTE]
+> The string transforms, `ZodString.ValidateSpan` (its result carries a string), and non-first union options are the allocation exceptions. Use `ZodString.IsValidSpan` for an allocation-free span check. See [Guarantees and Limitations](Guarantees-and-Limitations.md).
 
 ## UUID validation (`UuidPerformanceTests`)
 
@@ -119,9 +122,9 @@ The char-scan is ~20% faster than the previous regex on the valid path, is versi
 ## Optimizations that make it fast
 
 1. **Struct-based rules** — every rule is a `readonly record struct` implementing `IValidationRule<T>`, so there is no per-validation object allocation.
-2. **Zero-allocation helpers** — `Span<T>`/`ReadOnlySpan<T>` string validation (`ValidateSpan`) and `ArrayPool<T>`-backed helpers.
+2. **Span-aware helpers** — `Span<T>`/`ReadOnlySpan<T>` APIs and `ArrayPool<T>`-backed helpers. The shipped string rules implement `IStringValidationRule` (except the URL and Base64 rules, which need a string), so `ZodString.ValidateSpan` validates the span directly and only materialises the value string for its result; `ZodString.IsValidSpan` avoids that allocation entirely.
 3. **Compiled validators** — `CompiledValidator.Compile` removes interface dispatch (see [Compiled Validators and Caching](Compiled-Validators-and-Caching.md)).
 4. **Source generation** — `[ZodSchema]` emits direct property access and typed equality checks with no reflection (see [Source Generator](Source-Generator.md)).
-5. **Fluent composition** — schemas are immutable and shareable, so `SchemaCache` avoids repeated construction (see [Compiled Validators and Caching](Compiled-Validators-and-Caching.md)).
+5. **Cacheable schema instances** — a fully built schema is safe to cache and share, so `SchemaCache` avoids repeated construction (see [Compiled Validators and Caching](Compiled-Validators-and-Caching.md)). Building is not immutable: the fluent rule methods mutate the receiver. See [Custom Rules](Custom-Rules.md) for extending rules.
 
-The only allocations on a successful validation are the string transforms (`ToLower`/`ToUpper`/`Trim` produce new strings) and the union non-first-option paths noted above.
+The allocations on a successful validation are limited to the string transforms (`ToLower`/`ToUpper`/`Trim`), `ZodString.ValidateSpan` (its result carries a string), and the union non-first-option paths.

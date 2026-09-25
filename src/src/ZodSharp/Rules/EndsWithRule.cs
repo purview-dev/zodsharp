@@ -4,7 +4,7 @@ namespace ZodSharp.Rules;
 /// Validation rule for string suffix.
 /// Uses struct to avoid allocations.
 /// </summary>
-public readonly record struct EndsWithRule : Core.IValidationRule<string>
+public readonly record struct EndsWithRule : Core.IValidationRule<string>, Core.IStringValidationRule
 {
 	readonly string _suffix;
 	readonly string? _message;
@@ -28,10 +28,25 @@ public readonly record struct EndsWithRule : Core.IValidationRule<string>
 	public bool IsValid(in string value) => value != null && value.EndsWith(_suffix, StringComparison.Ordinal);
 
 	/// <summary>
+	/// Validates that the span ends with the specified suffix without materialising a string.
+	/// </summary>
+	/// <param name="value">The value to validate</param>
+	/// <returns>True if valid, false otherwise</returns>
+	public bool IsValid(ReadOnlySpan<char> value) => value.EndsWith(_suffix.AsSpan(), StringComparison.Ordinal);
+
+	/// <summary>
 	/// Gets the error message for a failed validation.
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in string value) =>
+		_message ?? $"String must end with '{_suffix}', but got '{value}'";
+
+	/// <summary>
+	/// Gets the error message for a failed span validation.
+	/// </summary>
+	/// <param name="value">The value that failed validation</param>
+	/// <returns>The error message</returns>
+	public string GetErrorMessage(ReadOnlySpan<char> value) =>
 		_message ?? $"String must end with '{_suffix}', but got '{value}'";
 }
