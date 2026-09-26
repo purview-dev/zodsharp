@@ -55,8 +55,17 @@ public readonly record struct ValidationResult<T>
 	/// </summary>
 	/// <returns>The validated value</returns>
 	/// <exception cref="ZodException">Thrown when validation fails</exception>
+	/// <seealso cref="ThrowOnError"/>
 	[SuppressMessage("Design", "CA1024:Use properties where appropriate")]
 	public T GetValueOrThrow() => IsSuccess ? Value : throw new ZodException(Errors);
+
+	/// <summary>
+	/// Throws a <see cref="ZodException"/> if validation failed.
+	/// </summary>
+	/// <returns>The validated value</returns>
+	/// <exception cref="ZodException">Thrown when validation fails</exception>
+	/// <seealso cref="GetValueOrThrow"/>
+	public T ThrowOnError() => IsSuccess ? Value : throw new ZodException(Errors);
 
 	/// <summary>
 	/// Creates a successful validation result.
