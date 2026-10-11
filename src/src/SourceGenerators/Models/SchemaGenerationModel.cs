@@ -114,7 +114,12 @@ readonly record struct ZodSchemaDescriptor(
 /// <param name="PropertyType">The declared type of the property, with a nullable wrapper removed.</param>
 /// <param name="Name">The name of the property.</param>
 /// <param name="DisplayName">The name reported in error messages, honouring a <c>[Display]</c> attribute.</param>
-/// <param name="CanBeNull">Indicates whether the property can be null.</param>
+/// <param name="CanBeNull">Indicates whether the property type can hold null at runtime (a reference type or <c>Nullable&lt;T&gt;</c>).</param>
+/// <param name="IsDeclaredNullable">
+/// Indicates whether the property is declared nullable (the nullable reference-type annotation, or
+/// <c>Nullable&lt;T&gt;</c>). This governs null acceptance in validation and the exported JSON Schema: a
+/// non-nullable reference type is required and its rules run unconditionally and reject null.
+/// </param>
 /// <param name="IsNullableValueType">Indicates whether the property type is a <c>Nullable&lt;T&gt;</c>.</param>
 /// <param name="IsEnum">Indicates whether the property type is an enum.</param>
 /// <param name="IsFlagsEnum">Indicates whether the enum type is declared with the <c>[Flags]</c> attribute.</param>
@@ -151,6 +156,7 @@ readonly record struct ZodPropertyDescriptor(
 	string Name,
 	string DisplayName,
 	bool CanBeNull,
+	bool IsDeclaredNullable,
 	bool IsNullableValueType,
 	bool IsEnum,
 	bool IsFlagsEnum,

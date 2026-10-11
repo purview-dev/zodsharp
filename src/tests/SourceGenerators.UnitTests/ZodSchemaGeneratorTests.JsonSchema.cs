@@ -86,14 +86,15 @@ namespace Testing
 		var schemaType = assembly.GetType("Testing.WidgetSchema")!;
 		var definition = (JsonSchemaDefinition)schemaType.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
 
-		// Assert — a reference-type property is nullable, so the property schema is an anyOf with the inner
-		// shape first and a null branch second.
+		// Assert — a non-nullable string is required and its rules reject null, so the property schema is the
+		// string shape directly (no null branch).
 		await Assert.That(definition.Type).IsEqualTo("object");
 		await Assert.That(definition.Properties).IsNotNull();
-		var nameSchema = definition.Properties!["name"].AnyOf![0];
+		var nameSchema = definition.Properties!["name"];
 		await Assert.That(nameSchema.Type).IsEqualTo("string");
 		await Assert.That(nameSchema.MinLength).IsEqualTo(1);
 		await Assert.That(nameSchema.Pattern).IsEqualTo("\\S");
+		await Assert.That(definition.Required!).Contains("name");
 	}
 
 	[Test]
@@ -127,7 +128,7 @@ namespace Testing
 		var definition = (JsonSchemaDefinition)schemaType.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
 
 		// Assert
-		var innerSchema = definition.Properties!["inner"].AnyOf![0];
+		var innerSchema = definition.Properties!["inner"];
 		await Assert.That(innerSchema.Type).IsEqualTo("object");
 		await Assert.That(innerSchema.Properties!["flag"].Type).IsEqualTo("boolean");
 	}
@@ -191,7 +192,7 @@ namespace Testing
 			assembly.GetType("Testing.WrapperSchema")!.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
 
 		// Assert — the property is an empty (any) schema rather than a reference to a missing method.
-		var innerSchema = definition.Properties!["inner"].AnyOf![0];
+		var innerSchema = definition.Properties!["inner"];
 		await Assert.That(innerSchema.Type).IsNull();
 		await Assert.That(innerSchema.Properties).IsNull();
 	}
@@ -414,6 +415,77 @@ namespace Testing
 		var status = definition.Properties!["status"];
 		await Assert.That(status.Enum!).Contains("active");
 		await Assert.That(status.Enum!).Contains("inactive");
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenNonNullableAndNullableStrings_MatchesValidationRequiredness(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — a non-nullable string is required and its rule rejects null; a nullable string keeps a
+		// null branch.
+		const string source =
+			@"
+using ZodSharp.Rules;
+
+namespace Testing
+{
+    [ZodSchema]
+    public sealed class Item
+    {
+        [NonSentinel]
+        public string Name { get; set; } = """";
+
+        [NullOrNonWhiteSpace]
+        public string? Branch { get; set; }
+    }
+}";
+
+		// Act
+		var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var schemaType = assembly.GetType("Testing.ItemSchema")!;
+		var definition = (JsonSchemaDefinition)schemaType.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
+
+		// Assert — the non-nullable string is required with no null branch.
+		await Assert.That(definition.Required!).Contains("name");
+		var name = definition.Properties!["name"];
+		await Assert.That(name.Type).IsEqualTo("string");
+		await Assert.That(name.MinLength).IsEqualTo(1);
+		await Assert.That(name.Pattern).IsEqualTo("\\S");
+		await Assert.That(name.AnyOf).IsNull();
+
+		// Assert — the nullable string keeps a null branch and is not required.
+		await Assert.That(definition.Required!).DoesNotContain("branch");
+		var branch = definition.Properties!["branch"].AnyOf!;
+		await Assert.That(branch.Any(candidate => candidate.Type == "null")).IsTrue();
+		var branchText = branch.Single(candidate => candidate.Type == "string");
+		await Assert.That(branchText.MinLength).IsEqualTo(1);
+		await Assert.That(branchText.Pattern).IsEqualTo("\\S");
+
+		// Assert — runtime validation agrees with the schema for the same fixtures.
+		var itemType = assembly.GetType("Testing.Item")!;
+		var validate = schemaType.GetMethod("Validate")!;
+
+		bool IsValid(string? name, string? branch)
+		{
+			var item = Activator.CreateInstance(itemType)!;
+			itemType.GetProperty("Name")!.SetValue(item, name);
+			itemType.GetProperty("Branch")!.SetValue(item, branch);
+			var result = validate.Invoke(null, [item])!;
+			return (bool)result.GetType().GetProperty("IsSuccess")!.GetValue(result)!;
+		}
+
+		await Assert.That(IsValid(null, null)).IsFalse();
+		await Assert.That(IsValid("", null)).IsFalse();
+		await Assert.That(IsValid("   ", null)).IsFalse();
+		await Assert.That(IsValid("name", null)).IsTrue();
+		await Assert.That(IsValid("name", "   ")).IsFalse();
+		await Assert.That(IsValid("name", "main")).IsTrue();
 	}
 
 	const string EnumSchemaSource =

@@ -78,8 +78,12 @@ apart: property names, nested objects, native enums, nullable fields, required f
   name is camelCased to match the ASP.NET Core / `JsonSerializerDefaults.Web` default. A non-camelCase global
   naming policy configured at runtime is not visible to the generator, so a consumer using one must adjust the
   exported names (or declare `[JsonPropertyName]`).
-- **Required fields** are the non-nullable ones (and any `[Required]`); a nullable field is wrapped in
-  `anyOf: [ …, { "type": "null" } ]`.
+- **Required fields** follow the nullable reference-type annotation: a non-nullable reference type (or
+  `Nullable<T>`) is required, and a nullable one (`string?`) is wrapped in `anyOf: [ …, { "type": "null" } ]`
+  and is not required. `[Required]` also makes a field required. The generated validator agrees: a
+  non-nullable reference type rejects null and its rules run unconditionally, while a nullable one skips them
+  for null. A rule that rejects an absent value (for example `[RequiredZod]`) makes the field non-null even
+  when its annotation is nullable.
 - **Scalar value objects** (`[Scalar<TValue>]`) export as their underlying value's schema — a `Guid` scalar is
   a `uuid` string — not as an object wrapping a `Value` property.
 - **Enums** follow System.Text.Json. They export as numbers by default; a per-type or per-property
@@ -140,8 +144,9 @@ the same, so a rule maps to JSON Schema identically on both paths:
 
 A rule that does not implement `IJsonSchemaRule` is reported through
 `JsonSchemaDefinition.UnsupportedRules` (`x-zodsharp-unsupported`). Consumer rules opt in by implementing the
-interface; for example a custom `NullOrValidStringRule` would add `IJsonSchemaRule` and set `minLength`/`pattern`
-on the schema passed to `ApplyTo`.
+interface; for example a custom null-or-non-whitespace rule would add `IJsonSchemaRule` and set
+`minLength`/`pattern` on the schema passed to `ApplyTo`. The built-in `NullOrNonWhiteSpaceRule` already does
+this, so a domain that needs that behaviour should use `[NullOrNonWhiteSpace]` rather than a bespoke rule.
 
 ## Serialize the definition
 

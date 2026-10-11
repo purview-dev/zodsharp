@@ -126,7 +126,7 @@ static partial class SourceGenLibrary
 			if (CustomRuleResolver.TryGetScalarUnderlyingValue(symbol, out var scalarValueType))
 			{
 				scalarUnderlyingType = CreateTypeIdentity(TypeHelpers.UnwrapNullableType(scalarValueType));
-				scalarUnderlyingCanBeNull = TypeHelpers.CanBeNull(scalarValueType);
+				scalarUnderlyingCanBeNull = IsNullableProperty(scalarValueType);
 			}
 			bool? generateIValidateOptions =
 				zodSchemaAttribute.GenerateIValidateOptions ? true
@@ -359,6 +359,7 @@ static partial class SourceGenLibrary
 			propertyName,
 			propertyName,
 			TypeHelpers.CanBeNull(valueType),
+			IsNullableProperty(valueType),
 			isNullableValueType,
 			isEnum,
 			isFlagsEnum,
@@ -419,7 +420,15 @@ static partial class SourceGenLibrary
 
 		var propertyType = declaredType.Value;
 		var originalPropertyType = property.Type;
+
+		// Two nullabilities are tracked. `CanBeNull` is whether the type can hold null at runtime (a
+		// reference type or Nullable<T>), which governs whether [Required] is meaningful. `IsDeclaredNullable`
+		// follows the nullable reference-type annotation (a non-nullable `string` is required and its rules
+		// run unconditionally and reject null, while a `string?` stays nullable). A compilation with the
+		// nullable context disabled reports NullableAnnotation.None, where a reference type is treated as
+		// nullable.
 		var propertyCanBeNull = TypeHelpers.CanBeNull(originalPropertyType);
+		var propertyDeclaredNullable = IsNullableProperty(originalPropertyType);
 		var isNullableValueType = false;
 		if (
 			originalPropertyType is INamedTypeSymbol
@@ -572,6 +581,7 @@ static partial class SourceGenLibrary
 				property.Name,
 				displayName,
 				propertyCanBeNull,
+				propertyDeclaredNullable,
 				isNullableValueType,
 				isEnum,
 				isFlagsEnum,
@@ -670,6 +680,23 @@ static partial class SourceGenLibrary
 
 		return null;
 	}
+
+	/// <summary>
+	/// Determines whether a property accepts null, from its nullable reference-type annotation or its
+	/// <see cref="Nullable{T}"/> construction. A non-nullable reference type (for example <c>string</c>) is
+	/// non-nullable, so its rules run unconditionally and reject null; a <c>string?</c> accepts null.
+	/// </summary>
+	/// <param name="typeSymbol">The declared property type.</param>
+	/// <returns><see langword="true"/> when the property accepts null.</returns>
+	/// <remarks>
+	/// A compilation with the nullable context disabled reports <see cref="NullableAnnotation.None"/> for
+	/// every reference type; there the annotation cannot distinguish nullable from non-nullable, so a
+	/// reference type is treated as nullable (the pre-annotation behaviour).
+	/// </remarks>
+	static bool IsNullableProperty(ITypeSymbol typeSymbol) =>
+		typeSymbol is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+		|| typeSymbol.NullableAnnotation == NullableAnnotation.Annotated
+		|| (typeSymbol.NullableAnnotation == NullableAnnotation.None && typeSymbol.IsReferenceType);
 
 	/// <summary>
 	/// Creates the <c>TypeIdentity</c> for a symbol, returning <see langword="null"/> for symbols that

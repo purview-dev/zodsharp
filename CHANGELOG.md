@@ -167,6 +167,14 @@ been published to NuGet.
   validates a flags enum against its defined members (a combination is a valid value without being a defined
   member), but the generated JSON Schema enumerated them, so a value such as `Read | Write` failed the
   exported schema. A flags enum now exports as `type: integer`.
+- **Exported requiredness and null acceptance now follow the nullable reference-type annotation.** The
+  generator treated every reference type as nullable, so a non-nullable `string` with `[NonSentinel]` was
+  wrapped in `anyOf: [ …, { "type": "null" } ]`, omitted from `required`, and its rule was skipped for null
+  (null passed validation). A non-nullable reference type is now required, its rules run unconditionally and
+  reject null, and the generated validator reports a null value rather than skipping it — matching the
+  exported schema. A `string?` keeps its null branch, and a rule that rejects an absent value still makes the
+  property non-null; a rule that accepts null (such as the built-in `NullOrNonWhiteSpaceRule`) keeps the
+  property nullable.
 - **A `[ZodSchema]` type referenced as a nested property could lose its generated DI adapter.** A type is
   reached twice by the generator — once from its own `[ZodSchema]` attribute (the primary schema) and once as
   a nested property of another schema (a secondary copy). Deduplication kept whichever the attribute contexts

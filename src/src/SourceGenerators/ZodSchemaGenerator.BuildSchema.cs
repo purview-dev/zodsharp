@@ -735,10 +735,24 @@ partial class ZodSchemaGenerator
 			block = writer.ElseScope();
 			GenerateValueSetValidations(writer, property, emitEnumRule);
 		}
+		else if (!property.IsDeclaredNullable && property.CanBeNull)
+		{
+			// A non-nullable reference type rejects null — the exported JSON Schema marks it required — so
+			// the rules below run only for a present value. This keeps null acceptance consistent with the
+			// schema and makes length/count access null-safe.
+			writer.Rule(
+				propertyName,
+				$"value.{propertyName} == null",
+				"invalid_type",
+				$"Field '{displayName}' cannot be null"
+			);
+			block = writer.ElseScope();
+			GenerateValueSetValidations(writer, property, emitEnumRule);
+		}
 		else
 		{
 			GenerateValueSetValidations(writer, property, emitEnumRule);
-			if (property.CanBeNull)
+			if (property.IsDeclaredNullable)
 				block = writer.IfBlockScope($"value.{propertyName} != null");
 		}
 
@@ -901,7 +915,7 @@ partial class ZodSchemaGenerator
 		var schemaType = property.NestedSchemaType.Value;
 
 		writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-		if (property.CanBeNull)
+		if (property.IsDeclaredNullable)
 		{
 			using (writer.IfBlockScope($"{propertyValueName} is not null"))
 			{

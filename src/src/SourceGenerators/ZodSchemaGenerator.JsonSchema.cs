@@ -114,8 +114,11 @@ partial class ZodSchemaGenerator
 		var nameLiteral = GetJsonName(property).StringLiteral();
 		var hasRequiredAttribute =
 			property.ValidationAttributes.Required.ShouldProcess && property.ValidationAttributes.Required.Value.Exists;
-		var isRequired = hasRequiredAttribute || !property.CanBeNull;
-		var isNullable = property.CanBeNull && !hasRequiredAttribute;
+		// A rule that rejects an absent value ([RequiredZod]) makes the property effectively non-null even
+		// when its annotation is nullable, matching how the generated validator emits it outside the guard.
+		var hasRequiredRule = property.CustomRules.Any(rule => rule.IsRequired);
+		var isRequired = hasRequiredAttribute || !property.IsDeclaredNullable;
+		var isNullable = property.IsDeclaredNullable && !hasRequiredAttribute && !hasRequiredRule;
 
 		body.Assignment("var", localName, BuildPropertySchemaExpression(property, schema));
 
