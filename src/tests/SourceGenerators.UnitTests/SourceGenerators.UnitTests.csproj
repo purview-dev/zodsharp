@@ -6,6 +6,9 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
 		<PackageReference Include="Purview.SourceGeneratorFramework.Testing.TUnit" />
+		<!-- The consumer generates time-bound identifiers with FastGuid; the cross-platform parity test uses
+		     real FastGuid values to prove the exported schema accepts them (they are not RFC UUIDs). -->
+		<PackageReference Include="FastGuid" />
 	</ItemGroup>
 
 	<ItemGroup>

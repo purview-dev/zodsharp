@@ -77,7 +77,7 @@ public readonly record struct StartsWithRule
 	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
 	{
 		ArgumentNullException.ThrowIfNull(schema);
-		schema.Pattern = "^" + Regex.Escape(_prefix);
+		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, "^" + Regex.Escape(_prefix));
 	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>

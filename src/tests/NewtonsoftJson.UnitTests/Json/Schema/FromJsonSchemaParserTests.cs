@@ -1,5 +1,6 @@
 using ZodSharp.JsonSchema;
 using ZodSharp.JsonSchema.NewtonsoftJson;
+using ZodSharp.Rules;
 
 namespace ZodSharp.Json.Schema;
 
@@ -134,5 +135,31 @@ public class FromJsonSchemaParserTests
 		// Assert
 		await Assert.That(json).Contains("\"$ref\"");
 		await Assert.That(json).Contains("\"$defs\"");
+	}
+
+	[Test]
+	public async Task Parse_GivenAllOfPatternBranches_EnforcesEveryBranch(CancellationToken cancellationToken)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+
+		// Arrange — the shape a Guid scalar with [NonSentinel] exports as: the canonical Guid pattern and the
+		// non-empty pattern as two allOf branches.
+		JsonSchemaDefinition definition = new()
+		{
+			Type = "string",
+			AllOf =
+			[
+				new JsonSchemaDefinition { Type = "string", Pattern = GuidRule.JsonSchemaPattern },
+				new JsonSchemaDefinition { Type = "string", Pattern = NonSentinelRule<Guid>.GuidJsonSchemaPattern },
+			],
+		};
+
+		// Act
+		var schema = FromJsonSchemaParser.Parse(definition);
+
+		// Assert — every branch is applied: the non-RFC Guid passes, the empty Guid and a malformed value fail.
+		await Assert.That(schema.Validate("9f41585f-31c5-fc4b-0d04-b1fe5b523139").IsSuccess).IsTrue();
+		await Assert.That(schema.Validate("00000000-0000-0000-0000-000000000000").IsSuccess).IsFalse();
+		await Assert.That(schema.Validate("not-a-guid").IsSuccess).IsFalse();
 	}
 }

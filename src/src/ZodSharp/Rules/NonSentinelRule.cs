@@ -35,6 +35,12 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 	/// <summary>Gets the message format; <c>{0}</c> is a description of the offending sentinel value.</summary>
 	public const string MessageFormat = "Value has a sentinel value, but got {0}";
 
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> for a canonical Guid that is not the all-zero <see cref="Guid.Empty"/>.
+	/// </summary>
+	public const string GuidJsonSchemaPattern =
+		"^(?!00000000-0000-0000-0000-000000000000$)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+
 	readonly string _message;
 
 	/// <summary>
@@ -73,7 +79,7 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 		if (typeof(T) == typeof(string))
 		{
 			schema.MinLength = 1;
-			schema.Pattern = "\\S";
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, "\\S");
 			return;
 		}
 
@@ -81,9 +87,9 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 		{
 			// Expressed as a pattern rather than `not: { const: ... }` so it survives converters that do not
 			// implement JSON Schema `not` (for example Zod's fromJSONSchema). The negative lookahead rejects
-			// the all-zero UUID while the body requires the canonical 8-4-4-4-12 form.
-			schema.Pattern =
-				"^(?!00000000-0000-0000-0000-000000000000$)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+			// the all-zero UUID while the body requires the canonical 8-4-4-4-12 form. Composed through
+			// ConstrainPattern so a second pattern (for example a UUID version constraint) is not lost.
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, GuidJsonSchemaPattern);
 			return;
 		}
 

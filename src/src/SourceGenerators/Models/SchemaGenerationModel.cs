@@ -67,7 +67,8 @@ readonly record struct LengthAccessor(string LengthExpression, string Origin, bo
 /// <param name="IsPrimary">True if this is the primary schema for the target type, false if it is a secondary schema.</param>
 /// <param name="ScalarUnderlyingType">
 /// When the target is a Purview.ValueObjects scalar, the underlying value type whose JSON wire form the
-/// scalar serialises as (for example a <c>Guid</c> scalar serialises as a UUID string). Null otherwise.
+/// scalar serialises as (for example a <c>Guid</c> scalar serialises as a canonical Guid string). Null
+/// otherwise.
 /// </param>
 /// <param name="ScalarUnderlyingCanBeNull">
 /// Whether the scalar's underlying value may be null (a nullable reference or nullable value scalar).

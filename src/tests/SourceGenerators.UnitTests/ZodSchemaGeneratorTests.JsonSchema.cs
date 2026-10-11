@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using ZodSharp.JsonSchema;
+using ZodSharp.Rules;
 using ZodSharp.SourceGenerators.Infra;
 
 namespace ZodSharp.SourceGenerators;
@@ -486,6 +487,204 @@ namespace Testing
 		await Assert.That(IsValid("name", null)).IsTrue();
 		await Assert.That(IsValid("name", "   ")).IsFalse();
 		await Assert.That(IsValid("name", "main")).IsTrue();
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenGuidProperty_ExportsTheCanonicalPatternWithoutUuidFormat(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			using System;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Widget
+				{
+					public Guid Id { get; set; }
+				}
+			}
+			""";
+
+		// Act
+		var definition = await BuildDefinitionAsync(source, "WidgetSchema", cancellationToken);
+
+		// Assert — a C# Guid accepts any 128-bit value, so it must not carry Zod's RFC UUID format.
+		var id = definition.Properties!["id"];
+		await Assert.That(id.Type).IsEqualTo("string");
+		await Assert.That(id.Format).IsNull();
+		await Assert.That(id.Pattern).IsEqualTo(GuidRule.JsonSchemaPattern);
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenUuidAttributes_ExportsFormatAndVersionPattern(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source = """
+			using ZodSharp;
+			using ZodSharp.Rules;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Widget
+				{
+					[UUID]
+					public string Any { get; set; } = string.Empty;
+
+					[UUID(UuidVersion.V4)]
+					public string V4 { get; set; } = string.Empty;
+				}
+			}
+			""";
+
+		// Act
+		var definition = await BuildDefinitionAsync(source, "WidgetSchema", cancellationToken);
+
+		// Assert — the versionless rule is the uuid format alone; the versioned rule pins the version with a
+		// pattern, since JSON Schema has no versioned uuid format.
+		var any = definition.Properties!["any"];
+		await Assert.That(any.Format).IsEqualTo("uuid");
+		await Assert.That(any.Pattern).IsNull();
+
+		var v4 = definition.Properties!["v4"];
+		await Assert.That(v4.Format).IsEqualTo("uuid");
+		await Assert.That(v4.Pattern).IsEqualTo(UUIDRule.JsonSchemaVersionPattern(UuidVersion.V4));
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenGuidScalarWithNonSentinel_ComposesBothPatternsThroughAllOf(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar]
+					[ZodSchema]
+					[NonSentinel]
+					public partial record struct TenantId
+						: Purview.ValueObjects.IScalarValueObject<TenantId, Guid>
+					{
+						public Guid Value { get; init; }
+					}
+				}
+				""";
+
+		// Act
+		var definition = await BuildDefinitionAsync(source, "TenantIdSchema", cancellationToken);
+
+		// Assert — the canonical Guid pattern and the non-empty pattern are both preserved.
+		await Assert.That(definition.Type).IsEqualTo("string");
+		await Assert.That(definition.Format).IsNull();
+		await Assert.That(definition.Pattern).IsNull();
+		await Assert.That(definition.AllOf!).Count().IsEqualTo(2);
+		await Assert.That(definition.AllOf!.Select(branch => branch.Pattern)).Contains(GuidRule.JsonSchemaPattern);
+		await Assert
+			.That(definition.AllOf!.Select(branch => branch.Pattern))
+			.Contains(NonSentinelRule<Guid>.GuidJsonSchemaPattern);
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenGuidScalarWithUuidVersion_ExportsUuidFormatAndVersionPattern(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar]
+					[ZodSchema]
+					[UUID(UuidVersion.V7)]
+					public partial record struct AssetId
+						: Purview.ValueObjects.IScalarValueObject<AssetId, Guid>
+					{
+						public Guid Value { get; init; }
+					}
+				}
+				""";
+
+		// Act
+		var definition = await BuildDefinitionAsync(source, "AssetIdSchema", cancellationToken);
+
+		// Assert — a Guid-backed scalar can require a UUID version; the base Guid pattern and the version
+		// pattern compose, so the version is not lost.
+		await Assert.That(definition.Type).IsEqualTo("string");
+		await Assert.That(definition.Format).IsEqualTo("uuid");
+		await Assert.That(definition.AllOf).IsNotNull();
+		await Assert.That(definition.AllOf!.Select(branch => branch.Pattern)).Contains(GuidRule.JsonSchemaPattern);
+		await Assert
+			.That(definition.AllOf!.Select(branch => branch.Pattern))
+			.Contains(UUIDRule.JsonSchemaVersionPattern(UuidVersion.V7));
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenGuidScalarNestedInObjectAndArray_ExportsThePatternAtEachLevel(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar]
+					[ZodSchema]
+					[NonSentinel]
+					public partial record struct TenantId
+						: Purview.ValueObjects.IScalarValueObject<TenantId, Guid>
+					{
+						public Guid Value { get; init; }
+					}
+
+					[ZodSchema]
+					public class Holder
+					{
+						public Guid Plain { get; set; }
+
+						public System.Collections.Generic.List<Guid> PlainGuids { get; set; } = new();
+
+						public TenantId Tenant { get; set; }
+
+						public System.Collections.Generic.List<TenantId> Tenants { get; set; } = new();
+					}
+				}
+				""";
+
+		// Act
+		var definition = await BuildDefinitionAsync(source, "HolderSchema", cancellationToken);
+
+		// Assert — a plain Guid and a Guid-backed scalar keep their constraint at the property, element and
+		// nested-scalar level.
+		await Assert.That(definition.Properties!["plain"].Pattern).IsEqualTo(GuidRule.JsonSchemaPattern);
+		await Assert.That(definition.Properties!["plainGuids"].Items!.Pattern).IsEqualTo(GuidRule.JsonSchemaPattern);
+		await Assert.That(definition.Properties!["tenant"].AllOf!).Count().IsEqualTo(2);
+		await Assert.That(definition.Properties!["tenants"].Items!.AllOf!).Count().IsEqualTo(2);
+	}
+
+	async Task<JsonSchemaDefinition> BuildDefinitionAsync(
+		string source,
+		string schemaTypeName,
+		CancellationToken cancellationToken
+	)
+	{
+		var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		return (JsonSchemaDefinition)
+			assembly.GetType($"Testing.{schemaTypeName}")!.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
 	}
 
 	const string EnumSchemaSource =

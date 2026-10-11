@@ -75,6 +75,57 @@ public static class JsonSchemaRules
 	}
 
 	/// <summary>
+	/// Adds a <c>pattern</c> constraint to <paramref name="schema"/> without discarding a pattern that is
+	/// already present. JSON Schema has a single <c>pattern</c> keyword, so two rules that both constrain
+	/// the string's shape would otherwise silently overwrite one another (last writer wins).
+	/// </summary>
+	/// <param name="schema">The schema the pattern constrains.</param>
+	/// <param name="pattern">The pattern to require in addition to any already present.</param>
+	/// <remarks>
+	/// The first pattern uses the <c>pattern</c> keyword, which keeps single-constraint exports unchanged.
+	/// A second, different pattern promotes the constraints to <c>allOf</c>, with each branch carrying the
+	/// schema's type: a consumer that discards a type-less branch (for example Zod's
+	/// <c>fromJSONSchema</c>, which maps one to <c>z.any()</c>) would otherwise drop the constraint.
+	/// </remarks>
+	public static void ConstrainPattern(JsonSchemaDefinition schema, string pattern)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		ArgumentException.ThrowIfNullOrEmpty(pattern);
+
+		// Fast path: nothing constrains the pattern yet, so the single keyword is enough.
+		if (schema.Pattern is null && schema.AllOf is not { Count: > 0 })
+		{
+			schema.Pattern = pattern;
+			return;
+		}
+
+		if (string.Equals(schema.Pattern, pattern, StringComparison.Ordinal))
+			return;
+
+		if (
+			schema.Pattern is null
+			&& schema.AllOf is { } branches
+			&& branches.Any(branch => string.Equals(branch.Pattern, pattern, StringComparison.Ordinal))
+		)
+		{
+			return;
+		}
+
+		schema.AllOf ??= [];
+
+		if (schema.Pattern is { Length: > 0 } current)
+		{
+			schema.AllOf.Insert(0, PatternBranch(schema.Type, current));
+			schema.Pattern = null;
+		}
+
+		schema.AllOf.Add(PatternBranch(schema.Type, pattern));
+	}
+
+	static JsonSchemaDefinition PatternBranch(string? type, string pattern) =>
+		new() { Type = type ?? "string", Pattern = pattern };
+
+	/// <summary>
 	/// Builds the JSON Schema for a native enum: the defined members, minus any <paramref name="disallowed"/>
 	/// member, in their numeric wire form (System.Text.Json's default enum representation).
 	/// </summary>

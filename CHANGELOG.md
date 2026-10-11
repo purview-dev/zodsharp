@@ -37,6 +37,10 @@ been published to NuGet.
 
 ### Added
 
+- **`UUIDRule` now validates a `Guid` as well as a `string`.** A `Guid` is a UUID, so its bytes are checked
+  directly; `[UUID]` / `[UUID(UuidVersion.Vx)]` can therefore constrain a `Guid` member or a `[Scalar<Guid>]`
+  value object, and the constraint is exported as `format: "uuid"` plus a version-pinning `pattern`.
+
 - **A type-level rule on a `[Scalar]` type now names the scalar in its default message.** Because a scalar's
   error reports an empty path, the generator replaces the leading subject word `Value` in the resolved rule's
   `MessageFormat` with the scalar's name, so `[NonSentinel]` on `[Scalar] TenantId` reports
@@ -157,6 +161,15 @@ been published to NuGet.
 
 ### Fixed
 
+- **Guid and UUID export semantics now match the runtime validator.** A C# `Guid` was exported as
+  `format: "uuid"`, so a consumer applied its RFC UUID validator (Zod's `z.uuid()`, which `z.fromJSONSchema`
+  also uses for `format: "guid"`) and rejected valid values that C# accepts — including every
+  `FastGuid.NewSqlServerGuid()`/`NewPostgreSqlGuid()` time-bound identifier, which is deliberately not an RFC
+  UUID. A `Guid` (and a `[Scalar<Guid>]` value object) now exports as a canonical hexadecimal `pattern`; a
+  versioned `UUIDRule`/`[UUID(UuidVersion.Vx)]` keeps its version as an additional `pattern`; and two rules that
+  both constrain `pattern` (for example a Guid plus `[NonSentinel]`) are composed under `allOf` instead of one
+  silently overwriting the other. The JSON Schema importer now intersects every `allOf` branch (previously it
+  took only the first) so an exported schema round-trips.
 - **Exported enum schemas now match the System.Text.Json wire form.** The generated JSON Schema always
   enumerated an enum's numeric values, so an enum serialized as a string (a per-type or per-property
   `[JsonConverter(typeof(JsonStringEnumConverter))]`, or a global converter) exported a schema that rejected

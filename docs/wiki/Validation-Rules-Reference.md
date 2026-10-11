@@ -129,7 +129,7 @@ Behaviour notes:
 - **`CreditCardRule`** mirrors `[CreditCard]`: Luhn check, ignoring spaces and hyphens.
 - **`Base64StringRule`** mirrors `[Base64String]`: `Convert.FromBase64String` must succeed.
 - **`Base64UrlRule`** accepts URL-safe base64 (`A-Z a-z 0-9 - _`) with no padding; a length of `4n+1` is rejected.
-- **`UUIDRule`** accepts RFC 9562 versions 1-8 with a variant nibble of `8`-`9`/`a`-`b`, plus the nil and max UUIDs. The versioned constructor requires a specific version and rejects nil/max.
+- **`UUIDRule`** accepts RFC 9562 versions 1-8 with a variant nibble of `8`-`9`/`a`-`b`, plus the nil and max UUIDs. The versioned constructor requires a specific version and rejects nil/max. It validates both a `string` and a `Guid` — a `Guid` is a UUID, so its bytes are inspected directly — which lets `[UUID(UuidVersion.Vx)]` constrain a `Guid` member or a `[Scalar<Guid>]` value object.
 - **`ULIDRule`** requires 26 Crockford base32 characters, with the first character `0`-`7`.
 - **`JWTRule`** requires three non-empty base64url-encoded segments separated by periods.
 - **`IPAddressRule`** accepts IPv4 or IPv6 (`IPAddress.TryParse`); pass an `IPAddressRuleType` to require `IPv4`, `IPv6`, or `Any` (the default).
@@ -140,7 +140,7 @@ Behaviour notes:
 - **`EmojiRule`** mirrors Zod's `emoji()`: every rune must be an `Extended_Pictographic` or `Emoji_Component` code point, and at least one must be an anchor (a pictograph, a regional indicator, or a keycap). The Unicode tables are generated from Unicode 16.0 `emoji-data.txt`, because .NET's regex engine does not expose the `Extended_Pictographic` property.
 - **`XidRule`** requires exactly 20 base32hex characters (`0-9`, `a-v`/`A-V`); **`KsuidRule`** requires exactly 27 base62 characters.
 - **`DurationRule`** accepts ISO 8601-1 durations; the 8601-2 extensions (negative durations and fractional/negative components) are rejected, matching Zod.
-- **`GuidRule`** accepts any 8-4-4-4-12 hexadecimal identifier, including nil and max; `UUIDRule` additionally checks the RFC 9562 version and variant nibbles.
+- **`GuidRule`** accepts any 8-4-4-4-12 hexadecimal identifier, including nil and max; `UUIDRule` additionally checks the RFC 9562 version and variant nibbles. A C# `Guid` is exported to JSON Schema as a canonical hexadecimal `pattern` (not `format: uuid`), because `Guid` accepts any 128-bit value; a `Guid` that must be an RFC version opts in with `[UUID(UuidVersion.Vx)]`.
 - **`CidrRule`** accepts an IPv4 or IPv6 block; pass a `CidrRuleType` to require `IPv4` or `IPv6` (`Any` is the default).
 
 ## Number rules

@@ -131,6 +131,6 @@ public readonly record struct RegexRule
 	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
 	{
 		ArgumentNullException.ThrowIfNull(schema);
-		schema.Pattern = Pattern.ToString();
+		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, Pattern.ToString());
 	}
 }

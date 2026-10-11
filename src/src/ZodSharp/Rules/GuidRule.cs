@@ -18,6 +18,14 @@ public readonly record struct GuidRule
 	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
 	public const string MessageFormat = "Invalid GUID: {0}";
 
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> for a canonical 8-4-4-4-12 hexadecimal identifier (any version or
+	/// variant nibble). The source generator emits this for a <see cref="System.Guid"/>, so the exported
+	/// constraint matches <see cref="IsValid(ReadOnlySpan{char})"/> rather than Zod's RFC UUID validator.
+	/// </summary>
+	public const string JsonSchemaPattern =
+		"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+
 	readonly string _message;
 
 	/// <summary>
@@ -87,7 +95,7 @@ public readonly record struct GuidRule
 	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
 	{
 		ArgumentNullException.ThrowIfNull(schema);
-		schema.Pattern = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, JsonSchemaPattern);
 	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>

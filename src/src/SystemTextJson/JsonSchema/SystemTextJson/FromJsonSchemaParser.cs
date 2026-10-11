@@ -66,6 +66,42 @@ public static class FromJsonSchemaParser
 			);
 		}
 
+		// Convert the base schema (type and its keywords, enum, const, $ref) first, then layer the
+		// composition keywords on top. An explicit type makes the composition an intersection with the base;
+		// without one the composition stands alone. This mirrors Zod's fromJSONSchema, and is what lets an
+		// `allOf` of pattern branches (for example a Guid plus a UUID-version constraint) keep every
+		// constraint instead of taking only the first branch.
+		var baseSchema = ConvertBaseSchema(schema, ctx);
+		var hasExplicitType = schema.Type != null || schema.Enum is { Count: > 0 } || schema.Const != null;
+
+		if (schema.AnyOf is { Count: > 0 } anyOf)
+		{
+			ZodUnion union = new(anyOf.Select(s => ConvertSchema(s, ctx)).ToArray());
+			baseSchema = hasExplicitType ? Z.Intersection(baseSchema, union) : union;
+		}
+
+		if (schema.OneOf is { Count: > 0 } oneOf)
+		{
+			// oneOf is semantically different (exactly one must match) but we approximate with union
+			ZodUnion union = new(oneOf.Select(s => ConvertSchema(s, ctx)).ToArray());
+			baseSchema = hasExplicitType ? Z.Intersection(baseSchema, union) : union;
+		}
+
+		if (schema.AllOf is { Count: > 0 } allOf)
+		{
+			var result = hasExplicitType ? baseSchema : ConvertSchema(allOf[0], ctx);
+			var start = hasExplicitType ? 0 : 1;
+			for (var i = start; i < allOf.Count; i++)
+				result = Z.Intersection(result, ConvertSchema(allOf[i], ctx));
+
+			baseSchema = result;
+		}
+
+		return baseSchema;
+	}
+
+	static IZodSchema<object, object> ConvertBaseSchema(JsonSchemaDefinition schema, ConversionContext ctx)
+	{
 		// Handle $ref
 		if (schema.Ref != null)
 		{
@@ -91,27 +127,6 @@ public static class FromJsonSchemaParser
 			return CreateLiteralSchema(schema.Const);
 		}
 
-		// Handle composition keywords
-		if (schema.AnyOf != null && schema.AnyOf.Count > 0)
-		{
-			var options = schema.AnyOf.Select(s => ConvertSchema(s, ctx)).ToArray();
-			return new ZodUnion(options);
-		}
-
-		if (schema.OneOf != null && schema.OneOf.Count > 0)
-		{
-			// oneOf is semantically different (exactly one must match) but we approximate with union
-			var options = schema.OneOf.Select(s => ConvertSchema(s, ctx)).ToArray();
-			return new ZodUnion(options);
-		}
-
-		if (schema.AllOf != null && schema.AllOf.Count > 0)
-		{
-			// allOf requires all to match - we can only fully support this for objects
-			// For now, just use the first schema
-			return ConvertSchema(schema.AllOf[0], ctx);
-		}
-
 		// Handle type
 		if (schema.Type == null)
 		{
@@ -119,7 +134,7 @@ public static class FromJsonSchemaParser
 			return new AnySchema();
 		}
 
-		var result = schema.Type switch
+		return schema.Type switch
 		{
 			"string" => ConvertStringSchema(schema),
 			"number" => ConvertNumberSchema(schema, isInteger: false),
@@ -130,8 +145,6 @@ public static class FromJsonSchemaParser
 			"array" => ConvertArraySchema(schema, ctx),
 			_ => new AnySchema(),
 		};
-
-		return result;
 	}
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage(

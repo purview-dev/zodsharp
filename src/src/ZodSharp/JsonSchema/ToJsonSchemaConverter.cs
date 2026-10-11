@@ -126,12 +126,16 @@ public static class ToJsonSchemaConverter
 					result.Format = "uri";
 					break;
 
-				case UUIDRule:
-					result.Format = "uuid";
+				case UUIDRule uuid:
+					uuid.ApplyTo(result);
+					break;
+
+				case GuidRule guid:
+					guid.ApplyTo(result);
 					break;
 
 				case RegexRule regex:
-					result.Pattern = regex.Pattern.ToString();
+					JsonSchemaRules.ConstrainPattern(result, regex.Pattern.ToString());
 					break;
 
 				default:

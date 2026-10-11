@@ -119,8 +119,8 @@ static partial class SourceGenLibrary
 			var isValueType = symbol.TypeKind == TypeKind.Struct;
 
 			// A Purview.ValueObjects scalar serialises as its underlying value, so its JSON Schema is the
-			// underlying type's schema (for example a Guid scalar is a UUID string), not an object wrapping a
-			// Value property.
+			// underlying type's schema (for example a Guid scalar is a canonical Guid string, not Zod's
+			// RFC UUID format), not an object wrapping a Value property.
 			TypeIdentity? scalarUnderlyingType = null;
 			var scalarUnderlyingCanBeNull = false;
 			if (CustomRuleResolver.TryGetScalarUnderlyingValue(symbol, out var scalarValueType))

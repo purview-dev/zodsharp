@@ -60,7 +60,7 @@ public readonly record struct NullOrNonWhiteSpaceRule
 	{
 		ArgumentNullException.ThrowIfNull(schema);
 		schema.MinLength = 1;
-		schema.Pattern = "\\S";
+		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, "\\S");
 	}
 
 	/// <summary>

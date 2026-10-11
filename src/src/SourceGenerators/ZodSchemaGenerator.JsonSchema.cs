@@ -81,8 +81,8 @@ partial class ZodSchemaGenerator
 
 	/// <summary>
 	/// Emits the JSON Schema for a scalar value object: the underlying value's schema (a Guid scalar is a
-	/// UUID string), with the scalar's own rules applied and a <c>null</c> branch when the underlying value
-	/// is nullable.
+	/// canonical Guid string, not Zod's RFC UUID format), with the scalar's own rules applied and a
+	/// <c>null</c> branch when the underlying value is nullable.
 	/// </summary>
 	static void EmitScalarJsonSchema(CodeWriter body, ZodSchemaDescriptor schema, TypeIdentity underlying)
 	{
@@ -218,7 +218,7 @@ partial class ZodSchemaGenerator
 			return $"new {JsonSchemaDefinitionTypeName}()";
 
 		if (IsWellKnown(type, "System", "Guid"))
-			return Schema("string", "uuid");
+			return $"new {JsonSchemaDefinitionTypeName} {{ Type = \"string\", Pattern = global::ZodSharp.Rules.GuidRule.JsonSchemaPattern }}";
 
 		if (type.SpecialType == SpecialType.System_DateTime || IsWellKnown(type, "System", "DateTimeOffset"))
 			return Schema("string", "date-time");
