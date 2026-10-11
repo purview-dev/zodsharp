@@ -30,10 +30,14 @@ For a `[ZodSchema]` target type `{TypeName}`, the generator emits:
 
 | Artifact | Shape |
 |---|---|
-| `{TypeName}Schema` | static partial class — the validator; access mirrors the target (public/internal/private for private nested types); the name is overridable with `SchemaName`; contains `Validate`, `Parse`, and (when composition is enabled) `ApplyAnd`, `ApplyOr`, `ApplyRefine` |
-| `{TypeName}SchemaValidator` | `partial class {TypeName}SchemaValidator : IZodSchemaValidator<{TypeName}>` — DI-friendly adapter with `Validate` / `ValidateAsync`; emitted only for the primary schema, and named `{SchemaName}Validator` when `SchemaName` is set |
+| `{TypeName}Schema` | static partial class — the validator; access mirrors the target (public/internal/private for private nested types); the name is overridable with `SchemaName`; contains `Validate`, `Parse`, `BuildJsonSchema`, and (when composition is enabled) `ApplyAnd`, `ApplyOr`, `ApplyRefine` |
+| `{TypeName}SchemaValidator` | `partial class {TypeName}SchemaValidator : IZodSchemaValidator<{TypeName}>, IJsonSchemaProvider` — DI-friendly adapter with `Validate` / `ValidateAsync` / `BuildJsonSchema`; emitted only for the primary schema, and named `{SchemaName}Validator` when `SchemaName` is set |
 | `{TypeName}Validator` | `sealed partial class {TypeName}Validator : IValidateOptions<{TypeName}>` — emitted only when `IValidateOptions` support is enabled (and the target is a class) |
 | `[assembly: ZodSchemaGenerated(typeof({TypeName}))]` | registration marker consumed by `IZodSchemaFactory` assembly scanning; emitted only for primary, non-nested schemas |
+
+`BuildJsonSchema` returns a `ZodSharp.JsonSchema.JsonSchemaDefinition` built from the same metadata as
+`Validate`, so a generated `[ZodSchema]` schema can be exported through `Z.ToJsonSchema` without rebuilding its
+rules by hand. See [JSON Schema Export](JsonSchema-Export.md#export-a-generated-zodschema).
 
 ```csharp
 // Value-first composition methods (EnableComposition, default true):
@@ -56,6 +60,7 @@ All options are optional.
 | `GenerateIValidateOptions` | `false` | Force `IValidateOptions<T>` generation. |
 | `SuppressIValidateOptions` | `false` | Opt out even when auto-detection would enable it. |
 | `ValidateEnumValues` | `true` | Set to `false` to skip the automatic enum validation for the type's enum properties. |
+| `GenerateJsonSchema` | `true` | Set to `false` to omit the JSON Schema export members (`BuildJsonSchema` and the `IJsonSchemaProvider` on the adapter), keeping the type out of the cross-platform contract surface. A type referenced by an exported type is reported as `ZODSGEN045`. |
 
 > [!NOTE]
 > `Parse`, the value-first composition methods (`ApplyAnd`/`ApplyOr`/`ApplyRefine`), the `IZodSchemaValidator` adapter and the `IValidateOptions` validator all depend on `Validate`. Setting `GenerateValidateMethod = false` omits them together.
@@ -147,6 +152,9 @@ MSBuild switches:
 | `DisableZodSharpSourceGenerator` | unset | disables the generator entirely when truthy |
 | `ZodSharpAutoGenerateOptionsValidators` | `true` | auto-detect `IValidateOptions` (only explicit `false` disables) |
 | `ZodSharpAutoGenerateOptionsValidatorSuffixes` | `Options;Settings` | semicolon/comma-separated suffix list |
+| `ZodSharpGenerateJsonSchemas` | `true` | assembly-wide JSON Schema export switch; explicit `false` omits `BuildJsonSchema` and `IJsonSchemaProvider` for every type |
+| `ZodSharpEnumSerialization` | `Number` | `String` makes enums export as their member names, matching a global `JsonStringEnumConverter` |
+| `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
 
 ## Automatic enum validation
 

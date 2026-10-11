@@ -61,6 +61,12 @@ public static class ToJsonSchemaConverter
 		while (schema is IJsonSchemaInnerSchema wrapper)
 			schema = wrapper.InnerSchema;
 
+		// A generated [ZodSchema] validator (or any schema) that describes its own JSON Schema takes over
+		// here. This is the bridge that makes an attribute-generated schema exportable without rebuilding
+		// its rules by hand with Z.Object()/Z.String().
+		if (schema is IJsonSchemaProvider provider)
+			return provider.BuildJsonSchema();
+
 		// Handle circular references
 		if (ctx.Seen.Contains(schema))
 		{
@@ -129,6 +135,7 @@ public static class ToJsonSchemaConverter
 					break;
 
 				default:
+					ApplyUnmappedRule(result, rule);
 					break;
 			}
 		}
@@ -178,6 +185,7 @@ public static class ToJsonSchemaConverter
 					break;
 
 				default:
+					ApplyUnmappedRule(result, rule);
 					break;
 			}
 		}
@@ -246,6 +254,13 @@ public static class ToJsonSchemaConverter
 		var schemaType = schema.GetType();
 		var typeName = schemaType.Name;
 
+		// Handle enum schemas (ZodNativeEnum<TEnum> / ZodEnum) through their introspection seam rather than
+		// by type name: a generic enum cannot be pattern-matched without naming its type.
+		if (schema is IJsonSchemaEnumInfo enumInfo)
+		{
+			return new JsonSchemaDefinition { Enum = [.. enumInfo.EnumValues] };
+		}
+
 		// Handle ZodArray<T>. Matched through the internal IJsonSchemaArrayInfo seam rather than by type
 		// name plus private-field reflection: the old lookups named fields and rule types that do not
 		// exist, so element schemas and bounds never reached the exported schema. See IJsonSchemaArrayInfo.
@@ -296,5 +311,22 @@ public static class ToJsonSchemaConverter
 
 		// Default: empty schema (any)
 		return new JsonSchemaDefinition();
+	}
+
+	/// <summary>
+	/// Applies a rule the switch did not recognise. A rule that describes its own JSON Schema constraint
+	/// contributes it; anything else is recorded as unsupported so the omission is visible rather than
+	/// silently weakening the exported schema.
+	/// </summary>
+	static void ApplyUnmappedRule(JsonSchemaDefinition schema, object rule)
+	{
+		if (rule is IJsonSchemaRule mapped)
+		{
+			mapped.ApplyTo(schema);
+			return;
+		}
+
+		if (rule is Core.IZodRule)
+			JsonSchemaRules.MarkUnsupported(schema, rule.GetType().Name);
 	}
 }

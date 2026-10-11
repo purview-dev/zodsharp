@@ -12,7 +12,7 @@ namespace ZodSharp.Rules;
 	Justification = "Name is real"
 )]
 [Core.ZodRule]
-public readonly record struct UrlRule : Core.IValidationRule<string>, Core.IZodRule
+public readonly record struct UrlRule : Core.IValidationRule<string>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -60,6 +60,14 @@ public readonly record struct UrlRule : Core.IValidationRule<string>, Core.IZodR
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in string value) => RuleMessage.Format(_message ?? MessageFormat, value);
+
+	/// <summary>Applies the JSON Schema <c>uri</c> string format.</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.Format = "uri";
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

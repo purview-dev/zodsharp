@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
@@ -13,7 +14,7 @@ namespace ZodSharp.Schemas;
 /// Initializes a new instance of the <see cref="ZodNativeEnum{TEnum}"/> class.
 /// </remarks>
 [SuppressMessage("Naming", "CA1711", Justification = "Name mirrors Zod's z.nativeEnum API.")]
-public class ZodNativeEnum<TEnum>() : ZodType<TEnum>
+public class ZodNativeEnum<TEnum>() : ZodType<TEnum>, JsonSchema.IJsonSchemaEnumInfo
 	where TEnum : struct, Enum
 {
 	static readonly string[] EmptyPath = [];
@@ -21,6 +22,24 @@ public class ZodNativeEnum<TEnum>() : ZodType<TEnum>
 	// Resolving the defined members once per closed generic type avoids the per-validation
 	// Enum.IsDefined reflection path.
 	static readonly HashSet<TEnum> DefinedValues = [.. System.Enum.GetValues<TEnum>()];
+
+	// The JSON Schema wire form of each member. System.Text.Json serialises a native enum as its numeric
+	// value by default, so the exported enum lists the underlying numbers rather than the member names.
+	static readonly List<object?> JsonEnumValues =
+	[
+		.. System
+			.Enum.GetValues<TEnum>()
+			.Select(static value =>
+				(object?)
+					Convert.ChangeType(
+						value,
+						System.Enum.GetUnderlyingType(typeof(TEnum)),
+						CultureInfo.InvariantCulture
+					)
+			),
+	];
+
+	IReadOnlyList<object?> JsonSchema.IJsonSchemaEnumInfo.EnumValues => JsonEnumValues;
 
 	/// <summary>
 	/// Validates that the value is a defined enum member.

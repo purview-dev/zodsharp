@@ -2,12 +2,16 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using ZodSharp.SourceGenerators.Models;
 using ZodSharp.SourceGenerators.Models.DataAttributes;
 
 namespace ZodSharp.SourceGenerators.Helpers;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	"Maintainability",
+	"CA1506:Avoid excessive class coupling",
+	Justification = "Cohesive helper library for the ZodSchema generator: the schema model, the DataAnnotations descriptors and the rule resolver are all in scope by design. The incremental stages that only configure generation live in GenerationSettingsResolver, and the enum/JSON wire metadata in EnumJsonResolver."
+)]
 static partial class SourceGenLibrary
 {
 	const string IValidateOptionsMetadataName = "Microsoft.Extensions.Options.IValidateOptions`1";
@@ -43,7 +47,7 @@ static partial class SourceGenLibrary
 				GetSchemasForGeneration(attributeContext, cancellationToken)
 		);
 		var autoDetectSettings = context.AnalyzerConfigOptionsProvider.Select(
-			static (provider, _) => ReadAutoDetectSettings(provider)
+			static (provider, _) => GenerationSettingsResolver.Read(provider)
 		);
 
 		return generationContext
@@ -54,87 +58,7 @@ static partial class SourceGenLibrary
 				"CollectZodSchemas"
 			)
 			.Combine(autoDetectSettings)
-			.Select(static (pair, _) => ApplyIValidateOptionsAutoDetection(pair));
-	}
-
-	readonly record struct AutoDetectSettings(bool AutoGenerate, EquatableArray<string> Suffixes);
-
-	static AutoDetectSettings ReadAutoDetectSettings(AnalyzerConfigOptionsProvider provider)
-	{
-		// Auto-detection is on by default; only an explicit "false" disables it.
-		var autoGenerate =
-			!provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsProperty}",
-				out var autoGenerateValue
-			)
-			|| !bool.TryParse(autoGenerateValue, out var autoGenerateEnabled)
-			|| autoGenerateEnabled;
-
-		var suffixes = ParseAutoGenerateIValidateOptionsSuffixes(
-			provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsSuffixesProperty}",
-				out var suffixValue
-			)
-				? suffixValue
-				: null
-		);
-
-		return new(autoGenerate, suffixes);
-	}
-
-	static EquatableArray<string> ParseAutoGenerateIValidateOptionsSuffixes(string? value)
-	{
-		var raw = string.IsNullOrWhiteSpace(value) ? "Options;Settings" : value!;
-		var builder = ImmutableArray.CreateBuilder<string>();
-		foreach (var segment in raw.Split(';', ','))
-		{
-			var suffix = segment.Trim();
-			if (suffix.Length > 0)
-				builder.Add(suffix);
-		}
-
-		return new(builder.ToImmutable());
-	}
-
-	static SchemaGenerationModel ApplyIValidateOptionsAutoDetection(
-		(SchemaGenerationModel Model, AutoDetectSettings Settings) input
-	)
-	{
-		var (model, settings) = input;
-		if (!settings.AutoGenerate || settings.Suffixes.Count == 0)
-			return model;
-
-		var builder = ImmutableArray.CreateBuilder<GeneratorResult<ZodSchemaDescriptor>>(model.ZodSchemas.Count);
-		foreach (var result in model.ZodSchemas)
-		{
-			if (!result.ShouldProcess)
-			{
-				builder.Add(result);
-				continue;
-			}
-
-			var schema = result.Value;
-			if (
-				schema.GenerateIValidateOptions is null
-				&& schema.IsPrimary
-				&& !schema.IsValueType
-				&& settings.Suffixes.Any(suffix => schema.TargetType.Name.EndsWith(suffix, StringComparison.Ordinal))
-			)
-			{
-				builder.Add(
-					GeneratorResult<ZodSchemaDescriptor>.Create(schema with { GenerateIValidateOptions = true })
-				);
-			}
-			else
-			{
-				builder.Add(result);
-			}
-		}
-
-		return model with
-		{
-			ZodSchemas = new(builder.ToImmutable()),
-		};
+			.Select(static (pair, _) => GenerationSettingsResolver.Apply(pair));
 	}
 
 	static GeneratorResult<SchemaSet> GetSchemasForGeneration(
@@ -193,6 +117,17 @@ static partial class SourceGenLibrary
 			if (customValidation.Value.HasCustomValidation && refinementHook.Value.IsImplemented)
 				customValidation = CustomValidationMethodData.None;
 			var isValueType = symbol.TypeKind == TypeKind.Struct;
+
+			// A Purview.ValueObjects scalar serialises as its underlying value, so its JSON Schema is the
+			// underlying type's schema (for example a Guid scalar is a UUID string), not an object wrapping a
+			// Value property.
+			TypeIdentity? scalarUnderlyingType = null;
+			var scalarUnderlyingCanBeNull = false;
+			if (CustomRuleResolver.TryGetScalarUnderlyingValue(symbol, out var scalarValueType))
+			{
+				scalarUnderlyingType = CreateTypeIdentity(TypeHelpers.UnwrapNullableType(scalarValueType));
+				scalarUnderlyingCanBeNull = TypeHelpers.CanBeNull(scalarValueType);
+			}
 			bool? generateIValidateOptions =
 				zodSchemaAttribute.GenerateIValidateOptions ? true
 				: zodSchemaAttribute.SuppressIValidateOptions ? false
@@ -204,6 +139,7 @@ static partial class SourceGenLibrary
 			var generateValidateMethod = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateValidateMethod;
 			var generateParseMethod = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateParseMethod;
 			var validateEnumValues = !zodSchemaAttribute.Exists || zodSchemaAttribute.ValidateEnumValues;
+			var generateJsonSchema = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateJsonSchema;
 
 			schemas.Add(
 				new(
@@ -222,7 +158,12 @@ static partial class SourceGenLibrary
 					generateParseMethod,
 					typeRules,
 					validateEnumValues,
-					isPrimary
+					isPrimary,
+					scalarUnderlyingType,
+					scalarUnderlyingCanBeNull,
+					generateJsonSchema,
+					false,
+					default
 				)
 			);
 
@@ -295,6 +236,25 @@ static partial class SourceGenLibrary
 	{
 		var results = ImmutableArray.CreateBuilder<GeneratorResult<ZodSchemaDescriptor>>();
 		HashSet<TypeIdentity> seen = [];
+
+		// A type can be reached twice: once from its own [ZodSchema] attribute (primary) and once as a
+		// nested property of another schema (secondary). The attribute contexts are processed in an
+		// unspecified order, so keeping whichever arrives first lets a secondary copy displace the primary.
+		// That drops the primary-only members — the DI adapter ({Type}SchemaValidator) and its assembly
+		// registration — for any type that happens to be referenced by a type processed earlier. Collect
+		// the primaries first, then fill in the secondaries, so the primary always wins.
+		foreach (var set in sets)
+		{
+			if (!set.ShouldProcess)
+				continue;
+
+			foreach (var schema in set.Value.Schemas)
+			{
+				if (schema.IsPrimary && seen.Add(schema.TargetType))
+					results.Add(schema);
+			}
+		}
+
 		foreach (var set in sets)
 		{
 			if (!set.ShouldProcess)
@@ -410,6 +370,10 @@ static partial class SourceGenLibrary
 			new(string.Empty, string.Empty, false),
 			false,
 			EmptyValidationAttributes,
+			new([]),
+			null,
+			true,
+			false,
 			new([])
 		);
 
@@ -589,6 +553,11 @@ static partial class SourceGenLibrary
 		var isEnum = enumType is { TypeKind: TypeKind.Enum };
 		var isFlagsEnum = isEnum && HasFlagsAttribute(enumType!);
 		var ignoredEnumMembers = isEnum && !isFlagsEnum ? GetIgnoredEnumMembers(enumType!) : default;
+		var enumSerializedAsString = isEnum && EnumJsonResolver.IsSerializedAsString(enumType!, property);
+		var enumJsonNames =
+			isEnum && !isFlagsEnum
+				? EnumJsonResolver.GetJsonNames(enumType!, validationAttributes)
+				: new(ImmutableArray<string>.Empty);
 
 		var customRules = CustomRuleResolver.Resolve(validationAttributes, originalPropertyType, diagnostics);
 
@@ -631,10 +600,75 @@ static partial class SourceGenLibrary
 					lengthAttribute,
 					rangeAttributeResult
 				),
-				customRules
+				customRules,
+				GetJsonPropertyName(property),
+				NestedSchemaExportsJsonSchema(property, validationKind, externalSchemas),
+				enumSerializedAsString,
+				enumJsonNames
 			),
 			diagnostics.ToImmutable()
 		);
+	}
+
+	/// <summary>
+	/// Determines whether the nested complex type a property references exports JSON Schema. A nested type
+	/// can opt out with <c>[ZodSchema(GenerateJsonSchema = false)]</c>, in which case the parent's schema
+	/// cannot reference it and falls back to an empty schema (reported as ZODSGEN045).
+	/// </summary>
+	/// <param name="property">The property to inspect.</param>
+	/// <param name="validationKind">The property's validation kind.</param>
+	/// <param name="externalSchemas">The resolver that decides schema ownership.</param>
+	/// <returns><see langword="true"/> when the property has no nested schema, or the nested type exports one.</returns>
+	static bool NestedSchemaExportsJsonSchema(
+		IPropertySymbol property,
+		PropertyValidationKind validationKind,
+		ExternalSchemaResolver? externalSchemas
+	)
+	{
+		if (validationKind is not (PropertyValidationKind.Complex or PropertyValidationKind.Collection))
+			return true;
+
+		var targetType =
+			validationKind == PropertyValidationKind.Collection
+				? GetCollectionElementTypeSymbol(property.Type)
+				: TypeHelpers.UnwrapNullableType(property.Type);
+
+		if (targetType is not INamedTypeSymbol namedType)
+			return true;
+
+		// Only a type owned by this compilation can opt out; an external schema's export is that assembly's
+		// concern.
+		if (externalSchemas is not null && !externalSchemas.IsSchemaOwnedByThisCompilation(namedType))
+			return true;
+
+		var attributeData = ZodSchemaAttributeData.FromAttributeData(namedType, out _);
+		return !attributeData.Exists || attributeData.GenerateJsonSchema;
+	}
+
+	/// <summary>
+	/// Reads an explicit <c>[System.Text.Json.Serialization.JsonPropertyName]</c> from a property, so the
+	/// exported JSON Schema names the property exactly as System.Text.Json writes it.
+	/// </summary>
+	/// <param name="property">The property to inspect.</param>
+	/// <returns>The declared JSON name, or <see langword="null"/> when none is declared.</returns>
+	static string? GetJsonPropertyName(IPropertySymbol property)
+	{
+		foreach (var attribute in property.GetAttributes())
+		{
+			if (
+				attribute.AttributeClass is not { Name: "JsonPropertyNameAttribute" } attributeClass
+				|| attributeClass.ContainingNamespace.ToDisplayString() != "System.Text.Json.Serialization"
+				|| attribute.ConstructorArguments.Length != 1
+			)
+			{
+				continue;
+			}
+
+			if (attribute.ConstructorArguments[0].Value is string { Length: > 0 } name)
+				return name;
+		}
+
+		return null;
 	}
 
 	/// <summary>

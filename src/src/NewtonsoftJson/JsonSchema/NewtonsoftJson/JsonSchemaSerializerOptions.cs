@@ -15,6 +15,7 @@ sealed class JsonSchemaNamingStrategy : CamelCaseNamingStrategy
 		["Id"] = "$id",
 		["Ref"] = "$ref",
 		["Defs"] = "$defs",
+		["UnsupportedRules"] = "x-zodsharp-unsupported",
 	};
 
 	public override string GetPropertyName(string name, bool hasSpecifiedName) =>

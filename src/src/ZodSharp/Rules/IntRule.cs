@@ -8,7 +8,7 @@ namespace ZodSharp.Rules;
 /// </summary>
 /// <typeparam name="T">The numeric type; any <see cref="INumber{T}"/> is supported.</typeparam>
 [Core.ZodRule]
-public readonly record struct IntRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct IntRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 	where T : INumber<T>
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
@@ -35,6 +35,14 @@ public readonly record struct IntRule<T> : Core.IValidationRule<T>, Core.IZodRul
 	/// (<c>double.PositiveInfinity == Math.Truncate(double.PositiveInfinity)</c>).
 	/// </remarks>
 	public bool IsValid(in T value) => value % T.One == T.Zero;
+
+	/// <summary>Applies the JSON Schema <c>integer</c> type.</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.Type = "integer";
+	}
 
 	/// <summary>
 	/// Gets the error message for a failed validation.

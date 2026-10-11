@@ -72,6 +72,26 @@ been published to NuGet.
 - **`ZODSGEN044`.** A `[ZodSchema]` type using an automatic `[Scalar]` form that cannot produce a usable
   schema (a suppressed `Validate` method, or an unrepresentable underlying type) is reported instead of
   leaving a dangling `{Type}Schema` reference. Recorded in `AnalyzerReleases.Unshipped.md`.
+- **A `[ZodSchema]` schema now exports a complete JSON Schema.** The generated `{Type}Schema` class emits a
+  static `BuildJsonSchema()` method and the generated `{Type}SchemaValidator` implements the new
+  `ZodSharp.JsonSchema.IJsonSchemaProvider`, so `Z.ToJsonSchema(new {Type}SchemaValidator())` returns a real
+  definition instead of an empty one. The definition is built from the same metadata as `Validate`, so nested
+  objects, native enums, nullable/required fields, scalar value objects (`[Scalar]` export as their underlying
+  value), `[JsonPropertyName]`/camelCase property names, DataAnnotations and `[ZodRule]`-mapped rules are all
+  reflected. Previously only hand-built runtime schemas could be exported.
+- **Rules describe their own JSON Schema constraint.** The new `ZodSharp.JsonSchema.IJsonSchemaRule` is
+  implemented by the built-in rules (length, bounds, `multipleOf`, integer/safe-integer, string formats,
+  `pattern`, sentinel, allowed/denied values, enum), and `ToJsonSchemaConverter` and the generated
+  `BuildJsonSchema()` apply them identically. A rule that cannot be represented — or a consumer rule that has
+  not opted in — is listed under the `x-zodsharp-unsupported` extension on the exported schema instead of
+  being dropped silently.
+- `ZodNativeEnum<TEnum>` and `ZodEnum` now export as JSON Schema `enum` (via the new `IJsonSchemaEnumInfo`
+  seam), and `JsonSchemaDefinition` gained `not`, `contentEncoding` and `x-zodsharp-unsupported`.
+- **JSON Schema generation can be opted out, per type or per assembly.** `[ZodSchema(GenerateJsonSchema =
+  false)]` omits the export members for one type, and the `ZodSharpGenerateJsonSchemas=false` MSBuild property
+  does so for the whole assembly — keeping validation-only types out of the cross-platform contract surface.
+  An exporting type that references a type whose export is disabled falls back to an empty schema and is
+  reported as the new **ZODSGEN045** warning instead of failing to compile or exporting silently.
 
 ### Changed — trimming and Native AOT
 
@@ -137,6 +157,24 @@ been published to NuGet.
 
 ### Fixed
 
+- **Exported enum schemas now match the System.Text.Json wire form.** The generated JSON Schema always
+  enumerated an enum's numeric values, so an enum serialized as a string (a per-type or per-property
+  `[JsonConverter(typeof(JsonStringEnumConverter))]`, or a global converter) exported a schema that rejected
+  the actual JSON. The generator now detects the string-enum converter, honours `[JsonStringEnumMemberName]`,
+  and supports the assembly-level `ZodSharpEnumSerialization=String` / `ZodSharpEnumNamingPolicy=CamelCase`
+  switches for a global converter and naming policy.
+- **A `[Flags]` enum exported an `enum` list, rejecting valid combinations.** The generated validator never
+  validates a flags enum against its defined members (a combination is a valid value without being a defined
+  member), but the generated JSON Schema enumerated them, so a value such as `Read | Write` failed the
+  exported schema. A flags enum now exports as `type: integer`.
+- **A `[ZodSchema]` type referenced as a nested property could lose its generated DI adapter.** A type is
+  reached twice by the generator — once from its own `[ZodSchema]` attribute (the primary schema) and once as
+  a nested property of another schema (a secondary copy). Deduplication kept whichever the attribute contexts
+  happened to produce first, so a secondary copy could displace the primary, dropping the primary-only members:
+  the `{Type}SchemaValidator` adapter and its `[assembly: ZodSchemaGenerated]` registration. Value-object
+  structs that were referenced by an earlier-declared type (for example a `[Scalar]` id nested in a record)
+  silently vanished from `IZodSchemaFactory` assembly scanning. Deduplication now always prefers the primary
+  schema.
 - **`[RequiredZod]` now rejects an absent value exactly like `[Required]`.** A custom rule bound to a
   reference-type member was emitted inside the generator's non-null guard, so a missing value never reached
   `RequiredRule<T>` and options/schema validation passed. The rule now implements the new `IRequiredRule`

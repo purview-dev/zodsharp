@@ -99,6 +99,14 @@ public class JsonSchemaDefinition
 	/// <summary>additionalProperties - Schema for additional properties, or false to disallow</summary>
 	public object? AdditionalProperties { get; set; }
 
+	// ========== Negation ==========
+
+	/// <summary>not - The data must not match this schema (for example a sentinel value that is rejected).</summary>
+	public JsonSchemaDefinition? Not { get; set; }
+
+	/// <summary>contentEncoding - The encoding of a string (for example <c>base64</c>).</summary>
+	public string? ContentEncoding { get; set; }
+
 	// ========== Composition ==========
 
 	/// <summary>anyOf - Match any of the schemas</summary>
@@ -143,4 +151,19 @@ public class JsonSchemaDefinition
 
 	/// <summary>nullable - OpenAPI 3.0 nullable flag</summary>
 	public bool? Nullable { get; set; }
+
+	// ========== Extensions ==========
+
+	/// <summary>
+	/// Names of validation rules that could not be represented as JSON Schema keywords. An exported schema
+	/// that lists a rule here is <b>incomplete</b> — a consumer cannot rely on it to reproduce that rule's
+	/// validation — so the omission is surfaced in the schema rather than dropped silently.
+	/// </summary>
+	/// <remarks>
+	/// Emitted as the vendor extension <c>x-zodsharp-unsupported</c>. The name is declared explicitly so both
+	/// serializers write it verbatim (Newtonsoft.Json maps it through
+	/// <c>ZodSharp.JsonSchema.NewtonsoftJson.JsonSchemaNamingStrategy</c>).
+	/// </remarks>
+	[JsonPropertyName("x-zodsharp-unsupported")]
+	public List<string>? UnsupportedRules { get; set; }
 }

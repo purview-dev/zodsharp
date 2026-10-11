@@ -31,3 +31,19 @@ interface IJsonSchemaLiteralInfo
 	/// </summary>
 	object? LiteralValue { get; }
 }
+
+/// <summary>
+/// A non-generic view of an enum schema, for the JSON Schema exporter.
+/// </summary>
+/// <remarks>
+/// <c>ZodNativeEnum&lt;TEnum&gt;</c> is generic, so the exporter cannot pattern-match it without naming
+/// <c>TEnum</c>. The values are boxed and expressed in their JSON wire form (the numeric value of a native
+/// enum, matching System.Text.Json's default enum handling).
+/// </remarks>
+interface IJsonSchemaEnumInfo
+{
+	/// <summary>
+	/// Gets the allowed values, boxed so they are reachable without naming the enum type.
+	/// </summary>
+	IReadOnlyList<object?> EnumValues { get; }
+}

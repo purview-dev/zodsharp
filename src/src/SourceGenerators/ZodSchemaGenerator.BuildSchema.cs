@@ -200,6 +200,9 @@ partial class ZodSchemaGenerator
 				GeneratePathFields(writer, outputContext.ZodSchema, cancellationToken);
 				GenerateStaticAttributeFields(writer, outputContext.ZodSchema, cancellationToken);
 
+				if (outputContext.ZodSchema.GenerateJsonSchema)
+					GenerateJsonSchemaMethod(writer, outputContext.ZodSchema, cancellationToken);
+
 				if (outputContext.ZodSchema.GenerateValidateMethod)
 				{
 					GenerateValidationHelpers(writer, cancellationToken);
@@ -254,6 +257,7 @@ partial class ZodSchemaGenerator
 				Accessibility = schema.TargetAccessibility,
 				IsPartial = true,
 				BaseType = baseType,
+				Interfaces = schema.GenerateJsonSchema ? [JsonSchemaProviderIdentity.AsTypeReference()] : [],
 			},
 			body =>
 			{
@@ -276,6 +280,23 @@ partial class ZodSchemaGenerator
 					);
 
 				GenerateValidateAsyncMethod(body, schema, cancellationToken);
+
+				if (!schema.GenerateJsonSchema)
+					return;
+
+				body.XmlSummary(
+						"Builds the JSON Schema (Draft 2020-12) definition for the target type.",
+						"Delegates to the generated schema, so an attribute-generated validator can be exported."
+					)
+					.XmlReturn("The JSON Schema definition.")
+					.Method(
+						new MethodDeclarationOptions(
+							"BuildJsonSchema",
+							JsonSchemaDefinitionIdentity.AsTypeReference(),
+							TypeDeclarationAccessibility.Public
+						),
+						methodBody => methodBody.Return($"{schema.SchemaType.Name}.BuildJsonSchema()")
+					);
 			}
 		);
 	}

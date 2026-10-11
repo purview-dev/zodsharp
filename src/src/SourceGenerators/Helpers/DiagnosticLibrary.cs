@@ -451,4 +451,19 @@ static class DiagnosticLibrary
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true
 	);
+
+	/// <summary>
+	/// ZODSGEN045: a type that exports JSON Schema references a nested <c>[ZodSchema]</c> type whose export
+	/// is disabled (<c>[ZodSchema(GenerateJsonSchema = false)]</c>, or the assembly-level
+	/// <c>ZodSharpGenerateJsonSchemas=false</c> switch). The nested type's schema cannot be referenced, so
+	/// the parent's exported schema falls back to an empty schema for that property.
+	/// </summary>
+	public static readonly DiagnosticDescriptor NestedSchemaExportDisabled = new(
+		id: "ZODSGEN045",
+		title: "Nested type has JSON Schema export disabled",
+		messageFormat: "Property '{0}' references type '{1}', which disables JSON Schema generation; the exported schema cannot describe it",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
 }

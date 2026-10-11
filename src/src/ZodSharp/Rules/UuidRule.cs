@@ -5,7 +5,11 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct UUIDRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct UUIDRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -137,6 +141,14 @@ public readonly record struct UUIDRule : Core.IValidationRule<string>, Core.IStr
 	}
 
 	static bool IsValidVariant(char c) => c is '8' or '9' or 'a' or 'b' or 'A' or 'B';
+
+	/// <summary>Applies the JSON Schema <c>uuid</c> string format.</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.Format = "uuid";
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

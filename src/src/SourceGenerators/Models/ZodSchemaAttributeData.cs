@@ -9,5 +9,6 @@ readonly partial record struct ZodSchemaAttributeData(
 	string? CustomValidationMethodName,
 	[Property(DefaultValue = false)] bool GenerateIValidateOptions,
 	[Property(DefaultValue = false)] bool SuppressIValidateOptions,
-	[Property(DefaultValue = true)] bool ValidateEnumValues
+	[Property(DefaultValue = true)] bool ValidateEnumValues,
+	[Property(DefaultValue = true)] bool GenerateJsonSchema
 );

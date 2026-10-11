@@ -27,7 +27,7 @@ namespace ZodSharp.Rules;
 /// </para>
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_value";
@@ -54,6 +54,41 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 	/// <param name="value">The value to validate</param>
 	/// <returns>True if valid, false otherwise</returns>
 	public bool IsValid(in T value) => !SentinelValues<T>.IsSentinel(value);
+
+	/// <summary>
+	/// Applies the JSON Schema constraint that rejects the value's sentinel, where the wire form is known.
+	/// </summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	/// <remarks>
+	/// A string sentinel (null/empty/whitespace) becomes <c>minLength: 1</c> plus a non-whitespace pattern; a
+	/// GUID sentinel (<see cref="Guid.Empty"/>) becomes a <c>not: { const: ... }</c> against the all-zero
+	/// UUID. A date/time sentinel depends on the exact serialized form, which the exporter cannot know here,
+	/// so it is reported through <see cref="JsonSchema.JsonSchemaDefinition.UnsupportedRules"/> instead of
+	/// being guessed or dropped.
+	/// </remarks>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+
+		if (typeof(T) == typeof(string))
+		{
+			schema.MinLength = 1;
+			schema.Pattern = "\\S";
+			return;
+		}
+
+		if (typeof(T) == typeof(Guid))
+		{
+			// Expressed as a pattern rather than `not: { const: ... }` so it survives converters that do not
+			// implement JSON Schema `not` (for example Zod's fromJSONSchema). The negative lookahead rejects
+			// the all-zero UUID while the body requires the canonical 8-4-4-4-12 form.
+			schema.Pattern =
+				"^(?!00000000-0000-0000-0000-000000000000$)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+			return;
+		}
+
+		JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(NonSentinelRule<>));
+	}
 
 	/// <summary>
 	/// Gets the error message for a failed validation.

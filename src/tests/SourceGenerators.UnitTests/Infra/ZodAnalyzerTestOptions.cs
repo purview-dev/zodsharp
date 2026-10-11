@@ -34,6 +34,8 @@ public sealed record ZodAnalyzerTestOptions : AnalyzerTestOptions
 					public string? CustomValidationMethodName { get; init; }
 					public bool GenerateIValidateOptions { get; init; } = false;
 					public bool SuppressIValidateOptions { get; init; } = false;
+					public bool ValidateEnumValues { get; init; } = true;
+					public bool GenerateJsonSchema { get; init; } = true;
 				}
 				""",
 		];

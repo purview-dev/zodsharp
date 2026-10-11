@@ -12,7 +12,7 @@ namespace ZodSharp.Rules;
 /// <c>System.ComponentModel.DataAnnotations</c>.
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct AllowedValuesRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct AllowedValuesRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_value";
@@ -58,6 +58,15 @@ public readonly record struct AllowedValuesRule<T> : Core.IValidationRule<T>, Co
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, value);
+
+	/// <summary>Applies the JSON Schema <c>enum</c> constraint.</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		if (_values is { Length: > 0 })
+			schema.Enum = [.. _values.Cast<object?>()];
+	}
 
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

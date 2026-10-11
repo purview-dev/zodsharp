@@ -6,7 +6,11 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct GuidRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct GuidRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -77,6 +81,14 @@ public readonly record struct GuidRule : Core.IValidationRule<string>, Core.IStr
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(ReadOnlySpan<char> value) =>
 		RuleMessage.Format(_message ?? MessageFormat, value.ToString());
+
+	/// <summary>Applies a JSON Schema pattern for an 8-4-4-4-12 hexadecimal identifier.</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.Pattern = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

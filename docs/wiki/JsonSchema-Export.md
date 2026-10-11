@@ -43,11 +43,105 @@ var jsonSchema = Z.ToJsonSchema<Dictionary<string, object?>>(userSchema, new ToJ
 
 ## Supported schema types
 
-`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodLiteral`, `ZodNullable`, and `ZodLazy`.
+`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, and `ZodLazy`.
 
 - Objects emit `additionalProperties: false`.
 - Literals emit `const` (and `type`).
+- Native enums emit `enum` with the defined members in their System.Text.Json wire form: the numeric values by default, or the member names when the enum is serialized as a string. A `[Flags]` enum emits `type: integer` instead, because a combination is valid without being a defined member.
 - Lazy/recursive schemas emit `$ref` entries under `$defs` (e.g. `#/$defs/__lazyN`).
+
+Rules that describe their own JSON Schema constraint implement `IJsonSchemaRule` and are applied during
+export (see [Validation rules and JSON Schema](#validation-rules-and-json-schema) below).
+
+## Export a generated `[ZodSchema]`
+
+A source-generated `[ZodSchema]` schema can be exported directly — there is no need to rebuild its rules by
+hand with `Z.Object()`/`Z.String()`. The generated `{Type}Schema` class exposes a static `BuildJsonSchema()`
+method, and the generated `{Type}SchemaValidator` (the DI adapter) implements `IJsonSchemaProvider`, so it can
+be handed to `Z.ToJsonSchema`:
+
+```csharp
+using ZodSharp;
+
+// Either call the generated schema directly…
+var jsonSchema = RepositoryInventoryItemSchema.BuildJsonSchema();
+
+// …or export the generated validator (the DI adapter) through Z.ToJsonSchema.
+var exported = Z.ToJsonSchema(new RepositoryInventoryItemSchemaValidator());
+```
+
+The definition is produced from the same metadata the generated validator uses, so the two cannot drift
+apart: property names, nested objects, native enums, nullable fields, required fields, `[NonSentinel]`,
+`[NullOrNonWhiteSpace]`, DataAnnotations, and `[ZodRule]`-mapped rules are all reflected.
+
+- **Property names** use the System.Text.Json wire form: an explicit `[JsonPropertyName]` wins, otherwise the
+  name is camelCased to match the ASP.NET Core / `JsonSerializerDefaults.Web` default. A non-camelCase global
+  naming policy configured at runtime is not visible to the generator, so a consumer using one must adjust the
+  exported names (or declare `[JsonPropertyName]`).
+- **Required fields** are the non-nullable ones (and any `[Required]`); a nullable field is wrapped in
+  `anyOf: [ …, { "type": "null" } ]`.
+- **Scalar value objects** (`[Scalar<TValue>]`) export as their underlying value's schema — a `Guid` scalar is
+  a `uuid` string — not as an object wrapping a `Value` property.
+- **Enums** follow System.Text.Json. They export as numbers by default; a per-type or per-property
+  `[JsonConverter(typeof(JsonStringEnumConverter))]` (or the assembly-level `ZodSharpEnumSerialization=String`
+  switch, matching a global converter) makes them strings, and `ZodSharpEnumNamingPolicy=CamelCase` matches a
+  `JsonNamingPolicy.CamelCase`. A member's `[JsonStringEnumMemberName]` name is used verbatim. A `[Flags]`
+  enum exports as `type: integer`.
+- **Unsupported rules** are not dropped silently: a rule the exporter cannot represent is listed under the
+  `x-zodsharp-unsupported` extension so the exported schema is visibly incomplete.
+
+> `additionalProperties: false` is emitted for objects (matching the runtime exporter). System.Text.Json
+> ignores unknown members by default, so a request with extra keys is accepted by the C# validator but
+> rejected by the exported schema.
+
+### Opting a type out of schema generation
+
+Not every `[ZodSchema]` type belongs to the cross-platform contract surface — a validation-only domain or
+options type does not need to be exported to TypeScript/JavaScript. Two switches disable the export members
+(the static `BuildJsonSchema` and the `IJsonSchemaProvider` implementation) while keeping validation intact:
+
+```csharp
+[ZodSchema(GenerateJsonSchema = false)] // this type only
+public sealed record InternalThing;
+```
+
+```xml
+<!-- the whole assembly -->
+<PropertyGroup>
+  <ZodSharpGenerateJsonSchemas>false</ZodSharpGenerateJsonSchemas>
+</PropertyGroup>
+```
+
+A type that exports JSON Schema must not reference a type whose export is disabled, because the nested
+`BuildJsonSchema` does not exist. The generator falls back to an empty (any) schema for that property and the
+analyzer reports **ZODSGEN045** naming the property and the disabled type, so the gap is surfaced at build
+time rather than shipped silently.
+
+## Validation rules and JSON Schema
+
+Every rule that can describe its own JSON Schema constraint implements `ZodSharp.JsonSchema.IJsonSchemaRule`.
+The exporter applies these rules through `JsonSchemaRules.Apply`, and the generated `BuildJsonSchema()` does
+the same, so a rule maps to JSON Schema identically on both paths:
+
+| Rule | JSON Schema |
+|---|---|
+| `MinLengthRule` / `MaxLengthRule` | `minLength` / `maxLength` |
+| `MinValueRule<T>` / `MaxValueRule<T>` | `minimum` / `maximum` |
+| `GreaterThanRule<T>` / `LessThanRule<T>` | `exclusiveMinimum` / `exclusiveMaximum` |
+| `MultipleOfRule<T>` / `EvenRule<T>` / `OddRule<T>` | `multipleOf` (odd uses `not: { multipleOf: 2 }`) |
+| `IntRule<T>` / `SafeIntegerRule` | `type: integer` (safe integer also bounds to the `int` range) |
+| `EmailRule` / `UrlRule` / `UriRule` / `UUIDRule` | `format: email` / `uri` / `uuid` |
+| `RegexRule` / `GuidRule` | `pattern` |
+| `StartsWithRule` / `EndsWithRule` / `IncludesRule` | anchored / escaped `pattern` |
+| `NonSentinelRule<string>` / `NullOrNonWhiteSpaceRule` | `minLength: 1` + `pattern: "\\S"` |
+| `NonSentinelRule<Guid>` | a `pattern` that rejects the all-zero UUID |
+| `AllowedValuesRule<T>` / `DeniedValuesRule<T>` / `EnumRule<TEnum>` | `enum` / `not: { enum: … }` |
+| `FiniteRule<T>` / `RequiredRule<T>` | no keyword (implied by `number` / the object's `required` list) |
+
+A rule that does not implement `IJsonSchemaRule` is reported through
+`JsonSchemaDefinition.UnsupportedRules` (`x-zodsharp-unsupported`). Consumer rules opt in by implementing the
+interface; for example a custom `NullOrValidStringRule` would add `IJsonSchemaRule` and set `minLength`/`pattern`
+on the schema passed to `ApplyTo`.
 
 ## Serialize the definition
 

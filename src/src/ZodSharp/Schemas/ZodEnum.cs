@@ -12,7 +12,7 @@ namespace ZodSharp.Schemas;
 /// </remarks>
 /// <param name="allowedValues">The allowed string values.</param>
 [SuppressMessage("Naming", "CA1711", Justification = "Name mirrors Zod's z.enum API.")]
-public class ZodEnum(HashSet<string> allowedValues) : ZodType<string>
+public class ZodEnum(HashSet<string> allowedValues) : ZodType<string>, JsonSchema.IJsonSchemaEnumInfo
 {
 	static readonly string[] EmptyPath = [];
 
@@ -20,6 +20,8 @@ public class ZodEnum(HashSet<string> allowedValues) : ZodType<string>
 	/// Gets the set of allowed values.
 	/// </summary>
 	public new IReadOnlyCollection<string> AllowedValues => allowedValues;
+
+	IReadOnlyList<object?> JsonSchema.IJsonSchemaEnumInfo.EnumValues => [.. allowedValues.Cast<object?>()];
 
 	/// <summary>
 	/// Validates that the string is one of the allowed values.

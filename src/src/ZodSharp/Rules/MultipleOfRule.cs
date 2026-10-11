@@ -8,7 +8,7 @@ namespace ZodSharp.Rules;
 /// </summary>
 /// <typeparam name="T">The numeric type; any <see cref="INumber{T}"/> is supported.</typeparam>
 [Core.ZodRule]
-public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 	where T : INumber<T>
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
@@ -70,6 +70,17 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, Divisor, value);
+
+	/// <summary>Applies the JSON Schema <c>multipleOf</c> constraint.</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		if (JsonSchema.JsonSchemaNumbers.TryToDouble(Divisor, out var divisor))
+			schema.MultipleOf = divisor;
+		else
+			JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(MultipleOfRule<>));
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

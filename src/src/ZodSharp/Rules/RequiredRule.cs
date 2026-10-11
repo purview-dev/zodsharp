@@ -26,7 +26,11 @@ namespace ZodSharp.Rules;
 /// </para>
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct RequiredRule<T> : Core.IValidationRule<T>, Core.IZodRule, Core.IRequiredRule
+public readonly record struct RequiredRule<T>
+	: Core.IValidationRule<T>,
+		Core.IZodRule,
+		Core.IRequiredRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "missing_field";
@@ -87,6 +91,17 @@ public readonly record struct RequiredRule<T> : Core.IValidationRule<T>, Core.IZ
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, value);
+
+	/// <summary>
+	/// Applies nothing: presence is expressed by the object schema's <c>required</c> list, which the exporter
+	/// builds from the property's nullability (and any <c>[Required]</c> attribute), not by a per-property
+	/// keyword.
+	/// </summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+	}
 
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

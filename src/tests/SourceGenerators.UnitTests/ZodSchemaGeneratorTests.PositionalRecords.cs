@@ -163,13 +163,15 @@ partial class ZodSchemaGeneratorTests
 		var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("SummarySchema")!;
 
-		// Assert
+		// Assert — the merged attribute set must not apply the same rule twice. The rule is constructed once
+		// in Validate and once in BuildJsonSchema (the exported JSON Schema), so a duplicate application would
+		// show up as four occurrences rather than two.
 		await Assert
 			.That(generated)
 			.ContainsGeneratedCode(
 				"new global::ZodSharp.Rules.NonSentinelRule<global::System.DateTimeOffset>(null!, null!)"
 			);
-		await Assert.That(CountOccurrences(generated, "NonSentinelRule<global::System.DateTimeOffset>")).IsEqualTo(1);
+		await Assert.That(CountOccurrences(generated, "NonSentinelRule<global::System.DateTimeOffset>")).IsEqualTo(2);
 	}
 
 	[Test]

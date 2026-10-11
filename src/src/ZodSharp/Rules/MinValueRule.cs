@@ -6,7 +6,7 @@ namespace ZodSharp.Rules;
 /// </summary>
 /// <typeparam name="T">The numeric type</typeparam>
 [Core.ZodRule]
-public readonly record struct MinValueRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct MinValueRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 	where T : IComparable<T>
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
@@ -46,6 +46,17 @@ public readonly record struct MinValueRule<T> : Core.IValidationRule<T>, Core.IZ
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, MinValue, value);
+
+	/// <summary>Applies the JSON Schema <c>minimum</c> constraint.</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		if (JsonSchema.JsonSchemaNumbers.TryToDouble(MinValue, out var minimum))
+			schema.Minimum = minimum;
+		else
+			JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(MinValueRule<>));
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

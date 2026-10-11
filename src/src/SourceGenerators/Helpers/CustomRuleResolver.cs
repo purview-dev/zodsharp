@@ -424,7 +424,7 @@ static class CustomRuleResolver
 	/// <param name="type">The type to inspect.</param>
 	/// <param name="valueType">The scalar's underlying value type, when it is a scalar.</param>
 	/// <returns><see langword="true"/> when <paramref name="type"/> is a scalar value object.</returns>
-	static bool TryGetScalarUnderlyingValue(ITypeSymbol type, out ITypeSymbol valueType)
+	internal static bool TryGetScalarUnderlyingValue(ITypeSymbol type, out ITypeSymbol valueType)
 	{
 		valueType = null!;
 
