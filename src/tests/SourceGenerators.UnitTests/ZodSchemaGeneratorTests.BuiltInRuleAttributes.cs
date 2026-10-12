@@ -104,7 +104,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -305,7 +305,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			BuiltInAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -412,7 +412,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			BuiltInScalarAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -500,7 +500,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			NewBuiltInAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -643,7 +643,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			UuidAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -743,7 +743,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -825,7 +825,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken

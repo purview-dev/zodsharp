@@ -128,7 +128,7 @@ public partial class ZodSchemaGeneratorTests
 		var postgreSqlGuid = FastGuid.NewPostgreSqlGuid();
 		var v7Guid = FastGuid.UUID.CreateVersion7();
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			GuidParitySource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken

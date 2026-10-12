@@ -10,7 +10,7 @@ partial class ZodSchemaGeneratorTests
 	[Test]
 	public async Task GeneratedValidate_GivenUserWithValidData_ReturnsSuccess(CancellationToken cancellationToken)
 	{
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			UserSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -44,7 +44,7 @@ partial class ZodSchemaGeneratorTests
 		CancellationToken cancellationToken
 	)
 	{
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			UserSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -64,7 +64,7 @@ partial class ZodSchemaGeneratorTests
 	[Test]
 	public async Task GeneratedParse_GivenInvalidUser_ThrowsZodException(CancellationToken cancellationToken)
 	{
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			UserSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -178,7 +178,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -216,7 +216,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -260,7 +260,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -310,7 +310,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -362,7 +362,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -440,7 +440,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -565,7 +565,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -627,7 +627,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken

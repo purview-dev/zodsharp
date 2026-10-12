@@ -78,7 +78,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -119,7 +119,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -183,7 +183,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -225,7 +225,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -443,7 +443,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -677,7 +677,7 @@ namespace Testing
 		CancellationToken cancellationToken
 	)
 	{
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -706,7 +706,9 @@ namespace Testing
 		CancellationToken cancellationToken
 	)
 	{
-		var driverResult = await GenerateAsync(source, options, cancellationToken);
+		// The emitted assembly is loaded into a collectible context; dispose it once the schema has been
+		// built so the context unloads instead of accumulating for the lifetime of the test run.
+		using var driverResult = await GenerateAsync(source, options, cancellationToken);
 		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
 		return (JsonSchemaDefinition)
 			assembly.GetType("Testing.WidgetSchema")!.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;

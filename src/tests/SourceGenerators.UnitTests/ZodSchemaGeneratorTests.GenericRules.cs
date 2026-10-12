@@ -80,7 +80,7 @@ partial class ZodSchemaGeneratorTests
 	public async Task GenericRule_GivenScalarLikeStruct_FailsAtRuntimeForEmptyGuid(CancellationToken cancellationToken)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			GenericRuleSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -222,7 +222,7 @@ partial class ZodSchemaGeneratorTests
 		// Arrange — the attribute maps to a value-object-only rule and is applied to a `string` member and to
 		// a scalar value object.
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			RuleFamilySource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -257,7 +257,7 @@ partial class ZodSchemaGeneratorTests
 		);
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -314,7 +314,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken

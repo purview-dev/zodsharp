@@ -214,7 +214,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			ScalarAdaptationSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken

@@ -58,7 +58,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			CustomRuleSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
