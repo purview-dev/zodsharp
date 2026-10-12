@@ -5,7 +5,7 @@
 		"allowPrerelease": true
 	},
 	"msbuild-sdks": {
-		"Purview.BuildSdk": "1.0.4"
+		"Purview.BuildSdk": "1.0.5"
 	},
 	"test": {
 		"runner": "Microsoft.Testing.Platform"
