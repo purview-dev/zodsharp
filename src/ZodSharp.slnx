@@ -19,6 +19,7 @@
 		<Project Path="tests/SourceGenerators.UnitTests/SourceGenerators.UnitTests.csproj" />
 		<Project Path="tests/SystemTextJson.UnitTests/SystemTextJson.UnitTests.csproj" />
 		<Project Path="tests/ZodSharp.UnitTests/ZodSharp.UnitTests.csproj" />
+		<Project Path="tests/Repository.UnitTests/Repository.UnitTests.csproj" />
 	</Folder>
 	<Folder Name="/src/">
 		<Project Path="src/AspNetCore/AspNetCore.csproj" />

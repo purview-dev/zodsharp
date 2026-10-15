@@ -10,7 +10,8 @@
 		-->
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
-		<TUnitVersion>1.74.0</TUnitVersion>
+		<!-- Purview.Skills.Testing 1.0.6 depends on TUnit.Assertions/TUnit.Core 1.75.0. -->
+		<TUnitVersion>1.75.0</TUnitVersion>
 		<PurviewSourceGenFramework>1.1.0</PurviewSourceGenFramework>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
 		<!--
@@ -51,6 +52,8 @@
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynAnalyzersVersion)" />
 		<PackageVersion Include="TUnit" Version="$(TUnitVersion)" />
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
+		<!-- The Agent Skills conformance rule set, shipped alongside Purview.BuildSdk. -->
+		<PackageVersion Include="Purview.Skills.Testing" Version="1.0.6" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageVersion Include="System.Text.Json" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="BenchmarkDotNet" Version="0.16.0-preview.2" />
