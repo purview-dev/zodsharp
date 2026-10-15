@@ -87,7 +87,7 @@ partial class ZodSchemaGeneratorTests
 		CancellationToken cancellationToken
 	)
 	{
-		var driverResult = await GenerateAsync(UserSource, cancellationToken);
+		using var driverResult = await GenerateAsync(UserSource, cancellationToken);
 
 		var generatedSource = driverResult.GetSource("UserSchema");
 
@@ -138,7 +138,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		var generatedSource = driverResult.GetSource("LengthExamplesSchema");
 
@@ -511,7 +511,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("StringFormatModelSchema");
 
 		await Assert

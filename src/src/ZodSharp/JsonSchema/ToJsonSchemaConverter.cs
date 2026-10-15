@@ -330,7 +330,7 @@ public static class ToJsonSchemaConverter
 			return;
 		}
 
-		if (rule is Core.IZodRule)
+		if (rule is IZodRule)
 			JsonSchemaRules.MarkUnsupported(schema, rule.GetType().Name);
 	}
 }

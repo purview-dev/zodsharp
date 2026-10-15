@@ -20,7 +20,7 @@ public readonly record struct GuidRule
 
 	/// <summary>
 	/// The JSON Schema <c>pattern</c> for a canonical 8-4-4-4-12 hexadecimal identifier (any version or
-	/// variant nibble). The source generator emits this for a <see cref="System.Guid"/>, so the exported
+	/// variant nibble). The source generator emits this for a <see cref="Guid"/>, so the exported
 	/// constraint matches <see cref="IsValid(ReadOnlySpan{char})"/> rather than Zod's RFC UUID validator.
 	/// </summary>
 	public const string JsonSchemaPattern =

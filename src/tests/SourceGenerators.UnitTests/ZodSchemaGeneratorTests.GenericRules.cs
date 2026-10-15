@@ -53,7 +53,7 @@ partial class ZodSchemaGeneratorTests
 	public async Task GenericRule_GivenUnboundGenericRule_ClosesWithPropertyType(CancellationToken cancellationToken)
 	{
 		// Act
-		var driverResult = await GenerateAsync(GenericRuleSource, cancellationToken);
+		using var driverResult = await GenerateAsync(GenericRuleSource, cancellationToken);
 		var assetSchema = driverResult.GetSource("AssetIdSchema");
 		var sequenceSchema = driverResult.GetSource("SequenceSchema");
 
@@ -66,7 +66,7 @@ partial class ZodSchemaGeneratorTests
 	public async Task GenericRule_GivenRuleOwningIdentity_EmitsRuleCodeExpression(CancellationToken cancellationToken)
 	{
 		// Act
-		var driverResult = await GenerateAsync(GenericRuleSource, cancellationToken);
+		using var driverResult = await GenerateAsync(GenericRuleSource, cancellationToken);
 		var generated = driverResult.GetSource("AssetIdSchema");
 
 		// Assert — the rule implements IZodRule, so its own identity is preferred over the attribute's.
@@ -146,7 +146,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("BrokenSchema");
 
 		// Assert
@@ -364,7 +364,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AssetIdSchema");
 
 		// Assert — the attribute-level Code wins over the [ZodRule] Code.

@@ -15,7 +15,7 @@ namespace Testing
 	public class NoCustom { public string? Name { get; set; } }
 }";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("NoCustomSchema");
 
 		// No async state machine
@@ -51,7 +51,7 @@ namespace Testing
 	}
 }";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("WithDefaultSchema");
 
 		await Assert
@@ -85,7 +85,7 @@ namespace Testing
 	}
 }";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("WithOverrideSchema");
 
 		await Assert.That(generated).ContainsGeneratedCode("await global::Testing.WithOverride.ValidateRulesAsync");
@@ -121,7 +121,7 @@ namespace Testing
 
 		// The second overload has 3 params so it won't match — only one valid candidate.
 		// This test verifies the generator doesn't falsely report ambiguity.
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(driverResult.EnsureValid).ThrowsNothing();
 	}

@@ -36,7 +36,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 		var source = Source;
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();
@@ -78,7 +78,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 		var source = Source;
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 		var generated = result.GetSource();
 
 		// Assert
@@ -110,7 +110,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			""";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();
@@ -152,7 +152,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			""";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();
@@ -202,7 +202,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			""";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();
@@ -243,7 +243,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			""";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();
@@ -285,7 +285,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			""";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();
@@ -329,7 +329,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			""";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();
@@ -353,7 +353,7 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 			""";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(result).HasNoErrorDiagnostics();

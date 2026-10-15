@@ -99,7 +99,7 @@ public class ToJsonSchemaRuleMappingTests
 		cancellationToken.ThrowIfCancellationRequested();
 
 		// Act
-		var schema = JsonSchemaRules.EnumSchema<SampleStatus>(SampleStatus.Disabled);
+		var schema = JsonSchemaRules.EnumSchema(SampleStatus.Disabled);
 
 		// Assert
 		await Assert.That(schema.Enum).IsNotNull();

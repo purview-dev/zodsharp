@@ -89,7 +89,7 @@ partial class ZodSchemaGenerator
 		body.Assignment("var", "inner", BuildBaseSchemaExpression(underlying));
 
 		foreach (var rule in schema.TypeRules)
-			body.Line($"{JsonSchemaRulesTypeName}.Apply(inner, {BuildRuleInstanceExpression(rule)});");
+			body.MethodCallOn(JsonSchemaRulesTypeName, "Apply", "inner", BuildRuleInstanceExpression(rule));
 
 		foreach (var property in schema.Properties)
 		{
@@ -98,7 +98,7 @@ partial class ZodSchemaGenerator
 
 			EmitAttributeConstraints(body, property.Value, "inner");
 			foreach (var rule in property.Value.CustomRules)
-				body.Line($"{JsonSchemaRulesTypeName}.Apply(inner, {BuildRuleInstanceExpression(rule)});");
+				body.MethodCallOn(JsonSchemaRulesTypeName, "Apply", "inner", BuildRuleInstanceExpression(rule));
 		}
 
 		body.Return(
@@ -125,27 +125,29 @@ partial class ZodSchemaGenerator
 		EmitAttributeConstraints(body, property, localName);
 
 		foreach (var rule in property.CustomRules)
-			body.Line($"{JsonSchemaRulesTypeName}.Apply({localName}, {BuildRuleInstanceExpression(rule)});");
+			body.MethodCallOn(JsonSchemaRulesTypeName, "Apply", localName, BuildRuleInstanceExpression(rule));
 
 		if (isNullable)
 		{
-			body.Line(
-				$"schema.Properties[{nameLiteral}] = new {JsonSchemaDefinitionTypeName} {{ AnyOf = new() {{ {localName}, new {JsonSchemaDefinitionTypeName} {{ Type = \"null\" }} }} }};"
+			body.Assignment(
+				$"schema.Properties[{nameLiteral}]",
+				$"new {JsonSchemaDefinitionTypeName} {{ AnyOf = new() {{ {localName}, new {JsonSchemaDefinitionTypeName} {{ Type = \"null\" }} }} }}"
 			);
 		}
 		else
 		{
-			body.Line($"schema.Properties[{nameLiteral}] = {localName};");
+			body.Assignment($"schema.Properties[{nameLiteral}]", localName);
 		}
 
 		if (isRequired)
-			body.Line($"schema.Required.Add({nameLiteral});");
+			body.MethodCallOn("schema.Required", "Add", nameLiteral);
 	}
 
 	/// <summary>
 	/// Builds the C# expression for a property's base schema (its JSON type, nested schema, enum values, or
 	/// array items), before any rule or attribute constraint is applied.
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0072:Add missing cases")]
 	static string BuildPropertySchemaExpression(ZodPropertyDescriptor property, ZodSchemaDescriptor schema) =>
 		property.ValidationKind switch
 		{
@@ -235,6 +237,7 @@ partial class ZodSchemaGenerator
 		if (IsWellKnown(type, "System", "Version"))
 			return Schema("string");
 
+		// A type with no JSON Schema representation (or a type the generator cannot classify) exports as the empty schema (any) rather than being guessed.
 		return $"new {JsonSchemaDefinitionTypeName}()";
 	}
 
@@ -308,8 +311,9 @@ partial class ZodSchemaGenerator
 		var maxKeyword = isCollection ? "MaxItems" : "MaxLength";
 
 		if (attributes.MinLength.ShouldProcess && attributes.MinLength.Value.Exists)
-			body.Line(
-				$"{localName}.{minKeyword} = {attributes.MinLength.Value.Length.ToString(CultureInfo.InvariantCulture)};"
+			body.Assignment(
+				$"{localName}.{minKeyword}",
+				attributes.MinLength.Value.Length.ToString(CultureInfo.InvariantCulture)
 			);
 
 		if (
@@ -318,8 +322,9 @@ partial class ZodSchemaGenerator
 			&& attributes.MaxLength.Value.Length >= 0
 		)
 		{
-			body.Line(
-				$"{localName}.{maxKeyword} = {attributes.MaxLength.Value.Length.ToString(CultureInfo.InvariantCulture)};"
+			body.Assignment(
+				$"{localName}.{maxKeyword}",
+				attributes.MaxLength.Value.Length.ToString(CultureInfo.InvariantCulture)
 			);
 		}
 
@@ -327,13 +332,15 @@ partial class ZodSchemaGenerator
 		{
 			if (attributes.StringLength.Value.MinimumLength > 0)
 			{
-				body.Line(
-					$"{localName}.MinLength = {attributes.StringLength.Value.MinimumLength.ToString(CultureInfo.InvariantCulture)};"
+				body.Assignment(
+					$"{localName}.MinLength",
+					attributes.StringLength.Value.MinimumLength.ToString(CultureInfo.InvariantCulture)
 				);
 			}
 
-			body.Line(
-				$"{localName}.MaxLength = {attributes.StringLength.Value.MaximumLength.ToString(CultureInfo.InvariantCulture)};"
+			body.Assignment(
+				$"{localName}.MaxLength",
+				attributes.StringLength.Value.MaximumLength.ToString(CultureInfo.InvariantCulture)
 			);
 		}
 
@@ -342,18 +349,18 @@ partial class ZodSchemaGenerator
 			var isString = property.PropertyType.SpecialType == SpecialType.System_String;
 			var minimum = attributes.Length.Value.MinimumLength.ToString(CultureInfo.InvariantCulture);
 			var maximum = attributes.Length.Value.MaximumLength.ToString(CultureInfo.InvariantCulture);
-			body.Line(isString ? $"{localName}.MinLength = {minimum};" : $"{localName}.MinItems = {minimum};");
-			body.Line(isString ? $"{localName}.MaxLength = {maximum};" : $"{localName}.MaxItems = {maximum};");
+			body.Assignment(isString ? $"{localName}.MinLength" : $"{localName}.MinItems", minimum);
+			body.Assignment(isString ? $"{localName}.MaxLength" : $"{localName}.MaxItems", maximum);
 		}
 	}
 
 	static void EmitFormatConstraints(CodeWriter body, ValidationAttributes attributes, string localName)
 	{
 		if (attributes.EmailAddress.ShouldProcess && attributes.EmailAddress.Value.Exists)
-			body.Line($"{localName}.Format = \"email\";");
+			body.Assignment($"{localName}.Format", "email".StringLiteral());
 
 		if (attributes.Url.ShouldProcess && attributes.Url.Value.Exists)
-			body.Line($"{localName}.Format = \"uri\";");
+			body.Assignment($"{localName}.Format", "uri".StringLiteral());
 
 		if (
 			attributes.RegularExpression.ShouldProcess
@@ -361,11 +368,11 @@ partial class ZodSchemaGenerator
 			&& attributes.RegularExpression.Value.Pattern is { Length: > 0 } pattern
 		)
 		{
-			body.Line($"{localName}.Pattern = {pattern.StringLiteral()};");
+			body.Assignment($"{localName}.Pattern", pattern.StringLiteral());
 		}
 
 		if (attributes.Base64String.ShouldProcess && attributes.Base64String.Value.Exists)
-			body.Line($"{localName}.ContentEncoding = \"base64\";");
+			body.Assignment($"{localName}.ContentEncoding", "base64".StringLiteral());
 	}
 
 	static void EmitValueConstraints(CodeWriter body, ValidationAttributes attributes, string localName)
@@ -374,7 +381,7 @@ partial class ZodSchemaGenerator
 		{
 			var values = RenderJsonValues(attributes.AllowedValues.Value.Values);
 			if (values.Count > 0)
-				body.Line($"{localName}.Enum = new() {{ {string.Join(", ", values)} }};");
+				body.Assignment($"{localName}.Enum", $"new() {{ {string.Join(", ", values)} }}");
 		}
 
 		if (attributes.DeniedValues.ShouldProcess && attributes.DeniedValues.Value.Exists)
@@ -382,8 +389,9 @@ partial class ZodSchemaGenerator
 			var values = RenderJsonValues(attributes.DeniedValues.Value.Values);
 			if (values.Count > 0)
 			{
-				body.Line(
-					$"{localName}.Not = new {JsonSchemaDefinitionTypeName} {{ Enum = new() {{ {string.Join(", ", values)} }} }};"
+				body.Assignment(
+					$"{localName}.Not",
+					$"new {JsonSchemaDefinitionTypeName} {{ Enum = new() {{ {string.Join(", ", values)} }} }}"
 				);
 			}
 		}
@@ -392,10 +400,15 @@ partial class ZodSchemaGenerator
 	static void EmitUnsupportedAttributeConstraints(CodeWriter body, ValidationAttributes attributes, string localName)
 	{
 		if (attributes.CreditCard.ShouldProcess && attributes.CreditCard.Value.Exists)
-			body.Line($"{JsonSchemaRulesTypeName}.MarkUnsupported({localName}, \"CreditCardAttribute\");");
+			body.MethodCallOn(
+				JsonSchemaRulesTypeName,
+				"MarkUnsupported",
+				localName,
+				"CreditCardAttribute".StringLiteral()
+			);
 
 		if (attributes.Phone.ShouldProcess && attributes.Phone.Value.Exists)
-			body.Line($"{JsonSchemaRulesTypeName}.MarkUnsupported({localName}, \"PhoneAttribute\");");
+			body.MethodCallOn(JsonSchemaRulesTypeName, "MarkUnsupported", localName, "PhoneAttribute".StringLiteral());
 	}
 
 	static void EmitRangeConstraint(CodeWriter body, GeneratorResult<RangeAttributeData> range, string localName)
@@ -406,15 +419,15 @@ partial class ZodSchemaGenerator
 		var data = range.Value;
 		if (data.Minimum is int minimumInt && data.Maximum is int maximumInt)
 		{
-			body.Line($"{localName}.Minimum = {minimumInt.ToString(CultureInfo.InvariantCulture)};");
-			body.Line($"{localName}.Maximum = {maximumInt.ToString(CultureInfo.InvariantCulture)};");
+			body.Assignment($"{localName}.Minimum", minimumInt.ToString(CultureInfo.InvariantCulture));
+			body.Assignment($"{localName}.Maximum", maximumInt.ToString(CultureInfo.InvariantCulture));
 			return;
 		}
 
 		if (data.Minimum is double minimumDouble && data.Maximum is double maximumDouble)
 		{
-			body.Line($"{localName}.Minimum = {minimumDouble.ToString("R", CultureInfo.InvariantCulture)};");
-			body.Line($"{localName}.Maximum = {maximumDouble.ToString("R", CultureInfo.InvariantCulture)};");
+			body.Assignment($"{localName}.Minimum", minimumDouble.ToString("R", CultureInfo.InvariantCulture));
+			body.Assignment($"{localName}.Maximum", maximumDouble.ToString("R", CultureInfo.InvariantCulture));
 		}
 	}
 

@@ -30,7 +30,11 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("BrokenSchema");
 
 		// Assert
@@ -106,7 +110,11 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("BrokenCollectionSchema");
 
 		// Assert

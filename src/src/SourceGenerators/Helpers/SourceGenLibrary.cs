@@ -564,9 +564,7 @@ static partial class SourceGenLibrary
 		var ignoredEnumMembers = isEnum && !isFlagsEnum ? GetIgnoredEnumMembers(enumType!) : default;
 		var enumSerializedAsString = isEnum && EnumJsonResolver.IsSerializedAsString(enumType!, property);
 		var enumJsonNames =
-			isEnum && !isFlagsEnum
-				? EnumJsonResolver.GetJsonNames(enumType!, validationAttributes)
-				: new(ImmutableArray<string>.Empty);
+			isEnum && !isFlagsEnum ? EnumJsonResolver.GetJsonNames(enumType!, validationAttributes) : new([]);
 
 		var customRules = CustomRuleResolver.Resolve(validationAttributes, originalPropertyType, diagnostics);
 

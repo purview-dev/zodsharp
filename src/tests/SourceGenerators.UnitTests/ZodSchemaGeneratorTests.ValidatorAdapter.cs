@@ -18,7 +18,7 @@ namespace Testing
         public string? Name { get; set; }
     }
 }";
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("WidgetSchema");
 
 		await Assert.That(generatedSource).ContainsGeneratedCode("class WidgetSchemaValidator");
@@ -54,7 +54,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var schemaSource = driverResult.GetSource("InnerSchema");
 		var registrationSource = driverResult.GetSource("InnerSchemaRegistration");
 
@@ -73,7 +73,7 @@ namespace Testing
     [ZodSchema]
     public class Gadget { }
 }";
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var allGenerated = string.Join("\n", driverResult.AllSyntaxTrees.Select(static t => t.GetText().ToString()));
 
 		await Assert.That(allGenerated).ContainsGeneratedCode("ZodSchemaGenerated");
@@ -95,7 +95,7 @@ namespace Testing
         public string? Name { get; set; }
     }
 }";
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("GizmoSchema");
 
 		await Assert.That(generatedSource).ContainsGeneratedCode("ValidateAsync");
@@ -132,7 +132,7 @@ namespace Testing
 			}}
 		}}
 	}}";
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.Compile, cancellationToken);
+		using var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.Compile, cancellationToken);
 		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
 
 		var gizmoType = assembly.GetType("Testing.Gizmo");

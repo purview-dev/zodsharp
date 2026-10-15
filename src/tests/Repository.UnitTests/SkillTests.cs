@@ -1,6 +1,6 @@
 using Purview.Skills.Testing;
 
-namespace ZodSharp;
+namespace ZodSharp.Repository;
 
 /// <summary>
 /// Runs the Agent Skills conformance rule set against this repository's authored skills in

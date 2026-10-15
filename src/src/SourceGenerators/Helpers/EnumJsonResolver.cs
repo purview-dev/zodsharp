@@ -129,6 +129,7 @@ static class EnumJsonResolver
 	/// <param name="name">The member name.</param>
 	/// <param name="policy">The naming policy.</param>
 	/// <returns>The transformed name.</returns>
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0072:Add missing cases")]
 	public static string ApplyNamingPolicy(string name, EnumJsonNamingPolicy policy) =>
 		policy switch
 		{

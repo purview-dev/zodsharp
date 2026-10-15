@@ -23,7 +23,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("WidgetSchema");
 
 		// Assert
@@ -49,7 +49,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("WidgetSchema");
 
 		// Assert — the adapter is what Z.ToJsonSchema receives, so it must forward to the schema.
@@ -152,7 +152,7 @@ namespace Testing
 }";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("WidgetSchema");
 
 		// Assert — the validation members are still generated; only the export members are omitted.

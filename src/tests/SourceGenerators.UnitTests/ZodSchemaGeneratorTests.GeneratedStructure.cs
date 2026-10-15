@@ -19,7 +19,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("CustomerSchema");
 
 		// Assert
@@ -41,7 +41,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("CustomerSchema");
 
 		// Assert
@@ -68,7 +68,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult.GetSource("CustomerSchema")).IsNotEmpty();

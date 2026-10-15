@@ -90,7 +90,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("InstallationIdSchema");
 
 		// Assert — the rule is closed over the underlying Guid and adapted to the value object.
@@ -128,7 +132,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("InstallationIdSchema");
 
 		// Assert
@@ -163,7 +171,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("NicknameSchema");
 
 		// Assert — the wrapped rule and the adapter's TValue keep the nullable annotation.
@@ -194,7 +206,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("NicknameSchema");
 
 		// Assert
@@ -223,7 +239,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("ScoreSchema");
 
 		// Assert — the synthesized nullable property is guarded, so null is accepted.
@@ -261,12 +281,12 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var genericResult = await GenerateAsync(
+		using var genericResult = await GenerateAsync(
 			genericSource,
 			ZodSourceGeneratorTestOptions.NoValidation,
 			cancellationToken
 		);
-		var typeofResult = await GenerateAsync(
+		using var typeofResult = await GenerateAsync(
 			typeofSource,
 			ZodSourceGeneratorTestOptions.NoValidation,
 			cancellationToken
@@ -298,7 +318,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("NameSchema");
 
 		// Assert — [RequiredZod] is closed over the underlying string? and adapted, with an empty path.
@@ -348,7 +372,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("ExternalIdSchema");
 
 		// Assert — the wrapped rule owns the identity, not the adapter.
@@ -439,7 +467,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("TenantIdSchema");
 
 		// Assert — the rule's own default message is reworded to name the scalar, since the error has an
@@ -517,7 +549,11 @@ partial class ZodSchemaGeneratorTests
 				""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("TenantIdSchema");
 
 		// Assert
@@ -550,7 +586,11 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("TenantSchema");
 
 		// Assert

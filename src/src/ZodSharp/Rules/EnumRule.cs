@@ -88,15 +88,10 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 		var disallowed = _disallowed;
 		schema.Enum =
 		[
-			.. System
-				.Enum.GetValues<TEnum>()
+			.. Enum.GetValues<TEnum>()
 				.Where(value => disallowed is null || Array.IndexOf(disallowed, value) < 0)
 				.Select(static value =>
-					Convert.ChangeType(
-						value,
-						System.Enum.GetUnderlyingType(typeof(TEnum)),
-						CultureInfo.InvariantCulture
-					)
+					Convert.ChangeType(value, Enum.GetUnderlyingType(typeof(TEnum)), CultureInfo.InvariantCulture)
 				),
 		];
 	}

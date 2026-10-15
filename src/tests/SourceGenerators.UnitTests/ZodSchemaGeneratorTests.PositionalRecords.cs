@@ -36,7 +36,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(NonSentinelDateTimeOffsetSource, cancellationToken);
+		using var driverResult = await GenerateAsync(NonSentinelDateTimeOffsetSource, cancellationToken);
 		var generated = driverResult.GetSource("SummarySchema");
 
 		// Assert - the open generic is closed with the property's own type, not dropped.
@@ -80,7 +80,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("IdentifiersSchema");
 
 		// Assert
@@ -125,7 +125,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("SummarySchema");
 
 		// Assert - the named Message argument flows into the rule like it does for a declared property.
@@ -160,7 +160,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("SummarySchema")!;
 
 		// Assert — the merged attribute set must not apply the same rule twice. The rule is constructed once
@@ -201,7 +201,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AccountSchema");
 
 		// Assert - the display name, the length bounds and the parsed DateTimeOffset bounds all come from the
@@ -228,7 +228,7 @@ partial class ZodSchemaGeneratorTests
 		// Arrange
 		var (assembly, validate) = await CompileSummarySchema(cancellationToken);
 		var modelType = assembly.GetType("Testing.Summary")!;
-		var summary = Activator.CreateInstance(modelType, new object?[] { default(DateTimeOffset) })!;
+		var summary = Activator.CreateInstance(modelType, [default(DateTimeOffset)])!;
 
 		// Act
 		var result = InvokeValidate(validate, summary);
@@ -277,10 +277,7 @@ partial class ZodSchemaGeneratorTests
 		// Arrange
 		var (assembly, validate) = await CompileSummarySchema(cancellationToken);
 		var modelType = assembly.GetType("Testing.Summary")!;
-		var summary = Activator.CreateInstance(
-			modelType,
-			new object?[] { new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero) }
-		)!;
+		var summary = Activator.CreateInstance(modelType, [new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero)])!;
 
 		// Act
 		var result = InvokeValidate(validate, summary);
@@ -332,15 +329,14 @@ partial class ZodSchemaGeneratorTests
 		var modelType = assembly.GetType("Testing.InventorySummary")!;
 		var summary = Activator.CreateInstance(
 			modelType,
-			new object?[]
-			{
+			[
 				"changeops",
 				"purview-dev/changeops",
 				null,
 				Enum.ToObject(modelType.GetProperty("Visibility")!.PropertyType, 1),
 				false,
 				default(DateTimeOffset),
-			}
+			]
 		)!;
 
 		// Act
@@ -364,15 +360,14 @@ partial class ZodSchemaGeneratorTests
 		var modelType = assembly.GetType("Testing.InventorySummary")!;
 		var summary = Activator.CreateInstance(
 			modelType,
-			new object?[]
-			{
+			[
 				"changeops",
 				"purview-dev/changeops",
 				null,
 				Enum.ToObject(modelType.GetProperty("Visibility")!.PropertyType, 1),
 				false,
 				new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero),
-			}
+			]
 		)!;
 
 		// Act
@@ -392,15 +387,14 @@ partial class ZodSchemaGeneratorTests
 		var modelType = assembly.GetType("Testing.InventorySummary")!;
 		var summary = Activator.CreateInstance(
 			modelType,
-			new object?[]
-			{
+			[
 				string.Empty,
 				"purview-dev/changeops",
 				null,
 				Enum.ToObject(modelType.GetProperty("Visibility")!.PropertyType, 1),
 				false,
 				new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero),
-			}
+			]
 		)!;
 
 		// Act
@@ -433,11 +427,8 @@ partial class ZodSchemaGeneratorTests
 		var (assembly, validate) = await CompileAsync(source, "Testing.NamedSchema", cancellationToken);
 		var modelType = assembly.GetType("Testing.Named")!;
 
-		var emptyResult = InvokeValidate(
-			validate,
-			Activator.CreateInstance(modelType, new object?[] { string.Empty })!
-		);
-		var namedResult = InvokeValidate(validate, Activator.CreateInstance(modelType, new object?[] { "changeops" })!);
+		var emptyResult = InvokeValidate(validate, Activator.CreateInstance(modelType, [string.Empty])!);
+		var namedResult = InvokeValidate(validate, Activator.CreateInstance(modelType, ["changeops"])!);
 
 		// Assert
 		await Assert.That(IsSuccess(emptyResult)).IsFalse();
@@ -464,8 +455,8 @@ partial class ZodSchemaGeneratorTests
 		var (assembly, validate) = await CompileAsync(source, "Testing.BranchSchema", cancellationToken);
 		var modelType = assembly.GetType("Testing.Branch")!;
 
-		var nullResult = InvokeValidate(validate, Activator.CreateInstance(modelType, new object?[] { null })!);
-		var whitespaceResult = InvokeValidate(validate, Activator.CreateInstance(modelType, new object?[] { "   " })!);
+		var nullResult = InvokeValidate(validate, Activator.CreateInstance(modelType, [null])!);
+		var whitespaceResult = InvokeValidate(validate, Activator.CreateInstance(modelType, ["   "])!);
 
 		// Assert
 		await Assert.That(IsSuccess(nullResult)).IsTrue();
@@ -497,7 +488,7 @@ partial class ZodSchemaGeneratorTests
 
 		var (assembly, validate) = await CompileAsync(source, "Testing.SummarySchema", cancellationToken);
 		var modelType = assembly.GetType("Testing.Summary")!;
-		var summary = Activator.CreateInstance(modelType, new object?[] { default(DateTimeOffset) })!;
+		var summary = Activator.CreateInstance(modelType, [default(DateTimeOffset)])!;
 
 		// Act
 		var result = InvokeValidate(validate, summary);
@@ -525,7 +516,7 @@ partial class ZodSchemaGeneratorTests
 
 		var (assembly, validate) = await CompileAsync(source, "Testing.AccountSchema", cancellationToken);
 		var modelType = assembly.GetType("Testing.Account")!;
-		var missing = Activator.CreateInstance(modelType, new object?[] { null })!;
+		var missing = Activator.CreateInstance(modelType, [null])!;
 
 		// Act
 		var result = InvokeValidate(validate, missing);
@@ -560,7 +551,7 @@ partial class ZodSchemaGeneratorTests
 
 		var (assembly, validate) = await CompileAsync(source, "Testing.AccountSchema", cancellationToken);
 		var modelType = assembly.GetType("Testing.Account")!;
-		var missing = Activator.CreateInstance(modelType, new object?[] { null })!;
+		var missing = Activator.CreateInstance(modelType, [null])!;
 
 		// Act
 		var result = InvokeValidate(validate, missing);
@@ -593,14 +584,8 @@ partial class ZodSchemaGeneratorTests
 		var (assembly, validate) = await CompileAsync(source, "Testing.WindowSchema", cancellationToken);
 		var modelType = assembly.GetType("Testing.Window")!;
 
-		var inRange = Activator.CreateInstance(
-			modelType,
-			new object?[] { new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero) }
-		)!;
-		var outOfRange = Activator.CreateInstance(
-			modelType,
-			new object?[] { new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero) }
-		)!;
+		var inRange = Activator.CreateInstance(modelType, [new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero)])!;
+		var outOfRange = Activator.CreateInstance(modelType, [new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero)])!;
 
 		// Act
 		var inRangeResult = InvokeValidate(validate, inRange);
@@ -637,10 +622,10 @@ partial class ZodSchemaGeneratorTests
 		var (assembly, validate) = await CompileAsync(source, "Testing.ObservationSchema", cancellationToken);
 		var modelType = assembly.GetType("Testing.Observation")!;
 
-		var invalid = Activator.CreateInstance(modelType, new object?[] { default(DateTimeOffset), Guid.Empty })!;
+		var invalid = Activator.CreateInstance(modelType, [default(DateTimeOffset), Guid.Empty])!;
 		var valid = Activator.CreateInstance(
 			modelType,
-			new object?[] { new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero), Guid.NewGuid() }
+			[new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero), Guid.NewGuid()]
 		)!;
 
 		// Act
@@ -721,14 +706,8 @@ partial class ZodSchemaGeneratorTests
 		customerType.GetProperty("Name")!.SetValue(validCustomer, "changeops");
 
 		// Act
-		var invalidResult = InvokeValidate(
-			validate,
-			Activator.CreateInstance(orderType, new object?[] { invalidCustomer })!
-		);
-		var validResult = InvokeValidate(
-			validate,
-			Activator.CreateInstance(orderType, new object?[] { validCustomer })!
-		);
+		var invalidResult = InvokeValidate(validate, Activator.CreateInstance(orderType, [invalidCustomer])!);
+		var validResult = InvokeValidate(validate, Activator.CreateInstance(orderType, [validCustomer])!);
 
 		// Assert
 		await Assert.That(IsSuccess(invalidResult)).IsFalse();
@@ -772,7 +751,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(CustomRuleOnPositionalParameterSource, cancellationToken);
+		using var driverResult = await GenerateAsync(CustomRuleOnPositionalParameterSource, cancellationToken);
 		var generated = driverResult.GetSource("UserSchema");
 
 		// Assert
@@ -794,7 +773,7 @@ partial class ZodSchemaGeneratorTests
 			cancellationToken
 		);
 		var modelType = assembly.GetType("Testing.User")!;
-		var instance = Activator.CreateInstance(modelType, new object?[] { "John Doe" })!;
+		var instance = Activator.CreateInstance(modelType, ["John Doe"])!;
 
 		// Act
 		var result = InvokeValidate(validate, instance);
@@ -807,15 +786,14 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(errors[0].Origin).IsEqualTo("string");
 	}
 
-	async Task<(System.Reflection.Assembly Assembly, MethodInfo Validate)> CompileSummarySchema(
-		CancellationToken cancellationToken
-	) => await CompileAsync(NonSentinelDateTimeOffsetSource, "Testing.SummarySchema", cancellationToken);
+	async Task<(Assembly Assembly, MethodInfo Validate)> CompileSummarySchema(CancellationToken cancellationToken) =>
+		await CompileAsync(NonSentinelDateTimeOffsetSource, "Testing.SummarySchema", cancellationToken);
 
-	async Task<(System.Reflection.Assembly Assembly, MethodInfo Validate)> CompileInventorySummarySchema(
+	async Task<(Assembly Assembly, MethodInfo Validate)> CompileInventorySummarySchema(
 		CancellationToken cancellationToken
 	) => await CompileAsync(InventorySummarySource, "Testing.InventorySummarySchema", cancellationToken);
 
-	async Task<(System.Reflection.Assembly Assembly, MethodInfo Validate)> CompileAsync(
+	async Task<(Assembly Assembly, MethodInfo Validate)> CompileAsync(
 		string source,
 		string schemaTypeName,
 		CancellationToken cancellationToken

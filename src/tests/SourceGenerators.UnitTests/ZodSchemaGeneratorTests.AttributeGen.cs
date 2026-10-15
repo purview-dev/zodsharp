@@ -23,7 +23,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult.AllSyntaxTrees.Length).IsEqualTo(ExpectedFileCount);
@@ -74,7 +74,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert — the refinement name is no longer configured by convention; the OnZodValidate hook
 		// is declared by the generator instead.

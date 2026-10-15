@@ -33,7 +33,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("PagingSchema");
 
 		await Assert
@@ -71,7 +71,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("PagingSchema");
 
 		// The validator neither allocates a context nor invokes the hook when no body is supplied.
@@ -98,7 +98,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		var emitted = driverResult.AllSyntaxTrees.Select(static tree => tree.GetText().ToString());
 		await Assert
