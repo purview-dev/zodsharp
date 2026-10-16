@@ -6,34 +6,46 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). `package.json` is the authoritative version; see
 [Release Flow](docs/wiki/Release-Flow.md).
 
-Released versions correspond to `v<version>` GitHub releases. Entries below the `Unreleased` heading have not
-been published to NuGet.
+Released versions correspond to `v<version>` GitHub releases.
 
-## Unreleased
+## 2.1.0
 
-> **This release contains breaking changes.** See [Breaking changes](#breaking-changes) below before
-> upgrading from `2.0.0`. The analyzer catalogue records them under `2.0.2`.
->
-> Note the changes below are consumer-visible: a rule's public `Code` constant was renamed to `ErrorCode`,
-> and rule constructor signatures changed, so attribute usages and code referencing those constants may not
-> compile against this version. Read the migration notes before upgrading.
+Consolidates the `2.0.1`, `2.0.1.1` and `2.0.2` incremental releases: upgrading from `2.0.0` goes straight to
+`2.1.0`, and the notes below cover that whole arc. The analyzer catalogue records each diagnostic under the
+release that introduced it, so `AnalyzerReleases.Shipped.md` shows `ZODSGEN037`–`ZODSGEN044` under
+`## Release 2.0.2` and `ZODSGEN045` under `## Release 2.1.0`.
 
-### Breaking changes
+> **Upgrading from `2.0.0`?** Start with [Upgrade notes](#upgrade-notes). A few rule and attribute APIs were
+> renamed and standardised across these releases, so some usages need a mechanical edit before they compile.
+> Each note names the old form, the new form, and the edit to make.
 
-- **Rule error-identity constants renamed from `Code` to `ErrorCode`.** Every validation rule now exposes its
-  error identity as public `const string ErrorCode` and `const string MessageFormat`. Code that referenced a
-  rule's `Code` constant must use `ErrorCode`. The new `ZODSGEN042` analyzer enforces the convention on
-  source-declared rules.
-- **Rule constructors are standardised.** Every rule now has a consistent constructor, extension method and
-  generated attribute. Generated rule attributes carry the rule's *value* parameters as constructor arguments:
-  a parameter declared without a default becomes a required positional argument, a parameter with a default
-  keeps it, and `message`/`code`/`origin` remain properties. Attribute usages for required values become
-  positional — `[MinValue(3)]`, `[Regex("^[a-z]+$")]`. Usages that previously set a required value by property
-  name no longer compile.
-- **`NonSentinelRule<T>.MessageFormat` reworded and the `{0}` argument now describes the sentinel.** The format
-  is now `Value has a sentinel value, but got {0}`, and `{0}` is a description (`an empty GUID`,
-  `DateTime.MinValue`, `an empty string`, …) instead of the raw value. Code or tests that assert against the old
-  string must be updated.
+### Upgrade notes
+
+- **A rule's error-identity constants are now `ErrorCode` and `MessageFormat`.** Every validation rule exposes
+  its error identity as public `const string ErrorCode` and `const string MessageFormat`.
+  - *Previously:* a rule's identity constant was named `Code`.
+  - *Now:* it is named `ErrorCode`.
+  - *To upgrade:* rename references from `SomeRule.Code` to `SomeRule.ErrorCode`. `ZODSGEN042` reports
+    source-declared rules that do not follow the convention, so the compiler points at each one.
+- **Rule constructors, extension methods and generated attributes now follow one shape.** A generated rule
+  attribute carries the rule's *value* parameters as constructor arguments: a parameter declared without a
+  default becomes a required positional argument, a parameter with a default keeps it, and
+  `message`/`code`/`origin` remain properties.
+  - *Previously:* a required value could be supplied by property name — the property derived from the rule's
+    parameter, so `MinValueRule<T>(T minValue, …)` was settable as `[MinValue(MinValue = 3)]`.
+  - *Now:* required values are positional — `[MinValue(3)]`, `[Regex("^[a-z]+$")]`.
+  - *To upgrade:* move a required value from a property assignment to a positional argument. Defaulted values
+    may still be set by property name.
+- **`NonSentinelRule<T>.MessageFormat` is reworded, and `{0}` now describes the sentinel.**
+  - *Previously:* `{0}` interpolated the raw value.
+  - *Now:* the format is `Value has a sentinel value, but got {0}`, and `{0}` is a description — `an empty
+    GUID`, `DateTime.MinValue`, `an empty string`, and so on.
+  - *To upgrade:* update any code or test that asserts against the old message text. Asserting against
+    `NonSentinelRule<T>.ErrorCode` instead keeps the assertion stable across future wording changes.
+- **`ZodSchemaGeneratedAttribute` now takes `(Type targetType, Type validatorType)`.** See
+  [`RegisterFromAssembly` is now genuinely trim- and AOT-safe](#changed--trimming-and-native-aot) for why.
+  - *To upgrade:* nothing, in the normal case — the attribute is generator-emitted and regenerates on rebuild.
+    Only a hand-written usage needs the second argument.
 
 ### Added
 
@@ -75,7 +87,7 @@ been published to NuGet.
   (which always rejects `null`) cannot express the check.
 - **`ZODSGEN044`.** A `[ZodSchema]` type using an automatic `[Scalar]` form that cannot produce a usable
   schema (a suppressed `Validate` method, or an unrepresentable underlying type) is reported instead of
-  leaving a dangling `{Type}Schema` reference. Recorded in `AnalyzerReleases.Unshipped.md`.
+  leaving a dangling `{Type}Schema` reference. Recorded under `## Release 2.0.2`.
 - **A `[ZodSchema]` schema now exports a complete JSON Schema.** The generated `{Type}Schema` class emits a
   static `BuildJsonSchema()` method and the generated `{Type}SchemaValidator` implements the new
   `ZodSharp.JsonSchema.IJsonSchemaProvider`, so `Z.ToJsonSchema(new {Type}SchemaValidator())` returns a real
@@ -112,8 +124,9 @@ been published to NuGet.
   `[DynamicallyAccessedMembers(PublicParameterlessConstructor)]` so its constructor survives. No string
   resolution remains, and the `[RequiresUnreferencedCode]` annotation has been removed entirely. Discovery
   is also now proportional to the number of generated schemas rather than the size of the assembly.
-  - **Breaking:** `ZodSchemaGeneratedAttribute` now takes `(Type targetType, Type validatorType)`. The
-    attribute is generator-emitted, so it regenerates on rebuild; only hand-written usages need updating.
+  - `ZodSchemaGeneratedAttribute` now takes `(Type targetType, Type validatorType)`. The attribute is
+    generator-emitted, so it regenerates on rebuild; only hand-written usages need updating. Listed under
+    [Upgrade notes](#upgrade-notes).
 - **`Purview.ZodSharp.SystemTextJson` is AOT-clean and marked.**
   - The validating `JsonConverter<T>` resolves a `JsonTypeInfo<T>` from the serializer options instead of
     calling the reflection-based `JsonSerializer` overloads, so it defers to whatever resolver the host
@@ -140,6 +153,11 @@ been published to NuGet.
 
 ### Changed
 
+- **NuGet package validation.** Every packable project now enables `EnablePackageValidation` against the
+  previous stable release (`2.0.2`), so an unintended change to the public API fails `dotnet pack` rather than
+  shipping. All four packages validate clean with no suppressions — the rule and attribute changes under
+  [Upgrade notes](#upgrade-notes) landed in the `2.0.x` releases, so they are already part of the baseline, and
+  `2.1.0` is additive over it. This is the guard that was missing when those changes went out.
 - Clarified in `SourceGenerators.csproj` that `EnforceExtendedAnalyzerRules` and `TreatWarningsAsErrors` are
   supplied and enforced by `Purview.BuildSdk` for every `IsRoslynComponent` project, rather than being optional
   project settings. Both were already `true`; the commented-out block implied otherwise.
@@ -248,6 +266,16 @@ been published to NuGet.
   `ScalarRuleAdapter<T, string, NonSentinelRule<string?>>`, whose `TValue` satisfied neither the adapter's
   `IValidationRule<TValue>` constraint nor the value object's `IScalarValueObject<TSelf, TValue>` — reporting
   CS8631 at every consumer. The value argument is now carried as a `TypeReference`, so both sides stay in step.
+
+### Fixed — analyzer release tracking guard
+
+- **`AnalyzerReleaseTrackingTests` was passing vacuously, and `ZODSGEN045` was never recorded as shipped.** The
+  guard that asserts the unshipped file declares no rules matched a rule row only in the pipe-delimited form
+  (`| ZODSGEN045 |`), but `AnalyzerReleases.Unshipped.md` is written without the leading pipe — so a rule parked
+  there parsed as *no rules at all* and the assertion compared two empty sets. `ZODSGEN045` sat unshipped with a
+  green suite. The row pattern now accepts both table styles, `ZODSGEN045` is recorded under a new
+  `## Release 2.1.0` block, and the test asserts that block exists. The guard now fails when a diagnostic is left
+  unshipped, which is the only thing it was ever meant to do.
 
 ### Added — packed generator smoke test
 

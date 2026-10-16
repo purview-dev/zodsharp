@@ -322,7 +322,7 @@ src/
 └── tests/                     # TUnit test projects
 ```
 
-The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net8.0`, `net9.0` and `net10.0`.
+The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net8.0`, `net9.0`, `net10.0` and `net11.0`.
 
 ## Advanced Features
 
