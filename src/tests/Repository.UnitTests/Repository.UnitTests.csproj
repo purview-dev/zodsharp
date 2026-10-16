@@ -12,5 +12,11 @@
 		<!-- The Agent Skills conformance rule set, shipped by Purview.BuildSdk. The rules live in the
 		     package so they are defined once rather than reimplemented here. -->
 		<PackageReference Include="Purview.Skills.Testing" />
+
+		<!-- Runs the vitest cross-platform suites as child processes (CrossPlatformVitestTests). Used
+		     rather than Process/ProcessStartInfo directly for its cancellation, exit-code validation and
+		     buffered stdout/stderr capture, which is what turns a vitest failure into a readable
+		     assertion message. -->
+		<PackageReference Include="CliWrap" />
 	</ItemGroup>
 </Project>

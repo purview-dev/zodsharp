@@ -277,6 +277,21 @@ release that introduced it, so `AnalyzerReleases.Shipped.md` shows `ZODSGEN037`�
   `## Release 2.1.0` block, and the test asserts that block exists. The guard now fails when a diagnostic is left
   unshipped, which is the only thing it was ever meant to do.
 
+### Added — the vitest suites run from the .NET test run
+
+- **`just test` now proves both halves of the cross-platform guarantee.** The TypeScript/Zod suites were driven
+  only by the dedicated `cross-platform` CI job, so a Zod-side regression could not fail a local run — and a gap
+  in that job's own wiring went unnoticed for a whole release. `Repository.UnitTests` now runs each
+  `tests/ts/*.test.ts` suite as a child process through **CliWrap** (one test per suite, so a failure names the
+  file and the child's stdout/stderr becomes the assertion message). The CI job remains the authoritative gate,
+  because it controls producer ordering and installs bun from scratch.
+- `VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered` fails when a vitest suite has no entry in the C# list, so
+  a new suite cannot end up driven by the CI job alone — the same class of gap as the parity producer above.
+- Missing prerequisites **skip** rather than fail: bun and `node_modules/` are absent on the shared pipeline's
+  build runner and before `bun install`, and reporting a missing toolchain as a broken repository would be wrong.
+  The coverage guard needs neither, so it still runs there. Both behaviours are verified, as is the failure
+  path — an injected parity violation fails the .NET test with the vitest output attached.
+
 ### Added — packed generator smoke test
 
 - `just smoke-packed-generator` (and a `packed-generator` CI job) packs the package, then builds and runs a

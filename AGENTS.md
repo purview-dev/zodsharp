@@ -72,6 +72,8 @@ bun run test                # vitest run (cross-platform TS tests)
 bun run generate-fixtures   # regenerates src/ts/fixtures/*.json from Zod
 ```
 
+`just test` also runs the vitest suites through CliWrap (see [Cross-platform fixtures](#cross-platform-fixtures)), so `bun run test` is for iterating on the TypeScript side rather than the only way to exercise it. It needs `bun install` to have been run.
+
 Formatting is enforced with CSharpier; `.editorconfig` at the repo root defines style (tabs for code, 2-space for XML/JSON/YAML/markdown).
 
 ## Testing
@@ -126,7 +128,15 @@ Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live 
 | `tests/ts/cross-platform.test.ts` | `src/tests/cross-platform/output/` | `ZodSharp.Json/*CrossPlatformTests` (the SystemTextJson and NewtonsoftJson unit tests) |
 | `tests/ts/guid-uuid-parity.test.ts` | `src/tests/cross-platform/guid-parity/` | `ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts` |
 
-`just test` runs the whole suite, so it covers both. The `cross-platform` job in `.github/workflows/pr.yml` selects them with treenode filters instead, and therefore needs **one step per producer** — a single `a|b` filter is not honoured as a top-level alternation and silently selects a broader set while skipping the parity producer. Adding a producer means adding a step. Both vitest suites fail loudly rather than passing vacuously when their directory is empty, which is the backstop for exactly this mistake.
+`just test` runs the whole suite, so it covers both producers. The `cross-platform` job in `.github/workflows/pr.yml` selects them with treenode filters instead, and therefore needs **one step per producer** — a single `a|b` filter is not honoured as a top-level alternation and silently selects a broader set while skipping the parity producer. Adding a producer means adding a step. Both vitest suites fail loudly rather than passing vacuously when their directory is empty, which is the backstop for exactly this mistake.
+
+`src/tests/Repository.UnitTests/CrossPlatformVitestTests.cs` additionally drives the vitest suites **from the .NET test run**, as child processes through CliWrap, so `just test` alone proves both halves of the guarantee and a TypeScript-side regression fails a local run. It is a deliberate duplicate of the CI job, not a replacement — the job stays the authoritative gate because it controls producer ordering and installs bun from scratch. Three rules keep the duplication honest:
+
+- **One test per suite**, so a failure names the `.test.ts` file, and the child process's stdout/stderr becomes the assertion message.
+- **`VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered`** fails when a `tests/ts/*.test.ts` file has no entry in `Suites()`, so a new suite cannot be driven by the CI job alone.
+- **Missing prerequisites skip rather than fail.** bun and `node_modules/` are absent on the shared pipeline's build runner and before `bun install`; failing there would report a missing toolchain as a broken repository. The coverage guard needs neither, so it still runs.
+
+Because `src/tests/cross-platform/` is gitignored and the producers live in other assemblies that may still be running in parallel, these tests wait for their fixture directory to fill before skipping, rather than nesting a second `dotnet test` inside the run.
 
 ## Commit conventions
 

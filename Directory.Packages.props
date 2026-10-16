@@ -38,6 +38,9 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageVersion Include="Bogus" Version="35.6.5" />
+		<!-- Drives the vitest cross-platform suites from the .NET test run (Repository.UnitTests), so
+		     `just test` covers both sides of the parity guarantee rather than only the C# side. -->
+		<PackageVersion Include="CliWrap" Version="3.10.5" />
 		<PackageVersion Include="FastGuid" Version="1.4.3" />
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDIVersion)" />
 		<PackageVersion
