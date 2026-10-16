@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace ZodSharp.Rules;
 
 /// <summary>
@@ -18,7 +20,7 @@ namespace ZodSharp.Rules;
 /// </para>
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Core.IZodRule
+public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 	where TEnum : struct, Enum
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
@@ -72,6 +74,27 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in TEnum value) =>
 		RuleMessage.Format(_message ?? MessageFormat, value, typeof(TEnum).Name);
+
+	/// <summary>
+	/// Applies the JSON Schema <c>enum</c> constraint listing the defined members that are not disallowed,
+	/// in their numeric wire form (System.Text.Json's default enum representation).
+	/// </summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+
+		// A lambda inside a struct cannot capture instance members, so copy the field to a local first.
+		var disallowed = _disallowed;
+		schema.Enum =
+		[
+			.. Enum.GetValues<TEnum>()
+				.Where(value => disallowed is null || Array.IndexOf(disallowed, value) < 0)
+				.Select(static value =>
+					Convert.ChangeType(value, Enum.GetUnderlyingType(typeof(TEnum)), CultureInfo.InvariantCulture)
+				),
+		];
+	}
 
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

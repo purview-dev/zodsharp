@@ -158,7 +158,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			NullableScalarAdaptationSource,
 			ZodSourceGeneratorTestOptions.NoValidation,
 			cancellationToken
@@ -186,7 +186,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(ScalarAdaptationSource, cancellationToken);
+		using var driverResult = await GenerateAsync(ScalarAdaptationSource, cancellationToken);
 		var generated = driverResult.GetSource("TenantIdSchema");
 
 		// Assert — the rule is constructed for the Guid and wrapped in the scalar adapter, which validates
@@ -214,7 +214,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			ScalarAdaptationSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -306,7 +306,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AssetIdSchema");
 
 		// Assert — the rule closes over the value object and is not adapted.
@@ -383,7 +383,11 @@ partial class ZodSchemaGeneratorTests
 
 		// Act — the stand-in adapter reads Value, which this renamed scalar does not declare, so the emitted
 		// rule is asserted instead of compiled.
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("TenantIdSchema");
 
 		// Assert

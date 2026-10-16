@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -84,18 +85,35 @@ static class TypeHelpersExtensions
 			return namedType.GetAttributes().Any(a => TypeLibrary.ZodSharp.ZodSchemaAttribute.Equals(a.AttributeClass));
 		}
 
-		public static bool HasDataAnnotationAttribute(IPropertySymbol propertySymbol)
+		public static bool HasDataAnnotationAttribute(IPropertySymbol propertySymbol) =>
+			HasDataAnnotationAttribute(propertySymbol.GetAttributes());
+
+		/// <summary>
+		/// Determines whether any of <paramref name="attributes"/> derives from the DataAnnotations
+		/// <c>ValidationAttribute</c>. The attributes are supplied by the caller rather than read from a symbol
+		/// so a positional record property can contribute the attributes of the primary-constructor parameter it
+		/// is synthesized from, which the compiler does not copy onto the property.
+		/// </summary>
+		/// <param name="attributes">The attributes to inspect.</param>
+		/// <returns><see langword="true"/> when an attribute derives from <c>ValidationAttribute</c>.</returns>
+		public static bool HasDataAnnotationAttribute(ImmutableArray<AttributeData> attributes)
 		{
-			// Check if the property has the DataAnnotation attribute
-			return propertySymbol
-				.GetAttributes()
-				.Any(a =>
-					a.AttributeClass is not null
+			// Check if any attribute derives from the DataAnnotation attribute
+			foreach (var attribute in attributes)
+			{
+				if (
+					attribute.AttributeClass is not null
 					&& TypeHelpers.InheritsFrom(
-						a.AttributeClass,
+						attribute.AttributeClass,
 						TypeLibrary.System.ComponentModel.DataAnnotations.ValidationAttribute
 					)
-				);
+				)
+				{
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 #pragma warning disable format

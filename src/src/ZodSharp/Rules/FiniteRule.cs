@@ -8,7 +8,7 @@ namespace ZodSharp.Rules;
 /// </summary>
 /// <typeparam name="T">The numeric type; any <see cref="INumber{T}"/> is supported.</typeparam>
 [Core.ZodRule]
-public readonly record struct FiniteRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct FiniteRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 	where T : INumber<T>
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
@@ -43,6 +43,16 @@ public readonly record struct FiniteRule<T> : Core.IValidationRule<T>, Core.IZod
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, value);
+
+	/// <summary>
+	/// Applies nothing: JSON has no representation for infinity or NaN, so every JSON number is finite and
+	/// the constraint is implicit in the <c>number</c> type.
+	/// </summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

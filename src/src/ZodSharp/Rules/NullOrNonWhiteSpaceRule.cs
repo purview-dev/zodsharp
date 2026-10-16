@@ -19,7 +19,10 @@ namespace ZodSharp.Rules;
 /// </para>
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct NullOrNonWhiteSpaceRule : Core.IValidationRule<string?>, Core.IZodRule
+public readonly record struct NullOrNonWhiteSpaceRule
+	: Core.IValidationRule<string?>,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -46,6 +49,19 @@ public readonly record struct NullOrNonWhiteSpaceRule : Core.IValidationRule<str
 	/// <param name="value">The value to validate</param>
 	/// <returns>True if valid, false otherwise</returns>
 	public bool IsValid(in string? value) => value is null || !string.IsNullOrWhiteSpace(value);
+
+	/// <summary>
+	/// Applies the JSON Schema constraint for a null-or-non-whitespace string: at least one non-whitespace
+	/// character when the value is present. Whether <c>null</c> is permitted is expressed by the property's
+	/// nullability, not by this rule.
+	/// </summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.MinLength = 1;
+		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, "\\S");
+	}
 
 	/// <summary>
 	/// Gets the error message for a failed validation.

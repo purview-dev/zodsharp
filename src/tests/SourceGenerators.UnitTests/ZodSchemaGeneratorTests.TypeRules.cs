@@ -53,7 +53,7 @@ partial class ZodSchemaGeneratorTests
 	public async Task TypeRule_GivenRuleAttributeOnSchemaType_EmitsWholeObjectRule(CancellationToken cancellationToken)
 	{
 		// Act
-		var driverResult = await GenerateAsync(TypeRuleSource, cancellationToken);
+		using var driverResult = await GenerateAsync(TypeRuleSource, cancellationToken);
 		var generated = driverResult.GetSource("AssetIdSchema");
 
 		// Assert — the rule runs against the value object itself with an empty path.
@@ -121,7 +121,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AssetIdSchema");
 
 		// Assert
@@ -200,7 +200,11 @@ partial class ZodSchemaGeneratorTests
 		// Act — the harness normally compiles the generated code, which a single synthetic compilation cannot
 		// do for this shape: the interface the constraint asks for is contributed by another generator, so the
 		// emitted rule is asserted instead of compiled.
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		var generated = driverResult.GetSource("AssetIdSchema");
 
 		// Assert — the rule still closes over the value object and validates the whole value.
@@ -217,7 +221,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			TypeRuleSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -303,7 +307,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AssetIdSchema");
 
 		// Assert

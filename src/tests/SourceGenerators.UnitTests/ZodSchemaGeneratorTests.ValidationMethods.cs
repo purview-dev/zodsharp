@@ -30,7 +30,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("WithBothSchema");
 
 		// The refinement hook is honoured...

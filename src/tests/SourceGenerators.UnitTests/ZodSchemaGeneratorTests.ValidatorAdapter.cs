@@ -18,7 +18,7 @@ namespace Testing
         public string? Name { get; set; }
     }
 }";
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("WidgetSchema");
 
 		await Assert.That(generatedSource).ContainsGeneratedCode("class WidgetSchemaValidator");
@@ -26,6 +26,41 @@ namespace Testing
 		await Assert.That(generatedSource).ContainsGeneratedCode("Widget");
 		await Assert.That(generatedSource).ContainsGeneratedCode("Validate(");
 		await Assert.That(generatedSource).ContainsGeneratedCode("return WidgetSchema.Validate(value);");
+	}
+
+	[Test]
+	public async Task Generate_GivenNestedTypeDeclaredAfterReferrer_KeepsTheNestedTypesOwnValidatorAdapter(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — `Wrapper` is declared first, so its attribute context discovers `Inner` as a secondary
+		// (nested) schema before `Inner`'s own [ZodSchema] context is processed. Deduplication must still
+		// keep the primary copy, otherwise the nested type silently loses its DI adapter and registration.
+		const string source =
+			@"
+namespace Testing
+{
+    [ZodSchema]
+    public class Wrapper
+    {
+        public Inner Inner { get; set; } = new();
+    }
+
+    [ZodSchema]
+    public partial record struct Inner
+    {
+        public string? Name { get; set; }
+    }
+}";
+
+		// Act
+		using var driverResult = await GenerateAsync(source, cancellationToken);
+		var schemaSource = driverResult.GetSource("InnerSchema");
+		var registrationSource = driverResult.GetSource("InnerSchemaRegistration");
+
+		// Assert — the primary schema wins, so the adapter and its registration are emitted.
+		await Assert.That(schemaSource).ContainsGeneratedCode("class InnerSchemaValidator");
+		await Assert.That(registrationSource).ContainsGeneratedCode("typeof(global::Testing.InnerSchemaValidator)");
 	}
 
 	[Test]
@@ -38,7 +73,7 @@ namespace Testing
     [ZodSchema]
     public class Gadget { }
 }";
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var allGenerated = string.Join("\n", driverResult.AllSyntaxTrees.Select(static t => t.GetText().ToString()));
 
 		await Assert.That(allGenerated).ContainsGeneratedCode("ZodSchemaGenerated");
@@ -60,7 +95,7 @@ namespace Testing
         public string? Name { get; set; }
     }
 }";
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("GizmoSchema");
 
 		await Assert.That(generatedSource).ContainsGeneratedCode("ValidateAsync");
@@ -97,7 +132,7 @@ namespace Testing
 			}}
 		}}
 	}}";
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.Compile, cancellationToken);
+		using var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.Compile, cancellationToken);
 		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
 
 		var gizmoType = assembly.GetType("Testing.Gizmo");

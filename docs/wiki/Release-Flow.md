@@ -4,9 +4,18 @@ Purview.ZodSharp releases are driven by the shared [purview-dev/build](https://g
 
 ## Versioning
 
-The package version comes from `package.json` (`version` field). The current stable line is `2.0.0`; bump `package.json` to release a new version (prerelease builds use a `MAJOR.MINOR.PATCH-prerelease.N` suffix).
+The package version comes from `package.json` (`version` field). The current stable line is `2.1.0`; bump `package.json` to release a new version (prerelease builds use a `MAJOR.MINOR.PATCH-prerelease.N` suffix).
 
 Package identities are `Purview.ZodSharp.*` (core, SystemTextJson, NewtonsoftJson, AspNetCore). Central package management lives in `Directory.Packages.props`; package versions there are minimum requirements, not exact pins, so the resolved graph can drift.
+
+## Releasing a version
+
+A push to `main` publishes, so everything below has to be true *before* the merge.
+
+1. **Rename the changelog heading to the version being released.** `CHANGELOG.md`'s newest `## <version>` heading is the one that ships; there is no `Unreleased` heading, precisely so a merge cannot publish an unnamed release. Consumer-visible renames and signature changes go under that version's `### Upgrade notes`, each naming the old form, the new form and the edit to make.
+2. **Move new diagnostics into a shipped block.** Anything in `AnalyzerReleases.Unshipped.md` moves to a `## Release <version>` block in `AnalyzerReleases.Shipped.md`. A rule stays recorded under the release that *introduced* it, so earlier blocks are never rewritten.
+3. **Bump the package-validation baseline.** `src/Directory.Build.targets` sets `PackageValidationBaselineVersion` to the previous stable release; it must name the version currently on NuGet, not the one being released. The build then fails `dotnet pack` on an unintended public-API change. An intended one needs a `CompatibilitySuppressions.xml` beside the owning project (`dotnet pack /p:GenerateCompatibilitySuppressionFile=true`) *and* a matching upgrade note — the two are each other's evidence.
+4. **Run `just pipeline-pr`**, which covers restore, build, lint, tests, pack and pack validation in one pass.
 
 ## Workflows
 

@@ -61,3 +61,11 @@
 | ZODSGEN042 | ZodSharp.SourceGenerator | Warning | A validation rule does not expose its error identity as public const ErrorCode/MessageFormat constants, so tests cannot assert against the rule without duplicating literals |
 | ZODSGEN043 | ZodSharp.SourceGenerator | Info | A built-in rule marked [ZodRule] does not generate a validation attribute because a constructor parameter cannot be represented as an attribute property (a derived name that collides with System.ComponentModel.DataAnnotations is emitted under a "Zod" suffix instead) |
 | ZODSGEN044 | ZodSharp.SourceGenerator | Error | A [ZodSchema] type that uses an automatic [Scalar] form ([Scalar<TValue>] or [Scalar(typeof(TValue))]) cannot produce a usable schema, because the generated Validate method is suppressed or the underlying type cannot be represented |
+
+## Release 2.1.0
+
+### New Rules
+
+| Rule ID | Category | Severity | Notes |
+|---|---|---|---|
+| ZODSGEN045 | ZodSharp.SourceGenerator | Warning | A type that exports JSON Schema references a nested [ZodSchema] type whose export is disabled ([ZodSchema(GenerateJsonSchema = false)] or the assembly-level ZodSharpGenerateJsonSchemas=false switch), so the parent's exported schema falls back to an empty schema for that property |

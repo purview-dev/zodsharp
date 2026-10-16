@@ -27,7 +27,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("NoWhitespaceAttribute");
 
 		// Assert
@@ -69,7 +69,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -125,7 +125,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert — the hand-authored attribute is left alone, the unmapped rule still gets one.
 		await Assert.That(driverResult.GetSource("OtherAttribute")).Contains("class OtherAttribute");
@@ -159,7 +159,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert — the hand-authored declaration wins, nothing is generated, and the suppression is reported
 		// rather than silent (previously the hand-authored mapping re-mapped the name with no notice).
@@ -209,7 +209,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			GenericRuleMarkerSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -245,7 +245,7 @@ partial class ZodSchemaGeneratorTests
 		);
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -290,7 +290,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -344,7 +344,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -431,7 +431,7 @@ partial class ZodSchemaGeneratorTests
 		);
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert — the generic half of the family is not covered by the declared mapping.
 		await Assert.That(driverResult).HasDiagnostic("ZODSGEN038");
@@ -451,7 +451,7 @@ partial class ZodSchemaGeneratorTests
 		);
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).DoesNotHaveDiagnostic("ZODSGEN038");
@@ -491,7 +491,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).HasDiagnostic("ZODSGEN038");
@@ -524,7 +524,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).DoesNotHaveDiagnostic("ZODSGEN038");
@@ -552,7 +552,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("RankAttribute");
 
 		// Assert — the warning is raised and the attribute is still generated.
@@ -588,7 +588,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).DoesNotHaveDiagnostic("ZODSGEN039");
@@ -635,7 +635,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -676,7 +676,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).HasDiagnostic("ZODSGEN039");
@@ -712,7 +712,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).HasDiagnostics("ZODSGEN039", 1);

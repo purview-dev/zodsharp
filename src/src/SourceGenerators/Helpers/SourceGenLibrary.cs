@@ -2,12 +2,16 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using ZodSharp.SourceGenerators.Models;
 using ZodSharp.SourceGenerators.Models.DataAttributes;
 
 namespace ZodSharp.SourceGenerators.Helpers;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	"Maintainability",
+	"CA1506:Avoid excessive class coupling",
+	Justification = "Cohesive helper library for the ZodSchema generator: the schema model, the DataAnnotations descriptors and the rule resolver are all in scope by design. The incremental stages that only configure generation live in GenerationSettingsResolver, and the enum/JSON wire metadata in EnumJsonResolver."
+)]
 static partial class SourceGenLibrary
 {
 	const string IValidateOptionsMetadataName = "Microsoft.Extensions.Options.IValidateOptions`1";
@@ -43,7 +47,7 @@ static partial class SourceGenLibrary
 				GetSchemasForGeneration(attributeContext, cancellationToken)
 		);
 		var autoDetectSettings = context.AnalyzerConfigOptionsProvider.Select(
-			static (provider, _) => ReadAutoDetectSettings(provider)
+			static (provider, _) => GenerationSettingsResolver.Read(provider)
 		);
 
 		return generationContext
@@ -54,87 +58,7 @@ static partial class SourceGenLibrary
 				"CollectZodSchemas"
 			)
 			.Combine(autoDetectSettings)
-			.Select(static (pair, _) => ApplyIValidateOptionsAutoDetection(pair));
-	}
-
-	readonly record struct AutoDetectSettings(bool AutoGenerate, EquatableArray<string> Suffixes);
-
-	static AutoDetectSettings ReadAutoDetectSettings(AnalyzerConfigOptionsProvider provider)
-	{
-		// Auto-detection is on by default; only an explicit "false" disables it.
-		var autoGenerate =
-			!provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsProperty}",
-				out var autoGenerateValue
-			)
-			|| !bool.TryParse(autoGenerateValue, out var autoGenerateEnabled)
-			|| autoGenerateEnabled;
-
-		var suffixes = ParseAutoGenerateIValidateOptionsSuffixes(
-			provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsSuffixesProperty}",
-				out var suffixValue
-			)
-				? suffixValue
-				: null
-		);
-
-		return new(autoGenerate, suffixes);
-	}
-
-	static EquatableArray<string> ParseAutoGenerateIValidateOptionsSuffixes(string? value)
-	{
-		var raw = string.IsNullOrWhiteSpace(value) ? "Options;Settings" : value!;
-		var builder = ImmutableArray.CreateBuilder<string>();
-		foreach (var segment in raw.Split(';', ','))
-		{
-			var suffix = segment.Trim();
-			if (suffix.Length > 0)
-				builder.Add(suffix);
-		}
-
-		return new(builder.ToImmutable());
-	}
-
-	static SchemaGenerationModel ApplyIValidateOptionsAutoDetection(
-		(SchemaGenerationModel Model, AutoDetectSettings Settings) input
-	)
-	{
-		var (model, settings) = input;
-		if (!settings.AutoGenerate || settings.Suffixes.Count == 0)
-			return model;
-
-		var builder = ImmutableArray.CreateBuilder<GeneratorResult<ZodSchemaDescriptor>>(model.ZodSchemas.Count);
-		foreach (var result in model.ZodSchemas)
-		{
-			if (!result.ShouldProcess)
-			{
-				builder.Add(result);
-				continue;
-			}
-
-			var schema = result.Value;
-			if (
-				schema.GenerateIValidateOptions is null
-				&& schema.IsPrimary
-				&& !schema.IsValueType
-				&& settings.Suffixes.Any(suffix => schema.TargetType.Name.EndsWith(suffix, StringComparison.Ordinal))
-			)
-			{
-				builder.Add(
-					GeneratorResult<ZodSchemaDescriptor>.Create(schema with { GenerateIValidateOptions = true })
-				);
-			}
-			else
-			{
-				builder.Add(result);
-			}
-		}
-
-		return model with
-		{
-			ZodSchemas = new(builder.ToImmutable()),
-		};
+			.Select(static (pair, _) => GenerationSettingsResolver.Apply(pair));
 	}
 
 	static GeneratorResult<SchemaSet> GetSchemasForGeneration(
@@ -145,7 +69,8 @@ static partial class SourceGenLibrary
 		if (context.SemanticModel.GetDeclaredSymbol(context.TargetNode, cancellationToken) is not INamedTypeSymbol root)
 			return default;
 
-		ExternalSchemaResolver externalSchemas = new(context.SemanticModel.Compilation);
+		var compilation = context.SemanticModel.Compilation;
+		ExternalSchemaResolver externalSchemas = new(compilation);
 		var schemas = ImmutableArray.CreateBuilder<ZodSchemaDescriptor>();
 		HashSet<TypeIdentity> seen = [];
 		Queue<(INamedTypeSymbol Symbol, bool IsPrimary)> queue = new();
@@ -170,14 +95,14 @@ static partial class SourceGenLibrary
 				: $"{target.Name}Schema";
 			var schema = target with { Name = schemaName };
 			var targetCanBeNull = TypeHelpers.CanBeNull(symbol);
-			var properties = GetZodProperties(symbol, externalSchemas);
+			var properties = GetZodProperties(symbol, externalSchemas, compilation);
 			properties = AddAutomaticScalarProperty(symbol, properties, externalSchemas);
 
 			// Type-level rules ([ZodRule]-mapped attributes on the target itself) validate the whole value
 			// rather than a property, which is what makes a scalar value object validatable as a unit. The
 			// generator only needs the descriptors: ZodSchemaAnalyzer resolves the same attributes and
 			// reports the diagnostics, so a dropped rule is visible in the build instead of failing silently.
-			var typeRules = CustomRuleResolver.Resolve(symbol, symbol);
+			var typeRules = CustomRuleResolver.Resolve(symbol, symbol, isTypeLevel: true);
 			var accessibility = symbol.ContainingType is null
 				? symbol.DeclaredAccessibility == Accessibility.Public
 					? TypeDeclarationAccessibility.Public
@@ -192,6 +117,17 @@ static partial class SourceGenLibrary
 			if (customValidation.Value.HasCustomValidation && refinementHook.Value.IsImplemented)
 				customValidation = CustomValidationMethodData.None;
 			var isValueType = symbol.TypeKind == TypeKind.Struct;
+
+			// A Purview.ValueObjects scalar serialises as its underlying value, so its JSON Schema is the
+			// underlying type's schema (for example a Guid scalar is a canonical Guid string, not Zod's
+			// RFC UUID format), not an object wrapping a Value property.
+			TypeIdentity? scalarUnderlyingType = null;
+			var scalarUnderlyingCanBeNull = false;
+			if (CustomRuleResolver.TryGetScalarUnderlyingValue(symbol, out var scalarValueType))
+			{
+				scalarUnderlyingType = CreateTypeIdentity(TypeHelpers.UnwrapNullableType(scalarValueType));
+				scalarUnderlyingCanBeNull = IsNullableProperty(scalarValueType);
+			}
 			bool? generateIValidateOptions =
 				zodSchemaAttribute.GenerateIValidateOptions ? true
 				: zodSchemaAttribute.SuppressIValidateOptions ? false
@@ -203,6 +139,7 @@ static partial class SourceGenLibrary
 			var generateValidateMethod = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateValidateMethod;
 			var generateParseMethod = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateParseMethod;
 			var validateEnumValues = !zodSchemaAttribute.Exists || zodSchemaAttribute.ValidateEnumValues;
+			var generateJsonSchema = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateJsonSchema;
 
 			schemas.Add(
 				new(
@@ -221,7 +158,12 @@ static partial class SourceGenLibrary
 					generateParseMethod,
 					typeRules,
 					validateEnumValues,
-					isPrimary
+					isPrimary,
+					scalarUnderlyingType,
+					scalarUnderlyingCanBeNull,
+					generateJsonSchema,
+					false,
+					default
 				)
 			);
 
@@ -233,7 +175,10 @@ static partial class SourceGenLibrary
 						m.DeclaredAccessibility == Accessibility.Public
 						&& !m.IsStatic
 						&& !m.IsIndexer
-						&& (TypeHelpers.HasDataAnnotationAttribute(m) || IsPropertyWithNestedSchema(m, externalSchemas))
+						&& (
+							TypeHelpers.HasDataAnnotationAttribute(GetValidationAttributes(m, compilation))
+							|| IsPropertyWithNestedSchema(m, externalSchemas)
+						)
 					)
 			)
 			{
@@ -291,6 +236,25 @@ static partial class SourceGenLibrary
 	{
 		var results = ImmutableArray.CreateBuilder<GeneratorResult<ZodSchemaDescriptor>>();
 		HashSet<TypeIdentity> seen = [];
+
+		// A type can be reached twice: once from its own [ZodSchema] attribute (primary) and once as a
+		// nested property of another schema (secondary). The attribute contexts are processed in an
+		// unspecified order, so keeping whichever arrives first lets a secondary copy displace the primary.
+		// That drops the primary-only members — the DI adapter ({Type}SchemaValidator) and its assembly
+		// registration — for any type that happens to be referenced by a type processed earlier. Collect
+		// the primaries first, then fill in the secondaries, so the primary always wins.
+		foreach (var set in sets)
+		{
+			if (!set.ShouldProcess)
+				continue;
+
+			foreach (var schema in set.Value.Schemas)
+			{
+				if (schema.IsPrimary && seen.Add(schema.TargetType))
+					results.Add(schema);
+			}
+		}
+
 		foreach (var set in sets)
 		{
 			if (!set.ShouldProcess)
@@ -308,7 +272,8 @@ static partial class SourceGenLibrary
 
 	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>> GetZodProperties(
 		INamedTypeSymbol symbol,
-		ExternalSchemaResolver externalSchemas
+		ExternalSchemaResolver externalSchemas,
+		Compilation compilation
 	)
 	{
 		var properties = symbol
@@ -317,11 +282,21 @@ static partial class SourceGenLibrary
 			.Where(property =>
 				property.DeclaredAccessibility == Accessibility.Public && !property.IsStatic && !property.IsIndexer
 			)
-			.Select(property => GetValidatablePropertyDescriptor(property, externalSchemas))
+			.Select(property => GetValidatablePropertyDescriptor(property, externalSchemas, compilation))
 			.ToImmutableArray();
 
 		return new(properties);
 	}
+
+	/// <summary>
+	/// Gets the validation attributes that apply to <paramref name="property"/>, merging in the attributes of
+	/// the primary-constructor parameter a positional record property is synthesized from. See
+	/// <see cref="PropertyAttributeResolver"/> for why the parameter's attributes are not on the property.
+	/// </summary>
+	internal static ImmutableArray<AttributeData> GetValidationAttributes(
+		IPropertySymbol property,
+		Compilation compilation
+	) => PropertyAttributeResolver.Resolve(property, compilation);
 
 	/// <summary>
 	/// Adds the schema property for an automatic scalar value object
@@ -384,6 +359,7 @@ static partial class SourceGenLibrary
 			propertyName,
 			propertyName,
 			TypeHelpers.CanBeNull(valueType),
+			IsNullableProperty(valueType),
 			isNullableValueType,
 			isEnum,
 			isFlagsEnum,
@@ -395,6 +371,10 @@ static partial class SourceGenLibrary
 			new(string.Empty, string.Empty, false),
 			false,
 			EmptyValidationAttributes,
+			new([]),
+			null,
+			true,
+			false,
 			new([])
 		);
 
@@ -426,7 +406,8 @@ static partial class SourceGenLibrary
 
 	internal static GeneratorResult<ZodPropertyDescriptor> GetValidatablePropertyDescriptor(
 		IPropertySymbol property,
-		ExternalSchemaResolver? externalSchemas = null
+		ExternalSchemaResolver? externalSchemas,
+		Compilation compilation
 	)
 	{
 		var declaredType = CreateTypeIdentity(property.Type);
@@ -439,7 +420,15 @@ static partial class SourceGenLibrary
 
 		var propertyType = declaredType.Value;
 		var originalPropertyType = property.Type;
+
+		// Two nullabilities are tracked. `CanBeNull` is whether the type can hold null at runtime (a
+		// reference type or Nullable<T>), which governs whether [Required] is meaningful. `IsDeclaredNullable`
+		// follows the nullable reference-type annotation (a non-nullable `string` is required and its rules
+		// run unconditionally and reject null, while a `string?` stays nullable). A compilation with the
+		// nullable context disabled reports NullableAnnotation.None, where a reference type is treated as
+		// nullable.
 		var propertyCanBeNull = TypeHelpers.CanBeNull(originalPropertyType);
+		var propertyDeclaredNullable = IsNullableProperty(originalPropertyType);
 		var isNullableValueType = false;
 		if (
 			originalPropertyType is INamedTypeSymbol
@@ -469,20 +458,27 @@ static partial class SourceGenLibrary
 			&& TypeHelpers.CanBeNull(GetCollectionElementTypeSymbol(originalPropertyType) ?? originalPropertyType);
 		var nestedSchemaType = GetNestedSchemaTypeIdentity(property, validationKind, externalSchemas);
 		var lengthAccessor = ClassifyLengthAccessor(originalPropertyType);
-		var displayName = GetDisplayName(property);
+		var validationAttributes = GetValidationAttributes(property, compilation);
+		var displayName = GetDisplayName(validationAttributes, property.Name);
 
-		var displayAttribute = DisplayAttributeData.FromAttributeData(property);
-		var requiredAttribute = RequiredAttributeData.FromAttributeData(property);
-		var compareAttribute = CompareAttributeData.FromAttributeData(property);
-		var emailAddressAttribute = EmailAddressAttributeData.FromAttributeData(property);
-		var creditCardAttribute = CreditCardAttributeData.FromAttributeData(property);
-		var phoneAttribute = PhoneAttribute.FromAttributeData(property);
-		var urlAttribute = UrlAttribute.FromAttributeData(property);
-		var stringLengthAttribute = StringLengthAttribute.FromAttributeData(property);
-		var minLengthAttribute = MinLengthAttributeData.FromAttributeData(property);
-		var maxLengthAttribute = MaxLengthAttributeData.FromAttributeData(property);
+		var displayAttribute = DisplayAttributeData.FromAttributeData(validationAttributes);
+		var requiredAttribute = RequiredAttributeData.FromAttributeData(validationAttributes);
+		var compareAttribute = CompareAttributeData.FromAttributeData(validationAttributes);
+		var emailAddressAttribute = EmailAddressAttributeData.FromAttributeData(validationAttributes);
+		var creditCardAttribute = CreditCardAttributeData.FromAttributeData(validationAttributes);
+		var phoneAttribute = PhoneAttribute.FromAttributeData(validationAttributes);
+		var urlAttribute = UrlAttribute.FromAttributeData(validationAttributes);
+		var stringLengthAttribute = StringLengthAttribute.FromAttributeData(validationAttributes);
+		var minLengthAttribute = MinLengthAttributeData.FromAttributeData(validationAttributes);
+		var maxLengthAttribute = MaxLengthAttributeData.FromAttributeData(validationAttributes);
 		var regularExpressionAttribute = GeneratorResult<RegularExpressionAttributeData>.Empty;
-		if (RegularExpressionAttributeData.TryFromAttributeData(property, out var regexData, out var attribute))
+		if (
+			RegularExpressionAttributeData.TryFromAttributeData(
+				validationAttributes,
+				out var regexData,
+				out var attribute
+			)
+		)
 		{
 			regularExpressionAttribute =
 				attribute is not null && propertyType.SpecialType != SpecialType.System_String
@@ -498,12 +494,13 @@ static partial class SourceGenLibrary
 					: GeneratorResult<RegularExpressionAttributeData>.Create(regexData);
 		}
 
-		var base64StringAttribute = Base64StringAttributeData.FromAttributeData(property);
-		var deniedValuesAttribute = DeniedValuesAttributeData.FromAttributeData(property);
-		var allowedValuesAttribute = AllowedValuesAttributeData.FromAttributeData(property);
+		var base64StringAttribute = Base64StringAttributeData.FromAttributeData(validationAttributes);
+		var deniedValuesAttribute = DeniedValuesAttributeData.FromAttributeData(validationAttributes);
+		var allowedValuesAttribute = AllowedValuesAttributeData.FromAttributeData(validationAttributes);
 
 		AddUnsupportedDataAnnotationsDiagnostics(
-			property,
+			validationAttributes,
+			property.Name,
 			propertyType,
 			originalPropertyType,
 			urlAttribute,
@@ -517,7 +514,7 @@ static partial class SourceGenLibrary
 		);
 
 		var lengthAttribute = GeneratorResult<LengthAttributeData>.Empty;
-		if (LengthAttributeData.TryFromAttributeData(property, out var lengthData, out attribute))
+		if (LengthAttributeData.TryFromAttributeData(validationAttributes, out var lengthData, out attribute))
 		{
 			lengthAttribute = BuildLengthAttributeResult(
 				property,
@@ -528,7 +525,7 @@ static partial class SourceGenLibrary
 			);
 		}
 
-		var rangeAttribute = RangeAttributeData.FromAttributeData(property.GetAttributes(), out attribute);
+		var rangeAttribute = RangeAttributeData.FromAttributeData(validationAttributes, out attribute);
 		var rangeAttributeResult = TryBuildRangeBoundaryExpressions(
 			originalPropertyType,
 			rangeAttribute,
@@ -552,9 +549,9 @@ static partial class SourceGenLibrary
 				)
 			);
 
-		ValidateCompareProperty(property, compareAttribute, diagnostics);
+		ValidateCompareProperty(property, validationAttributes, compareAttribute, diagnostics);
 
-		ValidateErrorMessageResourceConfiguration(property, diagnostics);
+		ValidateErrorMessageResourceConfiguration(validationAttributes, property.Name, diagnostics);
 
 		diagnostics.AddRange(regularExpressionAttribute.Diagnostics);
 		diagnostics.AddRange(lengthAttribute.Diagnostics);
@@ -565,8 +562,11 @@ static partial class SourceGenLibrary
 		var isEnum = enumType is { TypeKind: TypeKind.Enum };
 		var isFlagsEnum = isEnum && HasFlagsAttribute(enumType!);
 		var ignoredEnumMembers = isEnum && !isFlagsEnum ? GetIgnoredEnumMembers(enumType!) : default;
+		var enumSerializedAsString = isEnum && EnumJsonResolver.IsSerializedAsString(enumType!, property);
+		var enumJsonNames =
+			isEnum && !isFlagsEnum ? EnumJsonResolver.GetJsonNames(enumType!, validationAttributes) : new([]);
 
-		var customRules = CustomRuleResolver.Resolve(property, originalPropertyType, diagnostics);
+		var customRules = CustomRuleResolver.Resolve(validationAttributes, originalPropertyType, diagnostics);
 
 		var compareViaCompareTo =
 			validationKind == PropertyValidationKind.Comparable
@@ -579,6 +579,7 @@ static partial class SourceGenLibrary
 				property.Name,
 				displayName,
 				propertyCanBeNull,
+				propertyDeclaredNullable,
 				isNullableValueType,
 				isEnum,
 				isFlagsEnum,
@@ -607,11 +608,93 @@ static partial class SourceGenLibrary
 					lengthAttribute,
 					rangeAttributeResult
 				),
-				customRules
+				customRules,
+				GetJsonPropertyName(property),
+				NestedSchemaExportsJsonSchema(property, validationKind, externalSchemas),
+				enumSerializedAsString,
+				enumJsonNames
 			),
 			diagnostics.ToImmutable()
 		);
 	}
+
+	/// <summary>
+	/// Determines whether the nested complex type a property references exports JSON Schema. A nested type
+	/// can opt out with <c>[ZodSchema(GenerateJsonSchema = false)]</c>, in which case the parent's schema
+	/// cannot reference it and falls back to an empty schema (reported as ZODSGEN045).
+	/// </summary>
+	/// <param name="property">The property to inspect.</param>
+	/// <param name="validationKind">The property's validation kind.</param>
+	/// <param name="externalSchemas">The resolver that decides schema ownership.</param>
+	/// <returns><see langword="true"/> when the property has no nested schema, or the nested type exports one.</returns>
+	static bool NestedSchemaExportsJsonSchema(
+		IPropertySymbol property,
+		PropertyValidationKind validationKind,
+		ExternalSchemaResolver? externalSchemas
+	)
+	{
+		if (validationKind is not (PropertyValidationKind.Complex or PropertyValidationKind.Collection))
+			return true;
+
+		var targetType =
+			validationKind == PropertyValidationKind.Collection
+				? GetCollectionElementTypeSymbol(property.Type)
+				: TypeHelpers.UnwrapNullableType(property.Type);
+
+		if (targetType is not INamedTypeSymbol namedType)
+			return true;
+
+		// Only a type owned by this compilation can opt out; an external schema's export is that assembly's
+		// concern.
+		if (externalSchemas is not null && !externalSchemas.IsSchemaOwnedByThisCompilation(namedType))
+			return true;
+
+		var attributeData = ZodSchemaAttributeData.FromAttributeData(namedType, out _);
+		return !attributeData.Exists || attributeData.GenerateJsonSchema;
+	}
+
+	/// <summary>
+	/// Reads an explicit <c>[System.Text.Json.Serialization.JsonPropertyName]</c> from a property, so the
+	/// exported JSON Schema names the property exactly as System.Text.Json writes it.
+	/// </summary>
+	/// <param name="property">The property to inspect.</param>
+	/// <returns>The declared JSON name, or <see langword="null"/> when none is declared.</returns>
+	static string? GetJsonPropertyName(IPropertySymbol property)
+	{
+		foreach (var attribute in property.GetAttributes())
+		{
+			if (
+				attribute.AttributeClass is not { Name: "JsonPropertyNameAttribute" } attributeClass
+				|| attributeClass.ContainingNamespace.ToDisplayString() != "System.Text.Json.Serialization"
+				|| attribute.ConstructorArguments.Length != 1
+			)
+			{
+				continue;
+			}
+
+			if (attribute.ConstructorArguments[0].Value is string { Length: > 0 } name)
+				return name;
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Determines whether a property accepts null, from its nullable reference-type annotation or its
+	/// <see cref="Nullable{T}"/> construction. A non-nullable reference type (for example <c>string</c>) is
+	/// non-nullable, so its rules run unconditionally and reject null; a <c>string?</c> accepts null.
+	/// </summary>
+	/// <param name="typeSymbol">The declared property type.</param>
+	/// <returns><see langword="true"/> when the property accepts null.</returns>
+	/// <remarks>
+	/// A compilation with the nullable context disabled reports <see cref="NullableAnnotation.None"/> for
+	/// every reference type; there the annotation cannot distinguish nullable from non-nullable, so a
+	/// reference type is treated as nullable (the pre-annotation behaviour).
+	/// </remarks>
+	static bool IsNullableProperty(ITypeSymbol typeSymbol) =>
+		typeSymbol is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+		|| typeSymbol.NullableAnnotation == NullableAnnotation.Annotated
+		|| (typeSymbol.NullableAnnotation == NullableAnnotation.None && typeSymbol.IsReferenceType);
 
 	/// <summary>
 	/// Creates the <c>TypeIdentity</c> for a symbol, returning <see langword="null"/> for symbols that
@@ -826,18 +909,18 @@ static partial class SourceGenLibrary
 		return new(string.Empty, string.Empty, false);
 	}
 
-	static string GetDisplayName(IPropertySymbol property)
+	static string GetDisplayName(ImmutableArray<AttributeData> attributes, string propertyName)
 	{
-		var display = DisplayAttributeData.FromAttributeData(property);
-		return display.Exists && !string.IsNullOrEmpty(display.Name) ? display.Name! : property.Name;
+		var display = DisplayAttributeData.FromAttributeData(attributes);
+		return display.Exists && !string.IsNullOrEmpty(display.Name) ? display.Name! : propertyName;
 	}
 
 	static Location GetAttributeLocation(AttributeData? attributeData) =>
 		attributeData?.ApplicationSyntaxReference?.GetSyntax().GetLocation() ?? Location.None;
 
-	static AttributeData? FindAttribute(IPropertySymbol property, string metadataName)
+	static AttributeData? FindAttribute(ImmutableArray<AttributeData> attributes, string metadataName)
 	{
-		foreach (var attribute in property.GetAttributes())
+		foreach (var attribute in attributes)
 		{
 			if (attribute.AttributeClass?.MetadataName == metadataName)
 				return attribute;
@@ -847,7 +930,7 @@ static partial class SourceGenLibrary
 	}
 
 	static void AddUnsupportedDataAnnotationsUsage(
-		IPropertySymbol property,
+		string propertyName,
 		AttributeData? attribute,
 		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	) =>
@@ -856,18 +939,21 @@ static partial class SourceGenLibrary
 				DiagnosticLibrary.UnsupportedDataAnnotationsUsage,
 				true,
 				GetAttributeLocation(attribute),
-				property.Name
+				propertyName
 			)
 		);
 
 	static void AddUnsupportedDataAnnotationsUsage(
-		IPropertySymbol property,
+		ImmutableArray<AttributeData> attributes,
+		string propertyName,
 		string attributeMetadataName,
 		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
-	) => AddUnsupportedDataAnnotationsUsage(property, FindAttribute(property, attributeMetadataName), diagnostics);
+	) =>
+		AddUnsupportedDataAnnotationsUsage(propertyName, FindAttribute(attributes, attributeMetadataName), diagnostics);
 
 	static void AddUnsupportedDataAnnotationsDiagnostics(
-		IPropertySymbol property,
+		ImmutableArray<AttributeData> attributes,
+		string propertyName,
 		TypeIdentity propertyType,
 		ITypeSymbol originalPropertyType,
 		UrlAttribute urlAttribute,
@@ -883,15 +969,15 @@ static partial class SourceGenLibrary
 		var isString = propertyType.SpecialType == SpecialType.System_String;
 
 		if (urlAttribute.Exists && !isString)
-			AddUnsupportedDataAnnotationsUsage(property, "UrlAttribute", diagnostics);
+			AddUnsupportedDataAnnotationsUsage(attributes, propertyName, "UrlAttribute", diagnostics);
 		if (phoneAttribute.Exists && !isString)
-			AddUnsupportedDataAnnotationsUsage(property, "PhoneAttribute", diagnostics);
+			AddUnsupportedDataAnnotationsUsage(attributes, propertyName, "PhoneAttribute", diagnostics);
 		if (creditCardAttribute.Exists && !isString)
-			AddUnsupportedDataAnnotationsUsage(property, "CreditCardAttribute", diagnostics);
+			AddUnsupportedDataAnnotationsUsage(attributes, propertyName, "CreditCardAttribute", diagnostics);
 		if (base64StringAttribute.Exists && !isString)
-			AddUnsupportedDataAnnotationsUsage(property, "Base64StringAttribute", diagnostics);
+			AddUnsupportedDataAnnotationsUsage(attributes, propertyName, "Base64StringAttribute", diagnostics);
 		if (emailAddressAttribute.Exists && !isString)
-			AddUnsupportedDataAnnotationsUsage(property, "EmailAddressAttribute", diagnostics);
+			AddUnsupportedDataAnnotationsUsage(attributes, propertyName, "EmailAddressAttribute", diagnostics);
 
 		if (
 			(allowedValuesAttribute.Exists || deniedValuesAttribute.Exists)
@@ -899,9 +985,10 @@ static partial class SourceGenLibrary
 		)
 		{
 			var valuesAttribute =
-				FindAttribute(property, "AllowedValuesAttribute") ?? FindAttribute(property, "DeniedValuesAttribute");
+				FindAttribute(attributes, "AllowedValuesAttribute")
+				?? FindAttribute(attributes, "DeniedValuesAttribute");
 			if (valuesAttribute is not null)
-				AddUnsupportedDataAnnotationsUsage(property, valuesAttribute, diagnostics);
+				AddUnsupportedDataAnnotationsUsage(propertyName, valuesAttribute, diagnostics);
 		}
 	}
 
@@ -948,6 +1035,7 @@ static partial class SourceGenLibrary
 
 	static void ValidateCompareProperty(
 		IPropertySymbol property,
+		ImmutableArray<AttributeData> attributes,
 		CompareAttributeData compareAttribute,
 		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	)
@@ -965,7 +1053,7 @@ static partial class SourceGenLibrary
 				ReportableDiagnostic.Create(
 					DiagnosticLibrary.ComparePropertyNotFound,
 					true,
-					GetAttributeLocation(FindAttribute(property, "CompareAttribute")),
+					GetAttributeLocation(FindAttribute(attributes, "CompareAttribute")),
 					property.Name,
 					compareAttribute.OtherProperty
 				)
@@ -998,11 +1086,12 @@ static partial class SourceGenLibrary
 	}
 
 	static void ValidateErrorMessageResourceConfiguration(
-		IPropertySymbol property,
+		ImmutableArray<AttributeData> attributes,
+		string propertyName,
 		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
 	)
 	{
-		foreach (var attribute in property.GetAttributes())
+		foreach (var attribute in attributes)
 		{
 			if (
 				attribute.AttributeClass is null
@@ -1036,7 +1125,7 @@ static partial class SourceGenLibrary
 					DiagnosticLibrary.InvalidDataAnnotationsErrorMessage,
 					true,
 					GetAttributeLocation(attribute),
-					property.Name
+					propertyName
 				)
 			);
 		}

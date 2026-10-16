@@ -6,32 +6,58 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). `package.json` is the authoritative version; see
 [Release Flow](docs/wiki/Release-Flow.md).
 
-Released versions correspond to `v<version>` GitHub releases. Entries below the `Unreleased` heading have not
-been published to NuGet.
+Released versions correspond to `v<version>` GitHub releases.
 
-## Unreleased
+## 2.1.0
 
-> **This release contains breaking changes.** See [Breaking changes](#breaking-changes) below before
-> upgrading from `2.0.0`. The analyzer catalogue records them under `2.0.2`.
->
-> Note the changes below are consumer-visible: a rule's public `Code` constant was renamed to `ErrorCode`,
-> and rule constructor signatures changed, so attribute usages and code referencing those constants may not
-> compile against this version. Read the migration notes before upgrading.
+Consolidates the `2.0.1`, `2.0.1.1` and `2.0.2` incremental releases: upgrading from `2.0.0` goes straight to
+`2.1.0`, and the notes below cover that whole arc. The analyzer catalogue records each diagnostic under the
+release that introduced it, so `AnalyzerReleases.Shipped.md` shows `ZODSGEN037`–`ZODSGEN044` under
+`## Release 2.0.2` and `ZODSGEN045` under `## Release 2.1.0`.
 
-### Breaking changes
+> **Upgrading from `2.0.0`?** Start with [Upgrade notes](#upgrade-notes). A few rule and attribute APIs were
+> renamed and standardised across these releases, so some usages need a mechanical edit before they compile.
+> Each note names the old form, the new form, and the edit to make.
 
-- **Rule error-identity constants renamed from `Code` to `ErrorCode`.** Every validation rule now exposes its
-  error identity as public `const string ErrorCode` and `const string MessageFormat`. Code that referenced a
-  rule's `Code` constant must use `ErrorCode`. The new `ZODSGEN042` analyzer enforces the convention on
-  source-declared rules.
-- **Rule constructors are standardised.** Every rule now has a consistent constructor, extension method and
-  generated attribute. Generated rule attributes carry the rule's *value* parameters as constructor arguments:
-  a parameter declared without a default becomes a required positional argument, a parameter with a default
-  keeps it, and `message`/`code`/`origin` remain properties. Attribute usages for required values become
-  positional — `[MinValue(3)]`, `[Regex("^[a-z]+$")]`. Usages that previously set a required value by property
-  name no longer compile.
+### Upgrade notes
+
+- **A rule's error-identity constants are now `ErrorCode` and `MessageFormat`.** Every validation rule exposes
+  its error identity as public `const string ErrorCode` and `const string MessageFormat`.
+  - *Previously:* a rule's identity constant was named `Code`.
+  - *Now:* it is named `ErrorCode`.
+  - *To upgrade:* rename references from `SomeRule.Code` to `SomeRule.ErrorCode`. `ZODSGEN042` reports
+    source-declared rules that do not follow the convention, so the compiler points at each one.
+- **Rule constructors, extension methods and generated attributes now follow one shape.** A generated rule
+  attribute carries the rule's *value* parameters as constructor arguments: a parameter declared without a
+  default becomes a required positional argument, a parameter with a default keeps it, and
+  `message`/`code`/`origin` remain properties.
+  - *Previously:* a required value could be supplied by property name — the property derived from the rule's
+    parameter, so `MinValueRule<T>(T minValue, …)` was settable as `[MinValue(MinValue = 3)]`.
+  - *Now:* required values are positional — `[MinValue(3)]`, `[Regex("^[a-z]+$")]`.
+  - *To upgrade:* move a required value from a property assignment to a positional argument. Defaulted values
+    may still be set by property name.
+- **`NonSentinelRule<T>.MessageFormat` is reworded, and `{0}` now describes the sentinel.**
+  - *Previously:* `{0}` interpolated the raw value.
+  - *Now:* the format is `Value has a sentinel value, but got {0}`, and `{0}` is a description — `an empty
+    GUID`, `DateTime.MinValue`, `an empty string`, and so on.
+  - *To upgrade:* update any code or test that asserts against the old message text. Asserting against
+    `NonSentinelRule<T>.ErrorCode` instead keeps the assertion stable across future wording changes.
+- **`ZodSchemaGeneratedAttribute` now takes `(Type targetType, Type validatorType)`.** See
+  [`RegisterFromAssembly` is now genuinely trim- and AOT-safe](#changed--trimming-and-native-aot) for why.
+  - *To upgrade:* nothing, in the normal case — the attribute is generator-emitted and regenerates on rebuild.
+    Only a hand-written usage needs the second argument.
 
 ### Added
+
+- **`UUIDRule` now validates a `Guid` as well as a `string`.** A `Guid` is a UUID, so its bytes are checked
+  directly; `[UUID]` / `[UUID(UuidVersion.Vx)]` can therefore constrain a `Guid` member or a `[Scalar<Guid>]`
+  value object, and the constraint is exported as `format: "uuid"` plus a version-pinning `pattern`.
+
+- **A type-level rule on a `[Scalar]` type now names the scalar in its default message.** Because a scalar's
+  error reports an empty path, the generator replaces the leading subject word `Value` in the resolved rule's
+  `MessageFormat` with the scalar's name, so `[NonSentinel]` on `[Scalar] TenantId` reports
+  `TenantId has a sentinel value, but got an empty GUID`. A rule whose format does not contain `Value`, and any
+  explicit `message`/`ErrorMessage`, are left unchanged.
 
 - **Native C# 15 union support.** `Z.NativeUnion` and `ZodTypedNativeUnion` return a native union on `net11.0`,
   giving allocation-free, exhaustively pattern-matchable options. `ZODSGEN041` suggests it where a typed union's
@@ -61,7 +87,27 @@ been published to NuGet.
   (which always rejects `null`) cannot express the check.
 - **`ZODSGEN044`.** A `[ZodSchema]` type using an automatic `[Scalar]` form that cannot produce a usable
   schema (a suppressed `Validate` method, or an unrepresentable underlying type) is reported instead of
-  leaving a dangling `{Type}Schema` reference. Recorded in `AnalyzerReleases.Unshipped.md`.
+  leaving a dangling `{Type}Schema` reference. Recorded under `## Release 2.0.2`.
+- **A `[ZodSchema]` schema now exports a complete JSON Schema.** The generated `{Type}Schema` class emits a
+  static `BuildJsonSchema()` method and the generated `{Type}SchemaValidator` implements the new
+  `ZodSharp.JsonSchema.IJsonSchemaProvider`, so `Z.ToJsonSchema(new {Type}SchemaValidator())` returns a real
+  definition instead of an empty one. The definition is built from the same metadata as `Validate`, so nested
+  objects, native enums, nullable/required fields, scalar value objects (`[Scalar]` export as their underlying
+  value), `[JsonPropertyName]`/camelCase property names, DataAnnotations and `[ZodRule]`-mapped rules are all
+  reflected. Previously only hand-built runtime schemas could be exported.
+- **Rules describe their own JSON Schema constraint.** The new `ZodSharp.JsonSchema.IJsonSchemaRule` is
+  implemented by the built-in rules (length, bounds, `multipleOf`, integer/safe-integer, string formats,
+  `pattern`, sentinel, allowed/denied values, enum), and `ToJsonSchemaConverter` and the generated
+  `BuildJsonSchema()` apply them identically. A rule that cannot be represented — or a consumer rule that has
+  not opted in — is listed under the `x-zodsharp-unsupported` extension on the exported schema instead of
+  being dropped silently.
+- `ZodNativeEnum<TEnum>` and `ZodEnum` now export as JSON Schema `enum` (via the new `IJsonSchemaEnumInfo`
+  seam), and `JsonSchemaDefinition` gained `not`, `contentEncoding` and `x-zodsharp-unsupported`.
+- **JSON Schema generation can be opted out, per type or per assembly.** `[ZodSchema(GenerateJsonSchema =
+  false)]` omits the export members for one type, and the `ZodSharpGenerateJsonSchemas=false` MSBuild property
+  does so for the whole assembly — keeping validation-only types out of the cross-platform contract surface.
+  An exporting type that references a type whose export is disabled falls back to an empty schema and is
+  reported as the new **ZODSGEN045** warning instead of failing to compile or exporting silently.
 
 ### Changed — trimming and Native AOT
 
@@ -78,8 +124,9 @@ been published to NuGet.
   `[DynamicallyAccessedMembers(PublicParameterlessConstructor)]` so its constructor survives. No string
   resolution remains, and the `[RequiresUnreferencedCode]` annotation has been removed entirely. Discovery
   is also now proportional to the number of generated schemas rather than the size of the assembly.
-  - **Breaking:** `ZodSchemaGeneratedAttribute` now takes `(Type targetType, Type validatorType)`. The
-    attribute is generator-emitted, so it regenerates on rebuild; only hand-written usages need updating.
+  - `ZodSchemaGeneratedAttribute` now takes `(Type targetType, Type validatorType)`. The attribute is
+    generator-emitted, so it regenerates on rebuild; only hand-written usages need updating. Listed under
+    [Upgrade notes](#upgrade-notes).
 - **`Purview.ZodSharp.SystemTextJson` is AOT-clean and marked.**
   - The validating `JsonConverter<T>` resolves a `JsonTypeInfo<T>` from the serializer options instead of
     calling the reflection-based `JsonSerializer` overloads, so it defers to whatever resolver the host
@@ -106,6 +153,11 @@ been published to NuGet.
 
 ### Changed
 
+- **NuGet package validation.** Every packable project now enables `EnablePackageValidation` against the
+  previous stable release (`2.0.2`), so an unintended change to the public API fails `dotnet pack` rather than
+  shipping. All four packages validate clean with no suppressions — the rule and attribute changes under
+  [Upgrade notes](#upgrade-notes) landed in the `2.0.x` releases, so they are already part of the baseline, and
+  `2.1.0` is additive over it. This is the guard that was missing when those changes went out.
 - Clarified in `SourceGenerators.csproj` that `EnforceExtendedAnalyzerRules` and `TreatWarningsAsErrors` are
   supplied and enforced by `Purview.BuildSdk` for every `IsRoslynComponent` project, rather than being optional
   project settings. Both were already `true`; the commented-out block implied otherwise.
@@ -127,6 +179,41 @@ been published to NuGet.
 
 ### Fixed
 
+- **Guid and UUID export semantics now match the runtime validator.** A C# `Guid` was exported as
+  `format: "uuid"`, so a consumer applied its RFC UUID validator (Zod's `z.uuid()`, which `z.fromJSONSchema`
+  also uses for `format: "guid"`) and rejected valid values that C# accepts — including every
+  `FastGuid.NewSqlServerGuid()`/`NewPostgreSqlGuid()` time-bound identifier, which is deliberately not an RFC
+  UUID. A `Guid` (and a `[Scalar<Guid>]` value object) now exports as a canonical hexadecimal `pattern`; a
+  versioned `UUIDRule`/`[UUID(UuidVersion.Vx)]` keeps its version as an additional `pattern`; and two rules that
+  both constrain `pattern` (for example a Guid plus `[NonSentinel]`) are composed under `allOf` instead of one
+  silently overwriting the other. The JSON Schema importer now intersects every `allOf` branch (previously it
+  took only the first) so an exported schema round-trips.
+- **Exported enum schemas now match the System.Text.Json wire form.** The generated JSON Schema always
+  enumerated an enum's numeric values, so an enum serialized as a string (a per-type or per-property
+  `[JsonConverter(typeof(JsonStringEnumConverter))]`, or a global converter) exported a schema that rejected
+  the actual JSON. The generator now detects the string-enum converter, honours `[JsonStringEnumMemberName]`,
+  and supports the assembly-level `ZodSharpEnumSerialization=String` / `ZodSharpEnumNamingPolicy=CamelCase`
+  switches for a global converter and naming policy.
+- **A `[Flags]` enum exported an `enum` list, rejecting valid combinations.** The generated validator never
+  validates a flags enum against its defined members (a combination is a valid value without being a defined
+  member), but the generated JSON Schema enumerated them, so a value such as `Read | Write` failed the
+  exported schema. A flags enum now exports as `type: integer`.
+- **Exported requiredness and null acceptance now follow the nullable reference-type annotation.** The
+  generator treated every reference type as nullable, so a non-nullable `string` with `[NonSentinel]` was
+  wrapped in `anyOf: [ …, { "type": "null" } ]`, omitted from `required`, and its rule was skipped for null
+  (null passed validation). A non-nullable reference type is now required, its rules run unconditionally and
+  reject null, and the generated validator reports a null value rather than skipping it — matching the
+  exported schema. A `string?` keeps its null branch, and a rule that rejects an absent value still makes the
+  property non-null; a rule that accepts null (such as the built-in `NullOrNonWhiteSpaceRule`) keeps the
+  property nullable.
+- **A `[ZodSchema]` type referenced as a nested property could lose its generated DI adapter.** A type is
+  reached twice by the generator — once from its own `[ZodSchema]` attribute (the primary schema) and once as
+  a nested property of another schema (a secondary copy). Deduplication kept whichever the attribute contexts
+  happened to produce first, so a secondary copy could displace the primary, dropping the primary-only members:
+  the `{Type}SchemaValidator` adapter and its `[assembly: ZodSchemaGenerated]` registration. Value-object
+  structs that were referenced by an earlier-declared type (for example a `[Scalar]` id nested in a record)
+  silently vanished from `IZodSchemaFactory` assembly scanning. Deduplication now always prefers the primary
+  schema.
 - **`[RequiredZod]` now rejects an absent value exactly like `[Required]`.** A custom rule bound to a
   reference-type member was emitted inside the generator's non-null guard, so a missing value never reached
   `RequiredRule<T>` and options/schema validation passed. The rule now implements the new `IRequiredRule`
@@ -180,6 +267,38 @@ been published to NuGet.
   `IValidationRule<TValue>` constraint nor the value object's `IScalarValueObject<TSelf, TValue>` — reporting
   CS8631 at every consumer. The value argument is now carried as a `TypeReference`, so both sides stay in step.
 
+### Fixed — analyzer release tracking guard
+
+- **`AnalyzerReleaseTrackingTests` was passing vacuously, and `ZODSGEN045` was never recorded as shipped.** The
+  guard that asserts the unshipped file declares no rules matched a rule row only in the pipe-delimited form
+  (`| ZODSGEN045 |`), but `AnalyzerReleases.Unshipped.md` is written without the leading pipe — so a rule parked
+  there parsed as *no rules at all* and the assertion compared two empty sets. `ZODSGEN045` sat unshipped with a
+  green suite. The row pattern now accepts both table styles, `ZODSGEN045` is recorded under a new
+  `## Release 2.1.0` block, and the test asserts that block exists. The guard now fails when a diagnostic is left
+  unshipped, which is the only thing it was ever meant to do.
+
+### Added — the vitest suites run from the .NET test run
+
+- **`just test` now proves both halves of the cross-platform guarantee.** The TypeScript/Zod suites were driven
+  only by the dedicated `cross-platform` CI job, so a Zod-side regression could not fail a local run — and a gap
+  in that job's own wiring went unnoticed for a whole release. `Repository.UnitTests` now runs each
+  `tests/ts/*.test.ts` suite as a child process through **CliWrap** (one test per suite, so a failure names the
+  file and the child's stdout/stderr becomes the assertion message). The CI job remains the authoritative gate,
+  because it controls producer ordering and installs bun from scratch.
+- `VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered` fails when a vitest suite has no entry in the C# list, so
+  a new suite cannot end up driven by the CI job alone — the same class of gap as the parity producer above.
+- **These tests never skip, and they run on bun or node.** A skipped test proves nothing, so the runner is
+  resolved per run — bun when it is on PATH, otherwise node against vitest's own entry point — and the test
+  **fails** when neither is available, or when the install or the run fails. `node_modules/` is gitignored, so
+  vitest is installed first when it is missing (`bun install --frozen-lockfile`, or `npm install` when only
+  node is present). The node path deliberately avoids `npx` and `node_modules/.bin`: the `.bin` shims belong to
+  whichever package manager installed the tree, and on Windows `npx` is a `.cmd`/`.ps1` shim that cannot be
+  started as a child process.
+- Every path is verified, not just the green one: an injected parity violation fails the .NET test with the
+  vitest output attached and names the runner that produced it; an unlisted `.test.ts` file fails the coverage
+  guard; the node fallback is confirmed to execute with bun removed from PATH; and with both removed the suite
+  tests fail rather than skipping.
+
 ### Added — packed generator smoke test
 
 - `just smoke-packed-generator` (and a `packed-generator` CI job) packs the package, then builds and runs a
@@ -215,6 +334,17 @@ been published to NuGet.
 - The vitest cross-platform suite now runs in CI, and it **fails** rather than silently passing when the C#
   cross-platform fixtures are absent. It also now reads the C# output recursively — the previous flat directory
   read never matched a file, so the C#-to-Zod handshake had never actually been asserted.
+- **The CI cross-platform job never produced the Guid/UUID parity artifacts, so `bun run test` failed there.**
+  The job selects the C# producers with a treenode filter, and carried only one —
+  `/*/ZodSharp.Json/*CrossPlatformTests/*`, which writes `cross-platform/output/`. The parity artifacts
+  `tests/ts/guid-uuid-parity.test.ts` reads come from a *second* producer added with the Guid/UUID export work,
+  in a different assembly, namespace and class
+  (`ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts`),
+  which that filter does not match. `cross-platform/guid-parity/` was therefore always empty in CI and the
+  parity suite failed every run. The job now runs a step per producer. They cannot be combined into one
+  OR-ed filter: `a|b` is not honoured as a top-level alternation — it silently selects a broader set and still
+  skips the parity producer, which was verified when fixing this. `just test` was unaffected, because it runs
+  the whole suite.
 
 ## 2.0.0
 

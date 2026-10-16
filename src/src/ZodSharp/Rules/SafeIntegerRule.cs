@@ -5,7 +5,7 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct SafeIntegerRule : Core.IValidationRule<double>, Core.IZodRule
+public readonly record struct SafeIntegerRule : Core.IValidationRule<double>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "too_big";
@@ -40,6 +40,16 @@ public readonly record struct SafeIntegerRule : Core.IValidationRule<double>, Co
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in double value) => RuleMessage.Format(_message ?? MessageFormat, value);
+
+	/// <summary>Applies the JSON Schema bounds of a safe integer (an <c>int</c>-range whole number).</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.Type = "integer";
+		schema.Minimum = int.MinValue;
+		schema.Maximum = int.MaxValue;
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

@@ -43,6 +43,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		DiagnosticLibrary.RuleAttributeWithoutSchema,
 		DiagnosticLibrary.NativeUnionRecommended,
 		DiagnosticLibrary.AutomaticScalarSchemaUnavailable,
+		DiagnosticLibrary.NestedSchemaExportDisabled,
 	];
 
 	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedDiagnosticsList;
@@ -124,6 +125,9 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		// validations, so a rule that resolves to nothing is reported here rather than dropped silently.
 		ReportTypeRuleDiagnostics(context, type, typeLocation);
 
+		if (zodSchemaData.GenerateJsonSchema && ReadGenerateJsonSchemas(context.Options))
+			ReportNestedSchemaExportDisabled(context, type, externalSchemas, typeLocation);
+
 		if (!hasDataAnnotations)
 		{
 			context.ReportDiagnostic(
@@ -177,17 +181,25 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 
 		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
 		{
+			// A positional record property inherits the attributes of the primary-constructor parameter it is
+			// synthesized from, so the analyzer resolves the same effective set the generator validates with.
+			var validationAttributes = SourceGenLibrary.GetValidationAttributes(property, context.Compilation);
+
 			if (
 				property.DeclaredAccessibility != Accessibility.Public
 				|| property.IsStatic
 				|| property.IsIndexer
-				|| !TypeHelpers.HasDataAnnotationAttribute(property)
+				|| !TypeHelpers.HasDataAnnotationAttribute(validationAttributes)
 			)
 			{
 				continue;
 			}
 
-			var propertyResult = SourceGenLibrary.GetValidatablePropertyDescriptor(property, externalSchemas);
+			var propertyResult = SourceGenLibrary.GetValidatablePropertyDescriptor(
+				property,
+				externalSchemas,
+				context.Compilation
+			);
 			foreach (var diagnosticInfo in propertyResult.Diagnostics)
 			{
 				var diagnostic = diagnosticInfo.ToDiagnostic();
@@ -217,7 +229,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 	static void ReportTypeRuleDiagnostics(SymbolAnalysisContext context, INamedTypeSymbol type, Location typeLocation)
 	{
 		var diagnostics = ImmutableArray.CreateBuilder<ReportableDiagnostic>();
-		_ = CustomRuleResolver.Resolve(type, type, diagnostics);
+		_ = CustomRuleResolver.Resolve(type, type, diagnostics, isTypeLevel: true);
 
 		foreach (var diagnosticInfo in diagnostics)
 		{
@@ -311,6 +323,59 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 	}
 
 	/// <summary>
+	/// Reads the assembly-level JSON Schema switch (<c>ZodSharpGenerateJsonSchemas</c>). On by default; only
+	/// an explicit <c>false</c> disables it.
+	/// </summary>
+	/// <param name="options">The analyzer options.</param>
+	/// <returns><see langword="true"/> when JSON Schema export is enabled for the compilation.</returns>
+	static bool ReadGenerateJsonSchemas(AnalyzerOptions options) =>
+		!options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
+			$"build_property:{PropertyLibrary.GenerateJsonSchemasProperty}",
+			out var value
+		)
+		|| !bool.TryParse(value, out var enabled)
+		|| enabled;
+
+	/// <summary>
+	/// Reports <c>ZODSGEN045</c> for each property whose nested <c>[ZodSchema]</c> type disables JSON Schema
+	/// export, so the parent's exported schema cannot describe it (it falls back to an empty schema).
+	/// </summary>
+	/// <param name="context">The analysis context the diagnostics are reported to.</param>
+	/// <param name="type">The exporting schema type.</param>
+	/// <param name="externalSchemas">The resolver that decides schema ownership.</param>
+	/// <param name="typeLocation">The location to fall back to when a property carries none.</param>
+	static void ReportNestedSchemaExportDisabled(
+		SymbolAnalysisContext context,
+		INamedTypeSymbol type,
+		ExternalSchemaResolver externalSchemas,
+		Location typeLocation
+	)
+	{
+		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		{
+			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
+				continue;
+
+			if (!SourceGenLibrary.TryGetNestedSchemaType(property, externalSchemas, out var nested))
+				continue;
+
+			var nestedData = ZodSchemaAttributeData.FromAttributeData(nested, out _);
+			if (!nestedData.Exists || nestedData.GenerateJsonSchema)
+				continue;
+
+			var location = GetMemberLocation(property);
+			context.ReportDiagnostic(
+				Diagnostic.Create(
+					DiagnosticLibrary.NestedSchemaExportDisabled,
+					location == Location.None ? typeLocation : location,
+					property.Name,
+					nested.Name
+				)
+			);
+		}
+	}
+
+	/// <summary>
 	/// Collects the types that will receive a generated schema: every <c>[ZodSchema]</c> type in this
 	/// assembly plus, transitively, the complex property types the generator discovers and emits secondary
 	/// schemas for.
@@ -393,7 +458,13 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
 				continue;
 
-			ReportRuleAttributes(context, property.GetAttributes(), type.Name);
+			// A positional record property inherits the attributes of the primary-constructor parameter it is
+			// synthesized from, so the same effective set the generator validates with is reported here.
+			ReportRuleAttributes(
+				context,
+				SourceGenLibrary.GetValidationAttributes(property, context.Compilation),
+				type.Name
+			);
 		}
 	}
 

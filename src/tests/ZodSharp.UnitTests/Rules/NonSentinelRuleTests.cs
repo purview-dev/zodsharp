@@ -13,9 +13,11 @@ public class NonSentinelRuleTests
 
 		// Act
 		var isValid = rule.IsValid(Guid.Empty);
+		var isDefaultValid = rule.IsValid(default);
 
 		// Assert
 		await Assert.That(isValid).IsFalse();
+		await Assert.That(isDefaultValid).IsFalse();
 	}
 
 	[Test]
@@ -40,10 +42,12 @@ public class NonSentinelRuleTests
 		// Act
 		var minIsValid = rule.IsValid(DateTime.MinValue);
 		var maxIsValid = rule.IsValid(DateTime.MaxValue);
+		var defaultIsValid = rule.IsValid(default);
 
 		// Assert
 		await Assert.That(minIsValid).IsFalse();
 		await Assert.That(maxIsValid).IsFalse();
+		await Assert.That(defaultIsValid).IsFalse();
 	}
 
 	[Test]
@@ -68,10 +72,12 @@ public class NonSentinelRuleTests
 		// Act
 		var minIsValid = rule.IsValid(DateTimeOffset.MinValue);
 		var maxIsValid = rule.IsValid(DateTimeOffset.MaxValue);
+		var defaultIsValid = rule.IsValid(default);
 
 		// Assert
 		await Assert.That(minIsValid).IsFalse();
 		await Assert.That(maxIsValid).IsFalse();
+		await Assert.That(defaultIsValid).IsFalse();
 	}
 
 	[Test]
@@ -96,10 +102,12 @@ public class NonSentinelRuleTests
 		// Act
 		var minIsValid = rule.IsValid(DateOnly.MinValue);
 		var maxIsValid = rule.IsValid(DateOnly.MaxValue);
+		var defaultIsValid = rule.IsValid(default);
 
 		// Assert
 		await Assert.That(minIsValid).IsFalse();
 		await Assert.That(maxIsValid).IsFalse();
+		await Assert.That(defaultIsValid).IsFalse();
 	}
 
 	[Test]
@@ -124,10 +132,12 @@ public class NonSentinelRuleTests
 		// Act
 		var minIsValid = rule.IsValid(TimeOnly.MinValue);
 		var maxIsValid = rule.IsValid(TimeOnly.MaxValue);
+		var defaultIsValid = rule.IsValid(default);
 
 		// Assert
 		await Assert.That(minIsValid).IsFalse();
 		await Assert.That(maxIsValid).IsFalse();
+		await Assert.That(defaultIsValid).IsFalse();
 	}
 
 	[Test]
@@ -154,9 +164,11 @@ public class NonSentinelRuleTests
 
 		// Act
 		var isValid = rule.IsValid(value!);
+		var defaultIsValid = rule.IsValid(default!);
 
 		// Assert
 		await Assert.That(isValid).IsFalse();
+		await Assert.That(defaultIsValid).IsFalse();
 	}
 
 	[Test]
@@ -196,11 +208,38 @@ public class NonSentinelRuleTests
 		var expected = string.Format(
 			CultureInfo.CurrentCulture,
 			CompositeFormat.Parse(NonSentinelRule<Guid>.MessageFormat),
-			Guid.Empty
+			"an empty GUID"
 		);
 
 		// Assert
 		await Assert.That(message).IsEqualTo(expected);
+		await Assert.That(message).IsEqualTo("Value has a sentinel value, but got an empty GUID");
+	}
+
+	[Test]
+	public async Task GetErrorMessage_GivenEmptyString_DescribesTheSentinel()
+	{
+		// Arrange
+		NonSentinelRule<string> rule = new();
+
+		// Act
+		var message = rule.GetErrorMessage("");
+
+		// Assert
+		await Assert.That(message).IsEqualTo("Value has a sentinel value, but got an empty string");
+	}
+
+	[Test]
+	public async Task GetErrorMessage_GivenDateTimeMinValue_DescribesTheSentinel()
+	{
+		// Arrange
+		NonSentinelRule<DateTime> rule = new();
+
+		// Act
+		var message = rule.GetErrorMessage(DateTime.MinValue);
+
+		// Assert
+		await Assert.That(message).IsEqualTo("Value has a sentinel value, but got DateTime.MinValue");
 	}
 
 	[Test]

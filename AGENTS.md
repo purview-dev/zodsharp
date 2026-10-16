@@ -32,7 +32,8 @@ src/
     cross-platform/    Output directory shared between the C# and TS cross-platform tests
 src/ts/                TypeScript (Zod) schema + fixture generation; consumed by C# and vitest tests
 tests/ts/              Vitest cross-platform tests
-.agents/               Skills/prompts bundled from Purview.BuildSdk and Purview.SourceGeneratorFramework
+skills/                Agent skills this repository authors and publishes
+.agents/skills/        Skills installed from other repositories by the skills CLI (gitignored)
 ```
 
 ## Build system
@@ -46,7 +47,7 @@ The build is driven by `Purview.BuildSdk`, imported via `src/Directory.Build.pro
 - `global.json` pins the `Purview.BuildSdk` MSBuild SDK version.
 - Pack layout for all packages is validated by `purview-build.json` (`PackValidation.RequiredContent`).
 
-Consult `.agents/skills/sdk-configuration-reference/SKILL.md`, `.agents/skills/sdk-project-behavior-and-detection/SKILL.md`, and `.agents/skills/project-placement-defaults/SKILL.md` before changing build/SDK configuration or adding/moving projects.
+Before changing build/SDK configuration or adding/moving projects, install and consult the SDK's own skills: `npx skills add purview-dev/build-sdk` (`purview-buildsdk-configuration`, `purview-buildsdk-project-detection`, `purview-buildsdk-project-layout`).
 
 ## Commands
 
@@ -71,6 +72,8 @@ bun run test                # vitest run (cross-platform TS tests)
 bun run generate-fixtures   # regenerates src/ts/fixtures/*.json from Zod
 ```
 
+`just test` also runs the vitest suites through CliWrap (see [Cross-platform fixtures](#cross-platform-fixtures)), so `bun run test` is for iterating on the TypeScript side rather than the only way to exercise it. It needs `bun install` to have been run.
+
 Formatting is enforced with CSharpier; `.editorconfig` at the repo root defines style (tabs for code, 2-space for XML/JSON/YAML/markdown).
 
 ## Testing
@@ -81,7 +84,7 @@ Formatting is enforced with CSharpier; `.editorconfig` at the repo root defines 
   - `// Arrange`, `// Act`, `// Assert` comments.
   - Meaningful, descriptive method names (`Action_GivenCondition_ExpectedResult`).
   - Treat work as incomplete until the relevant tests pass.
-- For source generators, diagnostic analyzers, code fixes and refactorings, use the `Purview.SourceGeneratorFramework.Testing.TUnit` base classes (`TUnitSourceGeneratorTestBase`, `TUnitDiagnosticAnalyzerTestBase`, `TUnitCodeFixTestBase`, `TUnitRefactoringTestBase`) and assert with `CodeQuery`. Load `.agents/skills/source-generator-testing/SKILL.md` and `.agents/skills/tunit-test-authoring/SKILL.md` before writing or changing these tests.
+- For source generators, diagnostic analyzers, code fixes and refactorings, use the `Purview.SourceGeneratorFramework.Testing.TUnit` base classes (`TUnitSourceGeneratorTestBase`, `TUnitDiagnosticAnalyzerTestBase`, `TUnitCodeFixTestBase`, `TUnitRefactoringTestBase`) and assert with `CodeQuery`. Install the framework's skills with `npx skills add purview-dev/sourcegenerator-framework` and load `purview-sourcegenerator-testing` and `purview-sourcegenerator-tunit-tests` before writing or changing these tests.
 
 ## Source generators
 
@@ -89,7 +92,7 @@ The `[ZodSchema]` attribute (generated into the `ZodSharp` namespace) marks a cl
 
 The generator and analyzer are built with `Purview.SourceGeneratorFramework`:
 
-- Use `CodeWriter` emission and incremental pipelines; load `.agents/skills/source-generator-codewriter-modernization/SKILL.md` before implementing, reviewing, or refactoring generator/analyzer code.
+- Use `CodeWriter` emission and incremental pipelines; load `purview-sourcegenerator-codewriter` (`npx skills add purview-dev/sourcegenerator-framework`) before implementing, reviewing, or refactoring generator/analyzer code.
 - Keep pipeline values immutable and value-equatable; never retain `ISymbol`, `Compilation`, `SemanticModel`, `IOperation`, `SyntaxNode`, or `Location` in pipeline models.
 - Use `ForAttributeWithMetadataName` for attribute-driven discovery.
 - Test incrementally, not just generated text (see the skills above).
@@ -116,7 +119,28 @@ Keep `purview-build.json`'s `PackValidation` requirements in sync with any packa
 
 ## Cross-platform fixtures
 
-Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume; the C# cross-platform tests write output to `src/tests/cross-platform/output/`, which the vitest tests (`tests/ts/cross-platform.test.ts`) read. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
+Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
+
+`src/tests/cross-platform/` is gitignored, so it starts empty on a clean checkout and in CI: **the C# producers must run before vitest**, in the same workspace. There are **two** producer/consumer pairs, in different assemblies, namespaces and classes:
+
+| Vitest consumer | Reads | C# producer |
+| --- | --- | --- |
+| `tests/ts/cross-platform.test.ts` | `src/tests/cross-platform/output/` | `ZodSharp.Json/*CrossPlatformTests` (the SystemTextJson and NewtonsoftJson unit tests) |
+| `tests/ts/guid-uuid-parity.test.ts` | `src/tests/cross-platform/guid-parity/` | `ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts` |
+
+`just test` runs the whole suite, so it covers both producers. The `cross-platform` job in `.github/workflows/pr.yml` selects them with treenode filters instead, and therefore needs **one step per producer** — a single `a|b` filter is not honoured as a top-level alternation and silently selects a broader set while skipping the parity producer. Adding a producer means adding a step. Both vitest suites fail loudly rather than passing vacuously when their directory is empty, which is the backstop for exactly this mistake.
+
+`src/tests/Repository.UnitTests/CrossPlatformVitestTests.cs` additionally drives the vitest suites **from the .NET test run**, as child processes through CliWrap, so `just test` alone proves both halves of the guarantee and a TypeScript-side regression fails a local run. It is a deliberate duplicate of the CI job, not a replacement — the job stays the authoritative gate because it controls producer ordering and installs bun from scratch. Three rules keep the duplication honest:
+
+- **One test per suite**, so a failure names the `.test.ts` file, and the child process's stdout/stderr becomes the assertion message.
+- **`VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered`** fails when a `tests/ts/*.test.ts` file has no entry in `Suites()`, so a new suite cannot be driven by the CI job alone.
+- **These tests never skip.** A skipped test proves nothing, and the parity guarantee is not optional. The runner is resolved per run: **bun** when it is on PATH, otherwise **node**. If neither is available, or the install or the run fails, the test fails and names the step.
+
+The node fallback invokes vitest's entry point (`node_modules/vitest/vitest.mjs`, from vitest's own `package.json` `bin` field) directly, rather than `npx` or `node_modules/.bin`. Both are unreliable: the `.bin` shims are written by whichever package manager installed the tree — a bun install leaves `vitest.exe`/`vitest.bunx` and no node shim — and on Windows `npx` resolves to a `.cmd`/`.ps1` shim, which cannot be started directly as a child process. For the same reason the PATH probe only accepts a real executable image (`.exe`/`.com`), not a shim.
+
+`node_modules/` is gitignored, so when vitest is missing the tests install it first — with `bun install --frozen-lockfile`, or `npm install` when only node is present. There is no npm lockfile (`bun.lock` is the only one), so npm resolves from `package.json`; that is a second reason bun is preferred for both the install and the run.
+
+Because `src/tests/cross-platform/` is gitignored and the producers live in other assemblies that may still be running in parallel, these tests wait for their fixture directory to fill before skipping, rather than nesting a second `dotnet test` inside the run.
 
 ## Commit conventions
 
@@ -129,3 +153,44 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 - `just lint-check` (CSharpier) reports no formatting changes.
 - Generated code is deterministic and reviewable; no scope leaks in `CodeWriter` output.
 - Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`).
+
+## Agent skills
+
+Authored skills live in the repository-root `skills/` folder. **Nothing packs them into a NuGet
+package** - `Purview.BuildSdk` 1.0.6 removed skill packaging outright. The skills CLI clones the *git*
+repository and only discovers a root `skills/` folder, so that is the one delivery route.
+
+`.agents/skills/` is the CLI's install location for skills from **other** repositories, and is
+gitignored. This repository's own skills are never installed into it - that would leave two copies to
+drift apart. Read them at their authored path, `skills/<name>/SKILL.md`.
+
+```bash
+npx skills add purview-dev/zodsharp
+```
+
+| Skill | Answers |
+| --- | --- |
+| `skills/purview-zodsharp-core/` | the runtime API: packages, the `Z` factory, `Validate`/`Parse`, `ValidationResult`, composition, coercion |
+| `skills/purview-zodsharp-source-generator/` | `[ZodSchema]`: what it emits, its options, DataAnnotations, `OnZodValidate`, enum validation, `IValidateOptions` |
+| `skills/purview-zodsharp-custom-rules/` | writing a rule, `ErrorCode`/`MessageFormat`, `IZodRule`, `[ZodRule]` attributes, scalar value objects |
+| `skills/purview-zodsharp-json/` | System.Text.Json and Newtonsoft integrations, JSON Schema export and import, TypeScript Zod interop |
+| `skills/purview-zodsharp-aspnetcore/` | ProblemDetails, minimal-API validation, `IZodSchemaFactory` registration, options validation, `ErrorType` |
+| `skills/purview-zodsharp-diagnostics/` | what a `ZODSGEN` or `ZODSASP` diagnostic means and how to fix it |
+
+Every skill carries the `purview-zodsharp` prefix. Skills install into one flat directory per agent,
+shared with every skill a developer has installed from anywhere, so an unprefixed name collides and
+the loser is whichever installed second.
+
+To add one: create `skills/<name>/SKILL.md` with spec-legal frontmatter. There is no per-project
+registration.
+
+`src/tests/Repository.UnitTests/SkillTests.cs` validates every skill on every test run, through
+`Purview.Skills.Testing`'s rule set (the Agent Skills specification: frontmatter fields, name and
+description constraints, bundled links, body size). The `[InheritsTests]` attribute on that class is
+load-bearing - TUnit does not walk base types during discovery, so without it the run is green and
+nothing is checked. That project is single-targeted at `net10.0`, because it asserts something about
+the repository rather than about the runtime's reach.
+
+A relative link from one `SKILL.md` into another skill's folder is a rule violation: only a skill's
+own folder is installed with it, so such a link works here and nowhere else. Name the other skill in
+prose instead, and keep deep detail in the skill's own `references/`.

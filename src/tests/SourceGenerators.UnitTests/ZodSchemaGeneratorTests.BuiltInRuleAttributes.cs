@@ -31,7 +31,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("RequiredZodAttribute");
 
 		// Assert - the DataAnnotations name is left alone and the rule's attribute is emitted under the "Zod"
@@ -67,7 +67,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("ThresholdAttribute");
 
 		// Assert
@@ -104,7 +104,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -119,6 +119,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(generated).ContainsGeneratedCode("public string? Message { get; set; } = null;");
 		await Assert.That(attributeType.GetConstructor([typeof(double)])).IsNotNull();
 		await Assert.That(attributeType.GetConstructor([])).IsNull();
+
 		driverResult.AssertNoCompilationErrors();
 	}
 
@@ -145,7 +146,11 @@ partial class ZodSchemaGeneratorTests
 
 		// Act - the harness normally rejects a run whose compilation has errors, so validation is disabled here
 		// to assert the error explicitly.
-		var driverResult = await GenerateAsync(source, ZodSourceGeneratorTestOptions.NoValidation, cancellationToken);
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		// Assert - a missing required value is a compile error at the attribute's usage site (CS7036), not a
 		// generator diagnostic that only surfaces when a schema is generated.
@@ -176,7 +181,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("WholeAttribute");
 
 		// Assert
@@ -207,7 +212,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).HasDiagnostic("ZODSGEN043");
@@ -237,7 +242,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert.That(driverResult).HasDiagnostic("ZODSGEN032");
@@ -279,7 +284,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(BuiltInAttributeSource, cancellationToken);
+		using var driverResult = await GenerateAsync(BuiltInAttributeSource, cancellationToken);
 		var generated = driverResult.GetSource("ContactSchema");
 
 		// Assert - each shipped attribute resolves to its built-in rule. The regex attribute mirrors the
@@ -305,7 +310,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			BuiltInAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -386,7 +391,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(BuiltInScalarAttributeSource, cancellationToken);
+		using var driverResult = await GenerateAsync(BuiltInScalarAttributeSource, cancellationToken);
 		var generated = driverResult.GetSource("TenantIdSchema");
 
 		// Assert - the shipped open-generic attribute closes over the scalar's underlying value and the wrapped
@@ -412,7 +417,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			BuiltInScalarAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -472,7 +477,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(NewBuiltInAttributeSource, cancellationToken);
+		using var driverResult = await GenerateAsync(NewBuiltInAttributeSource, cancellationToken);
 		var generated = driverResult.GetSource("MetricsSchema");
 
 		// Assert - the generic bound rules are closed with the member type (their double bound converted to
@@ -500,7 +505,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			NewBuiltInAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -561,7 +566,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(OptionalValueAttributeSource, cancellationToken);
+		using var driverResult = await GenerateAsync(OptionalValueAttributeSource, cancellationToken);
 		var generated = driverResult.GetSource("PreferencesSchema");
 
 		// Assert - the string comparison and IP family flow into the rule (rendered as their enum value) and
@@ -618,7 +623,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Act
-		var driverResult = await GenerateAsync(UuidAttributeSource, cancellationToken);
+		using var driverResult = await GenerateAsync(UuidAttributeSource, cancellationToken);
 		var generated = driverResult.GetSource("IdentifiersSchema");
 
 		// Assert - the bare [UUID] maps to the versionless overload and [UUID(UuidVersion.V4)] to the versioned
@@ -643,7 +648,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			UuidAttributeSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -708,7 +713,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AccountSchema");
 
 		// Assert - the open generic is closed with the member type and carries both options.
@@ -743,7 +748,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -792,7 +797,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("ChoiceSchema");
 
 		// Assert
@@ -825,7 +830,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -869,7 +874,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("RatingSchema");
 
 		// Assert

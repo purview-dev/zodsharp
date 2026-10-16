@@ -9,8 +9,19 @@ namespace ZodSharp.SourceGenerators;
 /// (<c>RS2000</c>/<c>RS2001</c>), which report at build time when a diagnostic is missing from either file.
 /// </summary>
 /// <remarks>
-/// <c>ZODSGEN037</c>–<c>ZODSGEN044</c> are recorded under a <c>## Release 2.0.2</c> block. The unshipped
-/// file declares no rules; the next diagnostic added goes there and moves across when it ships.
+/// <para>
+/// <c>ZODSGEN037</c>–<c>ZODSGEN044</c> are recorded under a <c>## Release 2.0.2</c> block and
+/// <c>ZODSGEN045</c> under <c>## Release 2.1.0</c>. A rule stays recorded under the release that introduced
+/// it, so an existing block is never rewritten. The unshipped file declares no rules; the next diagnostic
+/// added goes there and moves across when it ships.
+/// </para>
+/// <para>
+/// <see cref="RuleIdRegex"/> accepts a rule row with or without a leading pipe, because the two files are
+/// written in different table styles — <c>AnalyzerReleases.Shipped.md</c> delimits rows with pipes and
+/// <c>AnalyzerReleases.Unshipped.md</c> does not. Matching only the pipe-delimited form made
+/// <see cref="UnshippedRelease_GivenEveryRuleHasShipped_DeclaresNoRules"/> vacuous: a rule parked in the
+/// unshipped file parsed as no rules at all, so the guard passed while the catalogue was wrong.
+/// </para>
 /// </remarks>
 public partial class AnalyzerReleaseTrackingTests
 {
@@ -72,6 +83,8 @@ public partial class AnalyzerReleaseTrackingTests
 		"ZODSGEN042",
 		"ZODSGEN043",
 		"ZODSGEN044",
+		// Release 2.1.0.
+		"ZODSGEN045",
 	];
 
 	/// <summary>
@@ -92,6 +105,7 @@ public partial class AnalyzerReleaseTrackingTests
 		// Assert — each release block the catalogue has published, and the full rule set across them.
 		await Assert.That(markdown).Contains("## Release 2.0.0");
 		await Assert.That(markdown).Contains("## Release 2.0.2");
+		await Assert.That(markdown).Contains("## Release 2.1.0");
 		await Assert.That(SortedRuleIds(ruleIds)).IsEqualTo(SortedRuleIds(ExpectedShippedRuleIds));
 	}
 
@@ -143,7 +157,7 @@ public partial class AnalyzerReleaseTrackingTests
 	static string[] ReadRuleIds(string markdown) =>
 		[.. RuleIdRegex().Matches(markdown).Select(static match => match.Groups[1].Value)];
 
-	[GeneratedRegex(@"\|[ \t]*(ZODS[A-Z]{3}\d{3})[ \t]*\|")]
+	[GeneratedRegex(@"(?m)^[ \t]*\|?[ \t]*(ZODS[A-Z]{3}\d{3})[ \t]*\|")]
 	private static partial Regex RuleIdRegex();
 
 	static string SortedRuleIds(IEnumerable<string> ruleIds) =>

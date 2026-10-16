@@ -21,7 +21,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("ComposeModelSchema");
 
 		await Assert.That(generatedSource).ContainsGeneratedCode("ApplyAnd");
@@ -46,7 +46,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("NoComposeModelSchema");
 
 		// Assert
@@ -72,7 +72,7 @@ namespace Testing
 ";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -127,7 +127,7 @@ namespace Testing
 
 		// Act — compile and invoke, proving the generated validator can be cast to
 		// IZodSchema<T> and used in the composition API.
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -142,6 +142,7 @@ namespace Testing
 
 		var getSchemaMethod = helper.GetMethod("GetSchema")!;
 		var schema = getSchemaMethod.Invoke(null, [])!;
+
 		await Assert.That(schema).IsNotNull();
 	}
 }

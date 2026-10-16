@@ -16,7 +16,7 @@ jobs:
       # The shared workflow defaults to the 10.0.x SDK, but this repository targets net11.0 and pins
       # the .NET 11 SDK in global.json; without it the release job cannot resolve global.json.
       # Keep in sync with `sdk.version` in global.json (and with .github/workflows/pr.yml).
-      dotnet-version: "11.0.100-rc.1.26425.128"
+      dotnet-version: "11.0.100-rc.2.26504.105"
       release-mode: NuGet
       release-branch: main
     secrets: inherit

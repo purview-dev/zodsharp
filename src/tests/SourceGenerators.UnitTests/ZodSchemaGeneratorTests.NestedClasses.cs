@@ -25,7 +25,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("InnerSchema");
 
 		await Assert.That(generatedSource).ContainsGeneratedCode("private static partial class InnerSchema");
@@ -53,7 +53,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(driverResult.GetSource("InnerSchema")).IsNotEmpty();
 	}
@@ -80,7 +80,7 @@ namespace Testing
 	}
 }";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -124,7 +124,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("InnerSchema");
 		await Assert.That(generatedSource).IsNotNull();
 
@@ -168,7 +168,7 @@ namespace Testing
 }
 ";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generatedSource = driverResult.GetSource("WebAppKitOptionsSchema");
 		await Assert.That(generatedSource).IsNotNull();
 

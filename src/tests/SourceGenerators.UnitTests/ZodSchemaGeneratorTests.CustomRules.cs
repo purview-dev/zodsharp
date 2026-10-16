@@ -41,7 +41,7 @@ partial class ZodSchemaGeneratorTests
 	public async Task CustomRule_GivenZodRuleMappedAttribute_EmitsRuleValidation(CancellationToken cancellationToken)
 	{
 		// Arrange / Act
-		var driverResult = await GenerateAsync(CustomRuleSource, cancellationToken);
+		using var driverResult = await GenerateAsync(CustomRuleSource, cancellationToken);
 		var generated = driverResult.GetSource("UserSchema");
 
 		// Assert
@@ -58,7 +58,7 @@ partial class ZodSchemaGeneratorTests
 	)
 	{
 		// Arrange
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			CustomRuleSource,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken
@@ -116,7 +116,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions { ThrowOnGenerationException = false },
 			cancellationToken
@@ -159,7 +159,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("ModelSchema");
 
 		// Assert — a required, non-nullable Code cannot be defaulted to null, so the rule is not emitted.

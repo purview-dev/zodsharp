@@ -110,7 +110,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new() { AdditionalReferences = [contractReference] };
 
 		// Act
-		var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
 
 		// Assert
 		var hintNames = GeneratedHintNames(driverResult);
@@ -128,7 +128,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new() { AdditionalReferences = [contractReference] };
 
 		// Act
-		var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
 
 		// Assert
 		var generated = driverResult.GetSource("AppOptionsSchema");
@@ -146,7 +146,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new() { AdditionalReferences = [contractReference] };
 
 		// Act
-		var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
 
 		// Assert
 		var diagnostics = driverResult.CompilationResult.Compilation.GetDiagnostics(cancellationToken);
@@ -166,7 +166,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new() { AdditionalReferences = [contractReference] };
 
 		// Act
-		var driverResult = await GenerateAsync(AppOptionsCollectionSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(AppOptionsCollectionSource, options, cancellationToken);
 
 		// Assert
 		var hintNames = GeneratedHintNames(driverResult);
@@ -187,7 +187,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new() { AdditionalReferences = [contractReference] };
 
 		// Act
-		var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
 
 		// Assert
 		var hintNames = GeneratedHintNames(driverResult);
@@ -208,7 +208,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new() { AdditionalReferences = [contractReference] };
 
 		// Act
-		var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(AppOptionsSource, options, cancellationToken);
 
 		// Assert
 		var hintNames = GeneratedHintNames(driverResult);
@@ -226,7 +226,7 @@ partial class ZodSchemaGeneratorTests
 	{
 		// Arrange
 		// Act
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			LocalOptionsSource,
 			new ZodSourceGeneratorTestOptions(),
 			cancellationToken
@@ -273,7 +273,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new() { AdditionalReferences = [contractReference] };
 
 		// Act
-		var driverResult = await GenerateAsync(NestedAppOptionsSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(NestedAppOptionsSource, options, cancellationToken);
 
 		// Assert
 		var hintNames = GeneratedHintNames(driverResult);
@@ -298,7 +298,7 @@ partial class ZodSchemaGeneratorTests
 	async Task<MetadataReference> CompileContractAsync(string source, CancellationToken cancellationToken)
 	{
 		ZodSourceGeneratorTestOptions options = new() { CompilationAssemblyName = "Testing.Contracts" };
-		var contractRun = await GenerateAsync(source, options, cancellationToken);
+		using var contractRun = await GenerateAsync(source, options, cancellationToken);
 
 		using MemoryStream stream = new();
 		var emitResult = contractRun.CompilationResult.Compilation.Emit(stream, cancellationToken: cancellationToken);

@@ -23,7 +23,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		var schema = driverResult.GetSource("UserZod.g.cs", HintNameMatchMode.Suffix);
@@ -55,7 +55,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var schema = driverResult.GetSource("UserSchema.g.cs", HintNameMatchMode.Suffix);
 
 		// Assert
@@ -85,7 +85,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var schema = driverResult.GetSource("UserSchema.g.cs", HintNameMatchMode.Suffix);
 
 		// Assert
@@ -117,7 +117,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var schema = driverResult.GetSource("BasketSchema.g.cs", HintNameMatchMode.Suffix);
 
 		// Assert
@@ -146,7 +146,7 @@ partial class ZodSchemaGeneratorTests
 			""";
 
 		// Act
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var schema = driverResult.GetSource("BasketSchema.g.cs", HintNameMatchMode.Suffix);
 
 		// Assert

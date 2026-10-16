@@ -28,6 +28,19 @@ enum PropertyValidationKind
 	Unsupported,
 }
 
+/// <summary>
+/// How a string-serialized enum's member names are transformed, mirroring the
+/// <c>JsonNamingPolicy</c> a <c>JsonStringEnumConverter</c> may be constructed with.
+/// </summary>
+enum EnumJsonNamingPolicy
+{
+	/// <summary>Member names are used as declared.</summary>
+	Unchanged,
+
+	/// <summary>Member names are camelCased, matching <c>JsonNamingPolicy.CamelCase</c>.</summary>
+	CamelCase,
+}
+
 readonly record struct LengthAccessor(string LengthExpression, string Origin, bool IsSupported);
 
 /// <param name="TargetType">This is the target of the attribute, the type where the attribute was defined.</param>
@@ -52,6 +65,29 @@ readonly record struct LengthAccessor(string LengthExpression, string Origin, bo
 /// <c>[ZodSchema]</c> attribute opts out.
 /// </param>
 /// <param name="IsPrimary">True if this is the primary schema for the target type, false if it is a secondary schema.</param>
+/// <param name="ScalarUnderlyingType">
+/// When the target is a Purview.ValueObjects scalar, the underlying value type whose JSON wire form the
+/// scalar serialises as (for example a <c>Guid</c> scalar serialises as a canonical Guid string). Null
+/// otherwise.
+/// </param>
+/// <param name="ScalarUnderlyingCanBeNull">
+/// Whether the scalar's underlying value may be null (a nullable reference or nullable value scalar).
+/// </param>
+/// <param name="GenerateJsonSchema">
+/// Whether the generated schema exports JSON Schema (the <c>BuildJsonSchema</c> method and the
+/// <c>IJsonSchemaProvider</c> implementation on the adapter). Controlled by
+/// <c>[ZodSchema(GenerateJsonSchema = false)]</c> and the assembly-level <c>ZodSharpGenerateJsonSchemas</c>
+/// switch.
+/// </param>
+/// <param name="EnumAsString">
+/// Whether enums in this schema are serialized as strings. Set by the assembly-level
+/// <c>ZodSharpEnumSerialization=String</c> switch (for a global <c>JsonStringEnumConverter</c>); a property
+/// can also opt in with a per-type/property <c>[JsonConverter(typeof(JsonStringEnumConverter))]</c>.
+/// </param>
+/// <param name="EnumNamingPolicy">
+/// How a string-serialized enum's member names are transformed, set by the assembly-level
+/// <c>ZodSharpEnumNamingPolicy</c> switch.
+/// </param>
 readonly record struct ZodSchemaDescriptor(
 	TypeIdentity TargetType,
 	TypeIdentity SchemaType,
@@ -68,13 +104,23 @@ readonly record struct ZodSchemaDescriptor(
 	bool GenerateParseMethod,
 	EquatableArray<CustomRuleDescriptor> TypeRules,
 	bool ValidateEnumValues,
-	bool IsPrimary
+	bool IsPrimary,
+	TypeIdentity? ScalarUnderlyingType,
+	bool ScalarUnderlyingCanBeNull,
+	bool GenerateJsonSchema,
+	bool EnumAsString,
+	EnumJsonNamingPolicy EnumNamingPolicy
 );
 
 /// <param name="PropertyType">The declared type of the property, with a nullable wrapper removed.</param>
 /// <param name="Name">The name of the property.</param>
 /// <param name="DisplayName">The name reported in error messages, honouring a <c>[Display]</c> attribute.</param>
-/// <param name="CanBeNull">Indicates whether the property can be null.</param>
+/// <param name="CanBeNull">Indicates whether the property type can hold null at runtime (a reference type or <c>Nullable&lt;T&gt;</c>).</param>
+/// <param name="IsDeclaredNullable">
+/// Indicates whether the property is declared nullable (the nullable reference-type annotation, or
+/// <c>Nullable&lt;T&gt;</c>). This governs null acceptance in validation and the exported JSON Schema: a
+/// non-nullable reference type is required and its rules run unconditionally and reject null.
+/// </param>
 /// <param name="IsNullableValueType">Indicates whether the property type is a <c>Nullable&lt;T&gt;</c>.</param>
 /// <param name="IsEnum">Indicates whether the property type is an enum.</param>
 /// <param name="IsFlagsEnum">Indicates whether the enum type is declared with the <c>[Flags]</c> attribute.</param>
@@ -90,11 +136,28 @@ readonly record struct ZodSchemaDescriptor(
 /// <param name="CompareViaCompareTo">Indicates whether ranges compare through <c>IComparable</c>.</param>
 /// <param name="ValidationAttributes">The DataAnnotations attributes declared on the property.</param>
 /// <param name="CustomRules">The rules bound to the property through <c>[ZodRule]</c>-mapped attributes.</param>
+/// <param name="JsonPropertyName">
+/// The explicit <c>[JsonPropertyName]</c> value, when one is declared. Used to name the property in the
+/// exported JSON Schema so it matches the System.Text.Json wire form.
+/// </param>
+/// <param name="NestedSchemaExportsJsonSchema">
+/// Whether the nested complex type's generated schema exports JSON Schema. When <see langword="false"/> the
+/// parent's schema cannot reference it and falls back to an empty schema (reported as ZODSGEN045).
+/// </param>
+/// <param name="EnumSerializedAsString">
+/// Whether the property's enum is serialized as a string (a per-type or per-property
+/// <c>[JsonConverter(typeof(JsonStringEnumConverter))]</c>). The assembly-level switch is applied separately.
+/// </param>
+/// <param name="EnumJsonNames">
+/// For a non-flags enum, the JSON names of the allowed members, in declaration order: the member name, or its
+/// <c>[JsonStringEnumMemberName]</c> value when declared. Used when the enum is serialized as a string.
+/// </param>
 readonly record struct ZodPropertyDescriptor(
 	TypeIdentity PropertyType,
 	string Name,
 	string DisplayName,
 	bool CanBeNull,
+	bool IsDeclaredNullable,
 	bool IsNullableValueType,
 	bool IsEnum,
 	bool IsFlagsEnum,
@@ -106,7 +169,11 @@ readonly record struct ZodPropertyDescriptor(
 	LengthAccessor LengthAccessor,
 	bool CompareViaCompareTo,
 	ValidationAttributes ValidationAttributes,
-	EquatableArray<CustomRuleDescriptor> CustomRules
+	EquatableArray<CustomRuleDescriptor> CustomRules,
+	string? JsonPropertyName,
+	bool NestedSchemaExportsJsonSchema,
+	bool EnumSerializedAsString,
+	EquatableArray<string> EnumJsonNames
 );
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(

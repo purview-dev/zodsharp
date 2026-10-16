@@ -32,24 +32,61 @@ static class CustomRuleResolver
 	/// </summary>
 	/// <param name="symbol">The symbol whose rule attributes are resolved.</param>
 	/// <param name="ruleTargetType">The type the rules are applied to.</param>
+	/// <param name="isTypeLevel">
+	/// Whether the rules are applied to <paramref name="ruleTargetType"/> itself rather than to a member. A
+	/// type-level rule on a scalar reports an empty path, so its default message names the scalar.
+	/// </param>
 	/// <returns>The resolved rule descriptors.</returns>
 	/// <remarks>
 	/// Used by the generator, which only needs the descriptors: the same resolution runs in
 	/// <c>ZodSchemaAnalyzer</c>, which reports the diagnostics, so a rule that resolves to nothing is still
 	/// visible in the build.
 	/// </remarks>
-	public static EquatableArray<CustomRuleDescriptor> Resolve(ISymbol symbol, ITypeSymbol ruleTargetType) =>
-		Resolve(symbol, ruleTargetType, ImmutableArray.CreateBuilder<ReportableDiagnostic>());
+	public static EquatableArray<CustomRuleDescriptor> Resolve(
+		ISymbol symbol,
+		ITypeSymbol ruleTargetType,
+		bool isTypeLevel = false
+	) => Resolve(symbol, ruleTargetType, ImmutableArray.CreateBuilder<ReportableDiagnostic>(), isTypeLevel);
 
 	public static EquatableArray<CustomRuleDescriptor> Resolve(
 		ISymbol symbol,
 		ITypeSymbol ruleTargetType,
-		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics,
+		bool isTypeLevel = false
+	) => Resolve(symbol.GetAttributes(), ruleTargetType, diagnostics, isTypeLevel);
+
+	/// <summary>
+	/// Resolves the custom rules declared by <paramref name="attributes"/>. The attributes are supplied by the
+	/// caller rather than read from a symbol so a positional record property can contribute the attributes of
+	/// the primary-constructor parameter it is synthesized from, which the compiler does not copy onto the
+	/// property when the attribute is valid on both targets.
+	/// </summary>
+	/// <param name="attributes">The validation attributes to resolve.</param>
+	/// <param name="ruleTargetType">The type the rules are applied to.</param>
+	/// <param name="diagnostics">The diagnostics a failed resolution reports into.</param>
+	/// <param name="isTypeLevel">
+	/// Whether the rules are applied to <paramref name="ruleTargetType"/> itself rather than to a member. A
+	/// type-level rule on a scalar reports an empty path, so its default message names the scalar.
+	/// </param>
+	/// <returns>The resolved rule descriptors.</returns>
+	public static EquatableArray<CustomRuleDescriptor> Resolve(
+		ImmutableArray<AttributeData> attributes,
+		ITypeSymbol ruleTargetType,
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics,
+		bool isTypeLevel = false
 	)
 	{
 		ImmutableArray<CustomRuleDescriptor>.Builder? builder = null;
 
-		foreach (var attribute in symbol.GetAttributes())
+		// A rule applied at the type level of a scalar value object reports an empty path, so the generic
+		// subject word in its message ("Value") is replaced with the scalar's name. The substitution only
+		// applies when the attribute supplies no message of its own.
+		var scalarSubject =
+			isTypeLevel && ruleTargetType is INamedTypeSymbol owner && TryGetScalarAttribute(owner, out _)
+				? owner.Name
+				: null;
+
+		foreach (var attribute in attributes)
 		{
 			if (attribute.AttributeClass is not INamedTypeSymbol attributeClass)
 				continue;
@@ -102,7 +139,22 @@ static class CustomRuleResolver
 				continue;
 			}
 
-			if (!TryBuildArguments(attribute, ruleType, out var arguments, out var unmappedParameterName))
+			// The subject-substituted default message, used only when the attribute supplies no message of its
+			// own. It is derived from the resolved rule's own MessageFormat so the wording stays the rule's.
+			var subjectMessage =
+				scalarSubject is not null && GetRuleMessageFormat(ruleType) is { } messageFormat
+					? SubstituteSubject(messageFormat, scalarSubject)
+					: null;
+
+			if (
+				!TryBuildArguments(
+					attribute,
+					ruleType,
+					subjectMessage,
+					out var arguments,
+					out var unmappedParameterName
+				)
+			)
 			{
 				diagnostics.Add(
 					ReportableDiagnostic.Create(
@@ -372,7 +424,7 @@ static class CustomRuleResolver
 	/// <param name="type">The type to inspect.</param>
 	/// <param name="valueType">The scalar's underlying value type, when it is a scalar.</param>
 	/// <returns><see langword="true"/> when <paramref name="type"/> is a scalar value object.</returns>
-	static bool TryGetScalarUnderlyingValue(ITypeSymbol type, out ITypeSymbol valueType)
+	internal static bool TryGetScalarUnderlyingValue(ITypeSymbol type, out ITypeSymbol valueType)
 	{
 		valueType = null!;
 
@@ -989,6 +1041,59 @@ static class CustomRuleResolver
 		return null;
 	}
 
+	/// <summary>
+	/// Reads a rule's <c>public const string MessageFormat</c>, walking base types so a rule that inherits
+	/// its error identity (for example from a shared abstract base) is still described.
+	/// </summary>
+	/// <param name="ruleType">The resolved rule type.</param>
+	/// <returns>The constant's value, or <see langword="null"/> when no such constant exists.</returns>
+	static string? GetRuleMessageFormat(INamedTypeSymbol ruleType)
+	{
+		for (var current = (INamedTypeSymbol?)ruleType; current is not null; current = current.BaseType)
+		{
+			foreach (var member in current.GetMembers("MessageFormat"))
+			{
+				if (member is IFieldSymbol { IsConst: true, ConstantValue: string value })
+					return value;
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Replaces the first whole-word subject token (<c>Value</c>) in a rule's message format with
+	/// <paramref name="subject"/>, so a type-level rule on a scalar names the scalar instead of the generic
+	/// subject. A format that does not reference the subject token is returned unchanged.
+	/// </summary>
+	/// <param name="messageFormat">The rule's message format.</param>
+	/// <param name="subject">The name to substitute for the subject token.</param>
+	/// <returns>The message format with the subject token replaced.</returns>
+	static string SubstituteSubject(string messageFormat, string subject)
+	{
+		const string token = "Value";
+
+		for (var index = 0; index <= messageFormat.Length - token.Length; index++)
+		{
+			if (string.CompareOrdinal(messageFormat, index, token, 0, token.Length) != 0)
+				continue;
+
+			var afterIndex = index + token.Length;
+			var before = index == 0 ? '\0' : messageFormat[index - 1];
+			var after = afterIndex >= messageFormat.Length ? '\0' : messageFormat[afterIndex];
+
+			// Only replace a whole word, so a format that mentions the subject inside another word is left alone.
+			if (IsWordCharacter(before) || IsWordCharacter(after))
+				continue;
+
+			return messageFormat.Substring(0, index) + subject + messageFormat.Substring(afterIndex);
+		}
+
+		return messageFormat;
+	}
+
+	static bool IsWordCharacter(char value) => char.IsLetterOrDigit(value) || value == '_';
+
 	static bool TryGetRuleMapping(INamedTypeSymbol attributeClass, out RuleMapping mapping)
 	{
 		for (var current = (INamedTypeSymbol?)attributeClass; current is not null; current = current.BaseType)
@@ -1069,6 +1174,10 @@ static class CustomRuleResolver
 	/// </summary>
 	/// <param name="attribute">The applied attribute.</param>
 	/// <param name="ruleType">The resolved rule type.</param>
+	/// <param name="subjectMessage">
+	/// The subject-substituted default message for a type-level rule on a scalar, or <see langword="null"/>.
+	/// It is used only when the attribute supplies no message of its own.
+	/// </param>
 	/// <param name="arguments">The argument expressions, in the selected constructor's parameter order.</param>
 	/// <param name="unmappedParameterName">
 	/// The parameter that could not be mapped when no overload could be satisfied.
@@ -1077,6 +1186,7 @@ static class CustomRuleResolver
 	static bool TryBuildArguments(
 		AttributeData attribute,
 		INamedTypeSymbol ruleType,
+		string? subjectMessage,
 		out EquatableArray<string> arguments,
 		out string? unmappedParameterName
 	)
@@ -1095,7 +1205,7 @@ static class CustomRuleResolver
 			if (!ConsumesSuppliedArguments(attribute, candidate))
 				continue;
 
-			if (TryBuildArgumentsFor(attribute, candidate, out arguments, out _))
+			if (TryBuildArgumentsFor(attribute, candidate, subjectMessage, out arguments, out _))
 				return true;
 		}
 
@@ -1103,12 +1213,12 @@ static class CustomRuleResolver
 		// their parameters differently from the rule's.
 		foreach (var candidate in candidates)
 		{
-			if (TryBuildArgumentsFor(attribute, candidate, out arguments, out _))
+			if (TryBuildArgumentsFor(attribute, candidate, subjectMessage, out arguments, out _))
 				return true;
 		}
 
 		// Report the failure against the widest overload for a useful message.
-		TryBuildArgumentsFor(attribute, candidates[0], out _, out unmappedParameterName);
+		TryBuildArgumentsFor(attribute, candidates[0], subjectMessage, out _, out unmappedParameterName);
 		return false;
 	}
 
@@ -1172,6 +1282,7 @@ static class CustomRuleResolver
 	static bool TryBuildArgumentsFor(
 		AttributeData attribute,
 		IMethodSymbol constructor,
+		string? subjectMessage,
 		out EquatableArray<string> arguments,
 		out string? unmappedParameterName
 	)
@@ -1245,6 +1356,15 @@ static class CustomRuleResolver
 			if (IsMessageParameter(parameter) && validation.Exists && !string.IsNullOrEmpty(validation.ErrorMessage))
 			{
 				expressions.Add(validation.ErrorMessage.StringLiteral());
+				continue;
+			}
+
+			// A type-level rule on a scalar reports an empty path, so its default message names the scalar
+			// instead of the generic subject. An explicit message (named/positional/ErrorMessage) has already
+			// been consumed above, so this only replaces the rule's own default.
+			if (subjectMessage is not null && IsMessageParameter(parameter))
+			{
+				expressions.Add(subjectMessage.StringLiteral());
 				continue;
 			}
 

@@ -35,7 +35,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(source, new ZodSourceGeneratorTestOptions(), cancellationToken);
+		using var driverResult = await GenerateAsync(source, new ZodSourceGeneratorTestOptions(), cancellationToken);
 		var generated = driverResult.GetSource("AdminPortalSchema");
 
 		await Assert
@@ -68,7 +68,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AdminPortalSchema");
 
 		await Assert.That(generated).DoesNotContain("AdminPortalValidator");
@@ -79,7 +79,7 @@ partial class ZodSchemaGeneratorTests
 		CancellationToken cancellationToken
 	)
 	{
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			OptionsValidatorSource,
 			new ZodSourceGeneratorTestOptions(),
 			cancellationToken
@@ -109,7 +109,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(source, cancellationToken);
+		using var driverResult = await GenerateAsync(source, cancellationToken);
 		var generated = driverResult.GetSource("AdminPortalOptionsSchema");
 
 		await Assert.That(generated).DoesNotContain("AdminPortalOptionsValidator");
@@ -128,7 +128,7 @@ partial class ZodSchemaGeneratorTests
 			),
 		};
 
-		var driverResult = await GenerateAsync(OptionsValidatorSource, options, cancellationToken);
+		using var driverResult = await GenerateAsync(OptionsValidatorSource, options, cancellationToken);
 		var generated = driverResult.GetSource("AdminPortalOptionsSchema");
 
 		await Assert.That(generated).DoesNotContain("AdminPortalOptionsValidator");
@@ -162,7 +162,7 @@ partial class ZodSchemaGeneratorTests
 			),
 		};
 
-		var driverResult = await GenerateAsync(source, options, cancellationToken);
+		using var driverResult = await GenerateAsync(source, options, cancellationToken);
 
 		var configSource = driverResult.GetSource("AdminPortalConfigSchema");
 		await Assert.That(configSource).ContainsGeneratedCode("public sealed partial class AdminPortalConfigValidator");
@@ -190,7 +190,7 @@ partial class ZodSchemaGeneratorTests
 			}
 			""";
 
-		var driverResult = await GenerateAsync(
+		using var driverResult = await GenerateAsync(
 			source,
 			new ZodSourceGeneratorTestOptions().Compile(),
 			cancellationToken

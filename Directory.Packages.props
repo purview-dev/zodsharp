@@ -10,9 +10,9 @@
 		-->
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
-		<TUnitVersion>1.68.17</TUnitVersion>
-		<PurviewSourceGenFramework>1.0.0</PurviewSourceGenFramework>
-		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
+		<TUnitVersion>1.75.0</TUnitVersion>
+		<PurviewSourceGenFramework>1.1.1</PurviewSourceGenFramework>
+		<DotnetRuntimeVersion>10.0.13</DotnetRuntimeVersion>
 		<!--
 			Microsoft.Extensions.Options and ...DependencyInjection.Abstractions are real dependencies of
 			the shipped Purview.ZodSharp package, so their version has to track the consumer's target
@@ -38,18 +38,23 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageVersion Include="Bogus" Version="35.6.5" />
+		<!-- Drives the vitest cross-platform suites from the .NET test run (Repository.UnitTests), so
+		     `just test` covers both sides of the parity guarantee rather than only the C# side. -->
+		<PackageVersion Include="CliWrap" Version="3.10.5" />
+		<PackageVersion Include="FastGuid" Version="1.4.3" />
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDIVersion)" />
 		<PackageVersion
 			Include="Microsoft.Extensions.DependencyInjection.Abstractions"
 			Version="$(MicrosoftExtensionsVersion)"
 		/>
 		<PackageVersion Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsVersion)" />
-		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
+		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.402" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynCompilerVersion)" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(RoslynCompilerVersion)" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynAnalyzersVersion)" />
 		<PackageVersion Include="TUnit" Version="$(TUnitVersion)" />
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
+		<PackageVersion Include="Purview.Skills.Testing" Version="1.0.6" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageVersion Include="System.Text.Json" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="BenchmarkDotNet" Version="0.16.0-preview.2" />

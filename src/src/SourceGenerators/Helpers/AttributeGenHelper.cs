@@ -161,6 +161,26 @@ static class AttributeGenHelper
 								Initializer = "true",
 							}
 						);
+
+					body.XmlSummary(
+							"Whether to generate the JSON Schema export members for this type: the static",
+							"<c>BuildJsonSchema</c> method and the <c>IJsonSchemaProvider</c> implementation on the",
+							"generated validator adapter. Set to <c>false</c> to keep a validation-only type out of the",
+							"cross-platform (TypeScript/JavaScript) contract surface. Default is true.",
+							"A type whose export is disabled cannot be referenced by an exported type; the generator",
+							"falls back to an empty schema and the analyzer reports ZODSGEN045."
+						)
+						.Property(
+							new(
+								nameof(ZodSchemaAttributeData.GenerateJsonSchema),
+								PurviewTypeLibrary.System.Boolean,
+								TypeDeclarationAccessibility.Public
+							)
+							{
+								IsInitOnly = true,
+								Initializer = "true",
+							}
+						);
 				}
 			);
 

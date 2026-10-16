@@ -6,7 +6,10 @@ namespace ZodSharp.Rules;
 /// </summary>
 /// <typeparam name="T">The comparable type</typeparam>
 [Core.ZodRule]
-public readonly record struct LessThanOrEqualRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct LessThanOrEqualRule<T>
+	: Core.IValidationRule<T>,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 	where T : IComparable<T>
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
@@ -45,6 +48,17 @@ public readonly record struct LessThanOrEqualRule<T> : Core.IValidationRule<T>, 
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, MaxValue, value);
+
+	/// <summary>Applies the JSON Schema <c>maximum</c> constraint (inclusive).</summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		if (JsonSchema.JsonSchemaNumbers.TryToDouble(MaxValue, out var maximum))
+			schema.Maximum = maximum;
+		else
+			JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(LessThanOrEqualRule<>));
+	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);

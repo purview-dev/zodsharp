@@ -27,13 +27,19 @@ namespace ZodSharp.Rules;
 /// </para>
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_value";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Value is a sentinel value, but got {0}";
+	/// <summary>Gets the message format; <c>{0}</c> is a description of the offending sentinel value.</summary>
+	public const string MessageFormat = "Value has a sentinel value, but got {0}";
+
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> for a canonical Guid that is not the all-zero <see cref="Guid.Empty"/>.
+	/// </summary>
+	public const string GuidJsonSchemaPattern =
+		"^(?!00000000-0000-0000-0000-000000000000$)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
 	readonly string _message;
 
@@ -56,11 +62,47 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 	public bool IsValid(in T value) => !SentinelValues<T>.IsSentinel(value);
 
 	/// <summary>
+	/// Applies the JSON Schema constraint that rejects the value's sentinel, where the wire form is known.
+	/// </summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	/// <remarks>
+	/// A string sentinel (null/empty/whitespace) becomes <c>minLength: 1</c> plus a non-whitespace pattern; a
+	/// GUID sentinel (<see cref="Guid.Empty"/>) becomes a <c>not: { const: ... }</c> against the all-zero
+	/// UUID. A date/time sentinel depends on the exact serialized form, which the exporter cannot know here,
+	/// so it is reported through <see cref="JsonSchema.JsonSchemaDefinition.UnsupportedRules"/> instead of
+	/// being guessed or dropped.
+	/// </remarks>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+
+		if (typeof(T) == typeof(string))
+		{
+			schema.MinLength = 1;
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, "\\S");
+			return;
+		}
+
+		if (typeof(T) == typeof(Guid))
+		{
+			// Expressed as a pattern rather than `not: { const: ... }` so it survives converters that do not
+			// implement JSON Schema `not` (for example Zod's fromJSONSchema). The negative lookahead rejects
+			// the all-zero UUID while the body requires the canonical 8-4-4-4-12 form. Composed through
+			// ConstrainPattern so a second pattern (for example a UUID version constraint) is not lost.
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, GuidJsonSchemaPattern);
+			return;
+		}
+
+		JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(NonSentinelRule<>));
+	}
+
+	/// <summary>
 	/// Gets the error message for a failed validation.
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
-	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, value);
+	public string GetErrorMessage(in T value) =>
+		RuleMessage.Format(_message ?? MessageFormat, SentinelValues<T>.Describe(value));
 
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);
@@ -119,4 +161,65 @@ static class SentinelValues<T>
 
 		return false;
 	}
+
+	/// <summary>
+	/// Describes the sentinel <paramref name="value"/> represents, for use in an error message (for example
+	/// <c>"an empty GUID"</c>). A value that is not a known sentinel is described by its own string
+	/// representation.
+	/// </summary>
+	/// <param name="value">The value to describe.</param>
+	/// <returns>A human-readable description of the value.</returns>
+	public static string Describe(in T value)
+	{
+		if (typeof(T) == typeof(Guid))
+			return Unsafe.As<T, Guid>(ref Unsafe.AsRef(in value)) == Guid.Empty ? "an empty GUID" : Raw(in value);
+
+		if (typeof(T) == typeof(DateTime))
+		{
+			var typed = Unsafe.As<T, DateTime>(ref Unsafe.AsRef(in value));
+			return typed == DateTime.MinValue ? "DateTime.MinValue"
+				: typed == DateTime.MaxValue ? "DateTime.MaxValue"
+				: Raw(in value);
+		}
+
+		if (typeof(T) == typeof(DateTimeOffset))
+		{
+			var typed = Unsafe.As<T, DateTimeOffset>(ref Unsafe.AsRef(in value));
+			return typed == DateTimeOffset.MinValue ? "DateTimeOffset.MinValue"
+				: typed == DateTimeOffset.MaxValue ? "DateTimeOffset.MaxValue"
+				: Raw(in value);
+		}
+
+		if (typeof(T) == typeof(DateOnly))
+		{
+			var typed = Unsafe.As<T, DateOnly>(ref Unsafe.AsRef(in value));
+			return typed == DateOnly.MinValue ? "DateOnly.MinValue"
+				: typed == DateOnly.MaxValue ? "DateOnly.MaxValue"
+				: Raw(in value);
+		}
+
+		if (typeof(T) == typeof(TimeOnly))
+		{
+			var typed = Unsafe.As<T, TimeOnly>(ref Unsafe.AsRef(in value));
+			return typed == TimeOnly.MinValue ? "TimeOnly.MinValue"
+				: typed == TimeOnly.MaxValue ? "TimeOnly.MaxValue"
+				: Raw(in value);
+		}
+
+		if (typeof(T) == typeof(string))
+		{
+			var typed = Unsafe.As<T, string?>(ref Unsafe.AsRef(in value));
+			return typed switch
+			{
+				null => "null",
+				{ Length: 0 } => "an empty string",
+				_ when string.IsNullOrWhiteSpace(typed) => "whitespace",
+				_ => typed,
+			};
+		}
+
+		return Raw(in value);
+	}
+
+	static string Raw(in T value) => value?.ToString() ?? "null";
 }
