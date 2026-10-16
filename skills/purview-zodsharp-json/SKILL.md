@@ -136,6 +136,11 @@ Things worth knowing:
 - **Scalar value objects** (`[Scalar<TValue>]`) export as the **underlying** value's schema, not as an
   object wrapping a `Value` property. A `Guid` scalar exports as a canonical 8-4-4-4-12 hexadecimal
   `pattern`, not Zod's RFC `uuid` format, because a C# `Guid` accepts any 128-bit value.
+- **Collection items** follow the null-items setting: `T[]`/`List<T>` maps to `z.array(T)` and
+  `T?[]`/`List<T?>` (or a property allowing nulls via `[CollectionBehavior(AllowNulls = true)]`) to
+  `z.array(T.nullable())`. A collection whose elements may be null exports
+  `items.anyOf: [ …, { "type": "null" } ]`; by default the generated validator rejects a null element with
+  `invalid_type` at the element's path, matching `z.array(T)`.
 
 ## JSON Schema import
 
@@ -164,7 +169,8 @@ Mapped keywords:
   exports `format: "uuid"` plus a version-pinning `pattern`, and the `allOf` composition preserves it
   on import. Multiple `pattern` constraints compose under `allOf`, and every branch is applied.
 - Numbers — `minimum`, `maximum`, `multipleOf`; `integer` additionally applies `.Int()`.
-- Objects — `required` and optional fields. Arrays — `items`, `minItems`, `maxItems`.
+- Objects — `required` and optional fields. Arrays — `items`, `minItems`, `maxItems` (a nullable item
+  schema — `anyOf` with a `{"type":"null"}` branch — imports as a nullable element).
 
 ### Limits
 

@@ -5,7 +5,7 @@
 - **Zero-allocation on valid inputs for the core schema types.** Primitives, strings, arrays, and objects (and their generated `[ZodSchema]` validators) validate valid inputs without allocating. See [Performance](Performance.md) for the measurements. The exceptions are listed under [Limitations](#limitations).
 - **No reflection on hot paths.** The runtime library uses expression trees only in the opt-in `CompiledValidator` and to compile a one-off discriminator accessor per (type, discriminator) pair for `ZodDiscriminatedUnion`. After that first use, validation runs direct property access; the source generator emits direct typed codegen.
 - **Deterministic, reviewable generated code.** The `[ZodSchema]` generator output is stable and de-duplicated; there are no scope leaks in emitted code.
-- **Cross-platform parity.** The C# implementation is exercised against TypeScript/Zod fixtures (see [Cross-Platform Interop](Cross-Platform-Interop.md)).
+- **Cross-platform parity.** The C# implementation is exercised against TypeScript/Zod fixtures (see [Cross-Platform Interop](Cross-Platform-Interop.md)). Array item nullability lines up with Zod: a generated `T[]` rejects null elements like `z.array(T)`, and a nullable element exports the same `items.anyOf` null branch that `z.array(T.nullable())` does.
 - **Multi-targeting.** Packages target `net8.0`, `net9.0`, `net10.0`, and `net11.0`; the source generator targets `netstandard2.0` so it runs in any compiler host.
 - **A fully built schema is safe to cache and share across threads.** Validation only reads the rule set and `Description`, so once construction is finished a schema can be reused concurrently. Building is *not* immutable — see the next section.
 

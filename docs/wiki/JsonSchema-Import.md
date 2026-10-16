@@ -42,7 +42,7 @@ var result = userSchema.Validate(userData);
 - String constraints — `minLength`, `maxLength`, `pattern`, and `format` (`email`, `uri`, `uuid`). The `uuid`/`guid` format maps to the versionless `.UUID()`; a versioned `.UUID(UuidVersion.V7)` schema exports `format: "uuid"` plus a version-pinning `pattern`, and the `allOf` composition preserves that pattern on import. Multiple `pattern` constraints are composed under `allOf`, and every branch is applied.
 - Numeric constraints — `minimum`, `maximum`, `multipleOf`; `integer` additionally applies `.Int()`.
 - Objects — `required` and optional fields via `Z.Object().Field(...)`.
-- Arrays — `items`, `minItems`, `maxItems`.
+- Arrays — `items`, `minItems`, `maxItems`. A nullable item schema (`items.anyOf` containing a `{"type":"null"}` branch) imports as a nullable element, matching `z.array(T.nullable())` and the shape the generated exporter emits for an allow-null collection.
 
 ## Limitations
 
