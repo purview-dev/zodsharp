@@ -18,16 +18,16 @@ namespace ZodSharp.Repository;
 /// </para>
 /// <para>
 /// This is a duplicate of that job's work, deliberately: the job stays the authoritative gate because it
-/// controls producer ordering and installs bun from scratch, while these tests make the same failure
-/// reproducible with one command on a developer machine. One test per vitest suite keeps a failure
-/// attributable to a file, and <see cref="VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered"/> fails
-/// when a suite is added that is not listed here, so the duplication cannot silently fall behind.
+/// controls producer ordering, while these tests make the same failure reproducible with one command on a
+/// developer machine. One test per vitest suite keeps a failure attributable to a file, and
+/// <see cref="VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered"/> fails when a suite is added that is
+/// not listed here, so the duplication cannot silently fall behind.
 /// </para>
 /// <para>
-/// <b>Prerequisites are skipped, not failed.</b> bun and <c>node_modules/</c> are absent on the shared
-/// build pipeline's runner (only the <c>cross-platform</c> job sets bun up) and on a checkout where
-/// <c>bun install</c> has not been run. Failing there would report a missing toolchain as a broken
-/// repository. A skip is reported by the test platform with its reason, so it stays visible.
+/// <b>These tests never skip.</b> A skipped test proves nothing, and the parity guarantee is not optional.
+/// The runner is resolved per run: <b>bun</b> when it is on PATH (the shared build pipeline and the
+/// <c>cross-platform</c> job both have it), otherwise <b>node</b> against vitest's own entry point. If
+/// neither is available, or the install or the run fails, the test fails and says which step and why.
 /// </para>
 /// </remarks>
 public sealed class CrossPlatformVitestTests
@@ -40,7 +40,19 @@ public sealed class CrossPlatformVitestTests
 	/// </summary>
 	static readonly TimeSpan FixtureWaitTimeout = TimeSpan.FromMinutes(2);
 
+	/// <summary>
+	/// Installing dependencies on a cold checkout fetches the whole tree, so this is generous.
+	/// </summary>
+	static readonly TimeSpan InstallTimeout = TimeSpan.FromMinutes(10);
+
 	static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
+
+	/// <summary>
+	/// Resolved once per test run: the toolchain probe and any install are shared by every suite, and
+	/// running two installs concurrently in the same working directory would corrupt <c>node_modules/</c>.
+	/// </summary>
+	static readonly SemaphoreSlim RunnerGate = new(1, 1);
+	static VitestRunner? CachedRunner;
 
 	/// <summary>
 	/// A vitest suite and the fixture directory its assertions read. Keep in step with
@@ -50,6 +62,12 @@ public sealed class CrossPlatformVitestTests
 	{
 		public override string ToString() => TestFile;
 	}
+
+	/// <summary>
+	/// How to invoke vitest. <paramref name="Arguments"/> are the leading arguments, to which the suite's
+	/// test-file path is appended.
+	/// </summary>
+	sealed record VitestRunner(string Name, string Executable, IReadOnlyList<string> Arguments);
 
 	public static IEnumerable<Func<VitestSuite>> Suites() =>
 		[
@@ -66,21 +84,21 @@ public sealed class CrossPlatformVitestTests
 	{
 		// Arrange
 		var root = RepositoryRoot.Value;
-		SkipUnlessToolchainIsAvailable(root);
+		var runner = await GetRunnerAsync(root, cancellationToken);
 
 		var fixtureDirectory = Path.Combine(root, suite.FixtureDirectory.Replace('/', Path.DirectorySeparatorChar));
 		if (!await WaitForFixturesAsync(fixtureDirectory, cancellationToken))
 		{
-			Skip.Test(
-				$"No fixtures in '{suite.FixtureDirectory}' after waiting {FixtureWaitTimeout.TotalSeconds:N0}s. "
-					+ "The C# producer for this suite did not run — run the whole suite with `just test`, which "
-					+ "covers every producer, then re-run."
+			Assert.Fail(
+				$"No fixtures in '{suite.FixtureDirectory}' after waiting {FixtureWaitTimeout.TotalSeconds:N0}s, so "
+					+ "this suite would verify nothing. Its C# producer did not run — run the whole suite with "
+					+ "`just test`, which covers every producer."
 			);
 		}
 
 		// Act — vitest exits non-zero on failure; capture rather than throw so the output reaches the assertion.
-		var result = await Cli.Wrap("bun")
-			.WithArguments(["run", "vitest", "run", suite.TestFile])
+		var result = await Cli.Wrap(runner.Executable)
+			.WithArguments([.. runner.Arguments, suite.TestFile])
 			.WithWorkingDirectory(root)
 			.WithValidation(CommandResultValidation.None)
 			.ExecuteBufferedAsync(cancellationToken);
@@ -90,7 +108,7 @@ public sealed class CrossPlatformVitestTests
 			.That(result.ExitCode)
 			.IsEqualTo(0)
 			.Because(
-				$"`bun run vitest run {suite.TestFile}` failed:{Environment.NewLine}"
+				$"vitest ({runner.Name}) failed for {suite.TestFile}:{Environment.NewLine}"
 					+ $"{result.StandardOutput}{Environment.NewLine}{result.StandardError}"
 			);
 	}
@@ -125,6 +143,107 @@ public sealed class CrossPlatformVitestTests
 			);
 	}
 
+	static async Task<VitestRunner> GetRunnerAsync(string root, CancellationToken cancellationToken)
+	{
+		await RunnerGate.WaitAsync(cancellationToken);
+		try
+		{
+			return CachedRunner ??= await ResolveRunnerAsync(root, cancellationToken);
+		}
+		finally
+		{
+			RunnerGate.Release();
+		}
+	}
+
+	/// <summary>
+	/// Prefers bun, falls back to node, and fails when neither can run the suites.
+	/// </summary>
+	/// <remarks>
+	/// The node path invokes vitest's entry point directly rather than going through <c>npx</c> or
+	/// <c>node_modules/.bin</c>. Both are unreliable here: the <c>.bin</c> shims are written by whichever
+	/// package manager installed the tree (a bun install leaves <c>vitest.exe</c>/<c>vitest.bunx</c> and no
+	/// node shim), and <c>npx</c> resolves to a <c>.cmd</c> or <c>.ps1</c> shim on Windows, which is not
+	/// directly executable as a child process. The entry point is declared by vitest's own
+	/// <c>package.json</c> <c>bin</c> field and is the same file either shim would invoke.
+	/// </remarks>
+	static async Task<VitestRunner> ResolveRunnerAsync(string root, CancellationToken cancellationToken)
+	{
+		var bun = FindOnPath("bun");
+		var node = FindOnPath("node");
+
+		if (bun is null && node is null)
+		{
+			Assert.Fail(
+				"Neither bun nor node is on PATH, so the TypeScript cross-platform suites cannot run. Install "
+					+ "either one: bun is what CI uses, and node is supported as the fallback."
+			);
+		}
+
+		await EnsureDependenciesInstalledAsync(root, bun, cancellationToken);
+
+		if (bun is not null)
+			return new VitestRunner("bun", bun, ["run", "vitest", "run"]);
+
+		var entryPoint = VitestEntryPoint(root);
+		if (!File.Exists(entryPoint))
+		{
+			Assert.Fail(
+				$"vitest's entry point is missing at '{entryPoint}' after installing dependencies, so the "
+					+ "TypeScript cross-platform suites cannot run."
+			);
+		}
+
+		return new VitestRunner("node", node!, [entryPoint, "run"]);
+	}
+
+	/// <summary>
+	/// Installs <c>node_modules/</c> when vitest is not already present. <c>node_modules/</c> is gitignored,
+	/// so a fresh checkout and a CI runner both start without it.
+	/// </summary>
+	/// <remarks>
+	/// bun installs from <c>bun.lock</c>; npm has no lockfile to read here, so it resolves from
+	/// <c>package.json</c>. That is why bun is preferred for the install as well as the run.
+	/// </remarks>
+	static async Task EnsureDependenciesInstalledAsync(string root, string? bun, CancellationToken cancellationToken)
+	{
+		if (File.Exists(VitestEntryPoint(root)))
+			return;
+
+		var installer =
+			bun is not null ? new VitestRunner("bun", bun, ["install", "--frozen-lockfile"])
+			: FindOnPath("npm") is { } npm ? new VitestRunner("npm", npm, ["install"])
+			: null;
+
+		if (installer is null)
+		{
+			Assert.Fail(
+				$"vitest is not installed at '{VitestEntryPoint(root)}' and neither bun nor npm is on PATH to "
+					+ "install it, so the TypeScript cross-platform suites cannot run."
+			);
+		}
+
+		using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+		timeout.CancelAfter(InstallTimeout);
+
+		var result = await Cli.Wrap(installer!.Executable)
+			.WithArguments(installer.Arguments)
+			.WithWorkingDirectory(root)
+			.WithValidation(CommandResultValidation.None)
+			.ExecuteBufferedAsync(timeout.Token);
+
+		if (result.ExitCode != 0)
+		{
+			Assert.Fail(
+				$"`{installer.Name} {string.Join(' ', installer.Arguments)}` failed with exit code "
+					+ $"{result.ExitCode}, so the TypeScript cross-platform suites cannot run:"
+					+ $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}"
+			);
+		}
+	}
+
+	static string VitestEntryPoint(string root) => Path.Combine(root, "node_modules", "vitest", "vitest.mjs");
+
 	/// <summary>
 	/// Polls for a non-empty fixture directory. Returns false once <see cref="FixtureWaitTimeout"/> elapses.
 	/// </summary>
@@ -147,47 +266,40 @@ public sealed class CrossPlatformVitestTests
 		}
 	}
 
-	static void SkipUnlessToolchainIsAvailable(string root)
-	{
-		// `bun install` writes node_modules/, which is gitignored; vitest is resolved from it.
-		Skip.Unless(
-			Directory.Exists(Path.Combine(root, "node_modules")),
-			"node_modules/ is absent — run `bun install` to drive the vitest suites from the .NET test run."
-		);
-
-		Skip.Unless(
-			IsOnPath("bun"),
-			"bun is not on PATH — the vitest suites run in the `cross-platform` CI job, which installs it."
-		);
-	}
-
-	static bool IsOnPath(string executable)
+	/// <summary>
+	/// Resolves an executable's full path from PATH, so CliWrap starts it without depending on the host's
+	/// own resolution. Returns null when it is not found.
+	/// </summary>
+	static string? FindOnPath(string executable)
 	{
 		var paths = Environment.GetEnvironmentVariable("PATH")?.Split(Path.PathSeparator) ?? [];
 
 		// On Windows an executable is found by appending a PATHEXT suffix; elsewhere the name is used as-is,
-		// which the single empty suffix expresses. PATHEXT's separator is Path.PathSeparator on Windows.
-		var pathExtensions = OperatingSystem.IsWindows()
-			? Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT"
-			: string.Empty;
-		var extensions = pathExtensions.Split(Path.PathSeparator);
+		// which the single empty suffix expresses. Only genuinely executable images are considered: a .cmd or
+		// .ps1 shim cannot be started directly as a child process.
+		var extensions = OperatingSystem.IsWindows() ? [".EXE", ".COM"] : new[] { string.Empty };
 
-		return paths
-			.Where(path => !string.IsNullOrWhiteSpace(path))
-			.Any(path =>
-				extensions.Any(extension =>
+		foreach (var path in paths.Where(path => !string.IsNullOrWhiteSpace(path)))
+		{
+			foreach (var extension in extensions)
+			{
+				string candidate;
+				try
 				{
-					try
-					{
-						return File.Exists(Path.Combine(path, executable + extension));
-					}
-					catch (ArgumentException)
-					{
-						// A malformed PATH entry is not this test's problem.
-						return false;
-					}
-				})
-			);
+					candidate = Path.Combine(path, executable + extension);
+				}
+				catch (ArgumentException)
+				{
+					// A malformed PATH entry is not this test's problem.
+					continue;
+				}
+
+				if (File.Exists(candidate))
+					return candidate;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>

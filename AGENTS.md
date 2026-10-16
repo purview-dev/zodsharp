@@ -134,7 +134,11 @@ Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live 
 
 - **One test per suite**, so a failure names the `.test.ts` file, and the child process's stdout/stderr becomes the assertion message.
 - **`VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered`** fails when a `tests/ts/*.test.ts` file has no entry in `Suites()`, so a new suite cannot be driven by the CI job alone.
-- **Missing prerequisites skip rather than fail.** bun and `node_modules/` are absent on the shared pipeline's build runner and before `bun install`; failing there would report a missing toolchain as a broken repository. The coverage guard needs neither, so it still runs.
+- **These tests never skip.** A skipped test proves nothing, and the parity guarantee is not optional. The runner is resolved per run: **bun** when it is on PATH, otherwise **node**. If neither is available, or the install or the run fails, the test fails and names the step.
+
+The node fallback invokes vitest's entry point (`node_modules/vitest/vitest.mjs`, from vitest's own `package.json` `bin` field) directly, rather than `npx` or `node_modules/.bin`. Both are unreliable: the `.bin` shims are written by whichever package manager installed the tree — a bun install leaves `vitest.exe`/`vitest.bunx` and no node shim — and on Windows `npx` resolves to a `.cmd`/`.ps1` shim, which cannot be started directly as a child process. For the same reason the PATH probe only accepts a real executable image (`.exe`/`.com`), not a shim.
+
+`node_modules/` is gitignored, so when vitest is missing the tests install it first — with `bun install --frozen-lockfile`, or `npm install` when only node is present. There is no npm lockfile (`bun.lock` is the only one), so npm resolves from `package.json`; that is a second reason bun is preferred for both the install and the run.
 
 Because `src/tests/cross-platform/` is gitignored and the producers live in other assemblies that may still be running in parallel, these tests wait for their fixture directory to fill before skipping, rather than nesting a second `dotnet test` inside the run.
 

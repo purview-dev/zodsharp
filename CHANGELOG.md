@@ -287,10 +287,17 @@ release that introduced it, so `AnalyzerReleases.Shipped.md` shows `ZODSGEN037`�
   because it controls producer ordering and installs bun from scratch.
 - `VitestSuites_GivenEveryTestFileOnDisk_AreAllCovered` fails when a vitest suite has no entry in the C# list, so
   a new suite cannot end up driven by the CI job alone — the same class of gap as the parity producer above.
-- Missing prerequisites **skip** rather than fail: bun and `node_modules/` are absent on the shared pipeline's
-  build runner and before `bun install`, and reporting a missing toolchain as a broken repository would be wrong.
-  The coverage guard needs neither, so it still runs there. Both behaviours are verified, as is the failure
-  path — an injected parity violation fails the .NET test with the vitest output attached.
+- **These tests never skip, and they run on bun or node.** A skipped test proves nothing, so the runner is
+  resolved per run — bun when it is on PATH, otherwise node against vitest's own entry point — and the test
+  **fails** when neither is available, or when the install or the run fails. `node_modules/` is gitignored, so
+  vitest is installed first when it is missing (`bun install --frozen-lockfile`, or `npm install` when only
+  node is present). The node path deliberately avoids `npx` and `node_modules/.bin`: the `.bin` shims belong to
+  whichever package manager installed the tree, and on Windows `npx` is a `.cmd`/`.ps1` shim that cannot be
+  started as a child process.
+- Every path is verified, not just the green one: an injected parity violation fails the .NET test with the
+  vitest output attached and names the runner that produced it; an unlisted `.test.ts` file fails the coverage
+  guard; the node fallback is confirmed to execute with bun removed from PATH; and with both removed the suite
+  tests fail rather than skipping.
 
 ### Added — packed generator smoke test
 
