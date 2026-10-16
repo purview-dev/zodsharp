@@ -312,6 +312,17 @@ release that introduced it, so `AnalyzerReleases.Shipped.md` shows `ZODSGEN037`�
 - The vitest cross-platform suite now runs in CI, and it **fails** rather than silently passing when the C#
   cross-platform fixtures are absent. It also now reads the C# output recursively — the previous flat directory
   read never matched a file, so the C#-to-Zod handshake had never actually been asserted.
+- **The CI cross-platform job never produced the Guid/UUID parity artifacts, so `bun run test` failed there.**
+  The job selects the C# producers with a treenode filter, and carried only one —
+  `/*/ZodSharp.Json/*CrossPlatformTests/*`, which writes `cross-platform/output/`. The parity artifacts
+  `tests/ts/guid-uuid-parity.test.ts` reads come from a *second* producer added with the Guid/UUID export work,
+  in a different assembly, namespace and class
+  (`ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts`),
+  which that filter does not match. `cross-platform/guid-parity/` was therefore always empty in CI and the
+  parity suite failed every run. The job now runs a step per producer. They cannot be combined into one
+  OR-ed filter: `a|b` is not honoured as a top-level alternation — it silently selects a broader set and still
+  skips the parity producer, which was verified when fixing this. `just test` was unaffected, because it runs
+  the whole suite.
 
 ## 2.0.0
 

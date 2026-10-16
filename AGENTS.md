@@ -117,7 +117,16 @@ Keep `purview-build.json`'s `PackValidation` requirements in sync with any packa
 
 ## Cross-platform fixtures
 
-Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume; the C# cross-platform tests write output to `src/tests/cross-platform/output/`, which the vitest tests (`tests/ts/cross-platform.test.ts`) read. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
+Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
+
+`src/tests/cross-platform/` is gitignored, so it starts empty on a clean checkout and in CI: **the C# producers must run before vitest**, in the same workspace. There are **two** producer/consumer pairs, in different assemblies, namespaces and classes:
+
+| Vitest consumer | Reads | C# producer |
+| --- | --- | --- |
+| `tests/ts/cross-platform.test.ts` | `src/tests/cross-platform/output/` | `ZodSharp.Json/*CrossPlatformTests` (the SystemTextJson and NewtonsoftJson unit tests) |
+| `tests/ts/guid-uuid-parity.test.ts` | `src/tests/cross-platform/guid-parity/` | `ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts` |
+
+`just test` runs the whole suite, so it covers both. The `cross-platform` job in `.github/workflows/pr.yml` selects them with treenode filters instead, and therefore needs **one step per producer** — a single `a|b` filter is not honoured as a top-level alternation and silently selects a broader set while skipping the parity producer. Adding a producer means adding a step. Both vitest suites fail loudly rather than passing vacuously when their directory is empty, which is the backstop for exactly this mistake.
 
 ## Commit conventions
 

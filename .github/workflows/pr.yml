@@ -48,10 +48,29 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - name: Run the C# cross-platform tests (writes the fixtures vitest reads)
+      # There are TWO producers of the fixtures vitest reads, in different assemblies, namespaces and
+      # classes, so they cannot be selected by one treenode filter:
+      #
+      #   tests/ts/cross-platform.test.ts    <- src/tests/cross-platform/output/
+      #                                         ZodSharp.Json/*CrossPlatformTests (SystemTextJson and
+      #                                         NewtonsoftJson unit tests)
+      #   tests/ts/guid-uuid-parity.test.ts  <- src/tests/cross-platform/guid-parity/
+      #                                         ZodSharp.SourceGenerators/ZodSchemaGeneratorTests
+      #
+      # Both run as separate steps rather than one OR-ed filter: `a|b` is not honoured as a top-level
+      # alternation by the treenode filter — it silently selects a different, broader set and skips the
+      # parity producer, which is how the parity artifacts came to be missing in CI while this job stayed
+      # green. Keep a step per producer, and keep each filter anchored to its class.
+      - name: Run the C# cross-platform tests (writes cross-platform/output)
         run: >-
           dotnet test --solution src/ZodSharp.slnx --configuration Debug
           --treenode-filter '/*/ZodSharp.Json/*CrossPlatformTests/*'
+
+      - name: Run the C# Guid/UUID parity test (writes cross-platform/guid-parity)
+        run: >-
+          dotnet test --solution src/ZodSharp.slnx --configuration Debug
+          --treenode-filter
+          '/*/ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts'
 
       - name: Run the TypeScript/Zod cross-platform tests
         run: bun run test
