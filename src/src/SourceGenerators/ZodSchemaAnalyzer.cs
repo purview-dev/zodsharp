@@ -44,6 +44,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		DiagnosticLibrary.NativeUnionRecommended,
 		DiagnosticLibrary.AutomaticScalarSchemaUnavailable,
 		DiagnosticLibrary.NestedSchemaExportDisabled,
+		DiagnosticLibrary.CollectionBehaviorNotApplicable,
 	];
 
 	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedDiagnosticsList;
@@ -128,6 +129,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		if (zodSchemaData.GenerateJsonSchema && ReadGenerateJsonSchemas(context.Options))
 			ReportNestedSchemaExportDisabled(context, type, externalSchemas, typeLocation);
 
+		ReportCollectionBehaviorDiagnostics(context, type, typeLocation);
+
 		if (!hasDataAnnotations)
 		{
 			context.ReportDiagnostic(
@@ -195,10 +198,12 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				continue;
 			}
 
+			_ = ZodSchemaAttributeData.FromAttributeData(type, out var schemaAttributeData);
 			var propertyResult = SourceGenLibrary.GetValidatablePropertyDescriptor(
 				property,
 				externalSchemas,
-				context.Compilation
+				context.Compilation,
+				SourceGenLibrary.ReadAllowNulls(schemaAttributeData)
 			);
 			foreach (var diagnosticInfo in propertyResult.Diagnostics)
 			{
@@ -414,6 +419,41 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		}
 
 		return [.. reachable];
+	}
+
+	/// <summary>
+	/// Reports <c>ZODSGEN046</c> when a <c>[CollectionBehavior]</c> attribute is applied to a property that is
+	/// not a collection of nullable elements, so the setting can never take effect.
+	/// </summary>
+	/// <param name="context">The analysis context the diagnostics are reported to.</param>
+	/// <param name="type">The schema type whose properties are inspected.</param>
+	/// <param name="typeLocation">The location to fall back to when a property carries none.</param>
+	static void ReportCollectionBehaviorDiagnostics(
+		SymbolAnalysisContext context,
+		INamedTypeSymbol type,
+		Location typeLocation
+	)
+	{
+		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		{
+			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
+				continue;
+
+			var hasAttribute = SourceGenLibrary
+				.GetValidationAttributes(property, context.Compilation)
+				.Any(attribute => TypeLibrary.ZodSharp.CollectionBehaviorAttribute.Equals(attribute.AttributeClass));
+			if (!hasAttribute || SourceGenLibrary.IsCollectionBehaviorApplicable(property))
+				continue;
+
+			var location = GetMemberLocation(property);
+			context.ReportDiagnostic(
+				Diagnostic.Create(
+					DiagnosticLibrary.CollectionBehaviorNotApplicable,
+					location == Location.None ? typeLocation : location,
+					property.Name
+				)
+			);
+		}
 	}
 
 	static IEnumerable<INamedTypeSymbol> EnumerateNamedTypes(INamespaceSymbol root)

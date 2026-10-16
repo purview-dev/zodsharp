@@ -84,6 +84,9 @@ apart: property names, nested objects, native enums, nullable fields, required f
   non-nullable reference type rejects null and its rules run unconditionally, while a nullable one skips them
   for null. A rule that rejects an absent value (for example `[RequiredZod]`) makes the field non-null even
   when its annotation is nullable.
+- **Collection items** follow the null-items setting (see
+  [Collection null items](Source-Generator.md#collection-null-items)): a collection whose elements may be null
+  exports `items` wrapped in `anyOf: [ …, { "type": "null" } ]`; otherwise `items` is the element's own schema.
 - **Scalar value objects** (`[Scalar<TValue>]`) export as their underlying value's schema — a `Guid` scalar is
   a canonical 8-4-4-4-12 hexadecimal string (a `pattern`, not Zod's RFC `uuid` format, because C# `Guid`
   accepts any 128-bit value) — not as an object wrapping a `Value` property.

@@ -70,6 +70,7 @@ var either = UserSchema.ApplyOr(user, u => u.Age < 18, "Must be an adult, or a m
 | `SuppressIValidateOptions` | `false` | Opts out even when auto-detection would enable it. |
 | `ValidateEnumValues` | `true` | `false` skips automatic enum validation. |
 | `GenerateJsonSchema` | `true` | `false` omits `BuildJsonSchema` and `IJsonSchemaProvider`. A type referenced by an exported type is `ZODSGEN045`. |
+| `AllowNulls` | unset | Whether this type's collection properties may contain `null` elements. Unset defers to the assembly default. |
 
 `Parse`, the composition methods, the `IZodSchemaValidator` adapter and the `IValidateOptions`
 validator all depend on `Validate` — `GenerateValidateMethod = false` removes them together.
@@ -83,6 +84,12 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   without** their own `[ZodSchema]`.
 - Nullable properties are null-guarded before value-set/type validation; a nullable target rejects
   `null` with `invalid_type`.
+- Collection elements reject `null` by default: the error is `invalid_type` at the element's own path
+  (`["Items", 0]`). Control it with `[CollectionBehavior(AllowNulls = ...)]` on the property, a `T?`
+  element annotation (implies allow), `[ZodSchema(AllowNulls = ...)]` on the containing type,
+  `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]`, then the `ZodSharpAllowNulls` MSBuild
+  property. The most specific statement wins; an unset level defers to the next. An explicit
+  `AllowNulls = true` exports a `null` branch on the collection's `items` schema.
 - Classes, structs and records are supported. Structs get no `IValidateOptions` (`ZODSGEN028` if
   requested).
 
@@ -188,6 +195,7 @@ and the type name ends with a configured suffix — `Options` or `Settings` by d
 | `ZodSharpGenerateJsonSchemas` | `true` | explicit `false` omits `BuildJsonSchema` and `IJsonSchemaProvider` assembly-wide |
 | `ZodSharpEnumSerialization` | `Number` | `String` exports enums as member names, matching a global `JsonStringEnumConverter` |
 | `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
+| `ZodSharpAllowNulls` | `false` | assembly-wide default for whether collections may contain `null` elements; explicit `true` accepts them |
 
 ## Value objects
 

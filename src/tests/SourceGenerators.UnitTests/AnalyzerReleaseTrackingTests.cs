@@ -10,10 +10,10 @@ namespace ZodSharp.SourceGenerators;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <c>ZODSGEN037</c>–<c>ZODSGEN044</c> are recorded under a <c>## Release 2.0.2</c> block and
-/// <c>ZODSGEN045</c> under <c>## Release 2.1.0</c>. A rule stays recorded under the release that introduced
-/// it, so an existing block is never rewritten. The unshipped file declares no rules; the next diagnostic
-/// added goes there and moves across when it ships.
+/// <c>ZODSGEN037</c>–<c>ZODSGEN044</c> are recorded under a <c>## Release 2.0.2</c> block,
+/// <c>ZODSGEN045</c> under <c>## Release 2.1.0</c>, and <c>ZODSGEN046</c> under <c>## Release 2.2.0</c>. A
+/// rule stays recorded under the release that introduced it, so an existing block is never rewritten. The
+/// unshipped file declares no rules; the next diagnostic added goes there and moves across when it ships.
 /// </para>
 /// <para>
 /// <see cref="RuleIdRegex"/> accepts a rule row with or without a leading pipe, because the two files are
@@ -85,6 +85,8 @@ public partial class AnalyzerReleaseTrackingTests
 		"ZODSGEN044",
 		// Release 2.1.0.
 		"ZODSGEN045",
+		// Release 2.2.0.
+		"ZODSGEN046",
 	];
 
 	/// <summary>

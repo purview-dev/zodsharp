@@ -3,5 +3,23 @@
 		<CompilerVisibleProperty Include="DisableZodSharpSourceGenerator">
 			<Description>Specifies whether to disable Purview.ZodSharp source generators.</Description>
 		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpAutoGenerateOptionsValidators">
+			<Description>Enables auto-detection of IValidateOptions validators for types with a configured name suffix.</Description>
+		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpAutoGenerateOptionsValidatorSuffixes">
+			<Description>Semicolon- or comma-separated name suffixes that trigger IValidateOptions auto-detection.</Description>
+		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpGenerateJsonSchemas">
+			<Description>Assembly-wide JSON Schema export switch; false omits BuildJsonSchema and IJsonSchemaProvider for every type.</Description>
+		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpEnumSerialization">
+			<Description>Assembly-wide enum serialization convention; String exports enums as member names, matching a global JsonStringEnumConverter.</Description>
+		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpEnumNamingPolicy">
+			<Description>Assembly-wide enum member naming policy; CamelCase matches JsonNamingPolicy.CamelCase.</Description>
+		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpAllowNulls">
+			<Description>Assembly-wide default for whether collection properties may contain null elements; false (the default) rejects them.</Description>
+		</CompilerVisibleProperty>
 	</ItemGroup>
 </Project>

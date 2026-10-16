@@ -87,6 +87,12 @@ All of these mean the method the generator was told to call cannot be called:
 | `ZODSGEN042` | *(warning)* A rule does not expose a public `const string ErrorCode` **and** a public `const string MessageFormat`, so its error identity cannot be asserted in tests without duplicating literals. |
 | `ZODSGEN043` | *(info)* A built-in rule marked `[ZodRule]` generates no attribute, because a constructor parameter cannot be represented as an attribute property. The rule is still reachable through the runtime/fluent API. A name colliding with DataAnnotations is **not** skipped — it is emitted with a `Zod` suffix. |
 
+## Collections
+
+| ID | Meaning |
+| --- | --- |
+| `ZODSGEN046` | *(warning)* `[CollectionBehavior]` is applied to a property that is not a collection of nullable elements (a scalar, or a collection whose element cannot be `null`), so the setting can never take effect. |
+
 ## Unions, value objects, JSON Schema
 
 | ID | Meaning |

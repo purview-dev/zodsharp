@@ -17,8 +17,15 @@ static class GenerationSettingsResolver
 		EquatableArray<string> Suffixes,
 		bool GenerateJsonSchemas,
 		bool EnumAsString,
-		EnumJsonNamingPolicy EnumNamingPolicy
+		EnumJsonNamingPolicy EnumNamingPolicy,
+		bool AllowNulls
 	);
+
+	/// <summary>
+	/// The assembly-level schema defaults declared by <c>[assembly: ZodSharpSchemaDefaults(...)]</c>. A null
+	/// value defers to the corresponding MSBuild property.
+	/// </summary>
+	internal readonly record struct AssemblyDefaults(bool? AllowNulls);
 
 	public static AutoDetectSettings Read(AnalyzerConfigOptionsProvider provider)
 	{
@@ -54,7 +61,39 @@ static class GenerationSettingsResolver
 		var enumAsString = ReadEnumSerializationAsString(provider);
 		var enumNamingPolicy = ReadEnumNamingPolicy(provider);
 
-		return new(autoGenerate, suffixes, generateJsonSchemas, enumAsString, enumNamingPolicy);
+		// Null collection elements are rejected by default. The assembly-level switch opts in to accepting
+		// them; only an explicit true enables it, so an unparsable value keeps the default.
+		var allowNulls =
+			provider.GlobalOptions.TryGetValue(
+				$"build_property:{PropertyLibrary.AllowNullsProperty}",
+				out var allowNullsValue
+			)
+			&& bool.TryParse(allowNullsValue, out var allowNullsEnabled)
+			&& allowNullsEnabled;
+
+		return new(autoGenerate, suffixes, generateJsonSchemas, enumAsString, enumNamingPolicy, allowNulls);
+	}
+
+	/// <summary>
+	/// Reads the assembly-level schema defaults from <c>[assembly: ZodSharpSchemaDefaults(...)]</c>. The
+	/// source-level attribute overrides the <c>ZodSharpAllowNulls</c> MSBuild property, so a null value here
+	/// defers to that property.
+	/// </summary>
+	/// <param name="compilation">The compilation whose assembly is inspected.</param>
+	/// <returns>The declared defaults, with null for anything left unset.</returns>
+	public static AssemblyDefaults ReadAssemblyDefaults(Compilation compilation)
+	{
+		foreach (var attribute in compilation.Assembly.GetAttributes())
+		{
+			if (!TypeLibrary.ZodSharp.ZodSharpSchemaDefaultsAttribute.Equals(attribute.AttributeClass))
+				continue;
+
+			return attribute.TryGetNamedArgument<bool>(AttributeGenHelper.AllowNullsPropertyName, out var allowNulls)
+				? new(allowNulls)
+				: new(null);
+		}
+
+		return new(null);
 	}
 
 	static bool ReadEnumSerializationAsString(AnalyzerConfigOptionsProvider provider) =>
@@ -81,10 +120,12 @@ static class GenerationSettingsResolver
 		return new(builder.ToImmutable());
 	}
 
-	public static SchemaGenerationModel Apply((SchemaGenerationModel Model, AutoDetectSettings Settings) input)
+	public static SchemaGenerationModel Apply(
+		SchemaGenerationModel model,
+		AutoDetectSettings settings,
+		AssemblyDefaults assemblyDefaults
+	)
 	{
-		var (model, settings) = input;
-
 		var builder = ImmutableArray.CreateBuilder<GeneratorResult<ZodSchemaDescriptor>>(model.ZodSchemas.Count);
 		foreach (var result in model.ZodSchemas)
 		{
@@ -131,6 +172,13 @@ static class GenerationSettingsResolver
 				changed = true;
 			}
 
+			var resolvedProperties = ResolveAllowNulls(schema.Properties, settings, assemblyDefaults);
+			if (resolvedProperties is { } properties)
+			{
+				schema = schema with { Properties = properties };
+				changed = true;
+			}
+
 			builder.Add(changed ? GeneratorResult<ZodSchemaDescriptor>.Create(schema) : result);
 		}
 
@@ -138,5 +186,47 @@ static class GenerationSettingsResolver
 		{
 			ZodSchemas = new(builder.ToImmutable()),
 		};
+	}
+
+	/// <summary>
+	/// Resolves each collection property's <c>AllowNulls</c> against the assembly defaults when neither the
+	/// property nor its containing type stated one.
+	/// </summary>
+	/// <param name="properties">The schema's properties.</param>
+	/// <param name="settings">The assembly-level MSBuild settings.</param>
+	/// <param name="assemblyDefaults">The source-level assembly defaults.</param>
+	/// <returns>The rewritten properties, or <see langword="null"/> when no property changed.</returns>
+	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>>? ResolveAllowNulls(
+		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> properties,
+		AutoDetectSettings settings,
+		AssemblyDefaults assemblyDefaults
+	)
+	{
+		if (properties.Count == 0)
+			return null;
+
+		var changed = false;
+		var builder = ImmutableArray.CreateBuilder<GeneratorResult<ZodPropertyDescriptor>>(properties.Count);
+		foreach (var propertyResult in properties)
+		{
+			if (!propertyResult.ShouldProcess)
+			{
+				builder.Add(propertyResult);
+				continue;
+			}
+
+			var property = propertyResult.Value;
+			var resolved = property.AllowNulls ?? assemblyDefaults.AllowNulls ?? settings.AllowNulls;
+			if (property.AllowNulls == resolved)
+			{
+				builder.Add(propertyResult);
+				continue;
+			}
+
+			builder.Add(GeneratorResult<ZodPropertyDescriptor>.Create(property with { AllowNulls = resolved }));
+			changed = true;
+		}
+
+		return changed ? new(builder.ToImmutable()) : null;
 	}
 }

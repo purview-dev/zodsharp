@@ -175,6 +175,11 @@ partial class ZodSchemaGenerator
 			: property.ElementType is { } element ? BuildBaseSchemaExpression(element)
 			: $"new {JsonSchemaDefinitionTypeName}()";
 
+		// A collection that allows null elements advertises it, mirroring how a nullable property is exported.
+		if (property.AllowNulls == true)
+			items =
+				$"new {JsonSchemaDefinitionTypeName} {{ AnyOf = new() {{ {items}, new {JsonSchemaDefinitionTypeName} {{ Type = \"null\" }} }} }}";
+
 		return $"new {JsonSchemaDefinitionTypeName} {{ Type = \"array\", Items = {items} }}";
 	}
 

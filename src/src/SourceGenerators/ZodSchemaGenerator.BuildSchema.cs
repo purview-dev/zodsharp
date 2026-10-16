@@ -857,15 +857,19 @@ partial class ZodSchemaGenerator
 
 	static void GenerateCollectionElementValidation(CodeWriter writer, ZodPropertyDescriptor property)
 	{
-		if (property.NestedSchemaType is null)
+		var hasNestedSchema = property.NestedSchemaType is not null;
+		var rejectNullItems = property.ElementTypeCanBeNull && property.AllowNulls != true;
+
+		// A value-element collection with no nested schema has nothing to check per element.
+		if (!hasNestedSchema && !rejectNullItems)
 			return;
 
 		var propertyName = property.Name;
+		var displayName = property.DisplayName;
 		var collectionValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Collection");
 		var itemValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Item");
 		var itemResultName = CodeGenHelpers.GetLocalIdentifier(propertyName, "ItemResult");
 		var indexName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Index");
-		var schemaType = property.NestedSchemaType.Value;
 
 		writer.Assignment("var", collectionValueName, $"value.{propertyName}");
 		using (writer.IfBlockScope($"{collectionValueName} is not null"))
@@ -875,26 +879,45 @@ partial class ZodSchemaGenerator
 			{
 				if (property.ElementTypeCanBeNull)
 				{
-					writer.IfBlock(
-						$"{itemValueName} is null",
-						ifBody =>
+					if (rejectNullItems)
+					{
+						using (writer.IfBlockScope($"{itemValueName} is null"))
 						{
-							ifBody.Line($"{indexName}++;");
-							ifBody.Line("continue;");
+							WriteNullItemError(writer, propertyName, displayName, indexName);
+							writer.Line($"{indexName}++;");
+							writer.Line("continue;");
 						}
-					);
+					}
+					else
+					{
+						writer.IfBlock(
+							$"{itemValueName} is null",
+							ifBody =>
+							{
+								ifBody.Line($"{indexName}++;");
+								ifBody.Line("continue;");
+							}
+						);
+					}
 				}
 
-				writer.Assignment("var", itemResultName, schemaType.StaticMember($"Validate({itemValueName})"));
-				using (writer.IfBlockScope($"!{itemResultName}.IsSuccess"))
+				if (hasNestedSchema)
 				{
-					writer.MethodCall(
-						"AddNestedErrors",
-						"ref errors",
+					writer.Assignment(
+						"var",
 						itemResultName,
-						propertyName.Surround(),
-						indexName
+						property.NestedSchemaType!.Value.StaticMember($"Validate({itemValueName})")
 					);
+					using (writer.IfBlockScope($"!{itemResultName}.IsSuccess"))
+					{
+						writer.MethodCall(
+							"AddNestedErrors",
+							"ref errors",
+							itemResultName,
+							propertyName.Surround(),
+							indexName
+						);
+					}
 				}
 
 				writer.Line($"{indexName}++;");
@@ -902,6 +925,29 @@ partial class ZodSchemaGenerator
 		}
 
 		writer.NewLine();
+	}
+
+	/// <summary>
+	/// Emits the <c>invalid_type</c> error for a null element in a collection that rejects null elements,
+	/// at the element's own path (<c>["Items", index]</c>), matching Zod's per-element issue path.
+	/// </summary>
+	static void WriteNullItemError(CodeWriter writer, string propertyName, string displayName, string indexName)
+	{
+		var message = $"Field '{displayName}' cannot contain null elements".StringLiteral();
+
+		writer.IfBlock(
+			"errors is null",
+			ifBody =>
+				ifBody.Assignment(
+					"errors",
+					"new global::System.Collections.Generic.List<global::ZodSharp.Core.ValidationError>()"
+				)
+		);
+		writer.MethodCallOn(
+			"errors",
+			"Add",
+			$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create({"invalid_type".Surround()}, {message}, global::System.Collections.Immutable.ImmutableArray.Create({propertyName.Surround()}, {indexName}.ToString()))"
+		);
 	}
 
 	static void GenerateComplexTypeValidation(CodeWriter writer, ZodPropertyDescriptor property)
