@@ -43,6 +43,8 @@ The same interop goal is available without fixtures via JSON Schema:
 - Export: `Z.ToJsonSchema` (core package) → JSON Schema, or `z.toJSONSchema` on the TypeScript side (Zod v4+).
 - Import: `Z.FromJsonSchema` (in the System.Text.Json or Newtonsoft.Json package — namespace `ZodSharp.JsonSchema.SystemTextJson` / `ZodSharp.JsonSchema.NewtonsoftJson`).
 
+A generated collection maps to Zod's array element type: `T[]` / `List<T>` ↔ `z.array(T)`, and a nullable element (`T?[]`, `List<T?>`, or a property that allows nulls via `[CollectionBehavior(AllowNulls = true)]`) ↔ `z.array(T.nullable())`. A collection whose elements may be null exports `items.anyOf: [ …, { "type": "null" } ]`, and both `z.fromJSONSchema` and `Z.FromJsonSchema` read that shape back. Null elements are rejected by default, so a generated `T[]` matches `z.array(T)` exactly — see [Collection null items](Source-Generator.md#collection-null-items).
+
 See [JSON Schema Export](JsonSchema-Export.md) and [JSON Schema Import](JsonSchema-Import.md).
 
 ## Directory layout

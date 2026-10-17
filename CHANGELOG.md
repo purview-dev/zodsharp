@@ -8,6 +8,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## 2.2.0
+
+### Added
+
+- **Collection null items are rejected by default.** A generated schema now rejects a `null` element in a
+  collection property with `invalid_type` at the element's own path (`["Items", 0]`), matching Zod's
+  per-element issue path. Previously null elements were silently skipped. Control it per property with
+  `[CollectionBehavior(AllowNulls = true/false)]`, per element type with `T?`, per type with
+  `[ZodSchema(AllowNulls = ...)]`, per assembly with `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]`,
+  or with the `ZodSharpAllowNulls` MSBuild property. The most specific statement wins; the built-in default is
+  to reject. A collection that allows null elements exports a `null` branch on its `items` JSON Schema, and
+  `[CollectionBehavior]` on a property that cannot hold null elements is reported as `ZODSGEN046`.
+- **The `ZodSharp*` MSBuild switches are declared compiler-visible** in the package's `buildTransitive` props,
+  so `ZodSharpGenerateJsonSchemas`, `ZodSharpEnumSerialization`, `ZodSharpEnumNamingPolicy`,
+  `ZodSharpAutoGenerateOptionsValidators`/`ZodSharpAutoGenerateOptionsValidatorSuffixes` and the new
+  `ZodSharpAllowNulls` reach the generator in a consumer build. They previously took effect only in this
+  repository's own tests, because nothing declared them as `CompilerVisibleProperty`.
+
 ## 2.1.0
 
 Consolidates the `2.0.1`, `2.0.1.1` and `2.0.2` incremental releases: upgrading from `2.0.0` goes straight to

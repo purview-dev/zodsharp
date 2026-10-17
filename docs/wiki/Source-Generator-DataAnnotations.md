@@ -84,6 +84,10 @@ var result = BasketSchema.Validate(new Basket { Items = ["apple"] });
 > [!NOTE]
 > The generator reports `Origin = "array"` for arrays and `Origin = "collection"` for countable/`IEnumerable` collections.
 
+## Collection null items
+
+A collection property rejects `null` elements by default: the generated validator reports `invalid_type` at the element's own path (`["Items", 0]`). Control it per property with `[CollectionBehavior(AllowNulls = true/false)]`, per element type with `T?`, per type with `[ZodSchema(AllowNulls = ...)]`, or per assembly with `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]` and the `ZodSharpAllowNulls` MSBuild property. The most specific statement wins. See [Collection null items](Source-Generator.md#collection-null-items) for the full precedence, and `ZODSGEN046` for the attribute-applicability warning.
+
 ## Range
 
 `[Range]` supports three constructor shapes plus `MinimumIsExclusive`, `MaximumIsExclusive`, `ConvertValueInInvariantCulture`, and `ParseLimitsInInvariantCulture`:

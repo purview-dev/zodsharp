@@ -5,6 +5,19 @@ namespace ZodSharp.SourceGenerators.Helpers;
 
 static class AttributeGenHelper
 {
+	/// <summary>
+	/// The name of the optional <c>AllowNulls</c> property on the generated <c>[ZodSchema]</c> attribute.
+	/// </summary>
+	/// <remarks>
+	/// The property is read from the raw <c>AttributeData</c> rather than through
+	/// <see cref="ZodSchemaAttributeData"/>: the framework's attribute-data-model generator collapses a named
+	/// argument to a plain value, so an unset <c>bool</c> is indistinguishable from an explicit <c>false</c>.
+	/// Reading the raw attribute preserves the unset state the precedence chain needs. A nullable
+	/// <c>bool?</c> cannot be used instead, because <see cref="Nullable{T}"/> is not a legal attribute
+	/// parameter type.
+	/// </remarks>
+	internal const string AllowNullsPropertyName = "AllowNulls";
+
 	public static IEnumerable<(string HintName, SourceText SourceText)> GenerateMarkers()
 	{
 		yield return (nameof(ZodSchemaAttribute), ZodSchemaAttribute());
@@ -179,6 +192,26 @@ static class AttributeGenHelper
 							{
 								IsInitOnly = true,
 								Initializer = "true",
+							}
+						);
+
+					body.XmlSummary(
+							"Default for whether this type's collection properties allow null elements.",
+							"When unset, the assembly-level default applies (the <c>ZodSharpAllowNulls</c> MSBuild",
+							"property, overridden by <c>[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]</c>).",
+							"When set, it applies to this type's collections unless a property overrides it with",
+							"<c>[CollectionBehavior(AllowNulls = ...)]</c> or an explicitly nullable element type",
+							"(<c>T?</c>). The built-in default is to reject null elements."
+						)
+						.Property(
+							new(
+								AllowNullsPropertyName,
+								PurviewTypeLibrary.System.Boolean,
+								TypeDeclarationAccessibility.Public
+							)
+							{
+								IsInitOnly = true,
+								Initializer = "false",
 							}
 						);
 				}

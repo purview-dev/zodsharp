@@ -4,6 +4,24 @@
 		<AssemblyName>Purview.ZodSharp.SourceGenerators</AssemblyName>
 	</PropertyGroup>
 
+	<!--
+		The generator reads the ZodSharp* switches from build_property.*. They are declared
+		compiler-visible in the Purview.ZodSharp package's buildTransitive props, which is what ships to
+		consumers; importing that same file here keeps the in-repo PSGF0003 guard honest without a second
+		copy of the names drifting from the package.
+	-->
+	<Import Project="../ZodSharp/Sdk/buildTransitive/Purview.ZodSharp.props" />
+
+	<ItemGroup Label="Generator-read MSBuild properties">
+		<PurviewGeneratorVisibleProperty Include="DisableZodSharpSourceGenerator" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpAutoGenerateOptionsValidators" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpAutoGenerateOptionsValidatorSuffixes" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpGenerateJsonSchemas" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpEnumSerialization" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpEnumNamingPolicy" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpAllowNulls" />
+	</ItemGroup>
+
 	<ItemGroup Label="Analyzer Release Files">
 		<AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
 		<AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />

@@ -61,6 +61,7 @@ All options are optional.
 | `SuppressIValidateOptions` | `false` | Opt out even when auto-detection would enable it. |
 | `ValidateEnumValues` | `true` | Set to `false` to skip the automatic enum validation for the type's enum properties. |
 | `GenerateJsonSchema` | `true` | Set to `false` to omit the JSON Schema export members (`BuildJsonSchema` and the `IJsonSchemaProvider` on the adapter), keeping the type out of the cross-platform contract surface. A type referenced by an exported type is reported as `ZODSGEN045`. |
+| `AllowNulls` | unset | Whether this type's collection properties may contain `null` elements. Unset applies the assembly default; `true`/`false` overrides it for this type. See [Collection null items](#collection-null-items). |
 
 > [!NOTE]
 > `Parse`, the value-first composition methods (`ApplyAnd`/`ApplyOr`/`ApplyRefine`), the `IZodSchemaValidator` adapter and the `IValidateOptions` validator all depend on `Validate`. Setting `GenerateValidateMethod = false` omits them together.
@@ -155,6 +156,42 @@ MSBuild switches:
 | `ZodSharpGenerateJsonSchemas` | `true` | assembly-wide JSON Schema export switch; explicit `false` omits `BuildJsonSchema` and `IJsonSchemaProvider` for every type |
 | `ZodSharpEnumSerialization` | `Number` | `String` makes enums export as their member names, matching a global `JsonStringEnumConverter` |
 | `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
+| `ZodSharpAllowNulls` | `false` | assembly-wide default for whether collection properties may contain `null` elements; explicit `true` accepts them |
+
+## Collection null items
+
+A collection property rejects `null` elements by default: the generated validator reports `invalid_type` at the element's own path (`["Items", 0]`), matching Zod's per-element issue path. The behaviour is controlled by the same setting at several levels, and the most specific statement wins:
+
+| Level | Declaration |
+|---|---|
+| Property (or positional record parameter) | `[CollectionBehavior(AllowNulls = true)]` / `[CollectionBehavior(AllowNulls = false)]` |
+| Element type | an explicitly nullable element (`T?`, for example `List<Child?>` or `Child?[]`) allows nulls |
+| Containing type | `[ZodSchema(AllowNulls = true)]` / `[ZodSchema(AllowNulls = false)]` |
+| Assembly | `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]`, then the `ZodSharpAllowNulls` MSBuild property |
+
+Precedence, highest first: the property attribute, the element's `T?` annotation, the containing type's `[ZodSchema]` option, the assembly attribute, the `ZodSharpAllowNulls` MSBuild property, then the built-in default (reject).
+
+```csharp
+using ZodSharp;
+
+[assembly: ZodSharpSchemaDefaults(AllowNulls = false)]
+
+[ZodSchema]
+public class RepositoryInventoryResponse
+{
+    // Rejected by default: a null element reports invalid_type at ["Items", index].
+    public RepositoryInventoryItem[] Items { get; set; } = [];
+
+    // Explicit opt-in for one property.
+    [CollectionBehavior(AllowNulls = true)]
+    public RepositoryInventoryItem[] OptionalItems { get; set; } = [];
+}
+```
+
+> [!NOTE]
+> `[CollectionBehavior]` and `[ZodSchema(AllowNulls = ...)]` only take effect when the named argument is present; an attribute that leaves it out defers to the next level. `[CollectionBehavior]` on a property that is not a collection of nullable elements is reported as `ZODSGEN046`.
+
+A collection whose elements may be null exports its `items` schema with a `null` branch, mirroring how a nullable property is exported.
 
 ## Automatic enum validation
 

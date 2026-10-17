@@ -49,6 +49,9 @@ static partial class SourceGenLibrary
 		var autoDetectSettings = context.AnalyzerConfigOptionsProvider.Select(
 			static (provider, _) => GenerationSettingsResolver.Read(provider)
 		);
+		var assemblyDefaults = context.CompilationProvider.Select(
+			static (compilation, _) => GenerationSettingsResolver.ReadAssemblyDefaults(compilation)
+		);
 
 		return generationContext
 			.CollectWith(
@@ -58,7 +61,10 @@ static partial class SourceGenLibrary
 				"CollectZodSchemas"
 			)
 			.Combine(autoDetectSettings)
-			.Select(static (pair, _) => GenerationSettingsResolver.Apply(pair));
+			.Combine(assemblyDefaults)
+			.Select(
+				static (input, _) => GenerationSettingsResolver.Apply(input.Left.Left, input.Left.Right, input.Right)
+			);
 	}
 
 	static GeneratorResult<SchemaSet> GetSchemasForGeneration(
@@ -95,7 +101,8 @@ static partial class SourceGenLibrary
 				: $"{target.Name}Schema";
 			var schema = target with { Name = schemaName };
 			var targetCanBeNull = TypeHelpers.CanBeNull(symbol);
-			var properties = GetZodProperties(symbol, externalSchemas, compilation);
+			var typeAllowNulls = ReadAllowNulls(attribute);
+			var properties = GetZodProperties(symbol, externalSchemas, compilation, typeAllowNulls);
 			properties = AddAutomaticScalarProperty(symbol, properties, externalSchemas);
 
 			// Type-level rules ([ZodRule]-mapped attributes on the target itself) validate the whole value
@@ -273,7 +280,8 @@ static partial class SourceGenLibrary
 	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>> GetZodProperties(
 		INamedTypeSymbol symbol,
 		ExternalSchemaResolver externalSchemas,
-		Compilation compilation
+		Compilation compilation,
+		bool? typeAllowNulls
 	)
 	{
 		var properties = symbol
@@ -282,7 +290,9 @@ static partial class SourceGenLibrary
 			.Where(property =>
 				property.DeclaredAccessibility == Accessibility.Public && !property.IsStatic && !property.IsIndexer
 			)
-			.Select(property => GetValidatablePropertyDescriptor(property, externalSchemas, compilation))
+			.Select(property =>
+				GetValidatablePropertyDescriptor(property, externalSchemas, compilation, typeAllowNulls)
+			)
 			.ToImmutableArray();
 
 		return new(properties);
@@ -368,6 +378,7 @@ static partial class SourceGenLibrary
 			null,
 			false,
 			null,
+			null,
 			new(string.Empty, string.Empty, false),
 			false,
 			EmptyValidationAttributes,
@@ -407,7 +418,8 @@ static partial class SourceGenLibrary
 	internal static GeneratorResult<ZodPropertyDescriptor> GetValidatablePropertyDescriptor(
 		IPropertySymbol property,
 		ExternalSchemaResolver? externalSchemas,
-		Compilation compilation
+		Compilation compilation,
+		bool? typeAllowNulls
 	)
 	{
 		var declaredType = CreateTypeIdentity(property.Type);
@@ -459,6 +471,10 @@ static partial class SourceGenLibrary
 		var nestedSchemaType = GetNestedSchemaTypeIdentity(property, validationKind, externalSchemas);
 		var lengthAccessor = ClassifyLengthAccessor(originalPropertyType);
 		var validationAttributes = GetValidationAttributes(property, compilation);
+		var allowNulls =
+			validationKind == PropertyValidationKind.Collection
+				? ResolveAllowNulls(originalPropertyType, validationAttributes, typeAllowNulls)
+				: null;
 		var displayName = GetDisplayName(validationAttributes, property.Name);
 
 		var displayAttribute = DisplayAttributeData.FromAttributeData(validationAttributes);
@@ -587,6 +603,7 @@ static partial class SourceGenLibrary
 				validationKind,
 				elementType,
 				elementTypeCanBeNull,
+				allowNulls,
 				nestedSchemaType,
 				lengthAccessor,
 				compareViaCompareTo,
@@ -847,6 +864,102 @@ static partial class SourceGenLibrary
 			&& TypeHelpers.Implements(namedType, TypeLibrary.System.Collections.Generic.IEnumerable)
 			? namedType.TypeArguments[0]
 			: null;
+	}
+
+	/// <summary>
+	/// Reads the optional <c>AllowNulls</c> option from a <c>[ZodSchema]</c> attribute, or
+	/// <see langword="null"/> when the attribute is absent or leaves the option unset.
+	/// </summary>
+	/// <remarks>
+	/// The option is read from the raw <see cref="AttributeData"/> rather than
+	/// <see cref="ZodSchemaAttributeData"/>: the framework's attribute-data-model generator collapses a
+	/// nullable value-type named argument to its underlying type, so an unset <c>bool?</c> would arrive as
+	/// <c>false</c> and could not defer to the assembly default.
+	/// </remarks>
+	/// <param name="attribute">The raw attribute, when the type declares <c>[ZodSchema]</c>.</param>
+	/// <returns>The declared value, or <see langword="null"/> when unset.</returns>
+	internal static bool? ReadAllowNulls(AttributeData? attribute) =>
+		attribute is not null
+		&& attribute.TryGetNamedArgument<bool>(AttributeGenHelper.AllowNullsPropertyName, out var allow)
+			? allow
+			: null;
+
+	/// <summary>
+	/// Resolves the property/type-level override for whether a collection may contain null elements.
+	/// </summary>
+	/// <param name="collectionType">The collection type, with a property-level nullable wrapper removed.</param>
+	/// <param name="attributes">The property's effective attributes (property plus positional parameter).</param>
+	/// <param name="typeAllowNulls">The containing type's <c>[ZodSchema(AllowNulls = ...)]</c>, when set.</param>
+	/// <returns>
+	/// The override, or <see langword="null"/> when neither the property nor the type states one, so the
+	/// assembly default applies.
+	/// </returns>
+	/// <remarks>
+	/// Precedence, highest first: <c>[CollectionBehavior(AllowNulls = ...)]</c> on the property, an explicitly
+	/// nullable element type (<c>T?</c>), then the containing type's <c>[ZodSchema]</c> option.
+	/// </remarks>
+	static bool? ResolveAllowNulls(
+		ITypeSymbol collectionType,
+		ImmutableArray<AttributeData> attributes,
+		bool? typeAllowNulls
+	)
+	{
+		foreach (var attribute in attributes)
+		{
+			if (!TypeLibrary.ZodSharp.CollectionBehaviorAttribute.Equals(attribute.AttributeClass))
+				continue;
+
+			if (attribute.TryGetNamedArgument<bool>(AttributeGenHelper.AllowNullsPropertyName, out var allow))
+				return allow;
+
+			break;
+		}
+
+		var elementType = GetCollectionElementTypeSymbol(collectionType);
+		if (elementType is not null && IsExplicitlyNullableElement(elementType))
+			return true;
+
+		// The containing type's [ZodSchema] attribute is the last override, so if it is set, return it; otherwise
+		// the assembly default applies.
+		return typeAllowNulls;
+	}
+
+	/// <summary>
+	/// Determines whether a collection element type is explicitly declared nullable — <c>T?</c> (an
+	/// annotated reference type) or <c>Nullable&lt;T&gt;</c> — which opts the element out of the default
+	/// "reject null items" behaviour.
+	/// </summary>
+	/// <param name="elementType">The collection's element type.</param>
+	/// <returns><see langword="true"/> when the element type is explicitly nullable.</returns>
+	/// <remarks>
+	/// Only <see cref="NullableAnnotation.Annotated"/> counts. A reference type with no annotation (or
+	/// <see cref="NullableAnnotation.None"/> in a nullable-disabled compilation) is not an explicit opt-in,
+	/// so the default still rejects null elements there.
+	/// </remarks>
+	static bool IsExplicitlyNullableElement(ITypeSymbol elementType) =>
+		elementType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+		|| elementType.NullableAnnotation == NullableAnnotation.Annotated;
+
+	/// <summary>
+	/// Determines whether a <c>[CollectionBehavior]</c> attribute can take effect on a property: it must be a
+	/// collection whose elements can be null.
+	/// </summary>
+	/// <param name="property">The property to inspect.</param>
+	/// <returns><see langword="true"/> when the attribute is meaningful for the property.</returns>
+	internal static bool IsCollectionBehaviorApplicable(IPropertySymbol property)
+	{
+		var type = TypeHelpers.UnwrapNullableType(property.Type);
+		if (
+			type is not IArrayTypeSymbol
+			&& !TypeHelpers.IsOrImplements(type, TypeLibrary.System.Collections.IEnumerable)
+			&& !TypeHelpers.IsOrImplements(type, TypeLibrary.System.Collections.Generic.IEnumerable)
+		)
+		{
+			return false;
+		}
+
+		var elementType = GetCollectionElementTypeSymbol(type);
+		return elementType is not null && TypeHelpers.CanBeNull(elementType);
 	}
 
 	static TypeIdentity? GetNestedSchemaTypeIdentity(
