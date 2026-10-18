@@ -118,3 +118,5 @@ var optional = Z.Optional(Z.String());
 optional.Validate(null);      // Success
 optional.Validate("value");   // Success
 ```
+
+For a generated collection, element nullability follows the element type: `T[]`/`List<T>` rejects `null` elements, while `T?[]`/`List<T?>` accepts them — the same distinction as `z.array(T)` versus `z.array(T.nullable())`. See [Collection null items](Source-Generator.md#collection-null-items).

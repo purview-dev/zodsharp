@@ -69,3 +69,11 @@
 | Rule ID | Category | Severity | Notes |
 |---|---|---|---|
 | ZODSGEN045 | ZodSharp.SourceGenerator | Warning | A type that exports JSON Schema references a nested [ZodSchema] type whose export is disabled ([ZodSchema(GenerateJsonSchema = false)] or the assembly-level ZodSharpGenerateJsonSchemas=false switch), so the parent's exported schema falls back to an empty schema for that property |
+
+## Release 2.2.0
+
+### New Rules
+
+| Rule ID | Category | Severity | Notes |
+|---|---|---|---|
+| ZODSGEN046 | ZodSharp.SourceGenerator | Warning | A [CollectionBehavior] attribute is applied to a property that is not a collection of nullable elements, so the setting can never take effect |

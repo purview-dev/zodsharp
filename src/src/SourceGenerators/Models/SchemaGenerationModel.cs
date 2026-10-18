@@ -131,6 +131,12 @@ readonly record struct ZodSchemaDescriptor(
 /// <param name="ValidationKind">The kind of validation the property supports.</param>
 /// <param name="ElementType">The collection element type, when the property is a collection.</param>
 /// <param name="ElementTypeCanBeNull">Indicates whether a collection element can be null.</param>
+/// <param name="AllowNulls">
+/// Whether the collection may contain null elements, when the property is a collection. Before the
+/// generation-settings pass this holds the property/type-level override (null when neither states one); that
+/// pass resolves the assembly default into a concrete value, so the generator always sees a non-null value
+/// for a collection property.
+/// </param>
 /// <param name="NestedSchemaType">The generated schema type of a nested complex type, when there is one.</param>
 /// <param name="LengthAccessor">The length expression and origin, when the property's length is countable.</param>
 /// <param name="CompareViaCompareTo">Indicates whether ranges compare through <c>IComparable</c>.</param>
@@ -165,6 +171,7 @@ readonly record struct ZodPropertyDescriptor(
 	PropertyValidationKind ValidationKind,
 	TypeIdentity? ElementType,
 	bool ElementTypeCanBeNull,
+	bool? AllowNulls,
 	TypeIdentity? NestedSchemaType,
 	LengthAccessor LengthAccessor,
 	bool CompareViaCompareTo,

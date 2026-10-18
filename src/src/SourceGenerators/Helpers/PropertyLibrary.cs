@@ -15,4 +15,6 @@ static class PropertyLibrary
 	public const string EnumSerializationProperty = "ZodSharpEnumSerialization";
 
 	public const string EnumNamingPolicyProperty = "ZodSharpEnumNamingPolicy";
+
+	public const string AllowNullsProperty = "ZodSharpAllowNulls";
 }
