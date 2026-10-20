@@ -162,4 +162,70 @@ public class FromJsonSchemaParserTests
 		await Assert.That(schema.Validate("00000000-0000-0000-0000-000000000000").IsSuccess).IsFalse();
 		await Assert.That(schema.Validate("not-a-guid").IsSuccess).IsFalse();
 	}
+
+	[Test]
+	public async Task JsonSchemaSerializerOptions_GivenTemporalPattern_WritesPatternAndUnsupportedKeyword()
+	{
+		// Arrange
+		JsonSchemaDefinition definition = new()
+		{
+			Type = "string",
+			Format = "date-time",
+			Pattern = NonSentinelRule<DateTimeOffset>.DateTimeOffsetJsonSchemaPattern,
+			UnsupportedRules = [nameof(NonSentinelRule<>)],
+		};
+
+		// Act
+		var json = Newtonsoft.Json.JsonConvert.SerializeObject(definition, JsonSchemaSerializerOptions.Default);
+
+		// Assert
+		await Assert.That(json).Contains("\"pattern\"");
+		await Assert.That(json).Contains("\"x-zodsharp-unsupported\"");
+		await Assert.That(json).Contains(nameof(NonSentinelRule<>));
+	}
+
+	[Test]
+	public async Task Parse_GivenDefaultDateTimeOffsetPattern_RejectsOffsetEquivalentBounds(
+		CancellationToken cancellationToken
+	)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+
+		// Arrange
+		JsonSchemaDefinition definition = new()
+		{
+			Type = "string",
+			Pattern = NonSentinelRule<DateTimeOffset>.DateTimeOffsetJsonSchemaPattern,
+		};
+
+		// Act
+		var schema = FromJsonSchemaParser.Parse(definition);
+
+		// Assert
+		await Assert.That(schema.Validate("2024-01-02T03:04:05+05:30").IsSuccess).IsTrue();
+		await Assert.That(schema.Validate("0001-01-01T05:30:00+05:30").IsSuccess).IsFalse();
+		await Assert.That(schema.Validate("9999-12-31T18:29:59.9999999-05:30").IsSuccess).IsFalse();
+	}
+
+	[Test]
+	public async Task Parse_GivenUtcTemporalPattern_RejectsBoundsAndNonUtcOffsets(CancellationToken cancellationToken)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+
+		// Arrange
+		JsonSchemaDefinition definition = new()
+		{
+			Type = "string",
+			Pattern = NonSentinelRule<DateTimeOffset>.DateTimeOffsetUtcJsonSchemaPattern,
+		};
+
+		// Act
+		var schema = FromJsonSchemaParser.Parse(definition);
+
+		// Assert
+		await Assert.That(schema.Validate("2024-01-02T03:04:05Z").IsSuccess).IsTrue();
+		await Assert.That(schema.Validate("0001-01-01T00:00:00Z").IsSuccess).IsFalse();
+		await Assert.That(schema.Validate("0001-01-01T05:30:00+05:30").IsSuccess).IsFalse();
+		await Assert.That(schema.Validate("2024-01-02T03:04:05+05:30").IsSuccess).IsFalse();
+	}
 }

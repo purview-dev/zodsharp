@@ -180,16 +180,19 @@ Behaviour notes:
 | `NonSentinelRule<T>` | `(string? message)` | `NonSentinel()` | `invalid_value` | `Value has a sentinel value, but got {0}` |
 | `NullOrNonWhiteSpaceRule` | `(string? message, string? code)` | — | `invalid_string` | `Value must be null or non-whitespace, but got '{0}'` |
 
-`NonSentinelRule<T>` rejects the framework default/boundary values an ORM commonly stores to mean "no value": `Guid.Empty`; `DateTime`, `DateTimeOffset`, `DateOnly`, and `TimeOnly` `MinValue`/`MaxValue`; and `null`/empty/whitespace strings. Types without a known sentinel always pass, so the rule never rejects a type it does not understand. It detects sentinels with a `typeof(T)` dispatch and reinterprets the value in place, so no boxing occurs. The `{0}` argument is a **description** of the sentinel (`an empty GUID`, `DateTime.MinValue`, `an empty string`, …) rather than the raw value, and a type-level `[NonSentinel]` on a `[Scalar]` type replaces the message's `Value` subject with the scalar's name — see [Value Objects Integration](Value-Objects-Integration.md#message-overrides).
+`NonSentinelRule<T>` rejects the framework default/boundary values an ORM commonly stores to mean "no value": `Guid.Empty`; `DateTime`, `DateTimeOffset`, `DateOnly`, and `TimeOnly` `MinValue`/`MaxValue`; and `null`/empty/whitespace strings. Types without a known sentinel always pass, so the rule never rejects a type it does not understand. It detects sentinels with a `typeof(T)` dispatch and reinterprets the value in place, so no boxing occurs. The `{0}` argument is a **description** of the sentinel (`an empty GUID`, `DateTime.MinValue`, `an empty string`, …) rather than the raw value, and a type-level `[NonSentinel]` on a `[Scalar]` type replaces the message's `Value` subject with the scalar's name — see [Value Objects Integration](Value-Objects-Integration.md#message-overrides). Its JSON Schema mapping is exact for `DateOnly`, `TimeOnly`, the deterministic `DateTime` wire forms, and `DateTimeOffset` (the default pattern is offset-aware); the optional UTC contract narrows the accepted offset — see [JSON Schema Export](JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
 
 `NullOrNonWhiteSpaceRule` is the null-tolerant counterpart: it accepts `null` but rejects an empty or whitespace-only string. It exists for nullable scalar value objects, which round-trip JSON `null`, so their schema must accept `null` while still rejecting whitespace — `[RequiredZod]` always rejects `null` and so cannot express it. Apply it to a nullable scalar type with `[NullOrNonWhiteSpace]`; a rule written against the underlying `string?` value is adapted to the value object automatically.
 
-The fluent `NonSentinel()` method is declared on `ZodType<TOutput, TInput>`, so it is available on every schema and closes the rule with the schema's output type. `ZodString` and `ZodDate` override it with a covariant return type so the fluent chain keeps the concrete schema:
+The fluent `NonSentinel()` method is declared on `ZodType<TOutput, TInput>`, so it is available on every schema and closes the rule with the schema's output type. `ZodString`, `ZodDate`, and `ZodDateTimeOffset` override it with a covariant return type so the fluent chain keeps the concrete schema:
 
 ```csharp
 var schema = Z.Date().NonSentinel();
 var result = schema.Validate(DateTime.MinValue);
 // result.Errors[0].Code == NonSentinelRule<DateTime>.ErrorCode   ("invalid_value")
+
+var offsetSchema = Z.DateTimeOffset().NonSentinel();
+var offsetResult = offsetSchema.Validate(DateTimeOffset.MinValue);
 
 // Covariant overrides keep the concrete schema, so later fluent calls still compile.
 var chained = Z.String().NonSentinel().Min(3);

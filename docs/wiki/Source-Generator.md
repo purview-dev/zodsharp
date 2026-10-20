@@ -157,6 +157,7 @@ MSBuild switches:
 | `ZodSharpEnumSerialization` | `Number` | `String` makes enums export as their member names, matching a global `JsonStringEnumConverter` |
 | `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
 | `ZodSharpAllowNulls` | `false` | assembly-wide default for whether collection properties may contain `null` elements; explicit `true` accepts them |
+| `ZodSharpDateTimeOffsetSerialization` | `PreserveOffset` | `Utc` narrows `[NonSentinel] DateTimeOffset` to a zero-offset wire contract; the matching converter must also reject non-UTC input. Both modes export an exact sentinel pattern |
 
 ## Collection null items
 
@@ -170,6 +171,45 @@ A collection property rejects `null` elements by default: the generated validato
 | Assembly | `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]`, then the `ZodSharpAllowNulls` MSBuild property |
 
 Precedence, highest first: the property attribute, the element's `T?` annotation, the containing type's `[ZodSchema]` option, the assembly attribute, the `ZodSharpAllowNulls` MSBuild property, then the built-in default (reject).
+
+## DateTimeOffset wire form
+
+The JSON Schema generated for `[NonSentinel] DateTimeOffset` depends on the wire form assumed for the value.
+By default offsets are preserved and the pattern is offset-aware: it rejects every offset-equivalent
+representation of the instant-based bounds, so no unsupported marker is emitted. An optional narrower UTC
+contract is available:
+
+```csharp
+// Directory.Build.props
+<ZodSharpDateTimeOffsetSerialization>Utc</ZodSharpDateTimeOffsetSerialization>
+```
+
+```csharp
+using ZodSharp;
+
+[assembly: ZodSharpSchemaDefaults(
+    DateTimeOffsetSerialization = DateTimeOffsetSerialization.Utc)]
+
+[ZodSchema]
+[DateTimeOffsetBehavior(DateTimeOffsetSerialization.Utc)]
+public sealed class Observation
+{
+    public DateTimeOffset ObservedAt { get; set; }
+
+    // Override the project/type default for one property.
+    [DateTimeOffsetBehavior(DateTimeOffsetSerialization.PreserveOffset)]
+    [JsonConverter(typeof(PreserveOffsetDateTimeOffsetConverter))]
+    public DateTimeOffset LegacySeenAt { get; set; }
+}
+```
+
+Precedence, highest first: `[DateTimeOffsetBehavior]` on the property (or positional record parameter), the
+containing type's attribute, the assembly attribute, the `ZodSharpDateTimeOffsetSerialization` MSBuild
+property, then `PreserveOffset`. The attribute shapes the schema only; pair `Utc` with the integration
+package's `UtcDateTimeOffsetConverter` (and `PreserveOffset` under a global UTC converter with
+`PreserveOffsetDateTimeOffsetConverter`). Both modes export an exact sentinel pattern; `Utc` additionally
+narrows the accepted wire form to a zero offset. See
+[JSON Schema Export](JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
 
 ```csharp
 using ZodSharp;

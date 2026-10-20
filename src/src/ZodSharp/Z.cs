@@ -38,6 +38,15 @@ public static class Z
 	public static ZodDate Date() => new();
 
 	/// <summary>
+	/// Creates a <see cref="DateTimeOffset"/> schema.
+	/// </summary>
+	/// <remarks>
+	/// The wire form is an RFC 3339 date-time string. Use <c>NonSentinel()</c> to reject
+	/// <see cref="DateTimeOffset.MinValue"/> and <see cref="DateTimeOffset.MaxValue"/>.
+	/// </remarks>
+	public static ZodDateTimeOffset DateTimeOffset() => new();
+
+	/// <summary>
 	/// Creates a 64-bit integer (bigint) schema.
 	/// Equivalent to Zod's <c>z.bigint()</c>.
 	/// </summary>

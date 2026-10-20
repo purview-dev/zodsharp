@@ -21,7 +21,7 @@ public static class ToJsonSchemaConverter
 	public static JsonSchemaDefinition Convert<T>(IZodSchema<T, T> schema, ToJsonSchemaOptions? options = null)
 	{
 		options ??= new ToJsonSchemaOptions();
-		ConversionContext context = new();
+		ConversionContext context = new() { DateTimeOffsetSerialization = options.DateTimeOffsetSerialization };
 
 		var result = ConvertSchema(schema, context);
 
@@ -51,6 +51,8 @@ public static class ToJsonSchemaConverter
 		public Dictionary<string, JsonSchemaDefinition> Defs { get; } = [];
 
 		public int Counter { get; set; }
+
+		public DateTimeOffsetSerialization DateTimeOffsetSerialization { get; init; }
 	}
 
 	static JsonSchemaDefinition ConvertSchema(object schema, ConversionContext ctx)
@@ -77,8 +79,13 @@ public static class ToJsonSchemaConverter
 
 		var result = schema switch
 		{
-			ZodString zodString => ConvertString(zodString),
-			ZodNumber zodNumber => ConvertNumber(zodNumber),
+			ZodString zodString => ConvertString(zodString, ctx),
+			ZodNumber zodNumber => ConvertNumber(zodNumber, ctx),
+			// A DateTime is the RFC 3339 date-time string System.Text.Json writes. The schema is expressed
+			// here rather than in ConvertGeneric so a rule that contributes a pattern (for example
+			// NonSentinelRule<DateTime>) has the typed schema to apply it to.
+			ZodDate zodDate => ConvertDate(zodDate, ctx),
+			ZodDateTimeOffset zodDateTimeOffset => ConvertDateTimeOffset(zodDateTimeOffset, ctx),
 			ZodBoolean => new JsonSchemaDefinition { Type = "boolean" },
 			ZodNull => new JsonSchemaDefinition { Type = "null" },
 			ZodObject zodObject => ConvertObject(zodObject, ctx),
@@ -98,7 +105,7 @@ public static class ToJsonSchemaConverter
 		return result;
 	}
 
-	static JsonSchemaDefinition ConvertString(ZodString schema)
+	static JsonSchemaDefinition ConvertString(ZodString schema, ConversionContext ctx)
 	{
 		JsonSchemaDefinition result = new() { Type = "string" };
 
@@ -139,7 +146,7 @@ public static class ToJsonSchemaConverter
 					break;
 
 				default:
-					ApplyUnmappedRule(result, rule);
+					ApplyUnmappedRule(result, rule, ctx.DateTimeOffsetSerialization);
 					break;
 			}
 		}
@@ -153,7 +160,33 @@ public static class ToJsonSchemaConverter
 		return result;
 	}
 
-	static JsonSchemaDefinition ConvertNumber(ZodNumber schema)
+	static JsonSchemaDefinition ConvertDate(ZodDate schema, ConversionContext ctx)
+	{
+		JsonSchemaDefinition result = new() { Type = "string", Format = "date-time" };
+
+		foreach (var rule in schema.AppliedRules)
+			ApplyUnmappedRule(result, rule, ctx.DateTimeOffsetSerialization);
+
+		if (schema.Description != null)
+			result.Description = schema.Description;
+
+		return result;
+	}
+
+	static JsonSchemaDefinition ConvertDateTimeOffset(ZodDateTimeOffset schema, ConversionContext ctx)
+	{
+		JsonSchemaDefinition result = new() { Type = "string", Format = "date-time" };
+
+		foreach (var rule in schema.AppliedRules)
+			ApplyUnmappedRule(result, rule, ctx.DateTimeOffsetSerialization);
+
+		if (schema.Description != null)
+			result.Description = schema.Description;
+
+		return result;
+	}
+
+	static JsonSchemaDefinition ConvertNumber(ZodNumber schema, ConversionContext ctx)
 	{
 		JsonSchemaDefinition result = new() { Type = "number" };
 
@@ -189,7 +222,7 @@ public static class ToJsonSchemaConverter
 					break;
 
 				default:
-					ApplyUnmappedRule(result, rule);
+					ApplyUnmappedRule(result, rule, ctx.DateTimeOffsetSerialization);
 					break;
 			}
 		}
@@ -322,8 +355,18 @@ public static class ToJsonSchemaConverter
 	/// contributes it; anything else is recorded as unsupported so the omission is visible rather than
 	/// silently weakening the exported schema.
 	/// </summary>
-	static void ApplyUnmappedRule(JsonSchemaDefinition schema, object rule)
+	static void ApplyUnmappedRule(
+		JsonSchemaDefinition schema,
+		object rule,
+		DateTimeOffsetSerialization dateTimeOffsetSerialization
+	)
 	{
+		if (rule is NonSentinelRule<DateTimeOffset> dateTimeOffsetRule)
+		{
+			dateTimeOffsetRule.ApplyTo(schema, dateTimeOffsetSerialization);
+			return;
+		}
+
 		if (rule is IJsonSchemaRule mapped)
 		{
 			mapped.ApplyTo(schema);

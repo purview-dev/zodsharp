@@ -41,6 +41,20 @@ enum EnumJsonNamingPolicy
 	CamelCase,
 }
 
+/// <summary>
+/// The DateTimeOffset wire form the generator assumes, mirroring the public
+/// <c>ZodSharp.DateTimeOffsetSerialization</c> enum. The generator cannot reference the core assembly, so the
+/// values are mapped by their numeric identity.
+/// </summary>
+enum DateTimeOffsetSerialization
+{
+	/// <summary>The wire form keeps the value's offset.</summary>
+	PreserveOffset = 0,
+
+	/// <summary>The wire form is UTC: a <c>Z</c> or zero offset.</summary>
+	Utc = 1,
+}
+
 readonly record struct LengthAccessor(string LengthExpression, string Origin, bool IsSupported);
 
 /// <param name="TargetType">This is the target of the attribute, the type where the attribute was defined.</param>
@@ -88,6 +102,11 @@ readonly record struct LengthAccessor(string LengthExpression, string Origin, bo
 /// How a string-serialized enum's member names are transformed, set by the assembly-level
 /// <c>ZodSharpEnumNamingPolicy</c> switch.
 /// </param>
+/// <param name="DateTimeOffsetSerialization">
+/// The type-level <c>[DateTimeOffsetBehavior]</c> override for the wire form assumed by JSON Schema
+/// generation, or <see langword="null"/> when unset. The generation-settings pass resolves it against the
+/// assembly/MSBuild default.
+/// </param>
 readonly record struct ZodSchemaDescriptor(
 	TypeIdentity TargetType,
 	TypeIdentity SchemaType,
@@ -109,7 +128,8 @@ readonly record struct ZodSchemaDescriptor(
 	bool ScalarUnderlyingCanBeNull,
 	bool GenerateJsonSchema,
 	bool EnumAsString,
-	EnumJsonNamingPolicy EnumNamingPolicy
+	EnumJsonNamingPolicy EnumNamingPolicy,
+	DateTimeOffsetSerialization? DateTimeOffsetSerialization = null
 );
 
 /// <param name="PropertyType">The declared type of the property, with a nullable wrapper removed.</param>
@@ -158,6 +178,10 @@ readonly record struct ZodSchemaDescriptor(
 /// For a non-flags enum, the JSON names of the allowed members, in declaration order: the member name, or its
 /// <c>[JsonStringEnumMemberName]</c> value when declared. Used when the enum is serialized as a string.
 /// </param>
+/// <param name="DateTimeOffsetSerialization">
+/// The property-level <c>[DateTimeOffsetBehavior]</c> override, or <see langword="null"/> when unset. The
+/// generation-settings pass resolves it against the type and assembly/MSBuild defaults.
+/// </param>
 readonly record struct ZodPropertyDescriptor(
 	TypeIdentity PropertyType,
 	string Name,
@@ -180,7 +204,8 @@ readonly record struct ZodPropertyDescriptor(
 	string? JsonPropertyName,
 	bool NestedSchemaExportsJsonSchema,
 	bool EnumSerializedAsString,
-	EquatableArray<string> EnumJsonNames
+	EquatableArray<string> EnumJsonNames,
+	DateTimeOffsetSerialization? DateTimeOffsetSerialization = null
 );
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(

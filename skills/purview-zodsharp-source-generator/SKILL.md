@@ -196,6 +196,12 @@ and the type name ends with a configured suffix — `Options` or `Settings` by d
 | `ZodSharpEnumSerialization` | `Number` | `String` exports enums as member names, matching a global `JsonStringEnumConverter` |
 | `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
 | `ZodSharpAllowNulls` | `false` | assembly-wide default for whether collections may contain `null` elements; explicit `true` accepts them |
+| `ZodSharpDateTimeOffsetSerialization` | `PreserveOffset` | `Utc` narrows `[NonSentinel] DateTimeOffset` to a zero-offset wire contract; pair with the integration package's `UtcDateTimeOffsetConverter`. Both modes export an exact sentinel pattern |
+
+`DateTimeOffset` precedence: `[DateTimeOffsetBehavior]` on the property/parameter, then on the type, then
+`[assembly: ZodSharpSchemaDefaults(DateTimeOffsetSerialization = ...)]`, then the MSBuild property, then
+`PreserveOffset`. The attribute shapes the schema only; `Utc` requires a converter that also rejects non-UTC
+input on read.
 
 ## Value objects
 

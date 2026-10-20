@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace ZodSharp.Rules;
 
@@ -25,6 +27,12 @@ namespace ZodSharp.Rules;
 /// without rejecting that type's entire value range. Detection uses a <c>typeof(T)</c> dispatch and
 /// reinterprets the value in place, so no boxing occurs on the validation path.
 /// </para>
+/// <para>
+/// The JSON Schema mapping applies to the same types. <see cref="DateTimeOffset"/> uses an offset-aware
+/// pattern that rejects every RFC 3339 representation of the instant-based bounds; a UTC-only contract is
+/// available as a narrower alternative. See <see cref="DateTimeOffsetBehaviorAttribute"/> and the overload
+/// of <see cref="ApplyTo(JsonSchema.JsonSchemaDefinition, DateTimeOffsetSerialization)"/>.
+/// </para>
 /// </remarks>
 [Core.ZodRule]
 public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
@@ -40,6 +48,103 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 	/// </summary>
 	public const string GuidJsonSchemaPattern =
 		"^(?!00000000-0000-0000-0000-000000000000$)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> that rejects <see cref="DateOnly.MinValue"/> and
+	/// <see cref="DateOnly.MaxValue"/> in their System.Text.Json wire form (<c>yyyy-MM-dd</c>).
+	/// </summary>
+	public const string DateOnlyJsonSchemaPattern = "^(?!0001-01-01$)(?!9999-12-31$)";
+
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> that rejects <see cref="TimeOnly.MinValue"/> and
+	/// <see cref="TimeOnly.MaxValue"/> in their System.Text.Json wire form (<c>HH:mm:ss[.fffffff]</c>).
+	/// </summary>
+	public const string TimeOnlyJsonSchemaPattern = "^(?!00:00(?::00(?:\\.0+)?)?$)(?!23:59:59\\.9999999\\d*$)";
+
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> that rejects the deterministic System.Text.Json wire forms of
+	/// <see cref="DateTime.MinValue"/> and <see cref="DateTime.MaxValue"/>: no offset, <c>Z</c>, or a zero
+	/// offset. A non-zero offset is intentionally not rejected — System.Text.Json converts such a value into
+	/// the receiver's local time zone, so it no longer represents the sentinel ticks.
+	/// </summary>
+	public const string DateTimeJsonSchemaPattern =
+		"^(?!0001-01-01T00:00:00(?:\\.0+)?(?:Z|[+-]00:00)?$)"
+		+ "(?!9999-12-31T23:59:59\\.9999999\\d*(?:Z|[+-]00:00)?$)";
+
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> that rejects every RFC 3339 representation of
+	/// <see cref="DateTimeOffset.MinValue"/> and <see cref="DateTimeOffset.MaxValue"/>, whatever offset the
+	/// wire form carries.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// DateTimeOffset equality compares instants, and RFC 3339 permits the same instant at different offsets.
+	/// For the minimum, the offset must be non-negative and the local wall clock equals the offset
+	/// (<c>0001-01-01T05:30:00+05:30</c>); for the maximum, the local wall clock is
+	/// <c>23:59:59.9999999</c> minus the offset (<c>9999-12-31T18:29:59.9999999-05:30</c>).
+	/// </para>
+	/// <para>
+	/// The pattern correlates the local time with the offset using a backreference for the minimum and two
+	/// lookaheads for the maximum (the hour and minute relations are independent). It is therefore exact for
+	/// every offset System.Text.Json can write, not just the zero-offset form.
+	/// </para>
+	/// </remarks>
+	public static readonly string DateTimeOffsetJsonSchemaPattern = BuildDateTimeOffsetJsonSchemaPattern();
+
+	/// <summary>
+	/// The JSON Schema <c>pattern</c> for a UTC-only <see cref="DateTimeOffset"/> contract: it requires a
+	/// <c>Z</c> or zero offset and rejects <see cref="DateTimeOffset.MinValue"/> and
+	/// <see cref="DateTimeOffset.MaxValue"/>.
+	/// </summary>
+	/// <remarks>
+	/// Because every accepted string has a zero offset, it denotes exactly one instant, so this pattern is
+	/// an exact representation of the instant-based sentinel check. Pair it with a converter that also
+	/// rejects non-UTC input; see <see cref="DateTimeOffsetBehaviorAttribute"/>.
+	/// </remarks>
+	public const string DateTimeOffsetUtcJsonSchemaPattern =
+		"^(?=.*(?:Z|[+-]00:00)$)"
+		+ "(?!0001-01-01T00:00:00(?:\\.0+)?(?:Z|[+-]00:00)$)"
+		+ "(?!9999-12-31T23:59:59\\.9999999\\d*(?:Z|[+-]00:00)$)";
+
+	static string BuildDateTimeOffsetJsonSchemaPattern()
+	{
+		// Maximum: local time = 23:59:59.9999999 minus the offset. The hour relation
+		// (local 23-offsetHour) and the minute relation (local 59-offsetMinute) are independent, so two
+		// lookaheads correlate them without enumerating every offset pair.
+		StringBuilder maxHours = new("9999-12-31T23:[0-5]\\d:59\\.9999999\\d*(?:Z|[+-]00:00|-00:[0-5]\\d)");
+		for (var offsetHour = 1; offsetHour <= 14; offsetHour++)
+		{
+			maxHours.Append(
+				CultureInfo.InvariantCulture,
+				$"|9999-12-31T{TwoDigits(23 - offsetHour)}:[0-5]\\d:59\\.9999999\\d*-{TwoDigits(offsetHour)}:[0-5]\\d"
+			);
+		}
+
+		StringBuilder maxMinutes = new("9999-12-31T[0-2]\\d:59:59\\.9999999\\d*(?:Z|[+-]00:00|-[0-2]\\d:00)");
+		for (var offsetMinute = 1; offsetMinute <= 59; offsetMinute++)
+		{
+			maxMinutes.Append(
+				CultureInfo.InvariantCulture,
+				$"|9999-12-31T[0-2]\\d:{TwoDigits(59 - offsetMinute)}:59\\.9999999\\d*-[0-2]\\d:{TwoDigits(offsetMinute)}"
+			);
+		}
+
+		// Minimum: local time = the offset, so numbered backreferences require both components to match. The
+		// offset cannot be negative (it would fall below DateTimeOffset.MinValue); zero-offset forms may be
+		// written as Z or -00:00 as well as +00:00 (which the backreferences cover). Numbered rather than named
+		// groups keep the pattern usable by JSON Schema validators built on regex engines that do not support
+		// named backreferences.
+		return "^(?!"
+			+ "(?=(?:"
+			+ maxHours
+			+ ")$)(?=(?:"
+			+ maxMinutes
+			+ ")$))"
+			+ "(?!0001-01-01T(0\\d|1[0-4]):([0-5]\\d):00(?:\\.0+)?\\+\\1:\\2"
+			+ "|0001-01-01T00:00:00(?:\\.0+)?(?:Z|-00:00))";
+	}
+
+	static string TwoDigits(int value) => value.ToString("00", CultureInfo.InvariantCulture);
 
 	readonly string _message;
 
@@ -62,17 +167,42 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 	public bool IsValid(in T value) => !SentinelValues<T>.IsSentinel(value);
 
 	/// <summary>
+	/// Applies the JSON Schema constraint that rejects the value's sentinel, assuming the default
+	/// <see cref="DateTimeOffsetSerialization.PreserveOffset"/> wire form.
+	/// </summary>
+	/// <param name="schema">The schema for the value being validated.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema) =>
+		ApplyTo(schema, DateTimeOffsetSerialization.PreserveOffset);
+
+	/// <summary>
 	/// Applies the JSON Schema constraint that rejects the value's sentinel, where the wire form is known.
 	/// </summary>
 	/// <param name="schema">The schema for the value being validated.</param>
+	/// <param name="dateTimeOffsetSerialization">
+	/// The wire form assumed for a <see cref="DateTimeOffset"/> value. It is ignored for every other type.
+	/// </param>
 	/// <remarks>
+	/// <para>
 	/// A string sentinel (null/empty/whitespace) becomes <c>minLength: 1</c> plus a non-whitespace pattern; a
-	/// GUID sentinel (<see cref="Guid.Empty"/>) becomes a <c>not: { const: ... }</c> against the all-zero
-	/// UUID. A date/time sentinel depends on the exact serialized form, which the exporter cannot know here,
-	/// so it is reported through <see cref="JsonSchema.JsonSchemaDefinition.UnsupportedRules"/> instead of
-	/// being guessed or dropped.
+	/// GUID sentinel (<see cref="Guid.Empty"/>) becomes a canonical-Guid pattern that rejects the all-zero
+	/// UUID. <see cref="DateOnly"/>, <see cref="TimeOnly"/> and <see cref="DateTime"/> become patterns that
+	/// reject the System.Text.Json wire forms of their bounds; those mappings are exact for the deterministic
+	/// wire forms.
+	/// </para>
+	/// <para>
+	/// <see cref="DateTimeOffset"/> compares instants, and RFC 3339 permits offset-equivalent
+	/// representations. <see cref="DateTimeOffsetSerialization.PreserveOffset"/> uses an offset-aware
+	/// pattern that correlates the local time with the offset and rejects every such representation of
+	/// <see cref="DateTimeOffset.MinValue"/> and <see cref="DateTimeOffset.MaxValue"/>.
+	/// <see cref="DateTimeOffsetSerialization.Utc"/> is the narrower alternative: the schema requires a zero
+	/// offset, so the same bounds reduce to a shorter pattern.
+	/// </para>
+	/// <para>
+	/// A type with no known sentinel always passes, so it contributes no constraint and is not reported as
+	/// unsupported.
+	/// </para>
 	/// </remarks>
-	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema, DateTimeOffsetSerialization dateTimeOffsetSerialization)
 	{
 		ArgumentNullException.ThrowIfNull(schema);
 
@@ -93,7 +223,37 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 			return;
 		}
 
-		JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(NonSentinelRule<>));
+		if (typeof(T) == typeof(DateOnly))
+		{
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, DateOnlyJsonSchemaPattern);
+			return;
+		}
+
+		if (typeof(T) == typeof(TimeOnly))
+		{
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, TimeOnlyJsonSchemaPattern);
+			return;
+		}
+
+		if (typeof(T) == typeof(DateTime))
+		{
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, DateTimeJsonSchemaPattern);
+			return;
+		}
+
+		if (typeof(T) == typeof(DateTimeOffset))
+		{
+			if (dateTimeOffsetSerialization == DateTimeOffsetSerialization.Utc)
+			{
+				JsonSchema.JsonSchemaRules.ConstrainPattern(schema, DateTimeOffsetUtcJsonSchemaPattern);
+				return;
+			}
+
+			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, DateTimeOffsetJsonSchemaPattern);
+			return;
+		}
+
+		// No built-in sentinel is known for T, so IsValid always passes and the schema needs no constraint.
 	}
 
 	/// <summary>

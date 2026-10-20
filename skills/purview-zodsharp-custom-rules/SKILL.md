@@ -197,7 +197,9 @@ A generic rule closed with the property type lets one attribute serve every memb
 default/boundary values an ORM stores to mean "no value" — `Guid.Empty`,
 `DateTime.MinValue`/`MaxValue`, the `DateTimeOffset`/`DateOnly`/`TimeOnly` bounds, and
 null/empty/whitespace strings. A type with no known sentinel always passes, so the rule never rejects
-something it does not understand.
+something it does not understand. Its JSON Schema mapping is exact for `DateOnly`, `TimeOnly`, deterministic
+`DateTime` forms, and `DateTimeOffset`; the optional UTC opt-in only narrows the accepted offset (see the JSON
+skill).
 
 ```csharp
 var schema = Z.Date().AddRule(new NonSentinelRule<DateTime>());

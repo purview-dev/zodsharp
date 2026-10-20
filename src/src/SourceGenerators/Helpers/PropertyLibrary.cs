@@ -17,4 +17,6 @@ static class PropertyLibrary
 	public const string EnumNamingPolicyProperty = "ZodSharpEnumNamingPolicy";
 
 	public const string AllowNullsProperty = "ZodSharpAllowNulls";
+
+	public const string DateTimeOffsetSerializationProperty = "ZodSharpDateTimeOffsetSerialization";
 }

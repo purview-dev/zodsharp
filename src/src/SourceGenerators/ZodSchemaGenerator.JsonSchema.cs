@@ -89,7 +89,7 @@ partial class ZodSchemaGenerator
 		body.Assignment("var", "inner", BuildBaseSchemaExpression(underlying));
 
 		foreach (var rule in schema.TypeRules)
-			body.MethodCallOn(JsonSchemaRulesTypeName, "Apply", "inner", BuildRuleInstanceExpression(rule));
+			EmitRuleJsonSchema(body, rule, "inner", schema.DateTimeOffsetSerialization);
 
 		foreach (var property in schema.Properties)
 		{
@@ -98,7 +98,7 @@ partial class ZodSchemaGenerator
 
 			EmitAttributeConstraints(body, property.Value, "inner");
 			foreach (var rule in property.Value.CustomRules)
-				body.MethodCallOn(JsonSchemaRulesTypeName, "Apply", "inner", BuildRuleInstanceExpression(rule));
+				EmitRuleJsonSchema(body, rule, "inner", property.Value.DateTimeOffsetSerialization);
 		}
 
 		body.Return(
@@ -125,7 +125,7 @@ partial class ZodSchemaGenerator
 		EmitAttributeConstraints(body, property, localName);
 
 		foreach (var rule in property.CustomRules)
-			body.MethodCallOn(JsonSchemaRulesTypeName, "Apply", localName, BuildRuleInstanceExpression(rule));
+			EmitRuleJsonSchema(body, rule, localName, property.DateTimeOffsetSerialization);
 
 		if (isNullable)
 		{
@@ -227,14 +227,23 @@ partial class ZodSchemaGenerator
 		if (IsWellKnown(type, "System", "Guid"))
 			return $"new {JsonSchemaDefinitionTypeName} {{ Type = \"string\", Pattern = global::ZodSharp.Rules.GuidRule.JsonSchemaPattern }}";
 
-		if (type.SpecialType == SpecialType.System_DateTime || IsWellKnown(type, "System", "DateTimeOffset"))
+		if (
+			type.SpecialType == SpecialType.System_DateTime
+			|| IsWellKnown(type, "System", "DateTime")
+			|| IsWellKnown(type, "System", "DateTimeOffset")
+		)
+		{
 			return Schema("string", "date-time");
+		}
 
 		if (IsWellKnown(type, "System", "DateOnly"))
 			return Schema("string", "date");
 
+		// format: time is an RFC 3339 full-time with an offset, while System.Text.Json writes TimeOnly as a
+		// local HH:mm:ss[.fffffff] value. Express the local lexical space as a pattern so strict consumers do
+		// not reject every TimeOnly payload.
 		if (IsWellKnown(type, "System", "TimeOnly"))
-			return Schema("string", "time");
+			return $"new {JsonSchemaDefinitionTypeName} {{ Type = \"string\", Pattern = {JsonSchemaRulesTypeName}.TimeOnlyPattern }}";
 
 		if (IsWellKnown(type, "System", "TimeSpan"))
 			return Schema("string", "duration");
@@ -283,6 +292,42 @@ partial class ZodSchemaGenerator
 
 	static bool IsFloatingType(SpecialType specialType) =>
 		specialType is SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+
+	/// <summary>
+	/// Emits the JSON Schema application of a custom rule. <c>NonSentinelRule&lt;T&gt;</c> receives the
+	/// resolved DateTimeOffset wire form so the rule can choose between the exact UTC mapping and the
+	/// offset-preserving mapping that retains the unsupported marker; every other rule uses the normal
+	/// two-argument overload.
+	/// </summary>
+	static void EmitRuleJsonSchema(
+		CodeWriter body,
+		CustomRuleDescriptor rule,
+		string localName,
+		DateTimeOffsetSerialization? dateTimeOffsetSerialization
+	)
+	{
+		if (IsNonSentinelRule(rule))
+		{
+			body.MethodCallOn(
+				JsonSchemaRulesTypeName,
+				"Apply",
+				localName,
+				BuildRuleInstanceExpression(rule),
+				RenderDateTimeOffsetSerialization(dateTimeOffsetSerialization)
+			);
+			return;
+		}
+
+		body.MethodCallOn(JsonSchemaRulesTypeName, "Apply", localName, BuildRuleInstanceExpression(rule));
+	}
+
+	static bool IsNonSentinelRule(CustomRuleDescriptor rule) =>
+		(rule.AdaptedFrom ?? rule.RuleType) is { Name: "NonSentinelRule", Namespace: "ZodSharp.Rules" };
+
+	static string RenderDateTimeOffsetSerialization(DateTimeOffsetSerialization? serialization) =>
+		serialization == DateTimeOffsetSerialization.Utc
+			? "global::ZodSharp.DateTimeOffsetSerialization.Utc"
+			: "global::ZodSharp.DateTimeOffsetSerialization.PreserveOffset";
 
 	static string BuildRuleInstanceExpression(CustomRuleDescriptor rule)
 	{

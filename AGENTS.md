@@ -121,14 +121,15 @@ Keep `purview-build.json`'s `PackValidation` requirements in sync with any packa
 
 Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
 
-`src/tests/cross-platform/` is gitignored, so it starts empty on a clean checkout and in CI: **the C# producers must run before vitest**, in the same workspace. There are **two** producer/consumer pairs, in different assemblies, namespaces and classes:
+`src/tests/cross-platform/` is gitignored, so it starts empty on a clean checkout and in CI: **the C# producers must run before vitest**, in the same workspace. There are **three** producer/consumer pairs, in different assemblies, namespaces and classes:
 
 | Vitest consumer | Reads | C# producer |
 | --- | --- | --- |
 | `tests/ts/cross-platform.test.ts` | `src/tests/cross-platform/output/` | `ZodSharp.Json/*CrossPlatformTests` (the SystemTextJson and NewtonsoftJson unit tests) |
 | `tests/ts/guid-uuid-parity.test.ts` | `src/tests/cross-platform/guid-parity/` | `ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts` |
+| `tests/ts/temporal-parity.test.ts` | `src/tests/cross-platform/temporal-parity/` | `ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedTemporalSchemas_WritesZodParityArtifacts` |
 
-`just test` runs the whole suite, so it covers both producers. The `cross-platform` job in `.github/workflows/pr.yml` selects them with treenode filters instead, and therefore needs **one step per producer** — a single `a|b` filter is not honoured as a top-level alternation and silently selects a broader set while skipping the parity producer. Adding a producer means adding a step. Both vitest suites fail loudly rather than passing vacuously when their directory is empty, which is the backstop for exactly this mistake.
+`just test` runs the whole suite, so it covers all three producers. The `cross-platform` job in `.github/workflows/pr.yml` selects them with treenode filters instead, and therefore needs **one step per producer** — a single `a|b` filter is not honoured as a top-level alternation and silently selects a broader set while skipping a parity producer. Adding a producer means adding a step. All vitest suites fail loudly rather than passing vacuously when their directory is empty, which is the backstop for exactly this mistake.
 
 `src/tests/Repository.UnitTests/CrossPlatformVitestTests.cs` additionally drives the vitest suites **from the .NET test run**, as child processes through CliWrap, so `just test` alone proves both halves of the guarantee and a TypeScript-side regression fails a local run. It is a deliberate duplicate of the CI job, not a replacement — the job stays the authoritative gate because it controls producer ordering and installs bun from scratch. Three rules keep the duplication honest:
 

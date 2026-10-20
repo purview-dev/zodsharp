@@ -47,6 +47,24 @@ Rules evaluated by the base `Validate` pipeline emit Zod-compatible codes: `too_
 
 `ZodEnum` (string values) and `ZodNativeEnum<TEnum>` validate against defined members; they do not parse or convert values.
 
+### Temporal sentinel export
+
+`[NonSentinel]` exports exact `pattern` constraints for `DateOnly`, `TimeOnly`, the deterministic `DateTime`
+wire forms (`Unspecified`, `Utc`, or a zero offset), and `DateTimeOffset`. The `DateTimeOffset` pattern is
+offset-aware: it correlates the local time with the offset and rejects every RFC 3339 representation of the
+instant bounds, including offset-equivalent forms, without an `x-zodsharp-unsupported` marker.
+
+A `DateTimeKind.Local` value can carry an arbitrary machine offset, and System.Text.Json converts an
+offset-bearing `DateTime` into the receiver's time zone, so that form is not portable; use `Unspecified`,
+`Utc`, or `DateTimeOffset` (whose sentinel pattern is exact) for a cross-platform contract.
+`DateTimeOffsetSerialization.Utc` is an optional narrower contract that requires a zero offset and a
+converter that rejects non-UTC input on read; see
+[JSON Schema Export](JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
+
+`TimeOnly` is exported as a local-time `pattern` instead of `format: time`. JSON Schema's `format: time` is an
+RFC 3339 full-time and requires an offset, while System.Text.Json writes `TimeOnly` as a local
+`HH:mm:ss[.fffffff]`; a strict `format: time` consumer would reject every value.
+
 ### JSON Schema import scope
 
 `Z.FromJsonSchema` supports **local** `$ref` (`#/...`) references only; external `$ref` targets throw a `NotSupportedException` that names the unsupported reference. The integration packages' `JsonSchemaSerializerOptions` read and write the JSON Schema keyword names (`$schema`, `$id`, `$ref`, `$defs`), so exported definitions round-trip; the core `JsonSchemaDefinition` type itself stays free of serializer annotations. Import types live in package-specific namespaces (`ZodSharp.JsonSchema.SystemTextJson` / `ZodSharp.JsonSchema.NewtonsoftJson`).

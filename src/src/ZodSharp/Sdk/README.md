@@ -351,6 +351,15 @@ The `Purview.ZodSharp.AspNetCore` package offers `AddZodSharp` with assembly aut
 var jsonSchema = Z.ToJsonSchema(userSchema, new ToJsonSchemaOptions { Title = "User" });
 ```
 
+Generated schemas export `[NonSentinel]` for `DateOnly`, `TimeOnly`, `DateTime`, and `DateTimeOffset` as exact
+patterns. The `DateTimeOffset` pattern is offset-aware, so the default preserves offsets without an
+`x-zodsharp-unsupported` marker. An optional narrower UTC contract is available with
+`<ZodSharpDateTimeOffsetSerialization>Utc</ZodSharpDateTimeOffsetSerialization>` (or
+`[assembly: ZodSharpSchemaDefaults(DateTimeOffsetSerialization = DateTimeOffsetSerialization.Utc)]`) and the
+JSON integration package's `UtcDateTimeOffsetConverter`. See the
+[JSON Schema Export](https://purview.dev/docs/zodsharp/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form)
+documentation.
+
 ## Documentation
 
 - [Homepage](https://purview.dev/projects/zodsharp/)

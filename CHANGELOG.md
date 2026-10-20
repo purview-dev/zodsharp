@@ -8,6 +8,54 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## 2.3.0
+
+### Added
+
+- **Temporal `[NonSentinel]` JSON Schema mappings.** `NonSentinelRule<DateOnly>`, `<TimeOnly>`, `<DateTime>`
+  and `<DateTimeOffset>` now export exact `pattern` constraints that reject the System.Text.Json wire forms of
+  their bounds, so no temporal rule appears under `x-zodsharp-unsupported`. The `DateTime` mapping covers the
+  deterministic `Unspecified`, `Utc` and zero-offset forms. The `DateTimeOffset` pattern is offset-aware: it
+  correlates the local time with the offset and rejects every RFC 3339 representation of both instant bounds.
+  `Z.Date().NonSentinel()` also exports `type: "string"`, `format: "date-time"` (previously it fell back to
+  the empty schema). See
+  [JSON Schema Export](docs/wiki/JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
+- **Optional exact UTC `DateTimeOffset` contract.** `DateTimeOffsetSerialization.Utc` narrows
+  `[NonSentinel] DateTimeOffset` to a zero-offset wire form. Configure it per project with
+  `<ZodSharpDateTimeOffsetSerialization>Utc</ZodSharpDateTimeOffsetSerialization>` (for example in
+  `Directory.Build.props`), per assembly with
+  `[assembly: ZodSharpSchemaDefaults(DateTimeOffsetSerialization = ...)]`, or per type/property with
+  `[DateTimeOffsetBehavior(...)]`. Precedence is property, type, assembly, MSBuild, then `PreserveOffset`.
+- **`UtcDateTimeOffsetConverter` and `PreserveOffsetDateTimeOffsetConverter`** in both JSON integration
+  packages (`ZodSharp.Json.Serialization.SystemTextJson` and `...NewtonsoftJson`). The UTC converter writes
+  UTC and rejects a value without an explicit `Z`/zero offset (or with a non-zero offset) on read, which is what
+  keeps it in agreement with the UTC schema; the
+  preserve-offset converter supports overriding a project-wide UTC converter. The Newtonsoft converters
+  require `DateParseHandling.None` so they can inspect the original offset;
+  `UseZodSharpUtcDateTimeOffset()` / `UseZodSharpPreserveOffsetDateTimeOffset()` configure both together.
+- `NonSentinelRule<T>.DateTimeOffsetUtcJsonSchemaPattern` and a
+  `JsonSchemaRules.Apply(schema, rule, DateTimeOffsetSerialization)` overload for manual schemas.
+- **`Z.DateTimeOffset()` and runtime manual-schema options.** `ZodDateTimeOffset` is the fluent counterpart to
+  a generated `DateTimeOffset` property, with the same `NonSentinel()` override.
+  `ToJsonSchemaOptions.DateTimeOffsetSerialization` lets a hand-built schema select the default offset-aware
+  mapping or the narrower UTC contract. `JsonSchemaRules.TimeOnlyPattern` is the local-time base pattern used
+  for a generated `TimeOnly` property.
+
+### Changed
+
+- `NonSentinelRule<T>` no longer reports `x-zodsharp-unsupported` for a type whose sentinel it does not
+  inspect. Such a rule always passes, so an unconstrained schema is complete.
+- A generated `TimeOnly` property now exports a local-time `pattern` instead of `format: time`. JSON Schema's
+  `format: time` requires an RFC 3339 offset, which System.Text.Json never writes for `TimeOnly`; strict
+  consumers previously rejected every value.
+
+### Known limitations
+
+- A `DateTimeKind.Local` sentinel can carry a machine-specific offset; use `Unspecified` or `Utc` for a
+  portable `DateTime` contract.
+- The optional UTC contract deliberately rejects non-UTC input, including otherwise valid timestamps, because
+  normalizing it on read would reintroduce the offset-equivalence gap.
+
 ## 2.2.0
 
 ### Added

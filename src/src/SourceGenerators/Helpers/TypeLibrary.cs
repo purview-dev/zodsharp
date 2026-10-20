@@ -58,6 +58,9 @@ static partial class TypeLibraryGenerator
 	static readonly TypeIdentity CollectionBehaviorAttribute = default;
 
 	[TypeRef(ZodSharpNamespace)]
+	static readonly TypeIdentity DateTimeOffsetBehaviorAttribute = default;
+
+	[TypeRef(ZodSharpNamespace)]
 	static readonly TypeIdentity ZodSharpSchemaDefaultsAttribute = default;
 
 	[TypeRef(ZodSharpCoreNamespace)]

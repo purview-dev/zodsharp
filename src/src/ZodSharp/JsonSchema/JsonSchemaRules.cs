@@ -1,4 +1,5 @@
 using System.Globalization;
+using ZodSharp.Rules;
 
 namespace ZodSharp.JsonSchema;
 
@@ -39,6 +40,18 @@ public interface IJsonSchemaRule
 public static class JsonSchemaRules
 {
 	/// <summary>
+	/// The JSON Schema <c>pattern</c> for the System.Text.Json <see cref="TimeOnly"/> wire form
+	/// (<c>HH:mm:ss[.fffffff]</c>, with no offset).
+	/// </summary>
+	/// <remarks>
+	/// JSON Schema's <c>format: time</c> is an RFC 3339 full-time and therefore requires an offset. A
+	/// System.Text.Json <see cref="TimeOnly"/> is a local time and never carries one, so a strict
+	/// <c>format: time</c> consumer rejects every value. The local lexical space is expressed as this pattern
+	/// instead, which a standards-based consumer can evaluate without a format assertion.
+	/// </remarks>
+	public const string TimeOnlyPattern = "^(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?$";
+
+	/// <summary>
 	/// Applies <paramref name="rule"/> to <paramref name="schema"/> when it implements
 	/// <see cref="IJsonSchemaRule"/>; otherwise records the rule as unsupported so the exported schema is
 	/// visibly incomplete rather than silently weaker.
@@ -57,6 +70,38 @@ public static class JsonSchemaRules
 		}
 
 		MarkUnsupported(schema, rule.GetType().Name);
+	}
+
+	/// <summary>
+	/// Applies <paramref name="rule"/> with the wire-form assumption a <c>DateTimeOffset</c> sentinel mapping
+	/// needs; every other rule ignores <paramref name="dateTimeOffsetSerialization"/>.
+	/// </summary>
+	/// <param name="schema">The schema the rule constrains.</param>
+	/// <param name="rule">The rule instance.</param>
+	/// <param name="dateTimeOffsetSerialization">
+	/// The wire form assumed for a <see cref="DateTimeOffset"/> value.
+	/// </param>
+	/// <remarks>
+	/// The generated <c>BuildJsonSchema</c> calls this overload for <see cref="NonSentinelRule{T}"/> so the
+	/// rule itself owns both the default and the UTC mapping. A rule that does not describe its own JSON
+	/// Schema constraint is still reported as unsupported.
+	/// </remarks>
+	public static void Apply(
+		JsonSchemaDefinition schema,
+		object rule,
+		DateTimeOffsetSerialization dateTimeOffsetSerialization
+	)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		ArgumentNullException.ThrowIfNull(rule);
+
+		if (rule is NonSentinelRule<DateTimeOffset> dateTimeOffsetRule)
+		{
+			dateTimeOffsetRule.ApplyTo(schema, dateTimeOffsetSerialization);
+			return;
+		}
+
+		Apply(schema, rule);
 	}
 
 	/// <summary>
