@@ -23,21 +23,19 @@ namespace ZodSharp;
 /// than to a property whose type is that scalar.
 /// </para>
 /// </remarks>
+/// <remarks>
+/// Initializes a new instance of the <see cref="DateTimeOffsetBehaviorAttribute"/> class.
+/// </remarks>
+/// <param name="serialization">The DateTimeOffset wire form assumed for JSON Schema generation.</param>
 [AttributeUsage(
 	AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Parameter,
 	AllowMultiple = false,
 	Inherited = false
 )]
-public sealed class DateTimeOffsetBehaviorAttribute : Attribute
+public sealed class DateTimeOffsetBehaviorAttribute(DateTimeOffsetSerialization serialization) : Attribute
 {
-	/// <summary>
-	/// Initializes a new instance of the <see cref="DateTimeOffsetBehaviorAttribute"/> class.
-	/// </summary>
-	/// <param name="serialization">The DateTimeOffset wire form assumed for JSON Schema generation.</param>
-	public DateTimeOffsetBehaviorAttribute(DateTimeOffsetSerialization serialization) => Serialization = serialization;
-
 	/// <summary>
 	/// Gets the DateTimeOffset wire form assumed for JSON Schema generation.
 	/// </summary>
-	public DateTimeOffsetSerialization Serialization { get; }
+	public DateTimeOffsetSerialization Serialization { get; } = serialization;
 }
