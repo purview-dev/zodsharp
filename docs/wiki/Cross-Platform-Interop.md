@@ -45,6 +45,13 @@ The same interop goal is available without fixtures via JSON Schema:
 
 A generated collection maps to Zod's array element type: `T[]` / `List<T>` ↔ `z.array(T)`, and a nullable element (`T?[]`, `List<T?>`, or a property that allows nulls via `[CollectionBehavior(AllowNulls = true)]`) ↔ `z.array(T.nullable())`. A collection whose elements may be null exports `items.anyOf: [ …, { "type": "null" } ]`, and both `z.fromJSONSchema` and `Z.FromJsonSchema` read that shape back. Null elements are rejected by default, so a generated `T[]` matches `z.array(T)` exactly — see [Collection null items](Source-Generator.md#collection-null-items).
 
+A dictionary property (`IDictionary<TKey, TValue>` / `IReadOnlyDictionary<TKey, TValue>`) is a map:
+`Dictionary<string, V>` ↔ `z.record(z.string(), V)`. The generated schema exports
+`{ "type": "object", "additionalProperties": … }` (with `minProperties`/`maxProperties` for size constraints),
+and its failures use the same key-prefixed paths as `z.record`. Both `z.fromJSONSchema` and
+`Z.FromJsonSchema` read that shape back as a record — see
+[JSON Schema Export](JsonSchema-Export.md#dictionaries).
+
 The temporal parity suite (`tests/ts/temporal-parity.test.ts`) proves the same loop for `[NonSentinel]` on
 `DateOnly`, `TimeOnly`, `DateTime`, and `DateTimeOffset` under the default preserve-offset contract, including
 the offset-equivalent bounds. The C# producer

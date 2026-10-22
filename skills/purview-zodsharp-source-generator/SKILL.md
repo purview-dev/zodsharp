@@ -90,6 +90,14 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]`, then the `ZodSharpAllowNulls` MSBuild
   property. The most specific statement wins; an unset level defers to the next. An explicit
   `AllowNulls = true` exports a `null` branch on the collection's `items` schema.
+- **Dictionaries are maps, not arrays.** A property whose type implements `IDictionary<TKey, TValue>`
+  or `IReadOnlyDictionary<TKey, TValue>` (for example `Dictionary`, `SortedDictionary`,
+  `ConcurrentDictionary`, `ImmutableDictionary`) validates every **value** against the value type's
+  nested schema and reports a failure at `["Items", "key"]`. Keys are used only in error paths, and
+  `AllowNulls` governs a null value (`Dictionary<string, Child>` rejects it by default; `Child?` or
+  `[CollectionBehavior(AllowNulls = true)]` accepts it). A dictionary exports as
+  `{ "type": "object", "additionalProperties": … }` and `[Length]`/`[MinLength]`/`[MaxLength]` map to
+  `minProperties`/`maxProperties` — never `z.array`/`items`.
 - Classes, structs and records are supported. Structs get no `IValidateOptions` (`ZODSGEN028` if
   requested).
 

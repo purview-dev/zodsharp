@@ -228,6 +228,17 @@ public static class FromJsonSchemaParser
 	)]
 	static IZodSchema<object, object> ConvertObjectSchema(JsonSchemaDefinition schema, ConversionContext ctx)
 	{
+		// An object with no declared properties whose additionalProperties is a schema is a record: every
+		// member is validated by the same value schema. This is the shape the generated exporter writes for a
+		// dictionary property, and matches Zod's z.record(z.string(), V).
+		if (
+			schema.Properties is not { Count: > 0 }
+			&& TryConvertAdditionalProperties(schema.AdditionalProperties, ctx, out var recordValueSchema)
+		)
+		{
+			return new RecordSchemaWrapper(recordValueSchema);
+		}
+
 		var builder = Z.Object();
 		HashSet<string> requiredSet = [.. schema.Required ?? []];
 
@@ -250,6 +261,65 @@ public static class FromJsonSchemaParser
 		}
 
 		return new ObjectSchemaWrapper(builder.Build());
+	}
+
+	/// <summary>
+	/// Converts the <c>additionalProperties</c> value of an object schema to the record's value schema. A
+	/// schema object (or a <c>true</c> wildcard) means the object is a record; <c>false</c> or an absent value
+	/// means it is not.
+	/// </summary>
+	/// <param name="additionalProperties">The raw <see cref="JsonSchemaDefinition.AdditionalProperties"/> value.</param>
+	/// <param name="ctx">The conversion context.</param>
+	/// <param name="valueSchema">The converted value schema, when the object is a record.</param>
+	/// <returns><see langword="true"/> when the object is a record.</returns>
+	static bool TryConvertAdditionalProperties(
+		object? additionalProperties,
+		ConversionContext ctx,
+		out IZodSchema<object, object> valueSchema
+	)
+	{
+		switch (additionalProperties)
+		{
+			case JsonSchemaDefinition definition:
+				valueSchema = ConvertSchema(definition, ctx);
+				return true;
+
+			// A string-parsed schema keeps additionalProperties as a JsonElement, because the model declares
+			// the member as object.
+			case JsonElement { ValueKind: JsonValueKind.Object } element:
+				var parsed = JsonSerializer.Deserialize(element, JsonSchemaJsonContext.Default.JsonSchemaDefinition);
+				valueSchema = parsed is null ? new AnySchema() : ConvertSchema(parsed, ctx);
+				return true;
+
+			case JsonElement { ValueKind: JsonValueKind.True }:
+			case true:
+				valueSchema = new AnySchema();
+				return true;
+
+			default:
+				valueSchema = null!;
+				return false;
+		}
+	}
+
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Performance",
+		"CA1859:Use concrete types when possible for improved performance"
+	)]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0072:Add missing cases")]
+	static object? ConvertJsonElement(JsonElement element)
+	{
+		return element.ValueKind switch
+		{
+			JsonValueKind.String => element.GetString(),
+			JsonValueKind.Number => element.TryGetInt64(out var longValue) ? longValue : element.GetDouble(),
+			JsonValueKind.True => true,
+			JsonValueKind.False => false,
+			JsonValueKind.Null => null,
+			JsonValueKind.Object => element,
+			JsonValueKind.Array => element,
+			_ => element,
+		};
 	}
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -536,26 +606,82 @@ public static class FromJsonSchemaParser
 			object value,
 			CancellationToken cancellationToken = default
 		) => new(Validate(value));
+	}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage(
-			"Performance",
-			"CA1859:Use concrete types when possible for improved performance"
-		)]
-		[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0072:Add missing cases")]
-		static object? ConvertJsonElement(JsonElement element)
+	/// <summary>
+	/// Validates a JSON object as a record: every member is validated by <c>valueSchema</c> and a failure is
+	/// reported at the member's key, matching <c>Z.Record</c> and Zod's <c>z.record</c> issue path.
+	/// </summary>
+	class RecordSchemaWrapper(IZodSchema<object, object> valueSchema) : IZodSchema<object, object>
+	{
+		public ValidationResult<object> Validate(object value)
 		{
-			return element.ValueKind switch
+			Dictionary<string, object?> dict;
+
+			if (value is Dictionary<string, object?> d)
 			{
-				JsonValueKind.String => element.GetString(),
-				JsonValueKind.Number => element.TryGetInt64(out var longValue) ? longValue : element.GetDouble(),
-				JsonValueKind.True => true,
-				JsonValueKind.False => false,
-				JsonValueKind.Null => null,
-				JsonValueKind.Object => element,
-				JsonValueKind.Array => element,
-				_ => element,
-			};
+				dict = d;
+			}
+			else if (value is JsonElement element && element.ValueKind == JsonValueKind.Object)
+			{
+				dict = [];
+				foreach (var prop in element.EnumerateObject())
+					dict[prop.Name] = ConvertJsonElement(prop.Value);
+			}
+			else
+			{
+				return ValidationResult<object>.Failure(
+					new ValidationError(
+						"invalid_type",
+						$"Expected object, but got {value?.GetType().Name ?? "null"}",
+						[]
+					)
+				);
+			}
+
+			Dictionary<string, object?> validated = [];
+			List<ValidationError> errors = [];
+
+			foreach (var (key, item) in dict)
+			{
+				var result = valueSchema.Validate(item!);
+				if (!result.IsSuccess)
+				{
+					foreach (var error in result.Errors)
+					{
+						var path = new string[error.Path.Length + 1];
+						path[0] = key;
+						error.Path.CopyTo(0, path, 1, error.Path.Length);
+						errors.Add(
+							ValidationError.Create(
+								error.Code,
+								error.Message,
+								System.Collections.Immutable.ImmutableArray.Create(path),
+								error.Parameters,
+								error.Origin,
+								error.Minimum,
+								error.Maximum,
+								error.Inclusive,
+								error.Category
+							)
+						);
+					}
+				}
+				else
+				{
+					validated[key] = result.Value;
+				}
+			}
+
+			return errors.Count > 0
+				? ValidationResult<object>.Failure(errors)
+				: ValidationResult<object>.Success(validated);
 		}
+
+		public ValueTask<ValidationResult<object>> ValidateAsync(
+			object value,
+			CancellationToken cancellationToken = default
+		) => new(Validate(value));
 	}
 
 	class ArraySchemaWrapper(IZodSchema<object, object> elementSchema, int? minItems, int? maxItems)

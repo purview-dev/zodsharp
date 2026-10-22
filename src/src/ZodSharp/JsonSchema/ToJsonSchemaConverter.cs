@@ -312,6 +312,17 @@ public static class ToJsonSchemaConverter
 			};
 		}
 
+		// Handle ZodRecord<TValue> through the internal IJsonSchemaRecordInfo seam. A dictionary is written as a
+		// JSON object, so its exported schema is an object whose additionalProperties is the value schema.
+		if (schema is IJsonSchemaRecordInfo recordInfo)
+		{
+			return new JsonSchemaDefinition
+			{
+				Type = "object",
+				AdditionalProperties = ConvertSchema(recordInfo.ValueSchema, ctx),
+			};
+		}
+
 		// Handle ZodLiteral<T> through its introspection seam rather than by type name and field name.
 		if (schema is IJsonSchemaLiteralInfo literalInfo && literalInfo.LiteralValue is { } value)
 		{

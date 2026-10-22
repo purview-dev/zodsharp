@@ -84,6 +84,12 @@ var schema2 = Z.Literal(42);
 var schema = Z.Record(Z.Number());
 ```
 
+A null value is the value schema's decision: `Z.Record(Z.String())` rejects it, while
+`Z.Record(Z.Optional(Z.String()))` accepts it. The schema exports and imports as
+`{ "type": "object", "additionalProperties": … }` (see
+[JSON Schema Export](JsonSchema-Export.md#dictionaries)), and a generated `Dictionary<TKey, TValue>`
+property is validated the same way.
+
 ## Tuple
 
 `ZodTuple` validates fixed-length tuples. Two- and three-element overloads exist; input is `object?[]`.
@@ -119,4 +125,4 @@ optional.Validate(null);      // Success
 optional.Validate("value");   // Success
 ```
 
-For a generated collection, element nullability follows the element type: `T[]`/`List<T>` rejects `null` elements, while `T?[]`/`List<T?>` accepts them — the same distinction as `z.array(T)` versus `z.array(T.nullable())`. See [Collection null items](Source-Generator.md#collection-null-items).
+For a generated collection, element nullability follows the element type: `T[]`/`List<T>` rejects `null` elements, while `T?[]`/`List<T?>` accepts them — the same distinction as `z.array(T)` versus `z.array(T.nullable())`. A dictionary property (`IDictionary<,>`/`IReadOnlyDictionary<,>`) is a map instead: values are validated like elements, and it maps to `z.record(z.string(), V)`. See [Collection null items](Source-Generator.md#collection-null-items).

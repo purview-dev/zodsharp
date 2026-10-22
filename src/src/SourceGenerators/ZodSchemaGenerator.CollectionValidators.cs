@@ -34,6 +34,8 @@ partial class ZodSchemaGenerator
 		var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
 		var propertyLengthName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Length");
 		var origin = lengthAccessor.Origin;
+		var singularNoun = property.IsMap ? "entry" : "element";
+		var pluralNoun = property.IsMap ? "entries" : "elements";
 
 		writer.Assignment("var", propertyValueName, $"value.{propertyName}");
 		using (writer.IfBlockScope($"{propertyValueName} is not null"))
@@ -48,14 +50,14 @@ partial class ZodSchemaGenerator
 				{
 					var tooSmallMessage = BuildMessageExpression(
 						length.ValidationAttribute,
-						$"{$"Field '{displayName}' must contain at least ".StringLiteral()} + FormatCount({length.MinimumLength}, {"element".Surround()}, {"elements".Surround()}) + {".".Surround()}",
+						$"{$"Field '{displayName}' must contain at least ".StringLiteral()} + FormatCount({length.MinimumLength}, {singularNoun.Surround()}, {pluralNoun.Surround()}) + {".".Surround()}",
 						displayName.StringLiteral(),
 						length.MaximumLength.ToString(CultureInfo.InvariantCulture),
 						length.MinimumLength.ToString(CultureInfo.InvariantCulture)
 					);
 					var tooBigMessage = BuildMessageExpression(
 						length.ValidationAttribute,
-						$"{$"Field '{displayName}' must contain no more than ".StringLiteral()} + FormatCount({length.MaximumLength}, {"element".Surround()}, {"elements".Surround()}) + {".".Surround()}",
+						$"{$"Field '{displayName}' must contain no more than ".StringLiteral()} + FormatCount({length.MaximumLength}, {singularNoun.Surround()}, {pluralNoun.Surround()}) + {".".Surround()}",
 						displayName.StringLiteral(),
 						length.MaximumLength.ToString(CultureInfo.InvariantCulture),
 						length.MinimumLength.ToString(CultureInfo.InvariantCulture)
@@ -94,7 +96,7 @@ partial class ZodSchemaGenerator
 				var minLength = minLengthAttr.Value.Length;
 				var messageExpression = BuildMessageExpression(
 					minLengthAttr.Value.ValidationAttribute,
-					$"{$"Field '{displayName}' must contain at least ".StringLiteral()} + FormatCount({minLength}, {"element".Surround()}, {"elements".Surround()}) + {".".Surround()}",
+					$"{$"Field '{displayName}' must contain at least ".StringLiteral()} + FormatCount({minLength}, {singularNoun.Surround()}, {pluralNoun.Surround()}) + {".".Surround()}",
 					displayName.StringLiteral(),
 					minLength.ToString(CultureInfo.InvariantCulture)
 				);
@@ -117,7 +119,7 @@ partial class ZodSchemaGenerator
 				var maxLength = maxLengthAttr.Value.Length;
 				var messageExpression = BuildMessageExpression(
 					maxLengthAttr.Value.ValidationAttribute,
-					$"{$"Field '{displayName}' must contain no more than ".StringLiteral()} + FormatCount({maxLength}, {"element".Surround()}, {"elements".Surround()}) + {".".Surround()}",
+					$"{$"Field '{displayName}' must contain no more than ".StringLiteral()} + FormatCount({maxLength}, {singularNoun.Surround()}, {pluralNoun.Surround()}) + {".".Surround()}",
 					displayName.StringLiteral(),
 					maxLength.ToString(CultureInfo.InvariantCulture)
 				);

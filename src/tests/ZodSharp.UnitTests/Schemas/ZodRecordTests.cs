@@ -52,6 +52,50 @@ public class ZodRecordTests
 	}
 
 	[Test]
+	public async Task Record_GivenNullValue_ReturnsFailure()
+	{
+		// Arrange — a non-nullable value schema rejects a null value, matching z.record(z.string(), T).
+		var schema = Z.Record(Z.String());
+
+		// Act
+		var result = schema.Validate(new Dictionary<string, string> { ["a"] = null! });
+
+		// Assert
+		await Assert.That(result.IsSuccess).IsFalse();
+		await Assert.That(result.Errors[0].Code).IsEqualTo("invalid_type");
+		await Assert.That(result.Errors[0].Path).Contains("a");
+	}
+
+	[Test]
+	public async Task Record_GivenNullableValueSchema_AcceptsNullValue()
+	{
+		// Arrange — null acceptance is the value schema's decision.
+		var schema = Z.Record(Z.Optional(Z.String()));
+
+		// Act
+		var result = schema.Validate(new Dictionary<string, string?> { ["a"] = null });
+
+		// Assert
+		await Assert.That(result.IsSuccess).IsTrue();
+	}
+
+	[Test]
+	public async Task Record_GivenInvalidValue_PreservesStructuredIssueMetadata()
+	{
+		// Arrange — the value schema's issue metadata survives the key-prefixed path rewrite.
+		var schema = Z.Record(Z.Array(Z.String()).Min(2));
+
+		// Act
+		var result = schema.Validate(new Dictionary<string, string[]> { ["a"] = ["only"] });
+
+		// Assert
+		await Assert.That(result.IsSuccess).IsFalse();
+		await Assert.That(result.Errors[0].Path[0]).IsEqualTo("a");
+		await Assert.That(result.Errors[0].Origin).IsEqualTo("array");
+		await Assert.That(result.Errors[0].Minimum).IsEqualTo(2);
+	}
+
+	[Test]
 	public async Task Record_GivenEmptyDictionary_ReturnsSuccess()
 	{
 		// Arrange
