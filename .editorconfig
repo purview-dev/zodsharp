@@ -1,3 +1,23 @@
+# Purview.BuildSdk 1.1.0 - managed file, do not edit
+#
+# This file is written by Purview.BuildSdk and is replaced whenever the SDK version changes. The version
+# on the first line is how the SDK recognises a file it owns: a .editorconfig without that marker is
+# yours, and is never touched.
+#
+# To add your own rules, create a second .editorconfig in a subdirectory - `src/.editorconfig` is the
+# usual choice - without `root = true`. EditorConfig applies the nearest file last, so your settings win
+# over these, and nothing you write is lost when this file is updated.
+#
+# To stop the SDK updating this file, set one of:
+#   <PurviewEditorConfigAutoUpdate>false</PurviewEditorConfigAutoUpdate>   keep this file as it is
+#   <PurviewRepoBootstrapMode>Never</PurviewRepoBootstrapMode>            opt out of all bootstrapping
+#   <BootstrapEditorConfigToRepoRoot>false</BootstrapEditorConfigToRepoRoot>
+#
+# Deleting the first line also works: without the marker the SDK treats the file as yours. You then own
+# every rule in it, including the ones a future SDK version would have fixed.
+#
+# See https://github.com/purview-dev/build-sdk#editorconfig for the full description.
+
 root = true
 
 # Base Configuration - General Settings, File Formatting, and Naming Conventions
@@ -360,11 +380,7 @@ dotnet_style_require_accessibility_modifiers = omit_if_default:warning
 # Code-block preferences
 csharp_prefer_braces = when_multiline:suggestion
 csharp_prefer_simple_using_statement = false:silent
-csharp_prefer_system_threading_lock = true
 dotnet_style_prefer_collection_expression = true:suggestion
-
-# Enable foreach explicit cast preference
-dotnet_style_prefer_foreach_explicit_cast_in_source = when_strongly_typed:warning
 
 # Prefer System.Threading.Lock
 csharp_prefer_system_threading_lock = true:warning
@@ -497,7 +513,7 @@ dotnet_style_prefer_auto_properties = true:warning
 dotnet_style_prefer_compound_assignment = true:warning
 dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
 dotnet_style_prefer_conditional_expression_over_return = true:suggestion
-dotnet_style_prefer_foreach_explicit_cast_in_source = when_strongly_typed
+dotnet_style_prefer_foreach_explicit_cast_in_source = when_strongly_typed:warning
 dotnet_style_prefer_inferred_anonymous_type_member_names = true:warning
 dotnet_style_prefer_inferred_tuple_names = true:warning
 dotnet_style_prefer_simplified_boolean_expressions = false:silent
