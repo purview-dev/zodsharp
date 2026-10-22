@@ -47,10 +47,12 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 						SchemaGenerationOutputContext outputContext = new(model.Context, schema.Value);
 						BuildSchema(outputContext, spc, schema.Value.IsPrimary);
 					}
-					catch (CodeWriterScopeValidationException)
-					{
-						throw;
-					}
+					// CodeWriterScopeValidationException was caught here and rethrown, to fail loudly on a
+					// generator bug. It reached the consumer as CS8785 instead, which discards every file this
+					// generator produced for the compilation and buries the real cause under the 'type or
+					// namespace not found' errors that follow (PSGFR44). It now takes the same path as any
+					// other failure: the exception message lists every open scope, so the diagnostic is no less
+					// loud, and the rest of the generated output still arrives.
 					catch (Exception ex)
 					{
 						var diagnostic = ReportableDiagnostic.Create(

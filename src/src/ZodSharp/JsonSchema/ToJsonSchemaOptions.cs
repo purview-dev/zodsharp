@@ -20,4 +20,15 @@ public sealed class ToJsonSchemaOptions
 	/// Custom title for the schema.
 	/// </summary>
 	public string? Title { get; set; }
+
+	/// <summary>
+	/// Gets or sets the wire form assumed for a <see cref="DateTimeOffset"/> sentinel mapping.
+	/// </summary>
+	/// <remarks>
+	/// The generated <c>BuildJsonSchema</c> path resolves this from
+	/// <see cref="DateTimeOffsetBehaviorAttribute"/> and the assembly/MSBuild defaults. This option is the
+	/// runtime equivalent for a hand-built fluent schema, which has no compile-time metadata to read.
+	/// </remarks>
+	public DateTimeOffsetSerialization DateTimeOffsetSerialization { get; set; } =
+		DateTimeOffsetSerialization.PreserveOffset;
 }

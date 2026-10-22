@@ -18,6 +18,12 @@ static class AttributeGenHelper
 	/// </remarks>
 	internal const string AllowNullsPropertyName = "AllowNulls";
 
+	/// <summary>
+	/// The name of the <c>DateTimeOffsetSerialization</c> property on
+	/// <c>[assembly: ZodSharpSchemaDefaults(...)]</c>.
+	/// </summary>
+	internal const string DateTimeOffsetSerializationPropertyName = "DateTimeOffsetSerialization";
+
 	public static IEnumerable<(string HintName, SourceText SourceText)> GenerateMarkers()
 	{
 		yield return (nameof(ZodSchemaAttribute), ZodSchemaAttribute());

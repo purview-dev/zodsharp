@@ -43,6 +43,24 @@ var options = new JsonSerializerOptions { Converters = { converter } };
 var value = JsonSerializer.Deserialize<User>(json, options);
 ```
 
+## UTC DateTimeOffset contract
+
+The default `PreserveOffset` schema is exact and needs no converter. When the generated JSON Schema uses
+`DateTimeOffsetSerialization.Utc`, add the matching converter so the serializer writes UTC and rejects a value
+without an explicit `Z`/zero offset (or with a non-zero offset) on read:
+
+```csharp
+using ZodSharp.Json.Serialization.SystemTextJson;
+
+var options = new JsonSerializerOptions
+{
+    Converters = { new UtcDateTimeOffsetConverter() },
+};
+```
+
+`PreserveOffsetDateTimeOffsetConverter` is available to opt a type or property back out of a project-wide UTC
+converter. See [JSON Schema Export](https://purview.dev/docs/zodsharp/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form).
+
 ## Import from JSON Schema
 
 ```csharp

@@ -20,6 +20,7 @@
 		<PurviewGeneratorVisibleProperty Include="ZodSharpEnumSerialization" />
 		<PurviewGeneratorVisibleProperty Include="ZodSharpEnumNamingPolicy" />
 		<PurviewGeneratorVisibleProperty Include="ZodSharpAllowNulls" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpDateTimeOffsetSerialization" />
 	</ItemGroup>
 
 	<ItemGroup Label="Analyzer Release Files">

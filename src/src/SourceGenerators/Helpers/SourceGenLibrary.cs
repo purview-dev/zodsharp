@@ -102,8 +102,20 @@ static partial class SourceGenLibrary
 			var schema = target with { Name = schemaName };
 			var targetCanBeNull = TypeHelpers.CanBeNull(symbol);
 			var typeAllowNulls = ReadAllowNulls(attribute);
-			var properties = GetZodProperties(symbol, externalSchemas, compilation, typeAllowNulls);
-			properties = AddAutomaticScalarProperty(symbol, properties, externalSchemas);
+			var typeDateTimeOffsetSerialization = ReadDateTimeOffsetSerialization(symbol.GetAttributes());
+			var properties = GetZodProperties(
+				symbol,
+				externalSchemas,
+				compilation,
+				typeAllowNulls,
+				typeDateTimeOffsetSerialization
+			);
+			properties = AddAutomaticScalarProperty(
+				symbol,
+				properties,
+				externalSchemas,
+				typeDateTimeOffsetSerialization
+			);
 
 			// Type-level rules ([ZodRule]-mapped attributes on the target itself) validate the whole value
 			// rather than a property, which is what makes a scalar value object validatable as a unit. The
@@ -170,7 +182,8 @@ static partial class SourceGenLibrary
 					scalarUnderlyingCanBeNull,
 					generateJsonSchema,
 					false,
-					default
+					default,
+					typeDateTimeOffsetSerialization
 				)
 			);
 
@@ -281,7 +294,8 @@ static partial class SourceGenLibrary
 		INamedTypeSymbol symbol,
 		ExternalSchemaResolver externalSchemas,
 		Compilation compilation,
-		bool? typeAllowNulls
+		bool? typeAllowNulls,
+		DateTimeOffsetSerialization? typeDateTimeOffsetSerialization
 	)
 	{
 		var properties = symbol
@@ -291,7 +305,13 @@ static partial class SourceGenLibrary
 				property.DeclaredAccessibility == Accessibility.Public && !property.IsStatic && !property.IsIndexer
 			)
 			.Select(property =>
-				GetValidatablePropertyDescriptor(property, externalSchemas, compilation, typeAllowNulls)
+				GetValidatablePropertyDescriptor(
+					property,
+					externalSchemas,
+					compilation,
+					typeAllowNulls,
+					typeDateTimeOffsetSerialization
+				)
 			)
 			.ToImmutableArray();
 
@@ -318,11 +338,13 @@ static partial class SourceGenLibrary
 	/// <param name="symbol">The schema target type.</param>
 	/// <param name="properties">The properties discovered from source.</param>
 	/// <param name="externalSchemas">The resolver that decides schema ownership.</param>
+	/// <param name="typeDateTimeOffsetSerialization">The containing type's DateTimeOffset wire-form override.</param>
 	/// <returns>The properties with the synthesized scalar property prepended, when applicable.</returns>
 	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>> AddAutomaticScalarProperty(
 		INamedTypeSymbol symbol,
 		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> properties,
-		ExternalSchemaResolver externalSchemas
+		ExternalSchemaResolver externalSchemas,
+		DateTimeOffsetSerialization? typeDateTimeOffsetSerialization
 	)
 	{
 		if (!CustomRuleResolver.TryGetAutomaticScalar(symbol, out var propertyName, out var valueType))
@@ -386,7 +408,8 @@ static partial class SourceGenLibrary
 			null,
 			true,
 			false,
-			new([])
+			new([]),
+			typeDateTimeOffsetSerialization
 		);
 
 		return new([GeneratorResult<ZodPropertyDescriptor>.Create(descriptor), .. properties]);
@@ -419,7 +442,8 @@ static partial class SourceGenLibrary
 		IPropertySymbol property,
 		ExternalSchemaResolver? externalSchemas,
 		Compilation compilation,
-		bool? typeAllowNulls
+		bool? typeAllowNulls,
+		DateTimeOffsetSerialization? typeDateTimeOffsetSerialization = null
 	)
 	{
 		var declaredType = CreateTypeIdentity(property.Type);
@@ -471,6 +495,8 @@ static partial class SourceGenLibrary
 		var nestedSchemaType = GetNestedSchemaTypeIdentity(property, validationKind, externalSchemas);
 		var lengthAccessor = ClassifyLengthAccessor(originalPropertyType);
 		var validationAttributes = GetValidationAttributes(property, compilation);
+		var dateTimeOffsetSerialization =
+			ReadDateTimeOffsetSerialization(validationAttributes) ?? typeDateTimeOffsetSerialization;
 		var allowNulls =
 			validationKind == PropertyValidationKind.Collection
 				? ResolveAllowNulls(originalPropertyType, validationAttributes, typeAllowNulls)
@@ -629,7 +655,8 @@ static partial class SourceGenLibrary
 				GetJsonPropertyName(property),
 				NestedSchemaExportsJsonSchema(property, validationKind, externalSchemas),
 				enumSerializedAsString,
-				enumJsonNames
+				enumJsonNames,
+				dateTimeOffsetSerialization
 			),
 			diagnostics.ToImmutable()
 		);
@@ -883,6 +910,43 @@ static partial class SourceGenLibrary
 		&& attribute.TryGetNamedArgument<bool>(AttributeGenHelper.AllowNullsPropertyName, out var allow)
 			? allow
 			: null;
+
+	/// <summary>
+	/// Reads the <c>[DateTimeOffsetBehavior]</c> override from a type's or property's attributes, or
+	/// <see langword="null"/> when absent.
+	/// </summary>
+	/// <param name="attributes">The effective attributes to inspect.</param>
+	/// <returns>The declared serialization, or <see langword="null"/> to defer to the next level.</returns>
+	static DateTimeOffsetSerialization? ReadDateTimeOffsetSerialization(ImmutableArray<AttributeData> attributes)
+	{
+		foreach (var attribute in attributes)
+		{
+			if (!TypeLibrary.ZodSharp.DateTimeOffsetBehaviorAttribute.Equals(attribute.AttributeClass))
+				continue;
+
+			foreach (var constructorArgument in attribute.ConstructorArguments)
+			{
+				if (constructorArgument.Value is int serialization)
+					return (DateTimeOffsetSerialization)serialization;
+
+				if (constructorArgument.Value is { } boxed)
+					return (DateTimeOffsetSerialization)
+						Convert.ToInt32(boxed, System.Globalization.CultureInfo.InvariantCulture);
+			}
+
+			foreach (var argument in attribute.NamedArguments)
+			{
+				if (argument.Key == "Serialization" && argument.Value.Value is int namedSerialization)
+				{
+					return (DateTimeOffsetSerialization)namedSerialization;
+				}
+			}
+
+			break;
+		}
+
+		return null;
+	}
 
 	/// <summary>
 	/// Resolves the property/type-level override for whether a collection may contain null elements.

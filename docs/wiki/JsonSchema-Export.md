@@ -146,6 +146,10 @@ the same, so a rule maps to JSON Schema identically on both paths:
 | `StartsWithRule` / `EndsWithRule` / `IncludesRule` | anchored / escaped `pattern` |
 | `NonSentinelRule<string>` / `NullOrNonWhiteSpaceRule` | `minLength: 1` + `pattern: "\\S"` |
 | `NonSentinelRule<Guid>` | a `pattern` that rejects the all-zero UUID |
+| `NonSentinelRule<DateOnly>` | a `pattern` that rejects `0001-01-01` and `9999-12-31` |
+| `NonSentinelRule<TimeOnly>` | a `pattern` that rejects `00:00:00` and `23:59:59.9999999` |
+| `NonSentinelRule<DateTime>` | a `pattern` that rejects the deterministic min/max timestamp forms (no offset, `Z`, or zero offset) |
+| `NonSentinelRule<DateTimeOffset>` | an offset-aware `pattern` that rejects every RFC 3339 representation of both instant bounds; the `Utc` contract narrows it to zero-offset form |
 | `AllowedValuesRule<T>` / `DeniedValuesRule<T>` / `EnumRule<TEnum>` | `enum` / `not: { enum: … }` |
 | `FiniteRule<T>` / `RequiredRule<T>` | no keyword (implied by `number` / the object's `required` list) |
 
@@ -166,6 +170,80 @@ A rule that does not implement `IJsonSchemaRule` is reported through
 interface; for example a custom null-or-non-whitespace rule would add `IJsonSchemaRule` and set
 `minLength`/`pattern` on the schema passed to `ApplyTo`. The built-in `NullOrNonWhiteSpaceRule` already does
 this, so a domain that needs that behaviour should use `[NullOrNonWhiteSpace]` rather than a bespoke rule.
+
+## Temporal sentinels and the DateTimeOffset wire form
+
+`DateOnly`, `TimeOnly` and `DateTime` export a `pattern` that rejects the System.Text.Json wire forms of their
+`MinValue`/`MaxValue`. The temporal mappings are exact for the deterministic forms: a `DateOnly` has one
+`yyyy-MM-dd` form, `TimeOnly` is a local `HH:mm:ss[.fffffff]` value, and a `DateTime` is deterministic when it
+is `Unspecified` or `Utc` (or written with a zero offset). A `DateTimeKind.Local` boundary value can carry an
+arbitrary machine offset, and JSON Schema has no way to know the receiver's time zone; use
+`Unspecified`/`Utc`, or `DateTimeOffset`/`Z.DateTimeOffset()` whose pattern is exact, for a portable contract.
+
+`TimeOnly` is exported as a `pattern` rather than `format: time`. JSON Schema's `format: time` is an RFC 3339
+full-time and requires an offset, while System.Text.Json never writes one for `TimeOnly`; a strict
+`format: time` consumer would reject every value.
+
+`DateTimeOffset` compares instants, and RFC 3339 allows the same instant at different offsets
+(`0001-01-01T00:00:00+00:00` and `0001-01-01T05:30:00+05:30` are both `DateTimeOffset.MinValue`). The default
+`DateTimeOffsetSerialization.PreserveOffset` pattern is offset-aware: it correlates the local time with the
+offset and rejects every representation of both bounds. It is exact, so no `x-zodsharp-unsupported` marker is
+emitted and no serializer change is required. The pattern is intentionally detailed because it encodes that
+relation for both bounds; it stays a standard ECMA-262 `pattern`.
+
+The `Utc` setting is a narrower contract. It requires a `Z` or zero offset and pairs with a converter that
+rejects non-UTC input, which is useful when the application wants to standardise on UTC:
+
+```csharp
+using ZodSharp;
+
+// Project-wide default (or set ZodSharpDateTimeOffsetSerialization=Utc in Directory.Build.props).
+[assembly: ZodSharpSchemaDefaults(
+    DateTimeOffsetSerialization = DateTimeOffsetSerialization.Utc)]
+```
+
+```csharp
+// System.Text.Json
+using ZodSharp.Json.Serialization.SystemTextJson;
+options.Converters.Add(new UtcDateTimeOffsetConverter());
+
+// Newtonsoft.Json — the helper also sets DateParseHandling.None so the converter sees the raw offset.
+using ZodSharp.Json.Serialization.NewtonsoftJson;
+var settings = new JsonSerializerSettings().UseZodSharpUtcDateTimeOffset();
+```
+
+Under the UTC contract the exported `pattern` requires a `Z` or zero offset and rejects both bounds. The
+converter must reject a non-UTC offset on read; normalizing it silently would reintroduce the gap. A value such
+as `2024-01-02T03:04:05+05:30` is therefore rejected by both sides when the contract is UTC, even though it is
+a valid timestamp. Under the default `PreserveOffset`, that value is accepted and the exact offset-aware
+pattern still rejects the bounds.
+
+The setting can be overridden at several levels; the most specific statement wins:
+
+| Level | Declaration |
+|---|---|
+| Property (or positional record parameter) | `[DateTimeOffsetBehavior(DateTimeOffsetSerialization.Utc)]` / `...[PreserveOffset]` |
+| Containing type | `[DateTimeOffsetBehavior(DateTimeOffsetSerialization.Utc)]` |
+| Assembly | `[assembly: ZodSharpSchemaDefaults(DateTimeOffsetSerialization = ...)]` |
+| MSBuild | `ZodSharpDateTimeOffsetSerialization` (`Utc` or `PreserveOffset`, for example in `Directory.Build.props`) |
+| Built-in default | `PreserveOffset` |
+
+The attribute controls schema generation only. Pair a `Utc` override with `UtcDateTimeOffsetConverter`, and a
+`PreserveOffset` override under a project-wide UTC converter with `PreserveOffsetDateTimeOffsetConverter`
+(available in both integration packages). A `[Scalar<DateTimeOffset>]` owns its schema, so apply the attribute
+to the scalar type rather than to a property whose type is that scalar.
+
+A hand-built fluent schema has no compile-time metadata to read, so set the runtime equivalent on
+`ToJsonSchemaOptions` when converting a manual schema:
+
+```csharp
+var jsonSchema = Z.ToJsonSchema(
+    Z.DateTimeOffset().NonSentinel(),
+    new ToJsonSchemaOptions { DateTimeOffsetSerialization = DateTimeOffsetSerialization.Utc });
+```
+
+The default remains `PreserveOffset`, which is also exact. The `rule.ApplyTo(schema, ...)` and
+`JsonSchemaRules.Apply(schema, rule, ...)` overloads are available for code that builds a definition directly.
 
 ## Serialize the definition
 

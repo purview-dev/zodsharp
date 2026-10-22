@@ -18,14 +18,18 @@ static class GenerationSettingsResolver
 		bool GenerateJsonSchemas,
 		bool EnumAsString,
 		EnumJsonNamingPolicy EnumNamingPolicy,
-		bool AllowNulls
+		bool AllowNulls,
+		DateTimeOffsetSerialization DateTimeOffsetSerialization
 	);
 
 	/// <summary>
 	/// The assembly-level schema defaults declared by <c>[assembly: ZodSharpSchemaDefaults(...)]</c>. A null
 	/// value defers to the corresponding MSBuild property.
 	/// </summary>
-	internal readonly record struct AssemblyDefaults(bool? AllowNulls);
+	internal readonly record struct AssemblyDefaults(
+		bool? AllowNulls,
+		DateTimeOffsetSerialization? DateTimeOffsetSerialization
+	);
 
 	public static AutoDetectSettings Read(AnalyzerConfigOptionsProvider provider)
 	{
@@ -71,7 +75,18 @@ static class GenerationSettingsResolver
 			&& bool.TryParse(allowNullsValue, out var allowNullsEnabled)
 			&& allowNullsEnabled;
 
-		return new(autoGenerate, suffixes, generateJsonSchemas, enumAsString, enumNamingPolicy, allowNulls);
+		// Offsets are preserved by default. Utc is the only opt-in value; anything else keeps the default.
+		var dateTimeOffsetSerialization = ReadDateTimeOffsetSerialization(provider);
+
+		return new(
+			autoGenerate,
+			suffixes,
+			generateJsonSchemas,
+			enumAsString,
+			enumNamingPolicy,
+			allowNulls,
+			dateTimeOffsetSerialization
+		);
 	}
 
 	/// <summary>
@@ -88,12 +103,43 @@ static class GenerationSettingsResolver
 			if (!TypeLibrary.ZodSharp.ZodSharpSchemaDefaultsAttribute.Equals(attribute.AttributeClass))
 				continue;
 
-			return attribute.TryGetNamedArgument<bool>(AttributeGenHelper.AllowNullsPropertyName, out var allowNulls)
-				? new(allowNulls)
-				: new(null);
+			var allowNulls = attribute.TryGetNamedArgument<bool>(
+				AttributeGenHelper.AllowNullsPropertyName,
+				out var allow
+			)
+				? allow
+				: (bool?)null;
+
+			DateTimeOffsetSerialization? dateTimeOffsetSerialization = null;
+			foreach (var argument in attribute.NamedArguments)
+			{
+				if (
+					argument.Key == AttributeGenHelper.DateTimeOffsetSerializationPropertyName
+					&& argument.Value.Value is int serialization
+				)
+				{
+					dateTimeOffsetSerialization = (DateTimeOffsetSerialization)serialization;
+				}
+			}
+
+			return new(allowNulls, dateTimeOffsetSerialization);
 		}
 
-		return new(null);
+		return new(null, null);
+	}
+
+	static DateTimeOffsetSerialization ReadDateTimeOffsetSerialization(AnalyzerConfigOptionsProvider provider)
+	{
+		var value = provider.GlobalOptions.TryGetValue(
+			$"build_property:{PropertyLibrary.DateTimeOffsetSerializationProperty}",
+			out var configured
+		)
+			? configured?.Trim()
+			: null;
+
+		return string.Equals(value, nameof(DateTimeOffsetSerialization.Utc), StringComparison.OrdinalIgnoreCase)
+			? DateTimeOffsetSerialization.Utc
+			: DateTimeOffsetSerialization.PreserveOffset;
 	}
 
 	static bool ReadEnumSerializationAsString(AnalyzerConfigOptionsProvider provider) =>
@@ -159,6 +205,19 @@ static class GenerationSettingsResolver
 				changed = true;
 			}
 
+			// Precedence, highest first: the type-level [DateTimeOffsetBehavior], the assembly-level
+			// ZodSharpSchemaDefaults, the MSBuild property, then PreserveOffset.
+			var dateTimeOffsetSerialization =
+				schema.DateTimeOffsetSerialization
+				?? assemblyDefaults.DateTimeOffsetSerialization
+				?? settings.DateTimeOffsetSerialization;
+
+			if (schema.DateTimeOffsetSerialization != dateTimeOffsetSerialization)
+			{
+				schema = schema with { DateTimeOffsetSerialization = dateTimeOffsetSerialization };
+				changed = true;
+			}
+
 			if (
 				settings.AutoGenerate
 				&& settings.Suffixes.Count > 0
@@ -176,6 +235,16 @@ static class GenerationSettingsResolver
 			if (resolvedProperties is { } properties)
 			{
 				schema = schema with { Properties = properties };
+				changed = true;
+			}
+
+			var resolvedDateTimeOffset = ResolveDateTimeOffsetSerialization(
+				schema.Properties,
+				dateTimeOffsetSerialization
+			);
+			if (resolvedDateTimeOffset is { } dateTimeOffsetProperties)
+			{
+				schema = schema with { Properties = dateTimeOffsetProperties };
 				changed = true;
 			}
 
@@ -224,6 +293,47 @@ static class GenerationSettingsResolver
 			}
 
 			builder.Add(GeneratorResult<ZodPropertyDescriptor>.Create(property with { AllowNulls = resolved }));
+			changed = true;
+		}
+
+		return changed ? new(builder.ToImmutable()) : null;
+	}
+
+	/// <summary>
+	/// Resolves each property's DateTimeOffset wire form against the containing type's resolved setting.
+	/// </summary>
+	/// <param name="properties">The schema's properties.</param>
+	/// <param name="schemaSerialization">The type/assembly/MSBuild setting already resolved for the schema.</param>
+	/// <returns>The rewritten properties, or <see langword="null"/> when no property changed.</returns>
+	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>>? ResolveDateTimeOffsetSerialization(
+		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> properties,
+		DateTimeOffsetSerialization schemaSerialization
+	)
+	{
+		if (properties.Count == 0)
+			return null;
+
+		var changed = false;
+		var builder = ImmutableArray.CreateBuilder<GeneratorResult<ZodPropertyDescriptor>>(properties.Count);
+		foreach (var propertyResult in properties)
+		{
+			if (!propertyResult.ShouldProcess)
+			{
+				builder.Add(propertyResult);
+				continue;
+			}
+
+			var property = propertyResult.Value;
+			var resolved = property.DateTimeOffsetSerialization ?? schemaSerialization;
+			if (property.DateTimeOffsetSerialization == resolved)
+			{
+				builder.Add(propertyResult);
+				continue;
+			}
+
+			builder.Add(
+				GeneratorResult<ZodPropertyDescriptor>.Create(property with { DateTimeOffsetSerialization = resolved })
+			);
 			changed = true;
 		}
 

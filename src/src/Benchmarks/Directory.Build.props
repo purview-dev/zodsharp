@@ -16,4 +16,9 @@
     BenchmarkDotNet's generated build output. The Benchmarks.csproj is fully
     self-contained and does not need the SDK.
   -->
+	<!-- Without this the centrally managed package versions would not be applied to this subtree -->
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+	</PropertyGroup>
 </Project>

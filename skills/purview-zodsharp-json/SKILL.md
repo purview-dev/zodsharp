@@ -110,7 +110,13 @@ behaviours:
   when serialized as strings. A `[Flags]` enum emits `type: integer` instead, because a combination is
   valid without being a defined member;
 - lazy/recursive schemas emit `$ref` entries under `$defs` (`#/$defs/__lazyN`);
-- rules that describe their own constraint implement `IJsonSchemaRule` and are applied during export.
+- rules that describe their own constraint implement `IJsonSchemaRule` and are applied during export;
+- `[NonSentinel]` exports exact patterns for `DateOnly`, `TimeOnly`, `DateTime`, and `DateTimeOffset`. The
+  default `DateTimeOffset` pattern is offset-aware and needs no converter. An optional narrower UTC contract
+  uses `ZodSharpDateTimeOffsetSerialization=Utc` or
+  `[assembly: ZodSharpSchemaDefaults(DateTimeOffsetSerialization = DateTimeOffsetSerialization.Utc)]`, paired
+  with the integration package's `UtcDateTimeOffsetConverter` (which rejects non-UTC input on read). Override
+  per type/property with `[DateTimeOffsetBehavior(...)]`.
 
 ### Exporting a generated `[ZodSchema]`
 

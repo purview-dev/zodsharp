@@ -11,6 +11,7 @@
 | `Boolean()` | `Z.Boolean()` | `ZodBoolean` |
 | `Null()` | `Z.Null()` | `ZodNull` |
 | `Date()` | `Z.Date()` | `ZodDate` |
+| `DateTimeOffset()` | `Z.DateTimeOffset()` | `ZodDateTimeOffset` |
 | `BigInt()` | `Z.BigInt()` | `ZodBigInt` |
 | `Array<T>` | `Z.Array<T>(IZodSchema<T, T> elementSchema)` | `ZodArray<T>` |
 | `Optional<T>` | `Z.Optional<T>(IZodSchema<T, T> schema)` — `T : class` | `ZodOptional<T>` |

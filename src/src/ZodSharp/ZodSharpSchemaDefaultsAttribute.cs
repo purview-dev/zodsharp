@@ -30,4 +30,24 @@ public sealed class ZodSharpSchemaDefaultsAttribute : Attribute
 	/// parameter type, so the unset state is the absence of the named argument rather than a null value.
 	/// </remarks>
 	public bool AllowNulls { get; set; }
+
+	/// <summary>
+	/// Gets or sets the assembly-wide default for the JSON wire form assumed for
+	/// <see cref="DateTimeOffset"/> values.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// This is the assembly-level default for schema generation. It overrides the
+	/// <c>ZodSharpDateTimeOffsetSerialization</c> MSBuild property, and a type or property can override it
+	/// with <see cref="DateTimeOffsetBehaviorAttribute"/>. When neither this property nor the MSBuild
+	/// property is set, <see cref="DateTimeOffsetSerialization.PreserveOffset"/> applies.
+	/// </para>
+	/// <para>
+	/// The setting only shapes the exported JSON Schema. <see cref="DateTimeOffsetSerialization.PreserveOffset"/>
+	/// exports an offset-aware sentinel pattern that matches the serializer's normal behavior.
+	/// <see cref="DateTimeOffsetSerialization.Utc"/> is narrower and must be paired with the integration
+	/// package's UTC converter so the serializer and the schema agree.
+	/// </para>
+	/// </remarks>
+	public DateTimeOffsetSerialization DateTimeOffsetSerialization { get; set; }
 }
