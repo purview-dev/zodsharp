@@ -95,6 +95,8 @@ Enum properties are validated automatically: a value that is not a defined membe
 
 Collection elements reject `null` by default: a null element reports `invalid_type` at its own path (for example `["Items", 0]`). Opt in per property with `[CollectionBehavior(AllowNulls = true)]`, per element type with `T?` (for example `List<Child?>`), per type with `[ZodSchema(AllowNulls = true)]`, or per assembly with `[assembly: ZodSharpSchemaDefaults(AllowNulls = true)]` or the `ZodSharpAllowNulls` MSBuild property. The most specific statement wins; `[CollectionBehavior]` on a property that cannot hold null elements is reported as `ZODSGEN046`.
 
+A dictionary property (`IDictionary<TKey, TValue>` / `IReadOnlyDictionary<TKey, TValue>`) is validated as a map: every value is checked against the value type's nested schema, a failure is reported at the entry's key (for example `["Variants", "blue"]`), and `AllowNulls` governs null values. It exports as `{ "type": "object", "additionalProperties": … }` rather than as an array.
+
 ## Custom rules
 
 A rule is any struct implementing `ZodSharp.Core.IValidationRule<T>`; attach it to a schema with the public `Rule`/`AddRule` API, or expose it as a DataAnnotations-style attribute that the source generator honours exactly like the built-ins.

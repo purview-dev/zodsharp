@@ -7,14 +7,14 @@
 		version ships. This lives in the repo because the baseline is package-specific; Purview.BuildSdk has no
 		default for it.
 
-		2.3.0 validates against 2.2.0 with no suppressions: the temporal rule and DateTimeOffset wire-form
-		additions are additive public API. An intended change from here needs a CompatibilitySuppressions.xml next
-		to the project that owns it (generate one with
+		2.4.0 validates against 2.3.0 with no suppressions: the dictionary validation, record JSON Schema and
+		minProperties/maxProperties additions are additive public API. An intended change from here needs a
+		CompatibilitySuppressions.xml next to the project that owns it (generate one with
 		`dotnet pack /p:GenerateCompatibilitySuppressionFile=true`), and that file is then the evidence behind the
 		matching upgrade note — a change that is not listed in both is a defect.
 	-->
 	<PropertyGroup Label="NuGet package validation" Condition="'$(IsPackable)' == 'true'">
 		<EnablePackageValidation>true</EnablePackageValidation>
-		<PackageValidationBaselineVersion>2.2.0</PackageValidationBaselineVersion>
+		<PackageValidationBaselineVersion>2.3.0</PackageValidationBaselineVersion>
 	</PropertyGroup>
 </Project>

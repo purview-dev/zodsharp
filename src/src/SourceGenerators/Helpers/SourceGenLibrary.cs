@@ -213,17 +213,7 @@ static partial class SourceGenLibrary
 	static bool IsPropertyWithNestedSchema(IPropertySymbol property, ExternalSchemaResolver externalSchemas)
 	{
 		var propertyType = TypeHelpers.UnwrapNullableType(property.Type);
-		if (propertyType is IArrayTypeSymbol arrayType)
-			propertyType = arrayType.ElementType;
-		else if (propertyType is INamedTypeSymbol namedType)
-		{
-			var enumerable = namedType.AllInterfaces.FirstOrDefault(
-				TypeLibrary.System.Collections.Generic.IEnumerable.Equals
-			);
-			if (enumerable is not null)
-				propertyType = enumerable.TypeArguments[0];
-		}
-
+		propertyType = GetCollectionItemTypeSymbol(propertyType) ?? propertyType;
 		propertyType = TypeHelpers.UnwrapNullableType(propertyType);
 		return propertyType is INamedTypeSymbol nested && externalSchemas.IsSchemaOwnedByThisCompilation(nested);
 	}
@@ -399,6 +389,8 @@ static partial class SourceGenLibrary
 			validationKind,
 			null,
 			false,
+			false,
+			false,
 			null,
 			null,
 			new(string.Empty, string.Empty, false),
@@ -484,14 +476,12 @@ static partial class SourceGenLibrary
 
 		var diagnostics = ImmutableArray.CreateBuilder<ReportableDiagnostic>();
 		var validationKind = GetPropertyValidationKind(propertyType, originalPropertyType, externalSchemas);
-		var elementType =
-			validationKind == PropertyValidationKind.Collection
-				? GetCollectionElementTypeIdentity(originalPropertyType)
-				: null;
-		var elementTypeCanBeNull =
-			validationKind == PropertyValidationKind.Collection
-			&& elementType is not null
-			&& TypeHelpers.CanBeNull(GetCollectionElementTypeSymbol(originalPropertyType) ?? originalPropertyType);
+		var collectionItem =
+			validationKind == PropertyValidationKind.Collection ? GetCollectionItemInfo(originalPropertyType) : default;
+		var elementType = collectionItem.Identity;
+		var elementTypeCanBeNull = collectionItem.CanBeNull;
+		var elementTypeIsNullableValueType = collectionItem.IsNullableValueType;
+		var isMap = collectionItem.IsMap;
 		var nestedSchemaType = GetNestedSchemaTypeIdentity(property, validationKind, externalSchemas);
 		var lengthAccessor = ClassifyLengthAccessor(originalPropertyType);
 		var validationAttributes = GetValidationAttributes(property, compilation);
@@ -629,6 +619,8 @@ static partial class SourceGenLibrary
 				validationKind,
 				elementType,
 				elementTypeCanBeNull,
+				elementTypeIsNullableValueType,
+				isMap,
 				allowNulls,
 				nestedSchemaType,
 				lengthAccessor,
@@ -682,8 +674,10 @@ static partial class SourceGenLibrary
 
 		var targetType =
 			validationKind == PropertyValidationKind.Collection
-				? GetCollectionElementTypeSymbol(property.Type)
+				? GetCollectionItemTypeSymbol(property.Type)
 				: TypeHelpers.UnwrapNullableType(property.Type);
+
+		targetType = targetType is null ? null : TypeHelpers.UnwrapNullableType(targetType);
 
 		if (targetType is not INamedTypeSymbol namedType)
 			return true;
@@ -851,46 +845,118 @@ static partial class SourceGenLibrary
 		return ignored is null ? new(ImmutableArray<string>.Empty) : new(ignored.ToImmutable());
 	}
 
-	static TypeIdentity? GetCollectionElementTypeIdentity(ITypeSymbol propertyType)
+	/// <summary>
+	/// Resolves the map arguments of a dictionary-like type: the <c>IDictionary&lt;TKey, TValue&gt;</c>
+	/// interface it implements, or <c>IReadOnlyDictionary&lt;TKey, TValue&gt;</c> when that is the only one.
+	/// The type itself is considered too, so a property declared as an interface is still a map.
+	/// </summary>
+	/// <param name="type">The type to inspect.</param>
+	/// <param name="keyType">The dictionary key type, when <paramref name="type"/> is a map.</param>
+	/// <param name="valueType">The dictionary value type, when <paramref name="type"/> is a map.</param>
+	/// <returns><see langword="true"/> when the type is a dictionary.</returns>
+	/// <remarks>
+	/// Detection is by interface, not by type name, so <c>Dictionary</c>, <c>SortedDictionary</c>,
+	/// <c>ConcurrentDictionary</c>, <c>ImmutableDictionary</c> and custom implementations all qualify.
+	/// </remarks>
+	static bool TryGetMapArguments(ITypeSymbol type, out ITypeSymbol? keyType, out ITypeSymbol? valueType)
 	{
-		if (propertyType is IArrayTypeSymbol arrayType)
-			return CreateTypeIdentity(arrayType.ElementType);
+		keyType = null;
+		valueType = null;
 
-		if (propertyType is not INamedTypeSymbol namedType)
-			return null;
+		INamedTypeSymbol? writable = null;
+		INamedTypeSymbol? readOnly = null;
 
-		foreach (var iface in namedType.AllInterfaces)
+		Consider(type as INamedTypeSymbol);
+
+		if (type is INamedTypeSymbol namedType)
 		{
-			if (TypeHelpers.Implements(iface, TypeLibrary.System.Collections.Generic.IEnumerable))
-				return CreateTypeIdentity(iface.TypeArguments[0]);
+			foreach (var iface in namedType.AllInterfaces)
+				Consider(iface);
 		}
 
-		return
-			namedType.IsGenericType
-			&& TypeHelpers.Implements(namedType, TypeLibrary.System.Collections.Generic.IEnumerable)
-			? CreateTypeIdentity(namedType.TypeArguments[0])
+		if ((writable ?? readOnly) is not { TypeArguments.Length: 2 } map)
+			return false;
+
+		keyType = map.TypeArguments[0];
+		valueType = map.TypeArguments[1];
+		return true;
+
+		void Consider(INamedTypeSymbol? candidate)
+		{
+			if (
+				candidate is null
+				|| candidate.OriginalDefinition.ContainingNamespace.ToDisplayString() != "System.Collections.Generic"
+				|| candidate.OriginalDefinition.MetadataName is not ("IDictionary`2" or "IReadOnlyDictionary`2")
+			)
+			{
+				return;
+			}
+
+			if (candidate.OriginalDefinition.MetadataName == "IDictionary`2")
+				writable ??= candidate;
+			else
+				readOnly ??= candidate;
+		}
+	}
+
+	/// <summary>
+	/// Resolves the per-entry type a generated collection validates: a map's value type, otherwise the
+	/// sequence element type.
+	/// </summary>
+	/// <param name="type">The collection (or collection-like) type.</param>
+	/// <returns>The value/element type, or <see langword="null"/> when the type has none.</returns>
+	/// <remarks>
+	/// The framework helper handles implemented interfaces (<c>Dictionary&lt;K, V&gt;</c> yields
+	/// <c>KeyValuePair&lt;K, V&gt;</c>), and the trailing case covers a property declared as the enumerable
+	/// interface itself, which the helper does not resolve.
+	/// </remarks>
+	static ITypeSymbol? GetCollectionItemTypeSymbol(ITypeSymbol type)
+	{
+		if (type is IArrayTypeSymbol arrayType)
+			return arrayType.ElementType;
+
+		if (TryGetMapArguments(type, out _, out var mapValueType))
+			return mapValueType;
+
+		if (TypeHelpers.TryGetElementType(type, out var elementType))
+			return elementType;
+
+		return type is INamedTypeSymbol { OriginalDefinition.MetadataName: "IEnumerable`1" } enumerable
+			? enumerable.TypeArguments[0]
 			: null;
 	}
 
-	static ITypeSymbol? GetCollectionElementTypeSymbol(ITypeSymbol propertyType)
+	/// <summary>
+	/// The collection metadata a property descriptor carries: the validated per-entry type and how it behaves.
+	/// </summary>
+	/// <param name="Identity">The representable item type, with a nullable value-type wrapper removed.</param>
+	/// <param name="CanBeNull">Whether an item can be null at runtime.</param>
+	/// <param name="IsNullableValueType">Whether the item is a <c>Nullable&lt;T&gt;</c>.</param>
+	/// <param name="IsMap">Whether the collection is a dictionary.</param>
+	readonly record struct CollectionItemInfo(
+		TypeIdentity? Identity,
+		bool CanBeNull,
+		bool IsNullableValueType,
+		bool IsMap
+	);
+
+	/// <summary>
+	/// Resolves the per-entry metadata for a collection property.
+	/// </summary>
+	/// <param name="collectionType">The collection type.</param>
+	/// <returns>The item metadata; all-false when the item type cannot be represented.</returns>
+	static CollectionItemInfo GetCollectionItemInfo(ITypeSymbol collectionType)
 	{
-		if (propertyType is IArrayTypeSymbol arrayType)
-			return arrayType.ElementType;
+		var itemType = GetCollectionItemTypeSymbol(collectionType);
+		var identity = itemType is null ? null : CreateTypeIdentity(TypeHelpers.UnwrapNullableType(itemType));
 
-		if (propertyType is not INamedTypeSymbol namedType)
-			return null;
-
-		foreach (var iface in namedType.AllInterfaces)
-		{
-			if (TypeHelpers.Implements(iface, TypeLibrary.System.Collections.Generic.IEnumerable))
-				return iface.TypeArguments[0];
-		}
-
-		return
-			namedType.IsGenericType
-			&& TypeHelpers.Implements(namedType, TypeLibrary.System.Collections.Generic.IEnumerable)
-			? namedType.TypeArguments[0]
-			: null;
+		return new(
+			identity,
+			identity is not null && itemType is not null && TypeHelpers.CanBeNull(itemType),
+			identity is not null
+				&& itemType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T },
+			TryGetMapArguments(collectionType, out _, out _)
+		);
 	}
 
 	/// <summary>
@@ -979,7 +1045,7 @@ static partial class SourceGenLibrary
 			break;
 		}
 
-		var elementType = GetCollectionElementTypeSymbol(collectionType);
+		var elementType = GetCollectionItemTypeSymbol(collectionType);
 		if (elementType is not null && IsExplicitlyNullableElement(elementType))
 			return true;
 
@@ -1022,7 +1088,7 @@ static partial class SourceGenLibrary
 			return false;
 		}
 
-		var elementType = GetCollectionElementTypeSymbol(type);
+		var elementType = GetCollectionItemTypeSymbol(type);
 		return elementType is not null && TypeHelpers.CanBeNull(elementType);
 	}
 
@@ -1034,8 +1100,10 @@ static partial class SourceGenLibrary
 	{
 		var targetType =
 			validationKind == PropertyValidationKind.Collection
-				? GetCollectionElementTypeSymbol(property.Type)
+				? GetCollectionItemTypeSymbol(property.Type)
 				: property.Type;
+
+		targetType = targetType is null ? null : TypeHelpers.UnwrapNullableType(targetType);
 
 		if (targetType is not INamedTypeSymbol namedType)
 			return null;
@@ -1323,17 +1391,7 @@ static partial class SourceGenLibrary
 	)
 	{
 		var propertyType = TypeHelpers.UnwrapNullableType(property.Type);
-		if (propertyType is IArrayTypeSymbol array)
-			propertyType = array.ElementType;
-		else if (propertyType is INamedTypeSymbol named)
-		{
-			var enumerable = named.AllInterfaces.FirstOrDefault(
-				TypeLibrary.System.Collections.Generic.IEnumerable.Equals
-			);
-			if (enumerable is not null)
-				propertyType = enumerable.TypeArguments[0];
-		}
-
+		propertyType = GetCollectionItemTypeSymbol(propertyType) ?? propertyType;
 		propertyType = TypeHelpers.UnwrapNullableType(propertyType);
 		nested = propertyType as INamedTypeSymbol ?? null!;
 		return nested is not null && externalSchemas.IsSchemaOwnedByThisCompilation(nested);

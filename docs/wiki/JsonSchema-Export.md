@@ -43,9 +43,10 @@ var jsonSchema = Z.ToJsonSchema<Dictionary<string, object?>>(userSchema, new ToJ
 
 ## Supported schema types
 
-`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, and `ZodLazy`.
+`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodRecord`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, and `ZodLazy`.
 
 - Objects emit `additionalProperties: false`.
+- Records (`Z.Record(valueSchema)`) emit `{ "type": "object", "additionalProperties": <value> }`.
 - Literals emit `const` (and `type`).
 - Native enums emit `enum` with the defined members in their System.Text.Json wire form: the numeric values by default, or the member names when the enum is serialized as a string. A `[Flags]` enum emits `type: integer` instead, because a combination is valid without being a defined member.
 - Lazy/recursive schemas emit `$ref` entries under `$defs` (e.g. `#/$defs/__lazyN`).
@@ -124,6 +125,28 @@ A type that exports JSON Schema must not reference a type whose export is disabl
 `BuildJsonSchema` does not exist. The generator falls back to an empty (any) schema for that property and the
 analyzer reports **ZODSGEN045** naming the property and the disabled type, so the gap is surfaced at build
 time rather than shipped silently.
+
+## Dictionaries
+
+System.Text.Json writes a dictionary as a JSON object, so a generated dictionary property
+(`IDictionary<TKey, TValue>` / `IReadOnlyDictionary<TKey, TValue>`) exports an object rather than an array:
+
+```json
+"variants": {
+  "type": "object",
+  "additionalProperties": { "type": "object", "properties": { … } }
+}
+```
+
+- `additionalProperties` is the **value** type's schema. A nested `[ZodSchema]` value type is referenced
+  inline, exactly as an element schema is for an array; a type whose export is disabled falls back to `{}`
+  and reports `ZODSGEN045`.
+- A nullable value (`Dictionary<string, Child?>`, `Dictionary<string, int?>`, or
+  `[CollectionBehavior(AllowNulls = true)]`) wraps the value schema in
+  `anyOf: [ …, { "type": "null" } ]`, mirroring the sequence `items` branch.
+- `[Length]`/`[MinLength]`/`[MaxLength]` export `minProperties`/`maxProperties` (not `minItems`/`maxItems`).
+- The TypeScript counterpart is `z.record(z.string(), V)`. Importing an object with `additionalProperties`
+  produces a record schema — see [JSON Schema Import](JsonSchema-Import.md#records).
 
 ## Validation rules and JSON Schema
 

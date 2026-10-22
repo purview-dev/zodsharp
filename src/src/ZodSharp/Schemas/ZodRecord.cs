@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
@@ -13,9 +14,14 @@ namespace ZodSharp.Schemas;
 /// </remarks>
 /// <param name="valueSchema">The schema for all values.</param>
 public class ZodRecord<TValue>(IZodSchema<TValue, TValue> valueSchema)
-	: ZodType<Dictionary<string, TValue>, Dictionary<string, TValue>>
+	: ZodType<Dictionary<string, TValue>, Dictionary<string, TValue>>,
+		JsonSchema.IJsonSchemaRecordInfo
 {
 	static readonly string[] EmptyPath = [];
+
+	// IJsonSchemaRecordInfo: the JSON Schema exporter's non-generic seam. A record exports as an object whose
+	// additionalProperties is the value schema. See IJsonSchemaRecordInfo.
+	object JsonSchema.IJsonSchemaRecordInfo.ValueSchema => valueSchema;
 
 	/// <summary>
 	/// Validates that all values in the dictionary match the value schema.
@@ -36,12 +42,8 @@ public class ZodRecord<TValue>(IZodSchema<TValue, TValue> valueSchema)
 
 		foreach (var (key, itemValue) in value)
 		{
-			if (itemValue is null)
-			{
-				validated[key] = default!;
-				continue;
-			}
-
+			// A null value is the value schema's decision, not the record's: a record of a non-nullable schema
+			// rejects it (matching z.record(z.string(), T)), while a nullable value schema accepts it.
 			var result = valueSchema.Validate(itemValue);
 			if (!result.IsSuccess)
 			{
@@ -50,12 +52,24 @@ public class ZodRecord<TValue>(IZodSchema<TValue, TValue> valueSchema)
 					var path = new string[error.Path.Length + 1];
 					path[0] = key;
 					error.Path.CopyTo(0, path, 1, error.Path.Length);
-					errors.Add(new(error.Code, error.Message, path, error.Parameters));
+					errors.Add(
+						ValidationError.Create(
+							error.Code,
+							error.Message,
+							ImmutableArray.Create(path),
+							error.Parameters,
+							error.Origin,
+							error.Minimum,
+							error.Maximum,
+							error.Inclusive,
+							error.Category
+						)
+					);
 				}
 			}
 			else
 			{
-				validated[key] = result.Value!;
+				validated[key] = result.Value;
 			}
 		}
 

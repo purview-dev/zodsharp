@@ -6,9 +6,9 @@ namespace ZodSharp;
 /// <remarks>
 /// <para>
 /// The only setting today is <see cref="AllowNulls"/>, which controls whether a collection may contain
-/// <see langword="null"/> elements. Null elements are rejected by default. Set <c>AllowNulls = true</c> to
-/// accept them, or <c>AllowNulls = false</c> to reject them even when the element type is explicitly
-/// nullable (<c>T?</c>) or a wider default allows them.
+/// <see langword="null"/> elements (or a dictionary a <see langword="null"/> value). Null entries are
+/// rejected by default. Set <c>AllowNulls = true</c> to accept them, or <c>AllowNulls = false</c> to reject
+/// them even when the element type is explicitly nullable (<c>T?</c>) or a wider default allows them.
 /// </para>
 /// <para>
 /// Apply to a collection property. The attribute is merged in from a positional record parameter, so

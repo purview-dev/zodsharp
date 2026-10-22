@@ -21,7 +21,7 @@ public sealed class ZodSharpSchemaDefaultsAttribute : Attribute
 {
 	/// <summary>
 	/// Gets or sets the assembly-wide default for whether collection properties allow <see langword="null"/>
-	/// elements.
+	/// elements (or <see langword="null"/> dictionary values).
 	/// </summary>
 	/// <remarks>
 	/// The setting only takes effect when it is explicitly assigned; an attribute that leaves it out defers to

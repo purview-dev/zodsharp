@@ -61,7 +61,7 @@ All options are optional.
 | `SuppressIValidateOptions` | `false` | Opt out even when auto-detection would enable it. |
 | `ValidateEnumValues` | `true` | Set to `false` to skip the automatic enum validation for the type's enum properties. |
 | `GenerateJsonSchema` | `true` | Set to `false` to omit the JSON Schema export members (`BuildJsonSchema` and the `IJsonSchemaProvider` on the adapter), keeping the type out of the cross-platform contract surface. A type referenced by an exported type is reported as `ZODSGEN045`. |
-| `AllowNulls` | unset | Whether this type's collection properties may contain `null` elements. Unset applies the assembly default; `true`/`false` overrides it for this type. See [Collection null items](#collection-null-items). |
+| `AllowNulls` | unset | Whether this type's collection properties may contain `null` elements (or `null` dictionary values). Unset applies the assembly default; `true`/`false` overrides it for this type. See [Collection null items](#collection-null-items). |
 
 > [!NOTE]
 > `Parse`, the value-first composition methods (`ApplyAnd`/`ApplyOr`/`ApplyRefine`), the `IZodSchemaValidator` adapter and the `IValidateOptions` validator all depend on `Validate`. Setting `GenerateValidateMethod = false` omits them together.
@@ -172,6 +172,46 @@ A collection property rejects `null` elements by default: the generated validato
 
 Precedence, highest first: the property attribute, the element's `T?` annotation, the containing type's `[ZodSchema]` option, the assembly attribute, the `ZodSharpAllowNulls` MSBuild property, then the built-in default (reject).
 
+### Dictionaries
+
+A property whose type implements `IDictionary<TKey, TValue>` or `IReadOnlyDictionary<TKey, TValue>` is a
+**map**, not a sequence: `Dictionary`, `SortedDictionary`, `ConcurrentDictionary`, `ImmutableDictionary`
+and custom implementations all qualify. The generated validator iterates the entries, validates each
+**value** against the value type's nested schema (discovered recursively, with or without its own
+`[ZodSchema]`), and reports a failure at the entry's key — `["Variants", "blue"]` — matching Zod's
+`z.record` issue path. Keys are used only in error paths; they are not validated.
+
+The null-items setting above applies to a map's **values**: `Dictionary<string, Child>` rejects a null
+value by default, while `Dictionary<string, Child?>` or `[CollectionBehavior(AllowNulls = true)]` accepts
+one. `Dictionary<string, int>` has no null case at all, so `[CollectionBehavior]` on it is reported as
+`ZODSGEN046`. `[Length]`/`[MinLength]`/`[MaxLength]` count entries, exactly as they count elements for a
+sequence.
+
+```csharp
+using ZodSharp;
+
+[assembly: ZodSharpSchemaDefaults(AllowNulls = false)]
+
+[ZodSchema]
+public class RepositoryInventoryResponse
+{
+    // Rejected by default: a null element reports invalid_type at ["Items", index].
+    public RepositoryInventoryItem[] Items { get; set; } = [];
+
+    // Explicit opt-in for one property.
+    [CollectionBehavior(AllowNulls = true)]
+    public RepositoryInventoryItem[] OptionalItems { get; set; } = [];
+
+    // A map: the setting governs null values, and failures are reported at ["Variants", key].
+    public Dictionary<string, VariantConfiguration> Variants { get; set; } = [];
+}
+```
+
+> [!NOTE]
+> `[CollectionBehavior]` and `[ZodSchema(AllowNulls = ...)]` only take effect when the named argument is present; an attribute that leaves it out defers to the next level. `[CollectionBehavior]` on a property that is not a collection of nullable elements (or a dictionary of nullable values) is reported as `ZODSGEN046`.
+
+A collection whose elements may be null exports its `items` schema with a `null` branch, mirroring how a nullable property is exported. A dictionary exports `{ "type": "object", "additionalProperties": … }` — see [JSON Schema Export](JsonSchema-Export.md#dictionaries).
+
 ## DateTimeOffset wire form
 
 The JSON Schema generated for `[NonSentinel] DateTimeOffset` depends on the wire form assumed for the value.
@@ -210,28 +250,6 @@ package's `UtcDateTimeOffsetConverter` (and `PreserveOffset` under a global UTC 
 `PreserveOffsetDateTimeOffsetConverter`). Both modes export an exact sentinel pattern; `Utc` additionally
 narrows the accepted wire form to a zero offset. See
 [JSON Schema Export](JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
-
-```csharp
-using ZodSharp;
-
-[assembly: ZodSharpSchemaDefaults(AllowNulls = false)]
-
-[ZodSchema]
-public class RepositoryInventoryResponse
-{
-    // Rejected by default: a null element reports invalid_type at ["Items", index].
-    public RepositoryInventoryItem[] Items { get; set; } = [];
-
-    // Explicit opt-in for one property.
-    [CollectionBehavior(AllowNulls = true)]
-    public RepositoryInventoryItem[] OptionalItems { get; set; } = [];
-}
-```
-
-> [!NOTE]
-> `[CollectionBehavior]` and `[ZodSchema(AllowNulls = ...)]` only take effect when the named argument is present; an attribute that leaves it out defers to the next level. `[CollectionBehavior]` on a property that is not a collection of nullable elements is reported as `ZODSGEN046`.
-
-A collection whose elements may be null exports its `items` schema with a `null` branch, mirroring how a nullable property is exported.
 
 ## Automatic enum validation
 

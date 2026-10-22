@@ -147,6 +147,11 @@ Things worth knowing:
   `z.array(T.nullable())`. A collection whose elements may be null exports
   `items.anyOf: [ …, { "type": "null" } ]`; by default the generated validator rejects a null element with
   `invalid_type` at the element's path, matching `z.array(T)`.
+- **Dictionaries map to `z.record(z.string(), V)`.** A property implementing `IDictionary<,>` or
+  `IReadOnlyDictionary<,>` exports `{ "type": "object", "additionalProperties": <V> }` (a nullable value
+  wraps that value schema in a `null` branch), and its size constraints use `minProperties`/`maxProperties`.
+  `Z.Record(schema)` exports the same shape, and `Z.FromJsonSchema` reads an object with
+  `additionalProperties` back as a record in both JSON integrations.
 
 ## JSON Schema import
 

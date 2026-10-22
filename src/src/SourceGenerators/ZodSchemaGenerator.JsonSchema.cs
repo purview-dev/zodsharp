@@ -165,7 +165,7 @@ partial class ZodSchemaGenerator
 
 	static string BuildCollectionSchemaExpression(ZodPropertyDescriptor property)
 	{
-		var items =
+		var itemSchema =
 			property.NestedSchemaType is { } nested
 				? (
 					property.NestedSchemaExportsJsonSchema
@@ -177,10 +177,14 @@ partial class ZodSchemaGenerator
 
 		// A collection that allows null elements advertises it, mirroring how a nullable property is exported.
 		if (property.AllowNulls == true)
-			items =
-				$"new {JsonSchemaDefinitionTypeName} {{ AnyOf = new() {{ {items}, new {JsonSchemaDefinitionTypeName} {{ Type = \"null\" }} }} }}";
+			itemSchema =
+				$"new {JsonSchemaDefinitionTypeName} {{ AnyOf = new() {{ {itemSchema}, new {JsonSchemaDefinitionTypeName} {{ Type = \"null\" }} }} }}";
 
-		return $"new {JsonSchemaDefinitionTypeName} {{ Type = \"array\", Items = {items} }}";
+		// A dictionary is written as a JSON object by System.Text.Json, so it exports as an object whose
+		// additionalProperties is the per-value schema rather than as an array of pairs.
+		return property.IsMap
+			? $"new {JsonSchemaDefinitionTypeName} {{ Type = \"object\", AdditionalProperties = {itemSchema} }}"
+			: $"new {JsonSchemaDefinitionTypeName} {{ Type = \"array\", Items = {itemSchema} }}";
 	}
 
 	static string BuildEnumSchemaExpression(ZodPropertyDescriptor property, ZodSchemaDescriptor schema)
@@ -355,10 +359,17 @@ partial class ZodSchemaGenerator
 		string localName
 	)
 	{
-		// [MinLength]/[MaxLength] apply to strings and collections; the JSON Schema keyword differs.
+		// [MinLength]/[MaxLength] apply to strings, collections and dictionaries; the JSON Schema keyword
+		// differs, and an object's member count is expressed with minProperties/maxProperties.
 		var isCollection = property.ValidationKind == PropertyValidationKind.Collection;
-		var minKeyword = isCollection ? "MinItems" : "MinLength";
-		var maxKeyword = isCollection ? "MaxItems" : "MaxLength";
+		var minKeyword =
+			property.IsMap ? "MinProperties"
+			: isCollection ? "MinItems"
+			: "MinLength";
+		var maxKeyword =
+			property.IsMap ? "MaxProperties"
+			: isCollection ? "MaxItems"
+			: "MaxLength";
 
 		if (attributes.MinLength.ShouldProcess && attributes.MinLength.Value.Exists)
 			body.Assignment(
@@ -397,10 +408,18 @@ partial class ZodSchemaGenerator
 		if (attributes.Length.ShouldProcess && attributes.Length.Value.Exists)
 		{
 			var isString = property.PropertyType.SpecialType == SpecialType.System_String;
+			var minimumKeyword =
+				isString ? "MinLength"
+				: property.IsMap ? "MinProperties"
+				: "MinItems";
+			var maximumKeyword =
+				isString ? "MaxLength"
+				: property.IsMap ? "MaxProperties"
+				: "MaxItems";
 			var minimum = attributes.Length.Value.MinimumLength.ToString(CultureInfo.InvariantCulture);
 			var maximum = attributes.Length.Value.MaximumLength.ToString(CultureInfo.InvariantCulture);
-			body.Assignment(isString ? $"{localName}.MinLength" : $"{localName}.MinItems", minimum);
-			body.Assignment(isString ? $"{localName}.MaxLength" : $"{localName}.MaxItems", maximum);
+			body.Assignment($"{localName}.{minimumKeyword}", minimum);
+			body.Assignment($"{localName}.{maximumKeyword}", maximum);
 		}
 	}
 

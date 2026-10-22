@@ -91,7 +91,7 @@ All of these mean the method the generator was told to call cannot be called:
 
 | ID | Meaning |
 | --- | --- |
-| `ZODSGEN046` | *(warning)* `[CollectionBehavior]` is applied to a property that is not a collection of nullable elements (a scalar, or a collection whose element cannot be `null`), so the setting can never take effect. |
+| `ZODSGEN046` | *(warning)* `[CollectionBehavior]` is applied to a property that is not a collection of nullable elements or values (a scalar, a collection whose element cannot be `null`, or a dictionary whose value cannot be `null`), so the setting can never take effect. |
 
 ## Unions, value objects, JSON Schema
 

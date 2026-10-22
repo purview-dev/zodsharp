@@ -99,6 +99,12 @@ public class JsonSchemaDefinition
 	/// <summary>additionalProperties - Schema for additional properties, or false to disallow</summary>
 	public object? AdditionalProperties { get; set; }
 
+	/// <summary>minProperties - Minimum number of members in an object</summary>
+	public int? MinProperties { get; set; }
+
+	/// <summary>maxProperties - Maximum number of members in an object</summary>
+	public int? MaxProperties { get; set; }
+
 	// ========== Negation ==========
 
 	/// <summary>not - The data must not match this schema (for example a sentinel value that is rejected).</summary>

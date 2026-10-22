@@ -8,6 +8,53 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## 2.4.0
+
+### Added
+
+- **Dictionary validation.** A property whose type implements `IDictionary<TKey, TValue>` or
+  `IReadOnlyDictionary<TKey, TValue>` (`Dictionary`, `SortedDictionary`, `ConcurrentDictionary`,
+  `ImmutableDictionary`, custom implementations) is now a map rather than a sequence. The generated validator
+  iterates the entries, validates every **value** against the value type's nested schema — discovered
+  recursively, with or without its own `[ZodSchema]` — and reports a failure at the entry's key
+  (`["Variants", "blue"]`), matching Zod's `z.record` issue path. Keys are used only in error paths.
+  `AllowNulls`, and therefore `[CollectionBehavior]`, `[ZodSchema(AllowNulls = ...)]`, the assembly default
+  and `ZodSharpAllowNulls`, now govern a map's values. `[Length]`/`[MinLength]`/`[MaxLength]` count entries.
+- **Dictionary JSON Schema export.** A dictionary exports as
+  `{ "type": "object", "additionalProperties": <value> }` instead of an array of pairs, and its size
+  constraints export as `minProperties`/`maxProperties` (new `JsonSchemaDefinition.MinProperties` and
+  `MaxProperties` members). A nullable value exports a `null` branch on `additionalProperties`.
+- **Record JSON Schema export and import.** `Z.ToJsonSchema(Z.Record(valueSchema))` now exports the same
+  object/`additionalProperties` shape, and `Z.FromJsonSchema` imports an object with `additionalProperties`
+  as a record in both JSON integration packages (`additionalProperties: true` treats every member as `any`).
+  See [JSON Schema Export](docs/wiki/JsonSchema-Export.md#dictionaries) and
+  [JSON Schema Import](docs/wiki/JsonSchema-Import.md#records).
+- **`IEnumerable<T>` properties validate their elements.** A property declared as the enumerable interface
+  itself now resolves its element type, validates elements and exports its `items` schema, like `T[]`.
+
+### Fixed
+
+- **Collection element resolution for dictionaries.** The element type was taken from whichever
+  `IEnumerable`-derived interface appeared first, so a `Dictionary<string, T>` resolved its **key** type
+  (`string`) as the element. The generated validator then emitted `if (item is null)` over a
+  `KeyValuePair<string, T>` (`CS0037`), exported `items: {"type":"string"}`, and skipped the value schema
+  entirely. The per-entry type now comes from `IEnumerable<T>` / the dictionary value.
+- **`ZodRecord` null values.** A null value is now the value schema's decision: `Z.Record(Z.String())`
+  rejects it (matching `z.record(z.string(), T)`), while a nullable value schema accepts it. Previously null
+  values were silently accepted and dropped. Re-keyed errors also preserve the inner issue's `origin`,
+  `minimum`, `maximum`, `inclusive` and `category`.
+- **Nullable value-type elements export their base schema.** `List<int?>` / `Dictionary<string, int?>` now
+  export `integer` (plus the `null` branch where allowed) instead of the empty schema `Nullable<int>`
+  produced.
+
+### Upgrade notes
+
+- A `Dictionary<TKey, TValue>` property is now validated per value rather than per key. If a dictionary was
+  relying on the old (incorrect) behaviour, add the value type's `[ZodSchema]` where desired; no source change
+  is required otherwise.
+- `Z.Record(nonNullableValueSchema)` now rejects a null dictionary value. Use a nullable/optional value
+  schema to keep accepting one.
+
 ## 2.3.0
 
 ### Added

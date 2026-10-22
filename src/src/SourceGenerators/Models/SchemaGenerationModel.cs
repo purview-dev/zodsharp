@@ -149,13 +149,26 @@ readonly record struct ZodSchemaDescriptor(
 /// flags property.
 /// </param>
 /// <param name="ValidationKind">The kind of validation the property supports.</param>
-/// <param name="ElementType">The collection element type, when the property is a collection.</param>
-/// <param name="ElementTypeCanBeNull">Indicates whether a collection element can be null.</param>
+/// <param name="ElementType">
+/// The collection element type — the map value type when the property is a dictionary — when the property is
+/// a collection. A nullable value type is unwrapped, so <c>List&lt;int?&gt;</c> carries <c>int</c>;
+/// <paramref name="ElementTypeIsNullableValueType"/> records the wrapper.
+/// </param>
+/// <param name="ElementTypeCanBeNull">Indicates whether a collection element (or map value) can be null.</param>
+/// <param name="ElementTypeIsNullableValueType">
+/// Indicates whether the collection element (or map value) is a <c>Nullable&lt;T&gt;</c>, so generated
+/// validation has to read <c>.Value</c> when it passes the item to a nested schema.
+/// </param>
+/// <param name="IsMap">
+/// Indicates whether the property is a dictionary (<c>IDictionary&lt;TKey, TValue&gt;</c> /
+/// <c>IReadOnlyDictionary&lt;TKey, TValue&gt;</c>). A map is validated per value, keys are used only for
+/// error paths, and the exported JSON Schema is an object with <c>additionalProperties</c>.
+/// </param>
 /// <param name="AllowNulls">
-/// Whether the collection may contain null elements, when the property is a collection. Before the
-/// generation-settings pass this holds the property/type-level override (null when neither states one); that
-/// pass resolves the assembly default into a concrete value, so the generator always sees a non-null value
-/// for a collection property.
+/// Whether the collection may contain null elements (or a map null values), when the property is a
+/// collection. Before the generation-settings pass this holds the property/type-level override (null when
+/// neither states one); that pass resolves the assembly default into a concrete value, so the generator always
+/// sees a non-null value for a collection property.
 /// </param>
 /// <param name="NestedSchemaType">The generated schema type of a nested complex type, when there is one.</param>
 /// <param name="LengthAccessor">The length expression and origin, when the property's length is countable.</param>
@@ -195,6 +208,8 @@ readonly record struct ZodPropertyDescriptor(
 	PropertyValidationKind ValidationKind,
 	TypeIdentity? ElementType,
 	bool ElementTypeCanBeNull,
+	bool ElementTypeIsNullableValueType,
+	bool IsMap,
 	bool? AllowNulls,
 	TypeIdentity? NestedSchemaType,
 	LengthAccessor LengthAccessor,
