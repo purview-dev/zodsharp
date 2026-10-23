@@ -73,6 +73,27 @@ partial class ZodSchemaGenerator
 			arguments
 		);
 
+		if (requiredRule.GuardedScalarPropertyName is { Length: > 0 } scalarPropertyName)
+		{
+			// The rule is closed over the scalar's unwrapped underlying value, so both an absent property and a
+			// present scalar with an absent underlying value are missing.
+			var scalarExpression = property.IsNullableValueType
+				? $"value.{propertyName}.Value"
+				: $"value.{propertyName}";
+
+			WriteRuleFailure(
+				writer,
+				requiredRule,
+				ruleVariable,
+				identityVariable,
+				"default!",
+				CodeGenHelpers.GetPathFieldName(propertyName),
+				property.DisplayName,
+				invalidCondition: $"value.{propertyName} == null || {scalarExpression}.{scalarPropertyName} == null"
+			);
+			return;
+		}
+
 		if (property.IsNullableValueType)
 		{
 			// The rule is closed over the underlying value, so it cannot be handed null. An absent value is
@@ -157,6 +178,21 @@ partial class ZodSchemaGenerator
 		bool declareValueLocal
 	)
 	{
+		if (rule.GuardedScalarPropertyName is { Length: > 0 } scalarPropertyName)
+		{
+			EmitGuardedScalarRule(
+				writer,
+				rule,
+				localPrefix,
+				index,
+				valueExpression,
+				scalarPropertyName,
+				pathExpression,
+				displayName
+			);
+			return;
+		}
+
 		var ruleVariable = CodeGenHelpers.GetLocalIdentifier(localPrefix, $"CustomRule{index}");
 		var valueVariable = declareValueLocal
 			? CodeGenHelpers.GetLocalIdentifier(localPrefix, $"CustomRuleValue{index}")
@@ -175,6 +211,65 @@ partial class ZodSchemaGenerator
 		);
 
 		WriteRuleFailure(writer, rule, ruleVariable, identityVariable, valueVariable, pathExpression, displayName);
+
+		writer.NewLine();
+	}
+
+	/// <summary>
+	/// Emits a rule that targets a nullable value scalar's underlying value. The rule is closed over the
+	/// non-nullable value type, so it is only invoked when the value is present; a required rule instead
+	/// reports the absent value itself. This mirrors how a <c>Nullable&lt;T&gt;</c> property is validated.
+	/// </summary>
+	/// <param name="writer">The writer positioned inside the validation method.</param>
+	/// <param name="rule">The resolved guarded rule descriptor.</param>
+	/// <param name="localPrefix">The prefix for generated local variable names.</param>
+	/// <param name="index">The rule's index within its owner's rule list.</param>
+	/// <param name="scalarExpression">The expression holding the scalar value object.</param>
+	/// <param name="scalarPropertyName">The scalar property that holds the nullable underlying value.</param>
+	/// <param name="pathExpression">The error path expression.</param>
+	/// <param name="displayName">The display name used for a custom error message.</param>
+	static void EmitGuardedScalarRule(
+		CodeWriter writer,
+		CustomRuleDescriptor rule,
+		string localPrefix,
+		int index,
+		string scalarExpression,
+		string scalarPropertyName,
+		string pathExpression,
+		string displayName
+	)
+	{
+		var ruleVariable = CodeGenHelpers.GetLocalIdentifier(localPrefix, $"CustomRule{index}");
+		var identityVariable = CodeGenHelpers.GetLocalIdentifier(localPrefix, $"CustomRuleInner{index}");
+		var arguments = $"({string.Join(", ", rule.Arguments)})";
+		var underlyingExpression = $"{scalarExpression}.{scalarPropertyName}";
+
+		if (rule.IsRequired)
+		{
+			// A required rule rejects an absent underlying value; it does not need to run over a present one.
+			var requiredIdentity = EmitRuleInstance(writer, rule, identityVariable, ruleVariable, arguments);
+			WriteRuleFailure(
+				writer,
+				rule,
+				ruleVariable,
+				requiredIdentity,
+				"default!",
+				pathExpression,
+				displayName,
+				invalidCondition: $"{underlyingExpression} == null"
+			);
+			writer.NewLine();
+			return;
+		}
+
+		writer.IfBlock(
+			$"{underlyingExpression} is {{ }} scalarValue",
+			body =>
+			{
+				var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
+				WriteRuleFailure(body, rule, ruleVariable, identity, "scalarValue", pathExpression, displayName);
+			}
+		);
 
 		writer.NewLine();
 	}

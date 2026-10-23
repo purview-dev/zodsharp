@@ -234,7 +234,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 	static void ReportTypeRuleDiagnostics(SymbolAnalysisContext context, INamedTypeSymbol type, Location typeLocation)
 	{
 		var diagnostics = ImmutableArray.CreateBuilder<ReportableDiagnostic>();
-		_ = CustomRuleResolver.Resolve(type, type, diagnostics, isTypeLevel: true);
+		_ = CustomRuleResolver.Resolve(type, type, context.Compilation, diagnostics, isTypeLevel: true);
 
 		foreach (var diagnosticInfo in diagnostics)
 		{

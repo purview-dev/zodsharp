@@ -81,7 +81,9 @@ so `AssetId` is `IScalarValueObject<AssetId, Guid>`.
 [Scalar<Guid>("Id")]                           [Scalar(typeof(Guid), "Id")]
 ```
 
-A nullable reference type cannot be a generic attribute argument (`[Scalar<string?>]` reports `CS8970`) or a `typeof` operand (`typeof(string?)` reports `CS8639`), so a nullable reference scalar is written with `Nullable = true`. Nullable value types are written directly (`[Scalar<int?>]` / `[Scalar(typeof(int?))]`). A nullable scalar round-trips JSON `null`, so its schema accepts `null`.
+A nullable reference type cannot be a generic attribute argument (`[Scalar<string?>]` reports `CS8970`) or a `typeof` operand (`typeof(string?)` reports `CS8639`), so a nullable reference scalar is written with `Nullable = true`. For a value type, `Nullable = true` wraps the underlying type in `Nullable<T>`, so `[Scalar<DateTimeOffset>(Nullable = true)]` emits `public DateTimeOffset? Value`. Nullable value types can also be written directly (`[Scalar<int?>]` / `[Scalar(typeof(int?))]`). A nullable scalar round-trips JSON `null`, so its schema accepts `null`.
+
+When the underlying value is nullable, a type-level rule written against that value is applied only when a value is present. The rule is closed over the non-nullable value type (so constrained rules such as `MinValueRule<T>` work), and `null` is treated as absent. Use `[RequiredZod]` when `null` must itself fail, exactly as for a nullable member.
 
 The property is emitted by the value-object generator, which ZodSharp cannot observe, so the automatic form has no source member for ZodSharp to read. ZodSharp resolves the underlying type from the attribute instead, so the schema is generated exactly as for the manual form:
 
@@ -94,7 +96,7 @@ public readonly partial record struct InstallationId { }
 
 Because there is no property to carry DataAnnotations, the automatic form supports **type-level** rules only:
 
-- `[RequiredZod]`, `[NullOrNonWhiteSpace]`, `[NonSentinel]`, and any custom `[ZodRule(typeof(...))]`-mapped attribute applied to the type are read from the type and adapted to the scalar's underlying value, reporting an **empty path** exactly as for the manual form.
+- `[RequiredZod]`, `[NullOrNonWhiteSpace]`, `[NonSentinel]`, and any custom `[ZodRule(typeof(...))]`-mapped attribute applied to the type are read from the type and applied to the scalar's underlying value, reporting an **empty path** exactly as for the manual form. For a nullable value scalar the rule runs only when the value is present; for a nullable reference scalar the rule receives the nullable value so it can decide (hence the null-tolerant `[NullOrNonWhiteSpace]`).
 - A **property-level DataAnnotation has no host** on the generated property, so it is never observed. Use a Zod-native type-level rule, or switch to the manual `[Scalar]` form when property-level DataAnnotations are required.
 - `[RequiredZod]` always rejects `null`; use `[NullOrNonWhiteSpace]` (or a custom null-tolerant rule) when a nullable scalar must accept `null` while rejecting whitespace.
 

@@ -4,7 +4,7 @@ Purview.ZodSharp releases are driven by the shared [purview-dev/build](https://g
 
 ## Versioning
 
-The package version comes from `package.json` (`version` field). The current stable line is `2.4.0`; bump `package.json` to release a new version (prerelease builds use a `MAJOR.MINOR.PATCH-prerelease.N` suffix).
+The package version comes from `package.json` (`version` field). The current stable line is `2.4.1`; bump `package.json` to release a new version (prerelease builds use a `MAJOR.MINOR.PATCH-prerelease.N` suffix).
 
 Package identities are `Purview.ZodSharp.*` (core, SystemTextJson, NewtonsoftJson, AspNetCore). Central package management lives in `Directory.Packages.props`; package versions there are minimum requirements, not exact pins, so the resolved graph can drift.
 

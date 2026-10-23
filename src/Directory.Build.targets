@@ -15,6 +15,6 @@
 	-->
 	<PropertyGroup Label="NuGet package validation" Condition="'$(IsPackable)' == 'true'">
 		<EnablePackageValidation>true</EnablePackageValidation>
-		<PackageValidationBaselineVersion>2.3.0</PackageValidationBaselineVersion>
+		<PackageValidationBaselineVersion>2.4.0</PackageValidationBaselineVersion>
 	</PropertyGroup>
 </Project>

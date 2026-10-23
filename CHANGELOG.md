@@ -8,6 +8,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## 2.4.1
+
+### Fixed
+
+- **Nullable value-type scalars.** `Purview.ValueObjects` 1.2.1 applies `Nullable = true` to a value type
+  by wrapping it in `Nullable<T>`. ZodSharp only applied the option to reference types, so
+  `[Scalar<DateTimeOffset>(Nullable = true)]` closed its rules over `DateTimeOffset` while the value object
+  implemented `IScalarValueObject<TSelf, DateTimeOffset?>`, which failed the generated adapter's constraint
+  (`CS0315`). The automatic scalar forms now mirror the value-object generator for both reference and value
+  types.
+- **Rules on a nullable value scalar are null-guarded and unwrapped.** A type-level or property-level rule
+  written against the underlying value is resolved against the non-nullable value type and run only when the
+  value is present, mirroring how a `Nullable<T>` property is validated. This also lets constrained rules
+  (`MinValueRule<T>`, numeric rules, comparison rules, `EnumRule<T>`, ...) resolve, because
+  `Nullable<T>` does not implement their constraints. `[RequiredZod]` still rejects an absent value, and the
+  exported JSON Schema no longer advertises a `null` branch when a required rule is present.
+- **Nullable scalar properties validate their unwrapped value.** A property declared as `T?` where `T` is a
+  scalar value object passed the `T?` value to the nested `TSchema.Validate(T)` call (`CS1503`). The nested
+  schema is now invoked with `T` inside the null guard.
+
+### Upgrade notes
+
+- A nullable value scalar now accepts `null` unless it carries `[RequiredZod]`; a rule written against its
+  underlying value is skipped for `null` and receives the non-nullable value otherwise. This matches the
+  behaviour of a nullable `Nullable<T>` property.
+
 ## 2.4.0
 
 ### Added
