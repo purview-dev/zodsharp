@@ -623,4 +623,67 @@ public partial class ZodSchemaAnalyzerTests
 		var result = await AnalyzeAsync(source, cancellationToken);
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnsupportedCustomRuleTarget);
 	}
+
+	/// <summary>
+	/// A nullable value scalar's underlying value is <c>Nullable&lt;T&gt;</c>, which does not satisfy a rule's
+	/// <c>IEquatable&lt;T&gt;</c> constraint. The analyzer resolves the rule against the unwrapped value, so the
+	/// rule is not reported as an unsupported target.
+	/// </summary>
+	[Test]
+	public async Task TypeRule_GivenNullableValueTypeScalar_ResolvesAgainstUnwrappedValue(
+		CancellationToken cancellationToken
+	)
+	{
+		const string source = """
+			using System;
+			using System.ComponentModel.DataAnnotations;
+			using ZodSharp.Core;
+
+			namespace Purview.ValueObjects.Serialization
+			{
+				[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+				public sealed class ScalarAttribute : Attribute { }
+			}
+
+			namespace Purview.ValueObjects
+			{
+				public interface IScalarValueObject<TSelf, TValue>
+					where TSelf : IScalarValueObject<TSelf, TValue>
+				{
+					TValue Value { get; }
+				}
+			}
+
+			namespace Testing
+			{
+				public readonly record struct NonSentinelRule<T>(string? Message = null)
+					: IValidationRule<T>, IZodRule
+					where T : IEquatable<T>
+				{
+					public bool IsValid(in T value) => !value.Equals(default(T)!);
+
+					public string GetErrorMessage(in T value) => Message ?? "Value must not be the default.";
+				}
+
+				[ZodRule(typeof(NonSentinelRule<>))]
+				[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property)]
+				public sealed class NonSentinelAttribute : ValidationAttribute
+				{
+					public string? Message { get; set; }
+				}
+
+				[Purview.ValueObjects.Serialization.Scalar]
+				[NonSentinel]
+				[ZodSchema]
+				public partial record struct OptionalTimestamp
+					: Purview.ValueObjects.IScalarValueObject<OptionalTimestamp, DateTimeOffset?>
+				{
+					public DateTimeOffset? Value { get; init; }
+				}
+			}
+			""";
+
+		var result = await AnalyzeAsync(source, cancellationToken);
+		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnsupportedCustomRuleTarget);
+	}
 }

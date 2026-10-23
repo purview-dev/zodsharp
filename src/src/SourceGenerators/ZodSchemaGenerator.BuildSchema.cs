@@ -1039,6 +1039,22 @@ partial class ZodSchemaGenerator
 		var nestedResultName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Result");
 		var schemaType = property.NestedSchemaType.Value;
 
+		if (property.IsNullableValueType)
+		{
+			// A Nullable<T> property is validated through its unwrapped value; the nested schema is declared
+			// for T, not Nullable<T>.
+			using (writer.IfBlockScope($"value.{propertyName} is {{ }} {propertyValueName}"))
+			{
+				writer.Assignment("var", nestedResultName, $"{schemaType}.Validate({propertyValueName})");
+				using (writer.IfBlockScope($"!{nestedResultName}.IsSuccess"))
+				{
+					writer.MethodCall("AddNestedErrors", "ref errors", nestedResultName, propertyName.Surround());
+				}
+			}
+
+			return;
+		}
+
 		writer.Assignment("var", propertyValueName, $"value.{propertyName}");
 		if (property.IsDeclaredNullable)
 		{

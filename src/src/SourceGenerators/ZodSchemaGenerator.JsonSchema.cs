@@ -101,8 +101,12 @@ partial class ZodSchemaGenerator
 				EmitRuleJsonSchema(body, rule, "inner", property.Value.DateTimeOffsetSerialization);
 		}
 
+		// A rule that rejects an absent value ([RequiredZod]) makes the scalar effectively non-null even
+		// when its underlying type is nullable, matching the generated validator.
+		var canBeNull = schema.ScalarUnderlyingCanBeNull && !schema.TypeRules.Any(static rule => rule.IsRequired);
+
 		body.Return(
-			schema.ScalarUnderlyingCanBeNull
+			canBeNull
 				? $"new {JsonSchemaDefinitionTypeName} {{ AnyOf = new() {{ inner, new {JsonSchemaDefinitionTypeName} {{ Type = \"null\" }} }} }}"
 				: "inner"
 		);

@@ -25,6 +25,12 @@ namespace ZodSharp.SourceGenerators.Models;
 /// emitted outside the generator's non-null guard so a missing value fails exactly as
 /// <c>[Required]</c> fails.
 /// </param>
+/// <param name="GuardedScalarPropertyName">
+/// When the rule targets a nullable value scalar's underlying value, the name of the scalar property that
+/// holds it. The rule is then instantiated directly against the unwrapped value type and emitted under a
+/// non-null guard (or as a required check), rather than wrapped in a scalar rule adapter. Null for every
+/// other rule.
+/// </param>
 readonly record struct CustomRuleDescriptor(
 	TypeIdentity RuleType,
 	TypeIdentity? AdaptedFrom,
@@ -33,5 +39,6 @@ readonly record struct CustomRuleDescriptor(
 	ValidationAttributeData Message,
 	EquatableArray<string> Arguments,
 	bool RuleOwnsIdentity,
-	bool IsRequired
+	bool IsRequired,
+	string? GuardedScalarPropertyName
 );

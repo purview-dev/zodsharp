@@ -598,4 +598,400 @@ partial class ZodSchemaGeneratorTests
 			.That(generated)
 			.ContainsGeneratedCode("new global::ZodSharp.Rules.NonSentinelRule<global::System.Guid>(null!, null!)");
 	}
+
+	[Test]
+	public async Task AutomaticScalar_GivenNullableValueTypeOption_EmitsNullablePropertyAndSchema(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — both automatic spellings. The value-object generator wraps the value type in
+		// Nullable<T>, so ZodSharp must synthesize the same nullable property and JSON\Schema null branch.
+		const string genericSource =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar<DateTimeOffset>(Nullable = true)]
+					[ZodSchema]
+					public readonly partial record struct OptionalTimestamp { }
+				}
+				""";
+		const string typeofSource =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar(typeof(DateTimeOffset), Nullable = true)]
+					[ZodSchema]
+					public readonly partial record struct OptionalTimestamp { }
+				}
+				""";
+
+		// Act
+		using var genericResult = await GenerateAsync(
+			genericSource,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
+		using var typeofResult = await GenerateAsync(
+			typeofSource,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
+		var generic = genericResult.GetSource("OptionalTimestampSchema");
+		var typeofGenerated = typeofResult.GetSource("OptionalTimestampSchema");
+
+		// Assert — the synthesized property is DateTimeOffset?, so null is accepted and exported.
+		foreach (var generated in new[] { generic, typeofGenerated })
+		{
+			await Assert.That(generated).ContainsGeneratedCode("value.Value != null");
+			await Assert.That(generated).ContainsGeneratedCode("ImmutableArray.Create(\"Value\")");
+			await Assert.That(generated).ContainsGeneratedCode("AnyOf = new()");
+			await Assert.That(generated).ContainsGeneratedCode("Type = \"null\"");
+		}
+	}
+
+	[Test]
+	public async Task AutomaticScalar_GivenNullableValueTypeOptionAndTypeRule_GuardsUnwrappedRule(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — [NonSentinel] is written against the underlying value. The scalar's underlying value is
+		// DateTimeOffset?, so the rule must be closed over DateTimeOffset and run only when a value is present;
+		// closing it over Nullable<DateTimeOffset> would not compile against the adapter's TSelf contract.
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar<DateTimeOffset>(Nullable = true)]
+					[NonSentinel]
+					[ZodSchema]
+					public readonly partial record struct OptionalDateTimeOffset { }
+				}
+				""";
+
+		// Act
+		using var driverResult = await GenerateAsync(
+			source,
+			ZodSourceGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
+		var generated = driverResult.GetSource("OptionalDateTimeOffsetSchema");
+
+		// Assert — the rule is direct (not adapted), guarded by the nullable underlying value.
+		await Assert
+			.That(generated)
+			.ContainsGeneratedCode("new global::ZodSharp.Rules.NonSentinelRule<global::System.DateTimeOffset>(");
+		await Assert.That(generated).ContainsGeneratedCode("value.Value is { } scalarValue");
+		await Assert.That(generated).ContainsGeneratedCode("IsValid(scalarValue)");
+		await Assert.That(generated).DoesNotContain("ScalarRuleAdapter");
+		await Assert.That(generated).ContainsGeneratedCode("AnyOf = new()");
+	}
+
+	[Test]
+	public async Task AutomaticScalar_GivenNullableValueTypeOptionAndNonSentinel_ValidatesAtRuntime(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — the declared property stands in for the one the value-object generator would emit, so the
+		// generated schema compiles and can be exercised.
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar<DateTimeOffset>(Nullable = true)]
+					[NonSentinel(Message = "OptionalDateTimeOffset has a sentinel value.")]
+					[ZodSchema]
+					public readonly partial record struct OptionalDateTimeOffset
+						: Purview.ValueObjects.IScalarValueObject<OptionalDateTimeOffset, DateTimeOffset?>
+					{
+						public DateTimeOffset? Value { get; init; }
+					}
+				}
+				""";
+
+		// Act
+		using var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var modelType = assembly.GetType("Testing.OptionalDateTimeOffset")!;
+		var validate = assembly.GetType("Testing.OptionalDateTimeOffsetSchema")!.GetMethod("Validate")!;
+
+		var nullInstance = Activator.CreateInstance(modelType)!;
+		var nullResult = validate.Invoke(null, [nullInstance])!;
+
+		var sentinelInstance = Activator.CreateInstance(modelType)!;
+		modelType.GetProperty("Value")!.SetValue(sentinelInstance, DateTimeOffset.MinValue);
+		var sentinelResult = validate.Invoke(null, [sentinelInstance])!;
+
+		var validInstance = Activator.CreateInstance(modelType)!;
+		modelType.GetProperty("Value")!.SetValue(validInstance, DateTimeOffset.UtcNow);
+		var validResult = validate.Invoke(null, [validInstance])!;
+
+		// Assert — null is absent (accepted), a sentinel present value fails, and a normal value passes.
+		await Assert.That((bool)nullResult.GetType().GetProperty("IsSuccess")!.GetValue(nullResult)!).IsTrue();
+		await Assert.That((bool)sentinelResult.GetType().GetProperty("IsSuccess")!.GetValue(sentinelResult)!).IsFalse();
+
+		var errors = (System.Collections.Immutable.ImmutableArray<Core.ValidationError>)
+			sentinelResult.GetType().GetProperty("Errors")!.GetValue(sentinelResult)!;
+		await Assert.That(errors).HasSingleItem();
+		await Assert.That(errors[0].Code).IsEqualTo(Rules.NonSentinelRule<DateTimeOffset>.ErrorCode);
+		await Assert.That(errors[0].Path.Length).IsEqualTo(0);
+
+		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
+	}
+
+	[Test]
+	public async Task AutomaticScalar_GivenNullableValueTypeOptionAndMinValue_ValidatesAtRuntime(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — a constrained generic rule (MinValueRule<T> where T : IComparable<T>) cannot close over
+		// Nullable<int>; it must be resolved against int and guarded.
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar<int?>(Nullable = true)]
+					[MinValue(3)]
+					[ZodSchema]
+					public readonly partial record struct Count
+						: Purview.ValueObjects.IScalarValueObject<Count, int?>
+					{
+						public int? Value { get; init; }
+					}
+				}
+				""";
+
+		// Act
+		using var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var modelType = assembly.GetType("Testing.Count")!;
+		var validate = assembly.GetType("Testing.CountSchema")!.GetMethod("Validate")!;
+
+		var nullInstance = Activator.CreateInstance(modelType)!;
+		var nullResult = validate.Invoke(null, [nullInstance])!;
+
+		var belowInstance = Activator.CreateInstance(modelType)!;
+		modelType.GetProperty("Value")!.SetValue(belowInstance, 2);
+		var belowResult = validate.Invoke(null, [belowInstance])!;
+
+		var validInstance = Activator.CreateInstance(modelType)!;
+		modelType.GetProperty("Value")!.SetValue(validInstance, 5);
+		var validResult = validate.Invoke(null, [validInstance])!;
+
+		// Assert
+		await Assert.That((bool)nullResult.GetType().GetProperty("IsSuccess")!.GetValue(nullResult)!).IsTrue();
+		await Assert.That((bool)belowResult.GetType().GetProperty("IsSuccess")!.GetValue(belowResult)!).IsFalse();
+
+		var errors = (System.Collections.Immutable.ImmutableArray<Core.ValidationError>)
+			belowResult.GetType().GetProperty("Errors")!.GetValue(belowResult)!;
+		await Assert.That(errors.Any(error => error.Code == Rules.MinValueRule<int>.ErrorCode)).IsTrue();
+
+		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
+	}
+
+	[Test]
+	public async Task AutomaticScalar_GivenNullableValueTypeOptionAndRequiredZod_RejectsNull(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — [RequiredZod] rejects an absent value even though the underlying type is nullable, and the
+		// exported JSON Schema must not advertise a null branch.
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar<int?>(Nullable = true)]
+					[RequiredZod]
+					[ZodSchema]
+					public readonly partial record struct RequiredCount
+						: Purview.ValueObjects.IScalarValueObject<RequiredCount, int?>
+					{
+						public int? Value { get; init; }
+					}
+				}
+				""";
+
+		// Act
+		using var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var modelType = assembly.GetType("Testing.RequiredCount")!;
+		var validate = assembly.GetType("Testing.RequiredCountSchema")!.GetMethod("Validate")!;
+
+		var nullInstance = Activator.CreateInstance(modelType)!;
+		var nullResult = validate.Invoke(null, [nullInstance])!;
+
+		var validInstance = Activator.CreateInstance(modelType)!;
+		modelType.GetProperty("Value")!.SetValue(validInstance, 5);
+		var validResult = validate.Invoke(null, [validInstance])!;
+
+		var generated = driverResult.GetSource("RequiredCountSchema");
+
+		// Assert
+		await Assert.That((bool)nullResult.GetType().GetProperty("IsSuccess")!.GetValue(nullResult)!).IsFalse();
+		var errors = (System.Collections.Immutable.ImmutableArray<Core.ValidationError>)
+			nullResult.GetType().GetProperty("Errors")!.GetValue(nullResult)!;
+		await Assert.That(errors.Any(error => error.Code == Rules.RequiredRule<int>.ErrorCode)).IsTrue();
+		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
+
+		await Assert.That(generated).ContainsGeneratedCode("value.Value == null");
+		await Assert.That(generated).DoesNotContain("Type = \"null\"");
+	}
+
+	[Test]
+	public async Task PropertyRule_GivenScalarWithNullableValue_GuardsUnwrappedRule(CancellationToken cancellationToken)
+	{
+		// Arrange — a rule on a scalar-typed property also targets the scalar's underlying value, so it must
+		// use the same guard-and-unwrap path.
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar<int?>(Nullable = true)]
+					[ZodSchema]
+					public readonly partial record struct Score
+						: Purview.ValueObjects.IScalarValueObject<Score, int?>
+					{
+						public int? Value { get; init; }
+					}
+
+					[ZodSchema]
+					public partial class ScoreHolder
+					{
+						[MinValue(3)]
+						public Score Score { get; set; }
+					}
+				}
+				""";
+
+		// Act
+		using var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var holderType = assembly.GetType("Testing.ScoreHolder")!;
+		var scoreType = assembly.GetType("Testing.Score")!;
+		var scoreProperty = holderType.GetProperty("Score")!;
+		var scoreValueProperty = scoreType.GetProperty("Value")!;
+		var validate = assembly.GetType("Testing.ScoreHolderSchema")!.GetMethod("Validate")!;
+
+		var nullHolder = Activator.CreateInstance(holderType)!;
+		var nullResult = validate.Invoke(null, [nullHolder])!;
+
+		var belowHolder = Activator.CreateInstance(holderType)!;
+		var belowScore = Activator.CreateInstance(scoreType)!;
+		scoreValueProperty.SetValue(belowScore, 2);
+		scoreProperty.SetValue(belowHolder, belowScore);
+		var belowResult = validate.Invoke(null, [belowHolder])!;
+
+		var validHolder = Activator.CreateInstance(holderType)!;
+		var validScore = Activator.CreateInstance(scoreType)!;
+		scoreValueProperty.SetValue(validScore, 5);
+		scoreProperty.SetValue(validHolder, validScore);
+		var validResult = validate.Invoke(null, [validHolder])!;
+
+		// Assert
+		await Assert.That((bool)nullResult.GetType().GetProperty("IsSuccess")!.GetValue(nullResult)!).IsTrue();
+		await Assert.That((bool)belowResult.GetType().GetProperty("IsSuccess")!.GetValue(belowResult)!).IsFalse();
+
+		var errors = (System.Collections.Immutable.ImmutableArray<Core.ValidationError>)
+			belowResult.GetType().GetProperty("Errors")!.GetValue(belowResult)!;
+		await Assert.That(errors.Any(error => error.Code == Rules.MinValueRule<int>.ErrorCode)).IsTrue();
+
+		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
+	}
+
+	[Test]
+	public async Task PropertyRule_GivenNullableScalarAndRequiredZod_RejectsNullPropertyAndNullValue(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — [RequiredZod] on a nullable scalar property must reject both an absent scalar and a
+		// present scalar whose underlying value is null.
+		const string source =
+			AutomaticScalarPrelude
+			+ """
+				namespace Testing
+				{
+					[Purview.ValueObjects.Serialization.Scalar<int?>(Nullable = true)]
+					[ZodSchema]
+					public readonly partial record struct Score
+						: Purview.ValueObjects.IScalarValueObject<Score, int?>
+					{
+						public int? Value { get; init; }
+					}
+
+					[ZodSchema]
+					public partial class ScoreHolder
+					{
+						[RequiredZod]
+						public Score? Score { get; set; }
+					}
+				}
+				""";
+
+		// Act
+		using var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var holderType = assembly.GetType("Testing.ScoreHolder")!;
+		var scoreType = assembly.GetType("Testing.Score")!;
+		var scoreProperty = holderType.GetProperty("Score")!;
+		var scoreValueProperty = scoreType.GetProperty("Value")!;
+		var validate = assembly.GetType("Testing.ScoreHolderSchema")!.GetMethod("Validate")!;
+
+		var nullHolder = Activator.CreateInstance(holderType)!;
+		var nullResult = validate.Invoke(null, [nullHolder])!;
+
+		var nullValueScore = Activator.CreateInstance(scoreType)!;
+		var nullValueHolder = Activator.CreateInstance(holderType)!;
+		scoreProperty.SetValue(nullValueHolder, nullValueScore);
+		var nullValueResult = validate.Invoke(null, [nullValueHolder])!;
+
+		var validScore = Activator.CreateInstance(scoreType)!;
+		scoreValueProperty.SetValue(validScore, 5);
+		var validHolder = Activator.CreateInstance(holderType)!;
+		scoreProperty.SetValue(validHolder, validScore);
+		var validResult = validate.Invoke(null, [validHolder])!;
+
+		// Assert
+		await Assert.That((bool)nullResult.GetType().GetProperty("IsSuccess")!.GetValue(nullResult)!).IsFalse();
+		var nullErrors = (System.Collections.Immutable.ImmutableArray<Core.ValidationError>)
+			nullResult.GetType().GetProperty("Errors")!.GetValue(nullResult)!;
+		await Assert.That(nullErrors.Any(error => error.Code == Rules.RequiredRule<int>.ErrorCode)).IsTrue();
+
+		await Assert
+			.That((bool)nullValueResult.GetType().GetProperty("IsSuccess")!.GetValue(nullValueResult)!)
+			.IsFalse();
+		var nullValueErrors = (System.Collections.Immutable.ImmutableArray<Core.ValidationError>)
+			nullValueResult.GetType().GetProperty("Errors")!.GetValue(nullValueResult)!;
+		await Assert.That(nullValueErrors.Any(error => error.Code == Rules.RequiredRule<int>.ErrorCode)).IsTrue();
+
+		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
+
+		var generated = driverResult.GetSource("ScoreHolderSchema");
+		await Assert.That(generated).ContainsGeneratedCode("value.Score == null || value.Score.Value.Value == null");
+	}
 }

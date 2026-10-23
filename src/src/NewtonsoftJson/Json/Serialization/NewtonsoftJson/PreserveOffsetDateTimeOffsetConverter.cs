@@ -40,6 +40,7 @@ public sealed class PreserveOffsetDateTimeOffsetConverter : JsonConverter
 		if (reader.TokenType == JsonToken.Null)
 			return null;
 
+		// Read the raw string and parse it with DateTimeOffset.Parse to preserve the offset.
 		return DateTimeOffset.Parse(
 			UtcDateTimeOffsetConverter.ReadRawString(reader),
 			CultureInfo.InvariantCulture,

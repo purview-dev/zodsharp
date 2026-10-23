@@ -114,6 +114,7 @@ static partial class SourceGenLibrary
 				symbol,
 				properties,
 				externalSchemas,
+				compilation,
 				typeDateTimeOffsetSerialization
 			);
 
@@ -121,7 +122,7 @@ static partial class SourceGenLibrary
 			// rather than a property, which is what makes a scalar value object validatable as a unit. The
 			// generator only needs the descriptors: ZodSchemaAnalyzer resolves the same attributes and
 			// reports the diagnostics, so a dropped rule is visible in the build instead of failing silently.
-			var typeRules = CustomRuleResolver.Resolve(symbol, symbol, isTypeLevel: true);
+			var typeRules = CustomRuleResolver.Resolve(symbol, symbol, compilation, isTypeLevel: true);
 			var accessibility = symbol.ContainingType is null
 				? symbol.DeclaredAccessibility == Accessibility.Public
 					? TypeDeclarationAccessibility.Public
@@ -142,7 +143,7 @@ static partial class SourceGenLibrary
 			// RFC UUID format), not an object wrapping a Value property.
 			TypeIdentity? scalarUnderlyingType = null;
 			var scalarUnderlyingCanBeNull = false;
-			if (CustomRuleResolver.TryGetScalarUnderlyingValue(symbol, out var scalarValueType))
+			if (CustomRuleResolver.TryGetScalarUnderlyingValue(symbol, compilation, out var scalarValueType, out _))
 			{
 				scalarUnderlyingType = CreateTypeIdentity(TypeHelpers.UnwrapNullableType(scalarValueType));
 				scalarUnderlyingCanBeNull = IsNullableProperty(scalarValueType);
@@ -328,17 +329,21 @@ static partial class SourceGenLibrary
 	/// <param name="symbol">The schema target type.</param>
 	/// <param name="properties">The properties discovered from source.</param>
 	/// <param name="externalSchemas">The resolver that decides schema ownership.</param>
+	/// <param name="compilation">The compilation, used to construct a <see cref="Nullable{T}"/> value type.</param>
 	/// <param name="typeDateTimeOffsetSerialization">The containing type's DateTimeOffset wire-form override.</param>
 	/// <returns>The properties with the synthesized scalar property prepended, when applicable.</returns>
 	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>> AddAutomaticScalarProperty(
 		INamedTypeSymbol symbol,
 		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> properties,
 		ExternalSchemaResolver externalSchemas,
+		Compilation compilation,
 		DateTimeOffsetSerialization? typeDateTimeOffsetSerialization
 	)
 	{
-		if (!CustomRuleResolver.TryGetAutomaticScalar(symbol, out var propertyName, out var valueType))
+		if (!CustomRuleResolver.TryGetAutomaticScalar(symbol, compilation, out var propertyName, out var valueType))
+		{
 			return properties;
+		}
 
 		// A declared member means the value-object generator does not own the property (the manual form, or
 		// a consumer that declared it by mistake); the discovered descriptor already covers it.
@@ -598,7 +603,12 @@ static partial class SourceGenLibrary
 		var enumJsonNames =
 			isEnum && !isFlagsEnum ? EnumJsonResolver.GetJsonNames(enumType!, validationAttributes) : new([]);
 
-		var customRules = CustomRuleResolver.Resolve(validationAttributes, originalPropertyType, diagnostics);
+		var customRules = CustomRuleResolver.Resolve(
+			validationAttributes,
+			originalPropertyType,
+			compilation,
+			diagnostics
+		);
 
 		var compareViaCompareTo =
 			validationKind == PropertyValidationKind.Comparable
@@ -921,6 +931,7 @@ static partial class SourceGenLibrary
 		if (TypeHelpers.TryGetElementType(type, out var elementType))
 			return elementType;
 
+		// The helper does not resolve a property declared as the enumerable interface itself, so check for that.
 		return type is INamedTypeSymbol { OriginalDefinition.MetadataName: "IEnumerable`1" } enumerable
 			? enumerable.TypeArguments[0]
 			: null;
@@ -996,8 +1007,7 @@ static partial class SourceGenLibrary
 					return (DateTimeOffsetSerialization)serialization;
 
 				if (constructorArgument.Value is { } boxed)
-					return (DateTimeOffsetSerialization)
-						Convert.ToInt32(boxed, System.Globalization.CultureInfo.InvariantCulture);
+					return (DateTimeOffsetSerialization)Convert.ToInt32(boxed, CultureInfo.InvariantCulture);
 			}
 
 			foreach (var argument in attribute.NamedArguments)

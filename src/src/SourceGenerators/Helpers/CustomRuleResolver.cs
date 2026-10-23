@@ -32,6 +32,7 @@ static class CustomRuleResolver
 	/// </summary>
 	/// <param name="symbol">The symbol whose rule attributes are resolved.</param>
 	/// <param name="ruleTargetType">The type the rules are applied to.</param>
+	/// <param name="compilation">The compilation, used to construct a <see cref="Nullable{T}"/> value type.</param>
 	/// <param name="isTypeLevel">
 	/// Whether the rules are applied to <paramref name="ruleTargetType"/> itself rather than to a member. A
 	/// type-level rule on a scalar reports an empty path, so its default message names the scalar.
@@ -45,15 +46,18 @@ static class CustomRuleResolver
 	public static EquatableArray<CustomRuleDescriptor> Resolve(
 		ISymbol symbol,
 		ITypeSymbol ruleTargetType,
+		Compilation compilation,
 		bool isTypeLevel = false
-	) => Resolve(symbol, ruleTargetType, ImmutableArray.CreateBuilder<ReportableDiagnostic>(), isTypeLevel);
+	) =>
+		Resolve(symbol, ruleTargetType, compilation, ImmutableArray.CreateBuilder<ReportableDiagnostic>(), isTypeLevel);
 
 	public static EquatableArray<CustomRuleDescriptor> Resolve(
 		ISymbol symbol,
 		ITypeSymbol ruleTargetType,
+		Compilation compilation,
 		ImmutableArray<ReportableDiagnostic>.Builder diagnostics,
 		bool isTypeLevel = false
-	) => Resolve(symbol.GetAttributes(), ruleTargetType, diagnostics, isTypeLevel);
+	) => Resolve(symbol.GetAttributes(), ruleTargetType, compilation, diagnostics, isTypeLevel);
 
 	/// <summary>
 	/// Resolves the custom rules declared by <paramref name="attributes"/>. The attributes are supplied by the
@@ -63,6 +67,7 @@ static class CustomRuleResolver
 	/// </summary>
 	/// <param name="attributes">The validation attributes to resolve.</param>
 	/// <param name="ruleTargetType">The type the rules are applied to.</param>
+	/// <param name="compilation">The compilation, used to construct a <see cref="Nullable{T}"/> value type.</param>
 	/// <param name="diagnostics">The diagnostics a failed resolution reports into.</param>
 	/// <param name="isTypeLevel">
 	/// Whether the rules are applied to <paramref name="ruleTargetType"/> itself rather than to a member. A
@@ -72,6 +77,7 @@ static class CustomRuleResolver
 	public static EquatableArray<CustomRuleDescriptor> Resolve(
 		ImmutableArray<AttributeData> attributes,
 		ITypeSymbol ruleTargetType,
+		Compilation compilation,
 		ImmutableArray<ReportableDiagnostic>.Builder diagnostics,
 		bool isTypeLevel = false
 	)
@@ -102,9 +108,11 @@ static class CustomRuleResolver
 				!TryResolveRule(
 					mapping.RuleType,
 					ruleTargetType,
+					compilation,
 					out var ruleType,
 					out var scalarTarget,
-					out var scalarValue
+					out var scalarValue,
+					out var guardedScalarPropertyName
 				)
 			)
 			{
@@ -169,19 +177,26 @@ static class CustomRuleResolver
 				continue;
 			}
 
+			// A guarded rule is resolved against the scalar's unwrapped value type, so it is instantiated
+			// directly and receives that value only when it is present. An adapted rule is wrapped in the
+			// ScalarRuleAdapter so it can validate the value object as a unit.
+			var isGuardedScalarValue = guardedScalarPropertyName is not null;
+			var isAdapted = scalarTarget is not null && !isGuardedScalarValue;
+
 			builder ??= ImmutableArray.CreateBuilder<CustomRuleDescriptor>();
 			builder.Add(
 				new CustomRuleDescriptor(
-					scalarTarget is null
-						? new TypeIdentity(ruleType)
-						: BuildScalarAdapterIdentity(scalarTarget, scalarValue!, ruleType),
-					scalarTarget is null ? null : new TypeIdentity(ruleType),
+					isAdapted
+						? BuildScalarAdapterIdentity(scalarTarget!, scalarValue!, ruleType)
+						: new TypeIdentity(ruleType),
+					isAdapted ? new TypeIdentity(ruleType) : null,
 					GetAttributeString(attribute, "Code") ?? mapping.Code,
 					GetAttributeString(attribute, "Origin") ?? mapping.Origin,
 					ValidationAttributeData.FromAttributeData(attribute),
 					arguments,
 					IsZodRule(ruleType),
-					TypeHelpers.IsOrImplements(ruleType, TypeLibrary.ZodSharp.Core.IRequiredRule)
+					TypeHelpers.IsOrImplements(ruleType, TypeLibrary.ZodSharp.Core.IRequiredRule),
+					guardedScalarPropertyName
 				)
 			);
 
@@ -250,30 +265,59 @@ static class CustomRuleResolver
 	/// </summary>
 	/// <param name="ruleType">The rule type declared by the mapping.</param>
 	/// <param name="targetType">The type the rule is applied to.</param>
+	/// <param name="compilation">The compilation, used to construct a <see cref="Nullable{T}"/> value type.</param>
 	/// <param name="instantiated">The rule type to instantiate (the wrapped rule when adapted).</param>
 	/// <param name="scalarTarget">The scalar value object to adapt for, or <see langword="null"/>.</param>
 	/// <param name="scalarValue">The scalar's underlying value type, or <see langword="null"/>.</param>
+	/// <param name="guardedScalarPropertyName">
+	/// When the underlying value is a <see cref="Nullable{T}"/>, the name of the scalar property holding it.
+	/// The rule is then instantiated directly against the unwrapped value type and emitted under a non-null
+	/// guard, rather than adapted to the value object.
+	/// </param>
 	/// <returns><see langword="true"/> when a usable rule was resolved.</returns>
+	/// <remarks>
+	/// A nullable value scalar is validated the same way a <c>Nullable&lt;T&gt;</c> property is: the rule is
+	/// closed over the non-nullable value type and skipped when the value is absent. This is what lets rules
+	/// with value-type constraints (for example <c>MinValueRule&lt;T&gt;</c>, where
+	/// <c>T : IComparable&lt;T&gt;</c>) resolve, because <c>Nullable&lt;T&gt;</c> does not implement them.
+	/// A rule written explicitly against the nullable type still takes the adapted path.
+	/// </remarks>
 	static bool TryResolveRule(
 		INamedTypeSymbol ruleType,
 		ITypeSymbol targetType,
+		Compilation compilation,
 		out INamedTypeSymbol instantiated,
 		out INamedTypeSymbol? scalarTarget,
-		out ITypeSymbol? scalarValue
+		out ITypeSymbol? scalarValue,
+		out string? guardedScalarPropertyName
 	)
 	{
 		scalarTarget = null;
 		scalarValue = null;
+		guardedScalarPropertyName = null;
 
-		if (
-			TryGetScalarUnderlyingValue(targetType, out var valueType)
-			&& TryResolveUnderlyingRule(ruleType, valueType, out var underlyingRule)
-		)
+		if (TryGetScalarUnderlyingValue(targetType, compilation, out var valueType, out var scalarPropertyName))
 		{
-			instantiated = underlyingRule;
-			scalarTarget = (INamedTypeSymbol)targetType;
-			scalarValue = valueType;
-			return true;
+			var unwrappedValueType = TypeHelpers.UnwrapNullableType(valueType);
+			if (
+				valueType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+				&& TryResolveUnderlyingRule(ruleType, unwrappedValueType, out var guardedRule)
+			)
+			{
+				instantiated = guardedRule;
+				scalarTarget = (INamedTypeSymbol)targetType;
+				scalarValue = unwrappedValueType;
+				guardedScalarPropertyName = scalarPropertyName;
+				return true;
+			}
+
+			if (TryResolveUnderlyingRule(ruleType, valueType, out var underlyingRule))
+			{
+				instantiated = underlyingRule;
+				scalarTarget = (INamedTypeSymbol)targetType;
+				scalarValue = valueType;
+				return true;
+			}
 		}
 
 		return TryResolveRuleType(ruleType, targetType, out instantiated);
@@ -322,7 +366,10 @@ static class CustomRuleResolver
 	/// <param name="PropertyName">The name of the property holding the underlying value (default <c>Value</c>).</param>
 	/// <param name="IsAutomatic">Whether the value-object generator owns the underlying property.</param>
 	/// <param name="ValueType">The declared underlying type for an automatic form; otherwise <see langword="null"/>.</param>
-	/// <param name="Nullable">Whether the automatic form declares the property as a nullable reference type.</param>
+	/// <param name="Nullable">
+	/// Whether the automatic form declares the property as nullable: a nullable reference annotation for a
+	/// reference type, or a <see cref="Nullable{T}"/> wrapper for a value type.
+	/// </param>
 	internal readonly record struct ScalarAttributeInfo(
 		string PropertyName,
 		bool IsAutomatic,
@@ -422,14 +469,24 @@ static class CustomRuleResolver
 	/// owns the property, so the type is read from the attribute instead.
 	/// </summary>
 	/// <param name="type">The type to inspect.</param>
+	/// <param name="compilation">The compilation, used to construct a <see cref="Nullable{T}"/> value type.</param>
 	/// <param name="valueType">The scalar's underlying value type, when it is a scalar.</param>
+	/// <param name="propertyName">The name of the property holding the scalar's underlying value.</param>
 	/// <returns><see langword="true"/> when <paramref name="type"/> is a scalar value object.</returns>
-	internal static bool TryGetScalarUnderlyingValue(ITypeSymbol type, out ITypeSymbol valueType)
+	internal static bool TryGetScalarUnderlyingValue(
+		ITypeSymbol type,
+		Compilation compilation,
+		out ITypeSymbol valueType,
+		out string propertyName
+	)
 	{
 		valueType = null!;
+		propertyName = string.Empty;
 
 		if (type is not INamedTypeSymbol named || !TryGetScalarAttribute(named, out var scalar))
 			return false;
+
+		propertyName = scalar.PropertyName;
 
 		foreach (var member in named.GetMembers(scalar.PropertyName))
 		{
@@ -443,7 +500,7 @@ static class CustomRuleResolver
 		if (scalar.ValueType is null)
 			return false;
 
-		valueType = AnnotateScalarValueType(scalar);
+		valueType = AnnotateScalarValueType(scalar, compilation);
 		return true;
 	}
 
@@ -453,10 +510,16 @@ static class CustomRuleResolver
 	/// declares the property. Used to synthesize the schema's property without the member being visible.
 	/// </summary>
 	/// <param name="type">The type to inspect.</param>
+	/// <param name="compilation">The compilation, used to construct a <see cref="Nullable{T}"/> value type.</param>
 	/// <param name="propertyName">The property the value-object generator declares.</param>
-	/// <param name="valueType">The declared underlying type, with a nullable reference annotation applied.</param>
+	/// <param name="valueType">The declared underlying type, with the nullable option applied.</param>
 	/// <returns><see langword="true"/> when <paramref name="type"/> uses an automatic scalar form.</returns>
-	internal static bool TryGetAutomaticScalar(ITypeSymbol type, out string propertyName, out ITypeSymbol valueType)
+	internal static bool TryGetAutomaticScalar(
+		ITypeSymbol type,
+		Compilation compilation,
+		out string propertyName,
+		out ITypeSymbol valueType
+	)
 	{
 		propertyName = string.Empty;
 		valueType = null!;
@@ -471,19 +534,39 @@ static class CustomRuleResolver
 		}
 
 		propertyName = scalar.PropertyName;
-		valueType = AnnotateScalarValueType(scalar);
+		valueType = AnnotateScalarValueType(scalar, compilation);
 		return true;
 	}
 
 	/// <summary>
-	/// Applies the automatic form's <c>Nullable</c> option as a nullable reference annotation, so the
-	/// adapted rule and the synthesized schema property match the value-object generator's
-	/// <c>IScalarValueObject&lt;TSelf, string?&gt;</c> construction.
+	/// Applies the automatic form's <c>Nullable</c> option, so the resolved rule and the synthesized schema
+	/// property match the value-object generator's <c>IScalarValueObject&lt;TSelf, TValue&gt;</c> construction.
+	/// A reference type gains the nullable annotation; a non-nullable value type is wrapped in
+	/// <see cref="Nullable{T}"/>. An already-nullable value type is left alone so
+	/// <c>[Scalar&lt;int?&gt;(Nullable = true)]</c> does not double-wrap, and a ref-like struct is left alone
+	/// because <see cref="Nullable{T}"/> cannot be constructed over it.
 	/// </summary>
-	static ITypeSymbol AnnotateScalarValueType(ScalarAttributeInfo scalar) =>
-		scalar.Nullable && scalar.ValueType is { IsReferenceType: true } referenceType
-			? referenceType.WithNullableAnnotation(NullableAnnotation.Annotated)
-			: scalar.ValueType!;
+	static ITypeSymbol AnnotateScalarValueType(ScalarAttributeInfo scalar, Compilation compilation)
+	{
+		if (!scalar.Nullable)
+			return scalar.ValueType!;
+
+		if (scalar.ValueType is { IsReferenceType: true } referenceType)
+			return referenceType.WithNullableAnnotation(NullableAnnotation.Annotated);
+
+		if (
+			scalar.ValueType is not { IsValueType: true } valueType
+			|| valueType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+			|| valueType is INamedTypeSymbol { IsRefLikeType: true }
+		)
+		{
+			return scalar.ValueType!;
+		}
+
+		// The value type is non-nullable and not ref-like, so wrap it in Nullable<T> to match the value-object
+		// generator's construction of IScalarValueObject<TSelf, TValue> for a nullable scalar.
+		return compilation.GetSpecialType(SpecialType.System_Nullable_T).Construct(valueType);
+	}
 
 	/// <summary>
 	/// Builds the <c>Purview.ValueObjects.ScalarRuleAdapter&lt;TSelf, TValue, TRule&gt;</c> identity the
