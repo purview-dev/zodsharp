@@ -3,7 +3,7 @@
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.75.0</TUnitVersion>
-		<PurviewSourceGenFramework>1.2.0</PurviewSourceGenFramework>
+		<PurviewSourceGenFramework>1.2.1</PurviewSourceGenFramework>
 		<DotnetRuntimeVersion>10.0.13</DotnetRuntimeVersion>
 		<!--
 			Microsoft.Extensions.Options and ...DependencyInjection.Abstractions are real dependencies of
