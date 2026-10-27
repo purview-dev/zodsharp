@@ -59,7 +59,8 @@ public sealed class StringLocalizerZodMessageFormatter : IZodMessageFormatter
 	}
 
 	/// <inheritdoc/>
-	public string Format(in ZodValidationError error, CultureInfo culture) => Format(error, null, culture);
+	public string Format(in ZodValidationError validationError, CultureInfo culture) =>
+		Format(validationError, null, culture);
 
 	/// <summary>
 	/// Formats <paramref name="error"/> for <paramref name="culture"/>, looking keys up in the localizer of
