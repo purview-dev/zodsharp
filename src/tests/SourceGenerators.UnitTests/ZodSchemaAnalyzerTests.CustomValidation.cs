@@ -128,6 +128,86 @@ public partial class ZodSchemaAnalyzerTests
 	}
 
 	[Test]
+	public async Task CustomValidation_GivenWrongCancellationTokenType_SaysItMustBeTheLastParameter(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		var source = """
+			using System;
+			using System.Threading;
+			using System.Threading.Tasks;
+			using ZodSharp.Core;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class WrongServiceAwareCT
+				{
+					public string? Name { get; set; }
+
+					internal static ValueTask<ValidationResult<WrongServiceAwareCT>> CustomValidationAsync(
+						WrongServiceAwareCT value, IServiceProvider services, string ct) =>
+						ValueTask.FromResult(ValidationResult<WrongServiceAwareCT>.Success(value));
+				}
+			}
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.CustomValidationInvalidCancellationToken);
+		await Assert
+			.That(
+				DiagnosticLibrary.CustomValidationInvalidCancellationToken.MessageFormat.ToString(
+					System.Globalization.CultureInfo.InvariantCulture
+				)
+			)
+			.Contains("last parameter");
+		await Assert
+			.That(
+				DiagnosticLibrary.CustomValidationInvalidCancellationToken.MessageFormat.ToString(
+					System.Globalization.CultureInfo.InvariantCulture
+				)
+			)
+			.DoesNotContain("second parameter");
+	}
+
+	[Test]
+	public async Task CustomValidation_GivenServiceAwareMethodWithWrongServicesType_ProducesZODSGEN054(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		var source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using ZodSharp.Core;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class WrongServices
+				{
+					public string? Name { get; set; }
+
+					internal static ValueTask<ValidationResult<WrongServices>> CustomValidationAsync(
+						WrongServices value, string services, CancellationToken ct) =>
+						ValueTask.FromResult(ValidationResult<WrongServices>.Success(value));
+				}
+			}
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.CustomValidationInvalidServicesParameter);
+		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.CustomValidationInvalidParameterCount);
+	}
+
+	[Test]
 	public async Task CustomValidation_GivenGenericMethod_ProducesZODSGEN012(CancellationToken cancellationToken)
 	{
 		var source = """

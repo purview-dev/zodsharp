@@ -339,7 +339,7 @@ partial class SourceGenLibrary
 		{
 			diagnostics.Add(
 				ReportableDiagnostic.Create(
-					DiagnosticLibrary.CustomValidationInvalidParameterCount,
+					DiagnosticLibrary.CustomValidationInvalidServicesParameter,
 					true,
 					methodLocation,
 					method.Name,

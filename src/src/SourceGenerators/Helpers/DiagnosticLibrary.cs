@@ -90,7 +90,16 @@ static class DiagnosticLibrary
 	public static readonly DiagnosticDescriptor CustomValidationInvalidCancellationToken = new(
 		id: "ZODSGEN011",
 		title: "Invalid custom validation method cancellation token parameter",
-		messageFormat: "Custom validation method '{0}' on schema type '{1}' must have 'CancellationToken' as its second parameter",
+		messageFormat: "Custom validation method '{0}' on schema type '{1}' must have 'CancellationToken' as its last parameter",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	public static readonly DiagnosticDescriptor CustomValidationInvalidServicesParameter = new(
+		id: "ZODSGEN054",
+		title: "Invalid custom validation method services parameter",
+		messageFormat: "Custom validation method '{0}' on schema type '{1}' takes three parameters, so its second parameter must be 'IServiceProvider' (T value, IServiceProvider services, CancellationToken cancellationToken)",
 		category: Category,
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true

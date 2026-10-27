@@ -132,8 +132,9 @@ Released versions correspond to `v<version>` GitHub releases.
 - Diagnostics `ZODSGEN047` (redundant `[ValidatableType]`, with a code fix), `ZODSGEN048` (async-only rules
   behind a synchronous `Validate`), `ZODSGEN049` (closed-hierarchy derived type without `[ZodSchema]`),
   `ZODSGEN050` (generated options validator conflicts with `[OptionsValidator]`, SYSLIB1205),
-  `ZODSGEN051` (`[ZodSchema]` type in a Razor file) and `ZODSGEN052` (an `ErrorMessage` placeholder the
-  attribute does not supply).
+  `ZODSGEN051` (`[ZodSchema]` type in a Razor file), `ZODSGEN052` (an `ErrorMessage` placeholder the
+  attribute does not supply) and `ZODSGEN054` (a service-aware custom validation method whose second parameter is
+  not `IServiceProvider`; it was reported as `ZODSGEN009`, whose title is about the parameter count).
 - **Shared error identities.** `ZodIssueCodes` (codes), `ZodMessages` (named-placeholder templates),
   `ZodIssues` (factories for null/invalid-type/missing-field/refinement/union/collection-size errors and the
   `GetUnionErrors()` extension) and `ZodTypeNames` (`Of(Type)`/`OfValue(object)`: Zod type names such as
@@ -334,6 +335,8 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **`ZODSGEN011` says `CancellationToken` must be the *last* parameter** (it said "second", which is wrong for the
+  service-aware three-parameter form).
 - **Source generator: `[ZodSchema]` types with the same simple name no longer fail with `ZODSGEN001`.** Two types
   named `Widget` in different namespaces (or two nested `Item` types in different containing types) produced the
   same hint name, so generation failed for the compilation. Each schema's outputs are now named by its namespace,

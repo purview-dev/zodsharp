@@ -11,9 +11,10 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN006 | Unsupported DataAnnotations usage (string-only attributes on non-string targets; `[AllowedValues]`/`[DeniedValues]` on unsupported types; `[RegularExpression]` on non-strings; `[Range]` on unsupported types) |
 | ZODSGEN007 | Custom validation method configured but not found (when a name is explicitly configured) |
 | ZODSGEN008 | Custom method return type is not `ValueTask<ValidationResult<T>>` |
-| ZODSGEN009 | Custom method is not `(T value, CancellationToken ct)` or the service-aware `(T value, IServiceProvider services, CancellationToken ct)` (wrong parameter count, or a three-parameter method whose second parameter is not `IServiceProvider`) |
+| ZODSGEN009 | Custom method does not take two or three parameters: `(T value, CancellationToken ct)` or the service-aware `(T value, IServiceProvider services, CancellationToken ct)` |
 | ZODSGEN010 | First custom method parameter is not the model type |
 | ZODSGEN011 | Last custom method parameter is not `CancellationToken` |
+| ZODSGEN054 | A three-parameter (service-aware) custom method's second parameter is not `IServiceProvider` |
 | ZODSGEN012 | Custom method is generic |
 | ZODSGEN013 | Custom method must be static when defined on the model type |
 | ZODSGEN014 | Custom method is inaccessible from the generated validator (private/protected) |

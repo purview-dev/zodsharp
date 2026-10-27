@@ -17,3 +17,4 @@ ZODSGEN050 | ZodSharp.SourceGenerator | Error | A generated IValidateOptions val
 ZODSGEN051 | ZodSharp.SourceGenerator | Warning | A [ZodSchema] type is declared in a Razor file, which the generator cannot see
 ZODSGEN052 | ZodSharp.SourceGenerator | Warning | An attribute ErrorMessage uses a placeholder the attribute does not supply, or an unbalanced brace
 ZODSGEN053 | ZodSharp.SourceGenerator | Warning | [MinLength]/[MaxLength]/[Length] on a collection member in a trimmed or AOT project; use [MinCount]/[MaxCount]/[CountRange]
+ZODSGEN054 | ZodSharp.SourceGenerator | Error | A three-parameter (service-aware) custom validation method's second parameter is not IServiceProvider

@@ -49,9 +49,10 @@ All of these mean the method the generator was told to call cannot be called:
 | --- | --- |
 | `ZODSGEN007` | Configured but not found. |
 | `ZODSGEN008` | Return type is not `ValueTask<ValidationResult<T>>`. |
-| `ZODSGEN009` | The parameters are neither `(T value, CancellationToken ct)` nor the service-aware `(T value, IServiceProvider services, CancellationToken ct)`. |
+| `ZODSGEN009` | The method takes neither two parameters `(T value, CancellationToken ct)` nor three, the service-aware `(T value, IServiceProvider services, CancellationToken ct)`. |
 | `ZODSGEN010` | First parameter is not the model type. |
 | `ZODSGEN011` | The last parameter is not `CancellationToken`. |
+| `ZODSGEN054` | A three-parameter (service-aware) method's second parameter is not `IServiceProvider`. |
 | `ZODSGEN012` | The method is generic. |
 | `ZODSGEN013` | Declared on the model type but not `static`. |
 | `ZODSGEN014` | Inaccessible from the generated validator (private/protected). |

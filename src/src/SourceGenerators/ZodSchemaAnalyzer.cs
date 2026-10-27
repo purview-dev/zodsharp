@@ -21,6 +21,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		DiagnosticLibrary.CustomValidationInvalidParameterCount,
 		DiagnosticLibrary.CustomValidationInvalidModelParameter,
 		DiagnosticLibrary.CustomValidationInvalidCancellationToken,
+		DiagnosticLibrary.CustomValidationInvalidServicesParameter,
 		DiagnosticLibrary.CustomValidationGenericMethod,
 		DiagnosticLibrary.CustomValidationInvalidStaticInstance,
 		DiagnosticLibrary.CustomValidationInaccessible,
