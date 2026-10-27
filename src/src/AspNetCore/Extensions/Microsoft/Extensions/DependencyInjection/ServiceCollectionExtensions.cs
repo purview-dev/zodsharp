@@ -1,6 +1,9 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ZodSharp.AspNetCore;
 using ZodSharp.Core;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -32,6 +35,7 @@ public static class ServiceCollectionExtensions
 				}
 			);
 			services.TryAddSingleton<IZodSchemaFactory>(CreateFactory);
+			AddProblemDetailsWriter(services);
 
 			return services;
 		}
@@ -118,12 +122,17 @@ public static class ServiceCollectionExtensions
 		}
 
 		/// <summary>
-		/// Registers <see cref="ZodExceptionHandler"/> as an <see cref="AspNetCore.Diagnostics.IExceptionHandler"/>
-		/// and configures <see cref="ZodProblemDetailsOptions"/>.
+		/// Registers <see cref="ZodExceptionHandler"/> as an <see cref="AspNetCore.Diagnostics.IExceptionHandler"/>,
+		/// the shared <see cref="ZodProblemDetailsWriter"/> and ASP.NET Core's ProblemDetails service, and configures
+		/// <see cref="ZodProblemDetailsOptions"/>.
 		/// </summary>
 		/// <remarks>
 		/// <para>
 		/// Requires <c>app.UseExceptionHandler()</c> in the request pipeline for the handler to be invoked.
+		/// </para>
+		/// <para>
+		/// Also adds the ZodSharp ProblemDetails JSON metadata to the minimal-API <c>JsonOptions</c> resolver chain,
+		/// so the payload serializes under Native AOT.
 		/// </para>
 		/// </remarks>
 		public IServiceCollection AddZodSharpProblemDetails(
@@ -136,9 +145,28 @@ public static class ServiceCollectionExtensions
 			if (configure is not null)
 				services.Configure(configure);
 
+			AddProblemDetailsWriter(services);
 			services.AddExceptionHandler<ZodExceptionHandler>();
 
 			return services;
+		}
+	}
+
+	static void AddProblemDetailsWriter(IServiceCollection services)
+	{
+		services.AddOptions<ZodProblemDetailsOptions>();
+		services.TryAddSingleton(static sp => new ZodProblemDetailsWriter(
+			sp.GetRequiredService<IOptions<ZodProblemDetailsOptions>>(),
+			sp.GetService<IZodMessageFormatter>(),
+			sp.GetService<ILogger<ZodProblemDetailsWriter>>()
+		));
+
+		if (!services.Any(static descriptor => descriptor.ServiceType == typeof(ZodProblemDetailsJsonMarker)))
+		{
+			services.AddSingleton<ZodProblemDetailsJsonMarker>();
+			services.ConfigureHttpJsonOptions(static options =>
+				options.SerializerOptions.TypeInfoResolverChain.Add(ZodProblemDetailsJsonContext.Default)
+			);
 		}
 	}
 

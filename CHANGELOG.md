@@ -28,6 +28,41 @@ Released versions correspond to `v<version>` GitHub releases.
 - `ZodIssueParameters.Format`, `Divisor`, `Pattern`, `Prefix`, `Suffix`, `Includes`, `Version` and `Key`.
 - `ZodMessageFormat` renders a sequence parameter (an options or keys list) as its elements joined by `, `.
 
+- **One ProblemDetails writer, `ZodProblemDetailsWriter`** (`Purview.ZodSharp.AspNetCore`). The endpoint filter,
+  `ZodExceptionHandler`, `ZodTypedResults` and every `ToHttpValidationProblemDetails`/`ToValidationProblemDetails`/
+  `ToValidationProblem` overload delegate to it, so all paths produce the same body (snapshot-tested). Public
+  `Create(ReadOnlySpan<ValidationError>|IEnumerable<ValidationError>, HttpContext?)`, `Apply(existing, errors, ...)`
+  (rewrites an existing `HttpValidationProblemDetails` and keeps non-ZodSharp `errors` entries, projected as
+  `dataannotations` issues), `WriteAsync(...)` (through `IProblemDetailsService`, so `CustomizeProblemDetails` runs)
+  and `GetOrCreate(IServiceProvider?)`.
+- **`WithZodSharpValidation()` for any `IEndpointConventionBuilder`**, including route groups. An endpoint filter
+  factory selects the parameters to validate when the endpoint is built (skipping services, `HttpContext`,
+  `CancellationToken`, `[FromServices]`, keyed services and `[SkipValidation]`), validates every one through
+  `IZodSchemaFactory.TryGetUntypedValidator`, keys errors like Microsoft.Extensions.Validation (complex parameters
+  unprefixed, sequences and root errors prefixed with the parameter name) and adds 400
+  `application/problem+json` response metadata for OpenAPI. `ZodEndpointValidationOptions` (`ThrowIfNoValidator`,
+  `OnBindingFailure`, `ProducesStatusCode`) and `ZodBindingFailureBehavior`.
+- **`ZodTypedResults.ValidationProblem(result|exception, HttpContext)`** (typed `ValidationProblem` for
+  `Results<…>` unions) and **`ZodTypedResults.Problem(...)`** (`ZodProblemDetailsResult`, keeps the computed status).
+  New `ToValidationProblem(HttpContext)`, `ToHttpValidationProblemDetails(HttpContext)` and
+  `ZodProblemDetailsOptions` overloads.
+- **`ZodProblemDetailsOptions`:** `PathNaming` (`ZodPathNaming.MemberName` default, or `Json` from the minimal-API
+  `JsonOptions` naming policy), `IncludeIssues`, `MergeParametersIntoExtensions` (default `true`),
+  `ProjectDataAnnotationsIssues`, `ErrorTypeResolver`, `DefaultStatusCode` and `StatusCodeOverride`.
+- **`ValidationIssue` serializes a Zod-style shape:** `path` (dotted key), `segments` (strings and integer
+  indexes), `code`, `category`, `origin`, typed `minimum`/`maximum` from `Lower`/`Upper` (numbers, or ISO-8601 for
+  dates), `inclusive`, `message`, safe camel-cased `parameters` and nested `unionErrors`. The CLR `Path`,
+  `Minimum`, `Maximum` and `Parameters` members are kept, unserialized.
+- **Native AOT:** the ProblemDetails payload has source-generated JSON metadata, added to the minimal-API
+  `JsonOptions` by `AddZodSharp`/`AddZodSharpProblemDetails`.
+- **`IZodMessageFormatter` and `DefaultZodMessageFormatter`** (core). The writer renders messages through the
+  registered formatter in `CultureInfo.CurrentUICulture`; without one, messages are used as produced.
+- **`ZodPathNaming`** (core): `MemberName` or `Json`, shared by every host.
+- **Options validation on .NET 11:** `ZodSchemaOptionsValidator<T>` implements `IAsyncValidateOptions<T>`, so
+  `ValidateOnStart()` runs asynchronous and service-aware rules (in a scope); `OptionsBuilder<T>.AddZodSchemaValidator`
+  registers through `Validate<TValidator>()`. New `AddZodSchemaValidator(missingValidatorBehavior, validateOnStart,
+  configurationSection)` overload, `BindAndValidateWithZod(section)` (AspNetCore package) and
+  `ZodValidateOptionsResult` (the failure with its full `Errors`). `Microsoft.Extensions.Options` 11 on net11.0.
 ### Breaking behaviour changes
 
 - **Index paths.** `ZodArray` and `ZodTuple` element errors are located with typed index segments; the legacy
@@ -80,6 +115,29 @@ Released versions correspond to `v<version>` GitHub releases.
   `"Array must have at least 2 elements, but got 1"` (matching `ZodArray`), and a literal mismatch no longer
   echoes the received value.
 
+- **ProblemDetails messages from an `ErrorType.MessageFormat`** replace the error's message only when every
+  placeholder resolves (from parameters or the built-ins `path`, `code`, `origin`, `minimum`, `maximum`,
+  `displayName`); a partly-filled template used to be returned with `{placeholders}` left in.
+- **`StatusCodeSelector` wins.** It runs after the highest `ErrorType.HttpStatus` is computed (it was overridden by
+  it, contrary to the docs).
+- **Parameters are merged into the top-level extensions on every overload** (they were merged only by the
+  registry/lookup overloads), and only safe scalar values are serialized. A parameter whose camel-cased name is a
+  reserved member (`type`, `title`, `status`, `detail`, `instance`, `errors`, `issues`, `traceId`) is written as
+  `param_{name}`. `issues[].parameters` keys are camel-cased (they kept the raw key).
+- **`issues[].path` is the dotted key** (`"Items[0].Quantity"`, was a string array); the array is `segments`, with
+  integer indexes. `minimum`/`maximum` come from the typed bounds.
+- **`traceId` is on every path** and matches ASP.NET Core's writer: `Activity.Current?.Id`, else
+  `HttpContext.TraceIdentifier` (the exception handler used `TraceIdentifier` only).
+- **The endpoint filter honours `ZodProblemDetailsOptions` and `ErrorTypeRegistry`** (it always answered 400), writes
+  through `IProblemDetailsService`, and validates every matching argument (only the first was validated).
+  `WithZodSharpValidation<T>()` resolves the validator when the endpoint is built and fails then - naming the
+  handler and parameter - when no factory or validator is registered (it threw on every request).
+- **MVC `ValidationProblemDetails` copies every extension** (only `issues` was copied).
+- **`ToValidationProblem()` returns a `ProblemHttpResult` that keeps the computed status** (it was always 400).
+- **Options failures name the setting:** each failure reads `{name}: {path}: {message} ({code})`, with the
+  configuration key (`Smtp:Servers:0:Host`) when a section was recorded; the name is omitted for the default
+  options name. `OptionsBuilder<T>.AddZodSchemaValidator()` validates only the builder's options name (it validated
+  every name).
 ### Fixed
 
 - Re-pathing an element, field, catchall, record value or tuple element error no longer drops its origin,
@@ -107,6 +165,12 @@ Released versions correspond to `v<version>` GitHub releases.
   failures carry origin `array`, both bounds, inclusivity and the `too_small`/`too_big` category, like
   `ZodArray`. A Newtonsoft `JValue` is no longer treated as an empty array.
 
+- **ASP.NET Core (D1-D12):** dotted ProblemDetails keys with escaping, complete-template-only message formatting,
+  consistent parameter handling, reserved-name protection, filter/registry parity, `FormatMessages` honoured,
+  selector precedence, full MVC copies, a safe issue DTO, .NET 11 binding failures passed through (a route, query,
+  header or form binding failure keeps ASP.NET Core's 400 unless `OnBindingFailure = ConvertToProblemDetails`), and
+  every argument validated with a build-time registration check.
+- **Options (O1):** failures keep their path, code and options name; asynchronous rules run at startup on .NET 11.
 ## 2.4.1
 
 ### Fixed

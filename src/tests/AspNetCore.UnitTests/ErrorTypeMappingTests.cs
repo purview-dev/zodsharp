@@ -117,8 +117,11 @@ public class ErrorTypeMappingTests
 	}
 
 	[Test]
-	public async Task GivenMessageFormat_MissingPlaceholderIsLeftAsIs()
+	public async Task GivenMessageFormat_MissingPlaceholder_KeepsTheErrorMessage()
 	{
+		// Defect D2: a template with an unresolved placeholder used to replace the message, leaving
+		// "{AggregateType}" in the response. The template now applies only when every placeholder resolves.
+
 		// Arrange
 		ErrorTypeRegistry registry = new();
 		registry.Register(
@@ -148,9 +151,7 @@ public class ErrorTypeMappingTests
 		var details = exception.ToHttpValidationProblemDetails(registry);
 
 		// Assert
-		await Assert
-			.That(details.Errors[string.Empty])
-			.IsEquivalentTo(["Aggregate 'agg-123' (of type {AggregateType}) failed to save"]);
+		await Assert.That(details.Errors[string.Empty]).IsEquivalentTo(["Save failed."]);
 	}
 
 	[Test]

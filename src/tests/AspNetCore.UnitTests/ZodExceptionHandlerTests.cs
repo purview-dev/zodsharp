@@ -30,7 +30,10 @@ public class ZodExceptionHandlerTests
 		var root = document.RootElement;
 		await Assert.That(root.GetProperty("status").GetInt32()).IsEqualTo(StatusCodes.Status400BadRequest);
 		await Assert.That(root.GetProperty("errors").GetProperty("value")[0].GetString()).IsEqualTo("Invalid value.");
-		await Assert.That(root.GetProperty("traceId").GetString()).IsEqualTo("trace-1");
+		// The trace id matches ASP.NET Core's own ProblemDetails writer: the current activity, else TraceIdentifier.
+		await Assert
+			.That(root.GetProperty("traceId").GetString())
+			.IsEqualTo(System.Diagnostics.Activity.Current?.Id ?? "trace-1");
 		await Assert.That(root.GetProperty("issues").GetArrayLength()).IsEqualTo(1);
 	}
 
@@ -79,7 +82,8 @@ public class ZodExceptionHandlerTests
 			.IsEqualTo("Aggregate 'agg-123' failed to save");
 		await Assert.That(root.GetProperty("aggregateId").GetString()).IsEqualTo("agg-123");
 		await Assert
-			.That(root.GetProperty("issues")[0].GetProperty("parameters").GetProperty("AggregateId").GetString())
+			// Defect D4: issue parameter keys are camel-cased, like the top-level extensions.
+			.That(root.GetProperty("issues")[0].GetProperty("parameters").GetProperty("aggregateId").GetString())
 			.IsEqualTo("agg-123");
 	}
 

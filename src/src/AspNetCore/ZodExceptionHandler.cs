@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
@@ -7,9 +6,9 @@ using ZodSharp.Core;
 namespace ZodSharp.AspNetCore;
 
 /// <summary>
-/// An <see cref="IExceptionHandler"/> that converts a thrown <see cref="ZodException"/>
-/// into a standard <see cref="HttpValidationProblemDetails"/> response,
-/// resolving <see cref="ErrorType"/>s from the configured <see cref="ZodProblemDetailsOptions.Registry"/>.
+/// An <see cref="IExceptionHandler"/> that converts a thrown <see cref="ZodException"/> into the ZodSharp
+/// ProblemDetails contract, written by <see cref="ZodProblemDetailsWriter"/> - the same body the endpoint filter
+/// and <see cref="ZodTypedResults"/> produce.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,17 +18,28 @@ namespace ZodSharp.AspNetCore;
 /// </remarks>
 public sealed class ZodExceptionHandler : IExceptionHandler
 {
-	static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-	readonly ZodProblemDetailsOptions _options;
+	readonly ZodProblemDetailsWriter _writer;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="ZodExceptionHandler"/> class.
+	/// Initializes a new instance of the <see cref="ZodExceptionHandler"/> class with a writer built from
+	/// <paramref name="options"/>.
 	/// </summary>
 	public ZodExceptionHandler(IOptions<ZodProblemDetailsOptions> options)
 	{
 		ArgumentNullException.ThrowIfNull(options);
-		_options = options.Value;
+		_writer = new ZodProblemDetailsWriter(options);
+	}
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="ZodExceptionHandler"/> class with the registered writer.
+	/// </summary>
+	/// <param name="options">The options; unused when <paramref name="writer"/> is supplied.</param>
+	/// <param name="writer">The shared ProblemDetails writer.</param>
+	public ZodExceptionHandler(IOptions<ZodProblemDetailsOptions> options, ZodProblemDetailsWriter writer)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+		ArgumentNullException.ThrowIfNull(writer);
+		_writer = writer;
 	}
 
 	/// <inheritdoc/>
@@ -44,35 +54,9 @@ public sealed class ZodExceptionHandler : IExceptionHandler
 		if (exception is not ZodException zodException)
 			return false;
 
-		var defaultStatusCode =
-			_options.StatusCodeSelector?.Invoke(zodException.Errors) ?? StatusCodes.Status400BadRequest;
-
-		var problem = zodException.ToHttpValidationProblemDetails(_options.Registry, defaultStatusCode);
-		problem.Extensions["traceId"] = httpContext.TraceIdentifier;
-
-		httpContext.Response.StatusCode = problem.Status!.Value;
-		await WriteProblemAsync(httpContext, problem, cancellationToken);
+		var problem = _writer.Create(zodException.Errors, httpContext);
+		await _writer.WriteAsync(httpContext, problem, exception).ConfigureAwait(false);
 
 		return true;
 	}
-
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "The serialized type is the concrete HttpValidationProblemDetails, not object, and is "
-			+ "the same type ASP.NET Core's own problem-details writer emits, so a trimmed or Native AOT host "
-			+ "already roots it. WriteAsJsonAsync carries the requirement unconditionally regardless of T."
-	)]
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"AOT",
-		"IL3050:RequiresDynamicCode",
-		Justification = "The serialized type is the concrete HttpValidationProblemDetails, not object, and is "
-			+ "the same type ASP.NET Core's own problem-details writer emits, so a trimmed or Native AOT host "
-			+ "already roots it. WriteAsJsonAsync carries the requirement unconditionally regardless of T."
-	)]
-	static Task WriteProblemAsync(
-		HttpContext httpContext,
-		HttpValidationProblemDetails problem,
-		CancellationToken cancellationToken
-	) => httpContext.Response.WriteAsJsonAsync(problem, JsonOptions, "application/problem+json", cancellationToken);
 }
