@@ -211,7 +211,7 @@ thrown from `Parse` inside a handler is mapped by `ZodExceptionHandler` to the i
 ```csharp
 var writer = ZodProblemDetailsWriter.GetOrCreate(httpContext.RequestServices);
 HttpValidationProblemDetails problem = writer.Create(errors, httpContext);
-writer.Apply(existingProblem, errors.AsSpan(), httpContext);   // keeps non-ZodSharp `errors` entries; span only
+writer.Apply(existingProblem, errors, httpContext);   // keeps non-ZodSharp `errors` entries; span or sequence
 await writer.WriteAsync(httpContext, problem);
 ```
 

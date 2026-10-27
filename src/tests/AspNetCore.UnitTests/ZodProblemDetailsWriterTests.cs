@@ -406,6 +406,33 @@ public class ZodProblemDetailsWriterTests
 	}
 
 	[Test]
+	public async Task Apply_GivenEverySequenceShape_RewritesTheSameWayWithoutAmbiguity()
+	{
+		// Arrange
+		var error = ValidationError.Create("invalid_email", "Email is invalid.", ZodPath.Member("Email"));
+		ImmutableArray<ValidationError> immutable = [error];
+		List<ValidationError> list = [error];
+		ValidationError[] array = [error];
+		var sequence = list.Where(static _ => true);
+		var writer = CreateWriter();
+		HttpValidationProblemDetails[] targets = [new(), new(), new(), new(), new(), new()];
+
+		// Act — each call compiles against the overloads as written, so an ambiguity is a build failure.
+		writer.Apply(targets[0], immutable);
+		writer.Apply(targets[1], list);
+		writer.Apply(targets[2], array);
+		writer.Apply(targets[3], sequence);
+		writer.Apply(targets[4], [error]);
+		writer.Apply(targets[5], default(ImmutableArray<ValidationError>));
+
+		// Assert
+		foreach (var target in targets[..5])
+			await Assert.That(target.Errors["Email"]).IsEquivalentTo(["Email is invalid."]);
+
+		await Assert.That(targets[5].Errors).IsEmpty();
+	}
+
+	[Test]
 	public async Task Apply_GivenExistingDataAnnotationsErrors_MergesThemAndProjectsIssues()
 	{
 		// Arrange

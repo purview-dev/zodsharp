@@ -145,7 +145,7 @@ public static class ServiceCollectionExtensions
 		/// On .NET 11 it also enriches the built-in Microsoft.Extensions.Validation pipeline (<c>AddZodSharpValidation()</c>):
 		/// it registers a report sink that collects the bridge's full errors on the current request (<c>ZodRequestValidationReport</c>, in <c>HttpContext.Features</c>) and composes a
 		/// <see cref="ProblemDetailsOptions.CustomizeProblemDetails"/> callback that rewrites the pipeline's
-		/// <see cref="HttpValidationProblemDetails"/> with <see cref="ZodProblemDetailsWriter.Apply"/> and mirrors the
+		/// <see cref="HttpValidationProblemDetails"/> with <see cref="ZodProblemDetailsWriter.Apply(HttpValidationProblemDetails, ReadOnlySpan{ValidationError}, HttpContext?)"/> and mirrors the
 		/// status to the response. The ZodSharp callback runs first and any callback the application configures - before
 		/// or after this call - runs after it, so the application keeps the last word.
 		/// </para>

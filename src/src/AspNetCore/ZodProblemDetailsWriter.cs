@@ -38,7 +38,7 @@ public sealed class ZodProblemDetailsWriter
 {
 	/// <summary>
 	/// The issue code given to <c>errors</c> entries that did not come from ZodSharp (see
-	/// <see cref="Apply"/>).
+	/// <see cref="Apply(HttpValidationProblemDetails, ReadOnlySpan{ValidationError}, HttpContext?)"/>).
 	/// </summary>
 	public const string DataAnnotationsCode = "dataannotations";
 
@@ -174,6 +174,30 @@ public sealed class ZodProblemDetailsWriter
 	{
 		ArgumentNullException.ThrowIfNull(problemDetails);
 		Populate(problemDetails, errors, httpContext, mergeExistingErrors: true);
+	}
+
+	/// <inheritdoc cref="Apply(HttpValidationProblemDetails, ReadOnlySpan{ValidationError}, HttpContext?)"/>
+	/// <remarks>
+	/// Accepts any sequence, such as a <see cref="ValidationResult{T}.Errors"/> <see cref="ImmutableArray{T}"/> or a
+	/// <see cref="List{T}"/>; an <see cref="ImmutableArray{T}"/> is read without copying.
+	/// </remarks>
+	public void Apply(
+		HttpValidationProblemDetails problemDetails,
+		IEnumerable<ValidationError> errors,
+		HttpContext? httpContext = null
+	)
+	{
+		ArgumentNullException.ThrowIfNull(problemDetails);
+		ArgumentNullException.ThrowIfNull(errors);
+
+		if (errors is ImmutableArray<ValidationError> immutable)
+		{
+			Apply(problemDetails, immutable.IsDefault ? [] : immutable.AsSpan(), httpContext);
+			return;
+		}
+
+		ValidationError[] materialized = [.. errors];
+		Apply(problemDetails, materialized.AsSpan(), httpContext);
 	}
 
 	/// <summary>

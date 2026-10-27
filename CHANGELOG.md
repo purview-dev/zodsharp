@@ -154,7 +154,9 @@ Released versions correspond to `v<version>` GitHub releases.
 - **One ProblemDetails writer, `ZodProblemDetailsWriter`** (`Purview.ZodSharp.AspNetCore`). The endpoint filter,
   `ZodExceptionHandler`, `ZodTypedResults` and every `ToHttpValidationProblemDetails`/`ToValidationProblemDetails`/
   `ToValidationProblem` overload delegate to it, so all paths produce the same body (snapshot-tested). Public
-  `Create(ReadOnlySpan<ValidationError>|IEnumerable<ValidationError>, HttpContext?)`, `Apply(existing, errors, ...)`
+  `Create(ReadOnlySpan<ValidationError>|IEnumerable<ValidationError>, HttpContext?)`, `Apply(existing,
+  ReadOnlySpan<ValidationError>|IEnumerable<ValidationError>, ...)` (the sequence form takes an `ImmutableArray`
+  without copying, and neither form is ambiguous for arrays, lists or collection expressions)
   (rewrites an existing `HttpValidationProblemDetails` and keeps non-ZodSharp `errors` entries, projected as
   `dataannotations` issues), `WriteAsync(...)` (through `IProblemDetailsService`, so `CustomizeProblemDetails` runs)
   and `GetOrCreate(IServiceProvider?)`.
