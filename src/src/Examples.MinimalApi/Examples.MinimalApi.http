@@ -1,0 +1,86 @@
+@host = http://localhost:5000
+
+### Mode A (the .NET 11 pipeline) - FAILS: nested, collection and dictionary errors in one ProblemDetails
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "customerEmail": "not-an-email",
+  "shippingAddress": { "street": "1 Main Street", "city": "", "postCode": "LS1 1AA" },
+  "lines": [{ "sku": "abc", "quantity": 0 }],
+  "additionalAddresses": { "billing": { "street": "2 High Street", "city": "Leeds", "postCode": "1" } }
+}
+
+### Mode A - FAILS, with the messages in French (codes and paths do not change)
+POST {{host}}/orders
+Content-Type: application/json
+Accept-Language: fr
+
+{
+  "customerEmail": "not-an-email",
+  "shippingAddress": { "street": "1 Main Street", "city": "", "postCode": "LS1 1AA" },
+  "lines": [{ "sku": "abc", "quantity": 0 }]
+}
+
+### Mode A - PASSES (201 Created)
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "customerEmail": "ann@example.com",
+  "shippingAddress": { "street": "1 Main Street", "city": "Leeds", "postCode": "LS1 1AA" },
+  "lines": [{ "sku": "ABC-1234", "quantity": 2 }],
+  "additionalAddresses": { "billing": { "street": "2 High Street", "city": "Leeds", "postCode": "LS2 2BB" } }
+}
+
+### Mode B (WithZodSharpValidation filter) - FAILS with the same contract
+POST {{host}}/filtered/orders
+Content-Type: application/json
+
+{
+  "customerEmail": "not-an-email",
+  "shippingAddress": { "street": "1 Main Street", "city": "", "postCode": "LS1 1AA" },
+  "lines": []
+}
+
+### Manual validation (ZodTypedResults.ValidationProblem) - FAILS with the same contract
+POST {{host}}/manual/orders
+Content-Type: application/json
+
+{
+  "customerEmail": "not-an-email",
+  "lines": [{ "sku": "ABC-1234", "quantity": 101 }]
+}
+
+### Manual validation - PASSES (201 Created)
+POST {{host}}/manual/orders
+Content-Type: application/json
+
+{
+  "customerEmail": "ann@example.com",
+  "shippingAddress": { "street": "1 Main Street", "city": "Leeds", "postCode": "LS1 1AA" },
+  "lines": [{ "sku": "ABC-1234", "quantity": 1 }]
+}
+
+### Service-aware async rule - FAILS: taken@example.com is already in the in-memory registry (email_taken)
+POST {{host}}/customers
+Content-Type: application/json
+
+{
+  "name": "Ann",
+  "email": "taken@example.com",
+  "age": 30
+}
+
+### Service-aware async rule - PASSES once (201 Created); sending it again FAILS, because it is now registered
+POST {{host}}/customers
+Content-Type: application/json
+
+{
+  "name": "Ann",
+  "email": "ann@example.com",
+  "age": 30
+}
+
+### The OpenAPI document: ZodSharp constraints, and ZodValidationProblemDetails on every validated operation
+GET {{host}}/openapi/v1.json

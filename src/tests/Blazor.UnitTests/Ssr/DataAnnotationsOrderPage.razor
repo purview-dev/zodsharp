@@ -1,0 +1,37 @@
+@page "/order/data-annotations"
+@using ZodSharp.Blazor.Fixtures
+
+<EditForm Model="Model" FormName="order" method="post" OnValidSubmit="Submit">
+	<DataAnnotationsValidator />
+	<ValidationSummary />
+	<InputText @bind-Value="Model!.Reference" />
+	<ValidationMessage For="() => Model!.Reference" />
+	<InputText @bind-Value="Model!.Customer.Email" />
+	<ValidationMessage For="() => Model!.Customer.Email" />
+	@for (var i = 0; i < Model!.Lines.Count; i++)
+	{
+		var index = i;
+		<InputText @bind-Value="Model!.Lines[index].Sku" />
+		<ValidationMessage For="() => Model!.Lines[index].Sku" />
+		<InputNumber @bind-Value="Model!.Lines[index].Quantity" />
+		<ValidationMessage For="() => Model!.Lines[index].Quantity" />
+	}
+	<button type="submit">Save</button>
+</EditForm>
+
+@if (_submitted)
+{
+	<p id="submitted">Saved</p>
+}
+
+@code {
+	bool _submitted;
+
+	[SupplyParameterFromForm(FormName = "order")]
+	GeneratedOrder? Model { get; set; }
+
+	protected override void OnInitialized() =>
+		Model ??= new() { Lines = [new() { Sku = "A" }, new() { Sku = "B" }] };
+
+	void Submit() => _submitted = true;
+}

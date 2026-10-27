@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+	<PropertyGroup>
+		<!-- net11.0 only, like the package under test. Directory.Build.props forces the 'All' set onto test projects,
+		     so both properties are reset here. -->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<RootNamespace>ZodSharp.Blazor</RootNamespace>
+		<AssemblyName>Purview.ZodSharp.Blazor.UnitTests</AssemblyName>
+		<PackageId>Purview.ZodSharp.Blazor.UnitTests</PackageId>
+		<IsPackable>false</IsPackable>
+		<!--
+			Directory.Packages.props picks package lines by $(TargetFramework), which a single-targeted project has not
+			set yet when that file is evaluated; the .NET 11 component and host packages need the 11.x lines.
+		-->
+		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<MicrosoftExtensionsDIVersion>$(MicrosoftExtensionsVersion)</MicrosoftExtensionsDIVersion>
+		<AspNetCoreTestHostVersion>11.0.0-rc.3.26522.148</AspNetCoreTestHostVersion>
+		<!-- CA1506: a component test couples bUnit, the form types, the validators and TUnit's generic assertion
+		     builders in a single method by design. -->
+		<NoWarn>$(NoWarn);CA1506</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\AspNetCore\AspNetCore.csproj" />
+		<ProjectReference Include="..\..\src\Extensions.Validation\Extensions.Validation.csproj" />
+		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
+		<!-- Runs the ZodSharp generator against the test project, for the [ZodSchema] fixtures. -->
+		<ProjectReference
+			Include="..\..\src\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- The static-SSR tests host Razor components in-process (TestServer). -->
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<PackageReference Include="Microsoft.AspNetCore.TestHost" />
+		<PackageReference Include="bunit" />
+	</ItemGroup>
+
+	<!--
+		Like a Blazor WebAssembly client, this project gets no Microsoft.Extensions.Validation generator: the shared
+		framework's targeting pack and the package both ship it, and it is removed before compiling. The headline
+		WebAssembly guarantee - nested validation of [ZodSchema] models with no [ValidatableType] and no generator -
+		is proved against that configuration (see WebAssemblyGuaranteeTests).
+	-->
+	<Target
+		Name="RemoveValidationsGenerator"
+		AfterTargets="ResolveLockFileAnalyzers;ResolveTargetingPackAssets"
+		BeforeTargets="CoreCompile"
+	>
+		<ItemGroup>
+			<Analyzer
+				Remove="@(Analyzer)"
+				Condition="'%(Filename)' == 'Microsoft.Extensions.Validation.ValidationsGenerator'"
+			/>
+		</ItemGroup>
+	</Target>
+</Project>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- net11.0 only, like the sample under test. Directory.Build.props forces the 'All' set onto test projects,
+		     so both properties are reset here. The SDK references ../../src/Examples.MinimalApi automatically. -->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<IsPackable>false</IsPackable>
+		<!-- In-memory host tests touch many framework types by nature. -->
+		<NoWarn>$(NoWarn);CA1506</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<PackageReference Include="Microsoft.AspNetCore.TestHost" />
+	</ItemGroup>
+</Project>

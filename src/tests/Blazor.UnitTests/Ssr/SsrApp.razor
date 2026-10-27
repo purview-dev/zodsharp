@@ -1,0 +1,14 @@
+@* The root component of the in-process static-SSR host (StaticSsrHost). *@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>ZodSharp static SSR</title>
+</head>
+<body>
+	<Router AppAssembly="typeof(SsrApp).Assembly">
+		<Found Context="routeData">
+			<RouteView RouteData="routeData" />
+		</Found>
+	</Router>
+</body>
+</html>

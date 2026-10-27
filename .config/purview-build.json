@@ -30,6 +30,20 @@
 				"purview-logo-light.png",
 				"README.md"
 			],
+			"purview.zodsharp.blazor": [
+				"build/Microsoft.AspNetCore.StaticWebAssets.targets",
+				"build/Purview.ZodSharp.Blazor.PackageAssets.json",
+				"build/Purview.ZodSharp.Blazor.targets",
+				"buildMultiTargeting/Purview.ZodSharp.Blazor.targets",
+				"buildTransitive/Purview.ZodSharp.Blazor.targets",
+				"lib/$(TFM)/Purview.ZodSharp.Blazor.dll",
+				"lib/$(TFM)/Purview.ZodSharp.Blazor.xml",
+				"staticwebassets/zodsharp-validation.js",
+				// The JavaScript initializer is fingerprinted by content, so its name carries a hash.
+				"staticwebassets/Purview.ZodSharp.Blazor.*.lib.module.js",
+				"purview-logo-light.png",
+				"README.md"
+			],
 			"purview.zodsharp.extensions.validation": [
 				"lib/$(TFM)/Purview.ZodSharp.Extensions.Validation.dll",
 				"lib/$(TFM)/Purview.ZodSharp.Extensions.Validation.xml",
