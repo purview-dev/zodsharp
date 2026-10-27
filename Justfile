@@ -5,6 +5,7 @@ solution := root_folder / "ZodSharp.slnx"
 perf_tests_project := root_folder / "src" / "Benchmarks" / "Benchmarks.csproj"
 aot_sample_project := root_folder / "src" / "Examples.MinimalApi" / "Examples.MinimalApi.csproj"
 trim_verification_project := root_folder / "tests" / "TrimSafety.Verification" / "TrimSafety.Verification.csproj"
+wasm_client_project := root_folder / "src" / "Examples.Blazor.Client" / "Examples.Blazor.Client.csproj"
 # Native AOT cannot cross-compile between operating systems, so the sample publishes for this machine by default.
 default_rid := (if os_family() == "windows" { "win" } else if os() == "macos" { "osx" } else { "linux" }) + "-" + (if arch() == "aarch64" { "arm64" } else { "x64" })
 build_configuration := "Debug"
@@ -132,6 +133,15 @@ verify-trim rid=default_rid *args:
     echo "Publishing {{ BLUE }}{{ trim_verification_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }} (consumer)"
     dotnet publish {{ trim_verification_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer -p:TrimVerificationMode=Consumer -warnaserror {{ args }}
     {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer/ZodSharp.TrimSafety.Verification
+
+# The CI `wasm-trimmed` job runs the same publish and check; the nightly `wasm-aot` job adds -p:RunAOTCompilation=true (needs `dotnet workload install wasm-tools`).
+# Publish the Blazor WebAssembly sample trimmed, failing on any IL2xxx/IL3xxx warning, then check the ZodSharp size budget
+[group('Build and Test')]
+wasm-size *args:
+    echo "Publishing {{ BLUE }}{{ wasm_client_project }}{{ NORMAL }} trimmed for WebAssembly"
+    rm -rf {{ artifacts_folder }}/wasm-trimmed
+    dotnet publish {{ wasm_client_project }} -c Release -o {{ artifacts_folder }}/wasm-trimmed -warnaserror {{ args }}
+    pwsh -NoProfile -File scripts/check-wasm-size.ps1 -PublishDirectory {{ artifacts_folder }}/wasm-trimmed
 
 # Displays the current version of the project.
 # Requires Bun.

@@ -1,0 +1,9 @@
+{
+  "description": "Brotli-compressed sizes (bytes) of the Purview.ZodSharp assemblies in the trimmed publish of Examples.Blazor.Client. Checked by scripts/check-wasm-size.ps1; regenerate with -Update after an intended change.",
+  "tolerancePercent": 10,
+  "assemblies": {
+    "Purview.ZodSharp.Blazor.wasm": 28837,
+    "Purview.ZodSharp.Extensions.Validation.wasm": 6741,
+    "Purview.ZodSharp.wasm": 24062
+  }
+}

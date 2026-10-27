@@ -1,0 +1,93 @@
+name: WebAssembly (nightly)
+
+# The slow half of the Blazor WebAssembly verification. pr.yml's wasm-trimmed job publishes the sample client trimmed
+# and checks its size on every pull request; these jobs AOT-compile it and drive the published sample in a browser,
+# which take minutes, so they run nightly and on demand rather than per PR.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # RunAOTCompilation compiles every assembly the trimmed client keeps to WebAssembly; a construct the Mono AOT
+  # compiler cannot handle fails here even when the interpreter runs it. Any IL2xxx/IL3xxx warning fails the publish.
+  wasm-aot:
+    name: Blazor WebAssembly AOT publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The SDK comes from global.json, not a floating version plus a feed quality (see pr.yml).
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # AOT compilation needs the Emscripten toolchain and the Mono AOT cross compiler.
+      - name: Install the wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Publish Examples.Blazor.Client with RunAOTCompilation (fails on any trim or AOT warning)
+        shell: bash
+        run: |
+          dotnet publish src/src/Examples.Blazor.Client/Examples.Blazor.Client.csproj \
+            --configuration Release --output artifacts/wasm-aot \
+            -p:RunAOTCompilation=true -warnaserror 2>&1 | tee publish.log
+          if grep -E 'warning IL[23][0-9]{3}' publish.log; then
+            echo "::error::The AOT WebAssembly publish reported trim or AOT warnings."
+            exit 1
+          fi
+
+      # The AOT build keeps the trimmed IL beside the native code, so the same budget applies.
+      - name: Check the Purview.ZodSharp size budget
+        shell: pwsh
+        run: ./scripts/check-wasm-size.ps1 -PublishDirectory artifacts/wasm-aot
+
+  # One form per render mode in a real browser, against the published sample (so the WebAssembly form runs the
+  # trimmed client): debounced validation with codes and the async pending state, server ProblemDetails mapped onto
+  # fields, interactive-server nested placement, static-SSR client rules, and French satellite resources.
+  blazor-e2e:
+    name: Blazor sample in a browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Publish the sample
+        run: >-
+          dotnet publish src/src/Examples.Blazor/Examples.Blazor.csproj
+          --configuration Release --output artifacts/blazor-sample
+
+      # playwright-core is not a repository dependency; it is installed for this job only, with its Chromium.
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright-core@1
+          npx playwright-core install --with-deps chromium
+
+      # Run from the publish folder: it is the content root, which serves wwwroot and the static web assets.
+      - name: Run the sample and the browser checks
+        shell: bash
+        working-directory: artifacts/blazor-sample
+        run: |
+          ASPNETCORE_URLS=http://127.0.0.1:5090 dotnet ZodSharp.Examples.Blazor.dll > app.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            curl --silent --fail --output /dev/null http://127.0.0.1:5090/ && break
+            sleep 1
+          done
+
+          if ! node ../../tests/e2e/blazor-sample.e2e.mjs http://127.0.0.1:5090; then
+            cat app.log
+            exit 1
+          fi

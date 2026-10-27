@@ -153,6 +153,41 @@ jobs:
             exit 1
           fi
 
+  # The only reliable proof that the Blazor integration is trim-safe in the browser: publish the WebAssembly half of
+  # the Blazor sample (Examples.Blazor.Client - ZodValidator, ZodValidationMessage, AddZodProblemDetails, the generated
+  # registration and the service-aware async rule) trimmed, and fail on any IL2xxx/IL3xxx warning. Then hold the
+  # Brotli-compressed size of every Purview.ZodSharp assembly in the output to .config/wasm-size-baseline.json (+10%).
+  # The RunAOTCompilation publish and the browser test are slower and run nightly (wasm-nightly.yml). `just wasm-size`
+  # runs the same publish and check locally.
+  wasm-trimmed:
+    name: Blazor WebAssembly trimmed publish and size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # -warnaserror fails the publish on any trim warning ILLink reports. The grep is a second gate in case a warning
+      # is ever logged without failing the step.
+      - name: Publish Examples.Blazor.Client trimmed (fails on any trim or AOT warning)
+        shell: bash
+        run: |
+          dotnet publish src/src/Examples.Blazor.Client/Examples.Blazor.Client.csproj \
+            --configuration Release --output artifacts/wasm-trimmed \
+            -warnaserror 2>&1 | tee publish.log
+          if grep -E 'warning IL[23][0-9]{3}' publish.log; then
+            echo "::error::The trimmed WebAssembly publish reported trim or AOT warnings."
+            exit 1
+          fi
+
+      - name: Check the Purview.ZodSharp size budget
+        shell: pwsh
+        run: ./scripts/check-wasm-size.ps1 -PublishDirectory artifacts/wasm-trimmed
+
   # Proves the whole trim-safe surface, not just what one sample calls. The harness publishes with PublishAot=true twice:
   # once with every Purview.ZodSharp assembly except NewtonsoftJson rooted whole, so ILC analyses all of their code, and
   # once as a plain consumer. Any IL2xxx/IL3xxx warning fails the publish, and each native binary exercises runtime
