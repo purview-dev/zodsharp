@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!--
+			net11.0 only. ASP.NET Core 11 moved Microsoft.AspNetCore.OpenApi onto the Microsoft.OpenApi 3.x object
+			model, a breaking change from the 2.x model .NET 10 uses; supporting an earlier framework would mean a
+			second implementation rather than a TFM switch.
+		-->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<IsAotCompatible>true</IsAotCompatible>
+		<IsPackable>true</IsPackable>
+		<!-- A new package has no previous release to validate against. -->
+		<DisablePackageBaselineValidation>true</DisablePackageBaselineValidation>
+		<RootNamespace>ZodSharp.AspNetCore.OpenApi</RootNamespace>
+		<PackageId>Purview.ZodSharp.AspNetCore.OpenApi</PackageId>
+		<AssemblyName>Purview.ZodSharp.AspNetCore.OpenApi</AssemblyName>
+		<Description>OpenAPI transformers for ASP.NET Core that describe the constraints, formats, unions and error contract ZodSharp enforces.</Description>
+		<PackageTags>zod;validation;aspnetcore;openapi;jsonschema</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AspNetCore\AspNetCore.csproj" />
+	</ItemGroup>
+</Project>

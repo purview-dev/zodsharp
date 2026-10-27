@@ -172,4 +172,39 @@ public class JsonSchemaDefinition
 	/// </remarks>
 	[JsonPropertyName("x-zodsharp-unsupported")]
 	public List<string>? UnsupportedRules { get; set; }
+
+	Dictionary<string, object?>? _vendorExtensions;
+
+	/// <summary>
+	/// Gets the vendor extensions (<c>x-zod-*</c>) rules recorded for this schema: information a validation rule
+	/// enforces that has no JSON Schema keyword, or that a keyword only approximates (the literal behind a
+	/// <c>startsWith</c> pattern, a UUID version, a CIDR family).
+	/// </summary>
+	/// <returns>The extensions keyed by name; empty when none were recorded.</returns>
+	/// <remarks>
+	/// Exposed through methods rather than a property on purpose: the JSON Schema exporters (System.Text.Json
+	/// and Newtonsoft.Json) serialize properties, so the exported JSON Schema is unchanged. Hosts whose format
+	/// carries vendor extensions, such as an OpenAPI document, read them from here.
+	/// </remarks>
+	public IReadOnlyDictionary<string, object?> GetVendorExtensions() =>
+		_vendorExtensions ?? (IReadOnlyDictionary<string, object?>)EmptyVendorExtensions;
+
+	/// <summary>
+	/// Records a vendor extension for this schema, replacing any value already recorded under
+	/// <paramref name="name"/>.
+	/// </summary>
+	/// <param name="name">The extension name; must start with <c>x-</c>.</param>
+	/// <param name="value">The extension value: a string, number, boolean or <see langword="null"/>.</param>
+	/// <exception cref="ArgumentException">Thrown when <paramref name="name"/> does not start with <c>x-</c>.</exception>
+	public void SetVendorExtension(string name, object? value)
+	{
+		ArgumentException.ThrowIfNullOrEmpty(name);
+		if (!name.StartsWith("x-", StringComparison.Ordinal))
+			throw new ArgumentException("A vendor extension name must start with 'x-'.", nameof(name));
+
+		_vendorExtensions ??= new(StringComparer.Ordinal);
+		_vendorExtensions[name] = value;
+	}
+
+	static readonly Dictionary<string, object?> EmptyVendorExtensions = new(StringComparer.Ordinal);
 }

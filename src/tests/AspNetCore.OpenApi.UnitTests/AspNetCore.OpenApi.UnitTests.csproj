@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- Single-targeted on purpose, against the repository's 'All' set: the package under test is net11.0
+		     only, because it targets the Microsoft.OpenApi 3.x object model ASP.NET Core 11 ships. -->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<IsPackable>false</IsPackable>
+		<RootNamespace>ZodSharp.AspNetCore.OpenApi</RootNamespace>
+		<PackageId>Purview.ZodSharp.AspNetCore.OpenApi.UnitTests</PackageId>
+		<AssemblyName>Purview.ZodSharp.AspNetCore.OpenApi.UnitTests</AssemblyName>
+		<!-- Microsoft.AspNetCore.OpenApi's XML-comment generator emits interceptors into this namespace. -->
+		<InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.AspNetCore.OpenApi.Generated</InterceptorsNamespaces>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<PackageReference Include="Microsoft.AspNetCore.TestHost" />
+		<!-- Test-only: evaluates fixture payloads against the emitted document to prove it agrees with ZodSharp. -->
+		<PackageReference Include="JsonSchema.Net" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\AspNetCore.OpenApi\AspNetCore.OpenApi.csproj" />
+		<ProjectReference Include="..\..\src\AspNetCore\AspNetCore.csproj" />
+		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Runs the generator against the test project, so the fixtures get generated validators. -->
+		<ProjectReference
+			Include="..\..\src\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
+	</ItemGroup>
+</Project>

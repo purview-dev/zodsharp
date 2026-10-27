@@ -206,7 +206,10 @@ public readonly record struct UUIDRule
 		schema.Format = "uuid";
 
 		if (_version is UuidVersion version)
+		{
 			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, JsonSchemaVersionPattern(version));
+			schema.SetVendorExtension("x-zod-uuidVersion", (int)version);
+		}
 	}
 
 	/// <summary>

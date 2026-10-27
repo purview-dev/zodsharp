@@ -80,12 +80,17 @@ public interface IZodUntypedValidator
 /// </summary>
 /// <typeparam name="T">The validated type.</typeparam>
 /// <param name="validator">The typed validator.</param>
-public sealed class ZodUntypedValidator<T>(IZodSchemaValidator<T> validator) : IZodUntypedValidator
+public sealed class ZodUntypedValidator<T>(IZodSchemaValidator<T> validator)
+	: IZodUntypedValidator,
+		JsonSchema.IJsonSchemaInnerSchema
 {
 	/// <summary>
 	/// Gets the wrapped validator.
 	/// </summary>
 	public IZodSchemaValidator<T> Inner { get; } = validator ?? throw new ArgumentNullException(nameof(validator));
+
+	// Lets the JSON Schema exporter see the validator this view adapts.
+	object JsonSchema.IJsonSchemaInnerSchema.InnerSchema => Inner;
 
 	/// <inheritdoc/>
 	public Type ValidatedType => typeof(T);

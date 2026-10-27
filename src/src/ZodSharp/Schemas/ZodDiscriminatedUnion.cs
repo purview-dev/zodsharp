@@ -33,6 +33,10 @@ public class ZodDiscriminatedUnion(
 
 	static readonly Func<object, string?> MissingDiscriminatorAccessor = static _ => null;
 
+	// Exposed to the JSON Schema exporter, which exports the union as oneOf with the discriminator recorded.
+	internal string Discriminator => discriminator;
+
+	internal ImmutableDictionary<string, IZodSchema<object, object>> Options => options;
 	/// <summary>
 	/// Parses and validates the value using the discriminated union.
 	/// </summary>

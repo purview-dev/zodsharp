@@ -6,7 +6,7 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct TimeStringRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct TimeStringRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule, JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -109,4 +109,20 @@ public readonly record struct TimeStringRule : Core.IValidationRule<string>, Cor
 	string? Core.IZodRule.Code => Code;
 
 	string? Core.IZodRule.Origin => null;
+
+	/// <summary>The JSON Schema <c>pattern</c> for the local <c>HH:mm[:ss[.fff]]</c> time this rule accepts.</summary>
+	public const string JsonSchemaPattern = "^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?$";
+
+	/// <summary>
+	/// Applies <see cref="JsonSchemaPattern"/>. JSON Schema's <c>format: time</c> is an RFC 3339 full-time and
+	/// requires an offset this rule never accepts, so the lexical space is expressed as a pattern and the
+	/// intent is recorded in the <c>x-zod-format</c> vendor extension.
+	/// </summary>
+	/// <param name="schema">The schema being built for the validated string.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, JsonSchemaPattern);
+		schema.SetVendorExtension("x-zod-format", "time");
+	}
 }

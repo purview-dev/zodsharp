@@ -5,7 +5,7 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct JWTRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct JWTRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule, JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -93,4 +93,16 @@ public readonly record struct JWTRule : Core.IValidationRule<string>, Core.IStri
 	string? Core.IZodRule.Code => Code;
 
 	string? Core.IZodRule.Origin => null;
+
+	/// <summary>
+	/// A JWT has no JSON Schema format, so the rule is recorded as unsupported and described by the
+	/// <c>x-zod-jwt</c> vendor extension.
+	/// </summary>
+	/// <param name="schema">The schema being built for the validated string.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.SetVendorExtension("x-zod-jwt", true);
+		JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(JWTRule));
+	}
 }
