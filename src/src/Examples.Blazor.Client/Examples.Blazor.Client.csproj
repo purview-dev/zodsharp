@@ -71,21 +71,6 @@
 			/>
 		</ItemGroup>
 	</Target>
-	<!--
-		Purview.SourceGeneratorFramework (the generator's build-time framework) declares its assembly as copy-to-output
-		content so the in-repo, unmerged ZodSharp generator can load it, and that content flows through every
-		ProjectReference to ZodSharp. It is a compiler-host dependency, never an application one: the WebAssembly AOT
-		compiler would try to compile it and fail on its Microsoft.CodeAnalysis references. Package consumers never see
-		it (the package ships the merged generator under analyzers/ only), so this is a project-reference-only concern.
-	-->
-	<Target Name="RemoveSourceGeneratorFrameworkFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
-		<ItemGroup>
-			<ResolvedFileToPublish
-				Remove="@(ResolvedFileToPublish)"
-				Condition="'%(Filename)' == 'Purview.SourceGeneratorFramework'"
-			/>
-		</ItemGroup>
-	</Target>
 
 	<!-- The Purview.ZodSharp package ships this through buildTransitive; a ProjectReference does not import it. -->
 	<Import Project="..\ZodSharp\Sdk\buildTransitive\Purview.ZodSharp.targets" />
