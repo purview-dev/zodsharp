@@ -9,7 +9,8 @@ namespace ZodSharp.AspNetCore.OpenApi;
 /// <c>ZodValidationProblemDetails</c> is RFC 9457 <c>HttpValidationProblemDetails</c> (<c>type</c>, <c>title</c>,
 /// <c>status</c>, <c>detail</c>, <c>instance</c>, <c>errors</c>) plus the structured <c>issues</c> and the
 /// <c>traceId</c>. <c>ZodValidationIssue</c> is one structured issue: the dotted <c>path</c>, its
-/// <c>segments</c> (member names and indexes), the Zod <c>code</c>, its <c>category</c> and <c>origin</c>, the
+/// <c>segments</c> (member names and indexes), the ZodSharp <c>code</c>, the Zod issue code as its <c>category</c>
+/// and the <c>origin</c>, the
 /// bounds of a size issue, the <c>message</c>, per-issue <c>parameters</c> and the case errors of a union.
 /// </remarks>
 static class ZodValidationProblemSchemas
@@ -84,9 +85,15 @@ static class ZodValidationProblemSchemas
 				["code"] = new OpenApiSchema
 				{
 					Type = JsonSchemaType.String,
-					Description = "The Zod-compatible issue code, for example 'too_small'.",
+					Description =
+						"The ZodSharp error code: the rule's or error type's own identity, for example 'invalid_email', 'missing_field' or 'too_small'.",
 				},
-				["category"] = Nullable(JsonSchemaType.String),
+				["category"] = new OpenApiSchema
+				{
+					Type = JsonSchemaType.String | JsonSchemaType.Null,
+					Description =
+						"The Zod issue code (Zod v4) the error maps to, for example 'too_small', 'invalid_format' or 'invalid_type'; handle ZodSharp and Zod issues alike by this.",
+				},
 				["origin"] = Nullable(JsonSchemaType.String),
 				["minimum"] = Bound("The lower bound of a size or range issue."),
 				["maximum"] = Bound("The upper bound of a size or range issue."),

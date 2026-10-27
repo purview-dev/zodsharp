@@ -16,6 +16,26 @@ public class ZodOpenApiOperationTransformerTests
 
 	[Test]
 	[MethodDataSource(nameof(Versions))]
+	public async Task ValidationIssueSchema_GivenCodeAndCategory_DescribesEachAsWhatTheWriterPutsThere(
+		OpenApiSpecVersion version
+	)
+	{
+		// Arrange
+		var document = await FixtureApi.GetAsync(version);
+
+		// Act
+		var properties = document.Component("ZodValidationIssue")["properties"]!;
+		var code = (string?)properties["code"]!["description"];
+		var category = (string?)properties["category"]!["description"];
+
+		// Assert — ValidationIssue.Code is ZodSharp's own code; Category carries the Zod (v4) issue code.
+		await Assert.That(code).IsNotNull().And.Contains("ZodSharp error code");
+		await Assert.That(code!).DoesNotContain("Zod-compatible");
+		await Assert.That(category).IsNotNull().And.Contains("Zod issue code");
+	}
+
+	[Test]
+	[MethodDataSource(nameof(Versions))]
 	public async Task TransformAsync_GivenZodSharpBody_DescribesValidationProblemResponse(OpenApiSpecVersion version)
 	{
 		// Arrange

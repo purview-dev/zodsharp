@@ -152,9 +152,11 @@ documents:
 - `ZodValidationProblemDetails` is RFC 9457 `HttpValidationProblemDetails` plus `issues` (an array of
   `ZodValidationIssue`) and `traceId`.
 - `ZodValidationIssue` has these properties:
-  - `path`, `code` and `message`, which are required.
+  - `path`, `code` and `message`, which are required. `code` is the ZodSharp error code (`invalid_email`,
+    `missing_field`, `too_small`, …).
   - `segments`, an array of `string | integer`.
-  - `category`, `origin` and `inclusive`.
+  - `category`, the Zod (v4) issue code the error maps to (`too_small`, `invalid_format`, …), then `origin` and
+    `inclusive`.
   - `minimum`/`maximum`, each a number or a `date-time` string.
   - `parameters` and `unionErrors`, an array of arrays of `ZodValidationIssue`.
 

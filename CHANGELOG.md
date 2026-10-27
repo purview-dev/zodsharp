@@ -337,6 +337,8 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **OpenAPI: the `ZodValidationIssue` `code` and `category` descriptions were swapped.** `code` was described as the
+  Zod issue code; it is the ZodSharp error code, and `category` (now described) carries the Zod issue code.
 - **`ZODSGEN011` says `CancellationToken` must be the *last* parameter** (it said "second", which is wrong for the
   service-aware three-parameter form).
 - **Source generator: `[ZodSchema]` types with the same simple name no longer fail with `ZODSGEN001`.** Two types
