@@ -76,7 +76,7 @@ public static class OptionsServiceCollectionExtensions
 
 	/// <summary>
 	/// Validates <typeparamref name="TOptions"/> with its ZodSharp schema, naming failures by the configuration keys
-	/// under <paramref name="configurationSection"/> (<c>Smtp:Servers:0:Host: Host is required (required)</c>), without
+	/// under <paramref name="configurationSection"/> (<c>Smtp:Servers:0:Host: Host is required (missing_field)</c>), without
 	/// binding the options. The trim- and Native AOT-safe counterpart of <c>BindAndValidateWithZod</c>.
 	/// </summary>
 	/// <remarks>

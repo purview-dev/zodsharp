@@ -12,7 +12,7 @@ namespace ZodSharp;
 /// <example>
 /// <code>
 /// [ZodAsyncMember(nameof(Email))]
-/// static async ValueTask&lt;ValidationResult&lt;User&gt;&gt; CustomValidationAsync(User value, IServiceProvider services, CancellationToken ct) { ... }
+/// internal static async ValueTask&lt;ValidationResult&lt;User&gt;&gt; CustomValidationAsync(User value, IServiceProvider services, CancellationToken ct) { ... }
 /// </code>
 /// </example>
 /// <param name="members">The C# member names the method validates.</param>

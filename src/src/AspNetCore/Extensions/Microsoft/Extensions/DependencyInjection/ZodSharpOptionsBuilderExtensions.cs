@@ -16,7 +16,7 @@ public static class ZodSharpOptionsBuilderExtensions
 	/// <summary>
 	/// Binds <typeparamref name="TOptions"/> to the configuration section <paramref name="configSectionPath"/> and
 	/// validates it with its ZodSharp schema. Failures name the configuration key of the offending setting
-	/// (<c>Smtp:Servers:0:Host: Host is required (required)</c>), so it can be found in <c>appsettings.json</c>.
+	/// (<c>Smtp:Servers:0:Host: Host is required (missing_field)</c>), so it can be found in <c>appsettings.json</c>.
 	/// </summary>
 	/// <remarks>
 	/// Binding uses the reflection-based configuration binder. A trimmed or Native AOT application should call
