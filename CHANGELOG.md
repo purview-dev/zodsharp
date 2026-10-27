@@ -356,7 +356,9 @@ Released versions correspond to `v<version>` GitHub releases.
 - `ZodArray.Min(2).Max(5)` reported a too-small failure with the maximum's message.
 - A null tuple element is handed to the element schema when the element type can hold `null`.
 - `GreaterThanRule`/`LessThanRule` report exclusive bounds; `SafeIntegerRule` reports `invalid_type` for a
-  fraction and `too_small`/`too_big` by direction (was always `too_big`).
+  fraction and `too_small`/`too_big` by direction (was always `too_big`), in both its `Category` and its `Code`
+  (the code stayed `too_big` below the range). A code given to the rule is kept. The new
+  `ZodRuleFailure.Code` lets any `IZodFailureDescriber<T>` choose a direction-dependent code the same way.
 - `ZodString` span validation reports the rule's full structured identity.
 - `default(IPAddressRule)` no longer formats a `null` message.
 

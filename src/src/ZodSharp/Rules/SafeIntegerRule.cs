@@ -11,7 +11,11 @@ public readonly record struct SafeIntegerRule
 		Core.IZodFailureDescriber<double>,
 		JsonSchema.IJsonSchemaRule
 {
-	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
+	/// <summary>
+	/// Gets the Zod-compatible error code reported when the rule fails above the safe range. A failure follows its
+	/// direction: <c>too_small</c> below the range and <c>invalid_type</c> for a fraction, unless the rule was
+	/// given a code of its own.
+	/// </summary>
 	public const string ErrorCode = "too_big";
 
 	static readonly IReadOnlyDictionary<string, object?> IntParameters = RuleParameters.One(
@@ -79,9 +83,20 @@ public readonly record struct SafeIntegerRule
 	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(int.MaxValue);
 
 	// A fraction (or NaN) is not an integer at all, which Zod reports as invalid_type; an out-of-range
-	// integer is too_small or too_big by direction.
-	Core.ZodRuleFailure Core.IZodFailureDescriber<double>.DescribeFailure(in double value) =>
-		value != Math.Truncate(value) ? new(Core.ZodIssueCategories.InvalidType, IntParameters)
-		: value < int.MinValue ? new(Core.ZodIssueCategories.TooSmall)
-		: new(Core.ZodIssueCategories.TooBig);
+	// integer is too_small or too_big by direction. The code follows the category unless the rule was given a
+	// code of its own.
+	Core.ZodRuleFailure Core.IZodFailureDescriber<double>.DescribeFailure(in double value)
+	{
+		Core.ZodRuleFailure failure =
+			value != Math.Truncate(value) ? new(Core.ZodIssueCategories.InvalidType, IntParameters)
+			: value < int.MinValue ? new(Core.ZodIssueCategories.TooSmall)
+			: new(Core.ZodIssueCategories.TooBig);
+
+		return string.Equals(Code, ErrorCode, StringComparison.Ordinal)
+			? failure with
+			{
+				Code = failure.Category,
+			}
+			: failure;
+	}
 }

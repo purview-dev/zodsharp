@@ -158,6 +158,43 @@ public class RuleErrorModelTests
 	}
 
 	[Test]
+	public async Task SafeIntegerRule_GivenEachFailure_ReportsTheCodeByDirection()
+	{
+		// Arrange
+		var schema = Z.Number().Safe();
+		SafeIntegerRule rule = new();
+
+		// Act
+		var tooSmall = schema.Validate(int.MinValue - 1d).Errors.Single();
+		var tooBig = schema.Validate(int.MaxValue + 1d).Errors.Single();
+		var fraction = schema.Validate(1.5).Errors.Single();
+		var generatedStyle = ZodRuleErrors.Create(rule, int.MinValue - 1d, ZodPath.Root, code: rule.Code);
+
+		// Assert
+		await Assert.That(tooSmall.Code).IsEqualTo(ZodIssueCodes.TooSmall);
+		await Assert.That(tooSmall.Category).IsEqualTo(ZodIssueCategories.TooSmall);
+		await Assert.That(tooBig.Code).IsEqualTo(ZodIssueCodes.TooBig);
+		await Assert.That(fraction.Code).IsEqualTo(ZodIssueCodes.InvalidType);
+		await Assert.That(generatedStyle.Code).IsEqualTo(ZodIssueCodes.TooSmall);
+	}
+
+	[Test]
+	public async Task SafeIntegerRule_GivenCustomCode_KeepsItInEveryDirection()
+	{
+		// Arrange
+		SafeIntegerRule rule = new(code: "not_safe");
+
+		// Act
+		var tooSmall = ZodRuleErrors.Create(rule, int.MinValue - 1d, ZodPath.Root);
+		var overridden = ZodRuleErrors.Create(new SafeIntegerRule(), int.MinValue - 1d, ZodPath.Root, code: "custom");
+
+		// Assert
+		await Assert.That(tooSmall.Code).IsEqualTo("not_safe");
+		await Assert.That(tooSmall.Category).IsEqualTo(ZodIssueCategories.TooSmall);
+		await Assert.That(overridden.Code).IsEqualTo("custom");
+	}
+
+	[Test]
 	public async Task Schema_GivenCustomMessageWithStrayBraces_DoesNotThrowAtValidationTime()
 	{
 		// Defect B5

@@ -9,7 +9,16 @@ namespace ZodSharp.Core;
 public readonly record struct ZodRuleFailure(
 	string? Category = null,
 	IReadOnlyDictionary<string, object?>? Parameters = null
-);
+)
+{
+	/// <summary>
+	/// Gets the error code for <em>this</em> failure, overriding the rule's own code when the failure's direction
+	/// decides it (for example <see cref="ZodIssueCodes.TooSmall"/> below a range and
+	/// <see cref="ZodIssueCodes.TooBig"/> above it); <see langword="null"/> keeps the rule's code. It replaces only
+	/// the rule's own code: a code supplied explicitly by the caller (an attribute's <c>Code</c>) still wins.
+	/// </summary>
+	public string? Code { get; init; }
+}
 
 /// <summary>
 /// Implemented by a rule whose failure depends on the failing value, such as a range rule whose Zod issue code is

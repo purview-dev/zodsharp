@@ -161,7 +161,7 @@ Fluent methods live on `ZodNumber` (`ZodSharp.Schemas`), which validates `double
 | `OddRule<T>` | `(string? message)` | `Odd()` | `invalid_value` | `Number must be odd` |
 | `MultipleOfRule<T>` | `(T divisor, string? message)` | `MultipleOf(divisor)` | `not_multiple_of` | `Number must be a multiple of {0}` |
 | `FiniteRule<T>` | `(string? message)` | `Finite()` | `not_finite` | `Number must be finite` |
-| `SafeIntegerRule` | `(string? message)` | `Safe()` | `too_big` | `Number must be a safe integer` |
+| `SafeIntegerRule` | `(string? message)` | `Safe()` | `too_small`/`too_big` by direction, `invalid_type` for a fraction | `Number must be a safe integer` |
 | `IntRule<T>` | `()` | `Int()` | `invalid_type` | `Expected integer, received float` |
 
 Behaviour notes:

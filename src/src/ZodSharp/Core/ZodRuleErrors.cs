@@ -38,7 +38,7 @@ public static class ZodRuleErrors
 		var failure = rule is IZodFailureDescriber<T> describer ? describer.DescribeFailure(value) : default;
 		var includeReceived = ZodErrorOptions.IncludeReceivedValues;
 		return BuildCore(
-			code ?? (zodRule?.Code is { } ruleCode ? ruleCode : rule.Code),
+			ResolveCode(code, zodRule?.Code is { } ruleCode ? ruleCode : rule.Code, failure),
 			message ?? rule.GetErrorMessage(value),
 			path,
 			zodRule,
@@ -48,6 +48,13 @@ public static class ZodRuleErrors
 			includeReceived ? value : null
 		);
 	}
+
+	// A failure's own code (a direction-dependent code) replaces the rule's code, including when the caller
+	// passes the rule's code back explicitly as generated validators do; a different explicit code wins.
+	static string ResolveCode(string? code, string ruleCode, ZodRuleFailure failure) =>
+		failure.Code is { } failureCode && (code is null || string.Equals(code, ruleCode, StringComparison.Ordinal))
+			? failureCode
+			: code ?? ruleCode;
 
 	/// <summary>
 	/// Creates the error for a failed <see cref="IStringValidationRule"/>.
@@ -73,7 +80,7 @@ public static class ZodRuleErrors
 		var failure = rule is IZodStringFailureDescriber describer ? describer.DescribeFailure(value) : default;
 		var includeReceived = ZodErrorOptions.IncludeReceivedValues;
 		return BuildCore(
-			code ?? (zodRule?.Code is { } ruleCode ? ruleCode : rule.Code),
+			ResolveCode(code, zodRule?.Code is { } ruleCode ? ruleCode : rule.Code, failure),
 			message ?? rule.GetErrorMessage(value),
 			path,
 			zodRule,
@@ -119,7 +126,17 @@ public static class ZodRuleErrors
 		IZodRule? rule,
 		ZodRuleFailure failure,
 		string? fallbackOrigin = null
-	) => BuildCore(code, message, path, rule, fallbackOrigin, failure, false, null);
+	) =>
+		BuildCore(
+			rule?.Code is { } ruleCode ? ResolveCode(code, ruleCode, failure) : code,
+			message,
+			path,
+			rule,
+			fallbackOrigin,
+			failure,
+			false,
+			null
+		);
 
 	static ValidationError BuildCore(
 		string code,
