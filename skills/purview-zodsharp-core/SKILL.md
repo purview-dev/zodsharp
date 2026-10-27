@@ -210,8 +210,23 @@ Object fields and union options wrap typed schemas, so boxed values out of a
   satisfies a `Z.Number()` field.
 - A non-nullable value type rejects `null`; anything else falls through to failure.
 
-## Related skills
+## Trimming and Native AOT
 
+Every package is `IsTrimmable`/`IsAotCompatible`. Runtime schemas, generated validators and generated
+registration are safe as they are. Anything that is not carries `[RequiresUnreferencedCode]` with the
+alternative in its message, so read the IL2026/IL3050 text rather than suppressing it:
+
+- JSON: the `JsonTypeInfo<T>` overloads with a source-generated `JsonSerializerContext`;
+  Newtonsoft.Json is never trim-safe.
+- Options: `BindConfiguration(section).ValidateWithZod(section)`, not `BindAndValidateWithZod`.
+- Registration: the generated `AddZodSharp{AssemblyId}Schemas()`, not `AddZodSharpAssemblyGraph`.
+- Discriminated unions over CLR types: add each option with `Option<T>`.
+
+`PublishTrimmed`/`PublishAot` turn off the `ZodSharp.Reflection.IsSupported` fallbacks (an unregistered
+POCO's discriminator, field walkers for non-generated validators, graph scanning). See the wiki page
+Trimming and Native AOT.
+
+## Related skills
 `purview-zodsharp-source-generator` for compile-time `[ZodSchema]` validators (which is what you want
 for a DTO), `purview-zodsharp-custom-rules` for writing rules and rule attributes,
 `purview-zodsharp-aspnetcore` for ProblemDetails, DI, the .NET 11 validation pipeline and OpenAPI,

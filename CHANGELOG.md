@@ -12,6 +12,28 @@ Released versions correspond to `v<version>` GitHub releases.
 
 ### Added
 
+- **Trimming and Native AOT across every package.** Every shipping package is `IsTrimmable`/`IsAotCompatible` on
+  `net8.0`+ and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
+  suppressed. `src/tests/TrimSafety.Verification` publishes with `PublishAot=true` (every ZodSharp assembly except
+  NewtonsoftJson rooted, then as a plain consumer), fails on any IL warning and runs the native binary
+  (`just verify-trim`, CI job `verify-trim`). See [Trimming and Native AOT](docs/wiki/Trimming-and-AOT.md).
+- **`[MinCount]`, `[MaxCount]` and `[CountRange]`** (`ZodSharp.Rules`, generated from the new `MinCountRule`,
+  `MaxCountRule` and `CountRangeRule`): trim-safe collection/dictionary count attributes. The generator validates
+  them exactly like `[MinLength]`/`[MaxLength]`/`[Length]` on a collection (same code, origin, bounds, `count`
+  parameter, message and JSON Schema keywords), without the BCL attributes' `[RequiresUnreferencedCode]`
+  constructors. **`ZODSGEN053`** (warning, with a code fix) suggests them for a collection member of a
+  `[ZodSchema]` type when `PublishTrimmed`, `PublishAot`, `IsTrimmable` or `IsAotCompatible` is set; the package
+  exposes those properties to analyzers through `CompilerVisibleProperty`.
+- **`OptionsBuilder<TOptions>.ValidateWithZod(configurationSection, validateOnStart, missingValidatorBehavior)`**:
+  the trim-safe counterpart of `BindAndValidateWithZod`. It records the section so failures name configuration
+  keys but never binds, so it pairs with `BindConfiguration(section)`, which the configuration binder source
+  generator intercepts.
+- **`ZodDiscriminatedUnionBuilder.Option<T>` reads a POCO discriminator without unannotated reflection**: `T` is
+  annotated `[DynamicallyAccessedMembers(PublicProperties)]` and the accessor is built from it, so POCO unions are
+  trim- and AOT-safe.
+- **The `ZodSharp.Reflection.IsSupported` feature switch**, set `false` by the new
+  `buildTransitive/Purview.ZodSharp.targets` when `PublishTrimmed` or `PublishAot` is `true`, so ILLink and ILC
+  remove the reflection fallbacks (see *Breaking behaviour changes*).
 - **`Purview.ZodSharp.Extensions.Validation`** (new package, `net11.0`): the bridge to .NET 11's
   Microsoft.Extensions.Validation, so minimal APIs, Blazor Server and Blazor WebAssembly validate ZodSharp types
   with ZodSharp. `AddZodSharpValidation()` registers `ZodValidatableInfoResolver` as the first resolver whether
@@ -173,6 +195,28 @@ Released versions correspond to `v<version>` GitHub releases.
   locally, and `Examples.MinimalApi.IntegrationTests` starts it in memory.
 ### Breaking behaviour changes
 
+- **Newly annotated APIs (not binary breaks; trimmed and AOT applications now get IL2026/IL3050 at the call site).**
+  `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` were added to: every `Purview.ZodSharp.NewtonsoftJson` API
+  that reaches Newtonsoft serialization (`NewtonsoftJsonExtensions.DeserializeAndValidate`,
+  `DeserializeAndValidateAsync`, `ValidateAndSerialize`, `ValidateAndSerializeAsync`, `CreateValidatingConverter`,
+  `Z.FromJsonSchema`, `FromJsonSchemaParser.Parse`, the `JsonSchemaSerializerOptions` class) - use
+  `Purview.ZodSharp.SystemTextJson`; `AddZodSharpAssemblyGraph` (all overloads) and
+  `ZodSchemaFactoryOptions.ScanAssemblyGraphs` - use the generated `AddZodSharp{AssemblyId}Schemas()` or
+  `AddZodSharpAssembly`; `ZodModelSchema.For<TModel>(ZodObject)` (Blazor) - use a `[ZodSchema]` validator or
+  `For<TModel>(IZodSchema<TModel, TModel>)`; `AddZodSharpClientValidation`, `ZodClientValidationProvider` and
+  `ZodClientValidationRules.FromAttribute` (static-SSR client validation needs `AddRazorComponents`, itself not
+  trim-compatible) - use `ZodClientValidationRules.For(IZodRule)`/`FromRule`. `BindAndValidateWithZod` keeps its
+  annotations and now names `ValidateWithZod`.
+- **`ZodDiscriminatedUnionBuilder.Option<T>`'s `T` is annotated `[DynamicallyAccessedMembers(PublicProperties)]`.**
+  Generic code that forwards an unannotated type parameter to it gets IL2091 when trim-analyzed.
+- **Reflection fallbacks are removed when trimming.** With `PublishTrimmed` or `PublishAot` (including Blazor
+  WebAssembly, which trims by default), `ZodSharp.Reflection.IsSupported` is `false`: a discriminated union reports
+  a POCO whose type was not added with `Option<T>` as missing its discriminator; the Blazor and
+  Microsoft.Extensions.Validation field walkers no longer place errors from a validator that does not resolve
+  members itself (generated validators do), so such an error stays on the nearest resolved object or the model;
+  and assembly reference-graph scanning registers nothing. Untrimmed applications are unchanged.
+- **The discriminator accessor cache is per union instance** rather than process-wide, so two unions over the same
+  type no longer share a cached accessor.
 - **ProblemDetails no longer copies error parameters to the top level.** In 2.4 every error's parameters were also merged (camel-cased, last error wins) into the root of the ProblemDetails body. They are now only written per issue, in `issues[].parameters`. Set `ZodProblemDetailsOptions.MergeParametersIntoExtensions = true` to restore the old top-level copy.
 - **`[Required]` on a string now matches `RequiredAttribute`** (source generator, defect G1). The generated
   check was inverted: the default (`AllowEmptyStrings = false`) only rejected `null`, so `""` passed, while

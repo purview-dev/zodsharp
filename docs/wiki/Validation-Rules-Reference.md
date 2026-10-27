@@ -298,6 +298,9 @@ Each built-in rule that can be expressed as an attribute ships a generated `Vali
 | `[LessThanOrEqual(…)]` | `LessThanOrEqualRule<T>` | as above |
 | `[Even]` | `EvenRule<T>` | closes the open generic with the member type |
 | `[Odd]` | `OddRule<T>` | closes the open generic with the member type |
+| `[MinCount(…)]` | `MinCountRule` | collection/dictionary minimum element count; the trim-safe `[MinLength]` on a collection, with the same error identity |
+| `[MaxCount(…)]` | `MaxCountRule` | collection/dictionary maximum element count; the trim-safe `[MaxLength]` on a collection |
+| `[CountRange(…, …)]` | `CountRangeRule` | inclusive element-count range; the trim-safe `[Length]` on a collection |
 | `[MinLengthZod(…)]` | `MinLengthRule` | suffixed to avoid the DataAnnotations name; exposes `Code`/`Message` |
 | `[MaxLengthZod(…)]` | `MaxLengthRule` | as above |
 | `[UrlZod]` | `UrlRule` | as above |

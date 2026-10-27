@@ -26,6 +26,7 @@
 - [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md)
 - [Source Generator Diagnostics](Source-Generator-Diagnostics.md)
 - [Cross-Platform Interop](Cross-Platform-Interop.md)
+- [Trimming and Native AOT](Trimming-and-AOT.md)
 - [Performance](Performance.md)
 - [Guarantees and Limitations](Guarantees-and-Limitations.md)
 - [Release Flow](Release-Flow.md)

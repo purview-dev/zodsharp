@@ -103,6 +103,11 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   `[CollectionBehavior(AllowNulls = true)]` accepts it). A dictionary exports as
   `{ "type": "object", "additionalProperties": … }` and `[Length]`/`[MinLength]`/`[MaxLength]` map to
   `minProperties`/`maxProperties` — never `z.array`/`items`.
+- **Collection counts in trimmed apps:** `[MinLength]`/`[MaxLength]`/`[Length]` constructors are
+  `[RequiresUnreferencedCode]` (IL2026). Use `[MinCount(n)]`, `[MaxCount(n)]` and `[CountRange(min, max)]`
+  from `ZodSharp.Rules`: same generated check, error identity and JSON Schema keywords. `ZODSGEN053`
+  (with a code fix) flags the BCL attributes on a collection when `PublishTrimmed`, `PublishAot`,
+  `IsTrimmable` or `IsAotCompatible` is set; on a scalar the count attributes are `ZODSGEN030`.
 - Classes, structs and records are supported. Structs get no `IValidateOptions` (`ZODSGEN028` if
   requested).
 

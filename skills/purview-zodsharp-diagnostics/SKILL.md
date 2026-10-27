@@ -20,7 +20,7 @@ Two families, both enabled by default:
   package and need no ASP.NET Core dependency.
 
 `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`,
-`ZODSGEN051` and `ZODSGEN052` are warnings; `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are
+`ZODSGEN051`, `ZODSGEN052` and `ZODSGEN053` are warnings; `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are
 informational; the rest are errors.
 
 IDs `ZODSGEN002` and `ZODSGEN022`–`ZODSGEN026` are intentionally unused. Rule identifiers are never
@@ -39,6 +39,7 @@ renumbered or reused, so a sighting of one means stale tooling or a stale suppre
 | `ZODSGEN021` | `System.ComponentModel.DataAnnotations` reference is missing. |
 | `ZODSGEN048` | *(warning)* The type has rules that only run asynchronously (an `AsyncValidationAttribute` member or `IAsyncValidatableObject`), so the generated synchronous `Validate` throws `InvalidOperationException`. Call `ValidateAsync`. |
 | `ZODSGEN052` | *(warning)* An attribute's `ErrorMessage` uses a positional placeholder the attribute does not supply (for example `{3}` on `[Required]`) or has an unbalanced brace. Messages are formatted with a never-throw engine, so the text is shown literally; fix the placeholder. |
+| `ZODSGEN053` | *(warning)* `[MinLength]`, `[MaxLength]` or `[Length]` on a collection member of a `[ZodSchema]` type in a trimmed or AOT project (`PublishTrimmed`, `PublishAot`, `IsTrimmable`, `IsAotCompatible`). The BCL constructors are `[RequiresUnreferencedCode]`; use `[MinCount]`, `[MaxCount]` or `[CountRange]` from `ZodSharp.Rules` (the code fix swaps it). |
 
 ## Custom async validation method
 
