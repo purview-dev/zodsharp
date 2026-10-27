@@ -31,16 +31,16 @@ Every rule **should** expose its error identity as public constants so code (and
 public readonly record struct EmailRule : IValidationRule<string>
 {
     public const string ErrorCode = "invalid_string";
-    public const string MessageFormat = "Invalid email format: {0}";
+    public const string MessageFormat = "Invalid email format";
 
     public string Code => ErrorCode;
-    public string GetErrorMessage(in string value) =>
-        string.Format(System.Globalization.CultureInfo.CurrentCulture, MessageFormat, value);
+    public string GetErrorMessage(in string value) => RuleMessage.Format(MessageFormat, value);
 }
 ```
 
 - **`ErrorCode`** is the rule's canonical code — the value a test compares against when no per-usage override is supplied. The interface member `IValidationRule<T>.Code` defaults to `"validation_failed"`; a rule that accepts a per-usage `code` override returns it (falling back to `ErrorCode`) from both `Code` and `IZodRule.Code`, so every route reports the same effective value.
-- **`MessageFormat`** is a `string.Format` template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments; format it with `string.Format(System.Globalization.CultureInfo.CurrentCulture, MessageFormat, …)`.
+- **`MessageFormat`** is a positional template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments. Format it with `ZodSharp.Rules.RuleMessage.Format(format, …)`, which uses the invariant culture (messages are culture-independent; hosts localize at the boundary - see [Localization](Localization.md)), caches the parsed format and **never throws**: a custom message with a stray brace or an index you do not supply is written out literally instead of raising `FormatException` at validation time.
+- **Keep the input out of the default message.** Errors leave the process (ProblemDetails, logs, UI), so a default `MessageFormat` should describe what was expected rather than quote the value (`"Invalid email format"`, not `"Invalid email format: {0}"`). The built-in rules follow this; see [Core Concepts: PII](Core-Concepts.md#pii).
 - The constants may be inherited from a base rule class, and **abstract bases are exempt**, so a shared base can host them for its concrete derivations.
 
 The convention is enforced by an analyzer: a source-declared rule that does not expose a public `const string ErrorCode` **and** a public `const string MessageFormat` is reported as **ZODSGEN042**. See [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the full list.
@@ -49,8 +49,7 @@ A `[Test]` can therefore assert without duplicating strings:
 
 ```csharp
 await Assert.That(error.Code).IsEqualTo(EmailRule.ErrorCode);
-await Assert.That(error.Message).IsEqualTo(
-    string.Format(CultureInfo.CurrentCulture, EmailRule.MessageFormat, value));
+await Assert.That(error.Message).IsEqualTo(EmailRule.MessageFormat);
 ```
 
 ### Runtime identity: `IZodRule`
@@ -62,12 +61,58 @@ public interface IZodRule
 {
     string? Code { get; }     // null falls back to the attribute-mapped code
     string? Origin { get; }   // null falls back to the attribute-mapped origin
+
+    // Optional structured identity (default interface members returning null):
+    string? Category => null;                                   // the Zod issue code (ZodIssueCategories)
+    ErrorBound? Lower => null;                                  // the bounds the rule enforces
+    ErrorBound? Upper => null;
+    string? MessageFormat => null;                              // a named-placeholder template hosts may re-format
+    IReadOnlyDictionary<string, object?>? Parameters => null;   // e.g. format, pattern, divisor
 }
 ```
+
+`ZodRuleErrors` (`ZodSharp.Core`) copies every member onto the reported `ValidationError`, so a runtime schema and a
+generated validator report exactly the same error for the same rule. Every built-in rule implements the
+structured members.
 
 The generated code casts to `IZodRule` when reading the values, so the identity can depend on the rule's constructor arguments. A rule that accepts a `code`/`origin` constructor parameter **without** implementing `IZodRule` never reaches the reported error identity and is reported as **ZODSGEN039**.
 
 The reported code and origin are resolved from the rule (when it implements `IZodRule`), then the applied attribute, then the `[ZodRule(typeof(...))]` mapping, and finally default to `validation_failed` — see [Error identity: code and origin precedence](#error-identity-code-and-origin-precedence) for the full order.
+
+### Value-dependent failures: `IZodFailureDescriber<T>`
+
+Some failures depend on the value: a range rule is `too_small` below the range and `too_big` above it, and a
+length rule reports the length it saw. Implement `IZodFailureDescriber<T>` (or `IZodStringFailureDescriber` for
+the span path) to describe that part; it is called only after the rule rejected the value, and its result is
+merged over the rule's static identity:
+
+```csharp
+public readonly record struct BetweenRule(int Min, int Max)
+    : IValidationRule<int>, IZodRule, IZodFailureDescriber<int>
+{
+    public const string ErrorCode = "out_of_range";
+    public const string MessageFormat = "Value must be between {0} and {1}";
+
+    public bool IsValid(in int value) => value >= Min && value <= Max;
+
+    public string GetErrorMessage(in int value) => RuleMessage.Format(MessageFormat, Min, Max);
+
+    public string Code => ErrorCode;
+
+    string? IZodRule.Code => ErrorCode;
+    string? IZodRule.Origin => ZodTypeNames.Number;
+    ErrorBound? IZodRule.Lower => ErrorBound.Including(Min);
+    ErrorBound? IZodRule.Upper => ErrorBound.Including(Max);
+
+    public ZodRuleFailure DescribeFailure(in int value) =>
+        new(Category: value < Min ? ZodIssueCategories.TooSmall : ZodIssueCategories.TooBig);
+}
+```
+
+`ZodRuleFailure(string? Category = null, IReadOnlyDictionary<string, object?>? Parameters = null)`: a `null`
+category keeps `IZodRule.Category`, and the parameters are merged over `IZodRule.Parameters`. When
+`ZodErrorOptions.IncludeReceivedValues` is enabled (development only), `ZodRuleErrors` also adds the raw input as
+the `received` parameter.
 
 ### Message overrides
 
@@ -95,8 +140,8 @@ Close it with the property type to use it through an attribute (`[ZodRule(typeof
 ## Defining a custom rule
 
 ```csharp
-using System.Globalization;
 using ZodSharp.Core;
+using ZodSharp.Rules;
 
 namespace MyRules;
 
@@ -104,7 +149,7 @@ namespace MyRules;
 public readonly record struct NoWhitespaceRule(string? Message = null) : IValidationRule<string>
 {
     public const string ErrorCode = "invalid_string";
-    public const string MessageFormat = "Whitespace is not allowed in '{0}'.";
+    public const string MessageFormat = "Whitespace is not allowed.";
 
     public bool IsValid(in string value)
     {
@@ -123,7 +168,7 @@ public readonly record struct NoWhitespaceRule(string? Message = null) : IValida
     public string Code => ErrorCode;
 
     public string GetErrorMessage(in string value) =>
-        Message ?? string.Format(CultureInfo.CurrentCulture, MessageFormat, value);
+        Message ?? RuleMessage.Format(MessageFormat, value);
 }
 ```
 
@@ -277,7 +322,7 @@ public readonly record struct NotEmptyRule<T>(string? Code = null, string? Messa
     public bool IsValid(in T value) => !value.Equals(default(T));
 
     public string GetErrorMessage(in T value) =>
-        Message ?? string.Format(System.Globalization.CultureInfo.CurrentCulture, MessageFormat);
+        Message ?? string.Format(System.Globalization.CultureInfo.InvariantCulture, MessageFormat);
 
     // The rule owns its identity, so callers can pass a per-member error code.
     string? IZodRule.Code => Code;
@@ -343,7 +388,7 @@ public readonly record struct NonWhiteSpaceStringRule(string? Message = null)
     public bool IsValid(in string? value) => value != null && !string.IsNullOrWhiteSpace(value);
 
     public string GetErrorMessage(in string? value) =>
-        Message ?? string.Format(System.Globalization.CultureInfo.CurrentCulture, MessageFormat);
+        Message ?? string.Format(System.Globalization.CultureInfo.InvariantCulture, MessageFormat);
 }
 
 // Value-object half: validates the scalar as a unit.
@@ -357,7 +402,7 @@ public readonly record struct NonWhiteSpaceStringRule<TSelf>(string? Code = null
     public bool IsValid(in TSelf value) => value.Value != null && !string.IsNullOrWhiteSpace(value.Value);
 
     public string GetErrorMessage(in TSelf value) =>
-        Message ?? string.Format(System.Globalization.CultureInfo.CurrentCulture, MessageFormat);
+        Message ?? string.Format(System.Globalization.CultureInfo.InvariantCulture, MessageFormat);
 
     string? IZodRule.Code => Code;
     string? IZodRule.Origin => "value_object";
@@ -397,7 +442,7 @@ public readonly record struct NoWhitespaceRule(bool AllowEmpty = true, string? M
     public bool IsValid(in string value) => AllowEmpty || value.IndexOf(' ') < 0;
 
     public string GetErrorMessage(in string value) =>
-        Message ?? string.Format(System.Globalization.CultureInfo.CurrentCulture, MessageFormat);
+        Message ?? string.Format(System.Globalization.CultureInfo.InvariantCulture, MessageFormat);
 }
 ```
 
@@ -451,7 +496,7 @@ public readonly record struct MultipleOfRule(int Factor = 1, string? Message = n
     public bool IsValid(in int value) => Factor != 0 && value % Factor == 0;
 
     public string GetErrorMessage(in int value) =>
-        Message ?? string.Format(System.Globalization.CultureInfo.CurrentCulture, MessageFormat, Factor, value);
+        Message ?? string.Format(System.Globalization.CultureInfo.InvariantCulture, MessageFormat, Factor, value);
 }
 
 [ZodSchema]

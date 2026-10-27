@@ -47,7 +47,19 @@ var options = new JsonSerializerOptions { Converters = { converter } };
 var value = JsonSerializer.Deserialize<User>(json, options);
 ```
 
-`CreateValidatingConverter<T>()` returns a `System.Text.Json.Serialization.JsonConverter<T>`. When the JSON is invalid, deserialization throws `ZodJsonValidationException` (a `JsonException`) with a `"Validation failed: ..."` message; its `Errors` property holds the full `ValidationError`s, located under the converted value's JSON path. The converter strips itself from the options it uses internally to avoid recursion.
+`CreateValidatingConverter<T>()` returns a `System.Text.Json.Serialization.JsonConverter<T>`. When the JSON is invalid, deserialization throws `ZodJsonValidationException` (namespace `ZodSharp.Json`, a `JsonException`) with a `"Validation failed: ..."` message, so existing `catch (JsonException)` blocks keep working. Its `Errors` property (`ImmutableArray<ValidationError>`) holds the full errors - code, category, origin, bounds and parameters - located under the converted value's JSON path: a nested `Owner` whose `Name` failed reports `Owner.Name`, including when validating converters are nested. `DeserializeAndValidate` unwraps the exception and returns those errors. The converter strips itself from the options it uses internally to avoid recursion.
+
+```csharp
+try
+{
+    var value = JsonSerializer.Deserialize<User>(json, options);
+}
+catch (ZodJsonValidationException ex)
+{
+    foreach (var error in ex.Errors)
+        Console.WriteLine($"{error.FullPath.ToDottedString()}: {error.Message} ({error.Code})");
+}
+```
 
 ## API surface
 
@@ -61,7 +73,18 @@ var value = JsonSerializer.Deserialize<User>(json, options);
 
 ## Failure codes
 
-A failure to read the JSON (malformed JSON, a value that cannot be converted, a `null` document, or a type the serializer cannot handle — `JsonException`, `NotSupportedException`, `InvalidOperationException`) produces one `ValidationError` with code `invalid_json` (`SystemTextJsonExtensions.InvalidJsonCode`) and category `invalid_type`. Its `FullPath` is the location the serializer reported (`$.items[1].age` becomes `items[1].age`), its `line` and `position` parameters hold the serializer's zero-based line number and byte position in the line, and its message is the fixed `"The JSON value could not be converted to {expected}."`, where `expected` is a Zod type name (`string`, `number`, `object`, `array`, …). The serializer's own message, which names CLR types and can quote the input, is never surfaced. A failure raised by a validating converter is returned as the schema's own errors, located under the converter's path.
+A failure to read the JSON (malformed JSON, a value that cannot be converted, a `null` document, or a type the serializer cannot handle — `JsonException`, `NotSupportedException`, `InvalidOperationException`) produces one `ValidationError` with code `invalid_json` (`SystemTextJsonExtensions.InvalidJsonCode`) and category `invalid_type`. Its `FullPath` is the location the serializer reported (`$.items[1].age` becomes `items[1].age`), its `line` and `position` parameters hold the serializer's zero-based line number and byte position in the line, and its message is the fixed `"The JSON value could not be converted to {expected}."`, where `expected` is a Zod type name (`string`, `number`, `object`, `array`, …) found by walking the failing path through the serializer contract, or the generic `"the expected type"` when it cannot be described (for example malformed JSON read into a `Dictionary<string, object?>`). The serializer's own message, which names CLR types and can quote the input, is never surfaced. A failure raised by a validating converter is returned as the schema's own errors, located under the converter's path.
+
+```csharp
+var result = userSchema.DeserializeAndValidate("""{ "name": "John", "age": }""");
+var error = result.Errors[0];
+// error.Code                         == SystemTextJsonExtensions.InvalidJsonCode ("invalid_json")
+// error.Category                     == ZodIssueCategories.InvalidType ("invalid_type")
+// error.MessageFormat                == "The JSON value could not be converted to {expected}."
+// error.Parameters["line"], ["position"] - where the serializer stopped
+```
+
+These are the same errors ASP.NET Core hosts project into ProblemDetails (see [ASP.NET Core Integration](AspNetCore-Integration.md)); OpenAPI documents describe the response shape (see [OpenAPI Integration](OpenAPI-Integration.md)).
 
 ## JSON Schema import
 

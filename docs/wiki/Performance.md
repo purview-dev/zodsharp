@@ -105,6 +105,33 @@ All valid-input paths for the core schema types are zero-allocation:
 > [!NOTE]
 > The string transforms, `ZodString.ValidateSpan` (its result carries a string), and non-first union options are the allocation exceptions. Use `ZodString.IsValidSpan` for an allocation-free span check. See [Guarantees and Limitations](Guarantees-and-Limitations.md).
 
+## Generated validators and ProblemDetails mapping
+
+Two suites cover the .NET 11 validation work. They have no committed results yet; run them locally:
+
+```bash
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -- --filter "*GeneratedValidationPerformanceTests*"
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -- --filter "*ProblemDetailsMappingPerformanceTests*"
+```
+
+- **`GeneratedValidationPerformanceTests`** - a `[ZodSchema]` model's `Validate` on valid and invalid input
+  (baseline), field-level `ValidateMember` on valid and invalid input, and `TryResolveMember` on a nested
+  path.
+- **`ProblemDetailsMappingPerformanceTests`** - converting a `ZodException` to `HttpValidationProblemDetails`
+  without a registry, with an `ErrorTypeRegistry` lookup, and with registry formatting.
+
+What the design guarantees regardless of the numbers:
+
+- **Field-level validation does not recurse.** `{Type}Schema.ValidateMember(value, memberName)` runs only that
+  member's own rules - no nested schemas, type rules, `IValidatableObject` or refinements - so validating one
+  Blazor field costs one member, not the whole graph.
+- **Synchronous fast path.** `{Type}Schema.RequiresAsyncValidation` is a compile-time constant. When nothing in
+  the graph is asynchronous, `ValidateAsync` completes synchronously (it returns `new ValueTask<…>(Validate(…))`).
+- **Errors cost on failure only.** Paths, bounds and parameters are built when a rule fails; messages are
+  formatted with the invariant culture at validation time and re-formatted for a user's culture only at a host
+  boundary, so success stays allocation-free.
+- **`TryResolveMember` is reflection-free**: it walks the generated member table, so it is trim- and AOT-safe.
+
 ## UUID validation (`UuidPerformanceTests`)
 
 UUID validation uses a zero-allocation char-scan (version nibble at position 14, variant nibble at position 19) instead of a regex. Measured against the previous compiled regex:

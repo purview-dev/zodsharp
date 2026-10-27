@@ -77,6 +77,22 @@ The fixture generator script is intentionally run via Bun rather than `npx tsx` 
 - **Expanded DataAnnotations support.** `[Length]`, `[MinLength]`, `[MaxLength]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and more, with structured size failures (`Code`, `Origin`, `Minimum`/`Maximum`, `Inclusive`, `Path`).
 - **Value-first composition methods.** `.ApplyAnd()`, `.ApplyOr()`, and `.ApplyRefine()` are the supported composition surface.
 
+## .NET 11 validation
+
+On `net11.0`, ZodSharp plugs into the platform's own validation (Microsoft.Extensions.Validation), so minimal APIs and
+Blazor validate ZodSharp types with ZodSharp and every host reports the same error contract: Zod-style `Code`/`Category`,
+canonical paths (`Items[0].Name`, `Map[en]`, `Map["0"]`), typed bounds and localizable messages.
+
+| Package | What it adds |
+| --- | --- |
+| `Purview.ZodSharp.Extensions.Validation` | The Microsoft.Extensions.Validation bridge (`AddZodSharpValidation()`); WebAssembly-safe. See [Microsoft.Extensions.Validation](docs/wiki/Microsoft-Extensions-Validation.md) |
+| `Purview.ZodSharp.AspNetCore.OpenApi` | OpenAPI transformers that describe ZodSharp's constraints and validation problem responses (`options.AddZodSharp()`). See [OpenAPI Integration](docs/wiki/OpenAPI-Integration.md) |
+| `Purview.ZodSharp.Blazor` | Blazor Server and WebAssembly form validation. See [Blazor Integration](docs/wiki/Blazor-Integration.md) |
+
+`Purview.ZodSharp.AspNetCore` uses the bridge on `net11.0` to produce full-fidelity ProblemDetails from the built-in
+pipeline ([ASP.NET Core Integration](docs/wiki/AspNetCore-Integration.md)), and messages are localized through
+`IZodMessageFormatter` ([Localization](docs/wiki/Localization.md)).
+
 ## Usage Examples
 
 ### Basic Validation
@@ -190,7 +206,7 @@ catch (ZodException ex)
     Console.WriteLine($"Validation failed: {ex.Message}");
     foreach (var error in ex.Errors)
     {
-        Console.WriteLine($"  - {string.Join(".", error.Path)}: {error.Message}");
+        Console.WriteLine($"  - {error.FullPath.ToDottedString()}: {error.Message} ({error.Code})");
     }
 }
 
@@ -610,21 +626,21 @@ var result = BasketSchema.Validate(new Basket { Items = ["apple"] });
 Install `Purview.ZodSharp.AspNetCore` to convert failed validation results into standard ASP.NET Core payloads while preserving structured issues:
 
 ```csharp
-using ZodSharp.AspNetCore;
+using ZodSharp;              // ToHttpValidationProblemDetails / ToValidationProblem
+using ZodSharp.AspNetCore;   // ZodTypedResults
 
-var result = BasketSchema.Validate(basket);
-
-if (!result.IsSuccess)
+app.MapPost("/baskets", (Basket basket, HttpContext httpContext) =>
 {
-    var problem = result.ToHttpValidationProblemDetails();
-    return Results.ValidationProblem(
-        problem.Errors,
-        extensions: new Dictionary<string, object?>
-        {
-            ["issues"] = problem.Extensions["issues"]
-        });
-}
+    var result = BasketSchema.Validate(basket);
+    return result.IsSuccess
+        ? Results.Ok(result.Value)
+        : result.ToValidationProblem(httpContext); // errors + issues + traceId, ErrorType status
+});
 ```
+
+Every path - this extension, `ZodTypedResults`, the `WithZodSharpValidation()` endpoint filter, `ZodExceptionHandler`
+and, on .NET 11, the built-in validation pipeline - writes the same body. See
+[ASP.NET Core Integration](docs/wiki/AspNetCore-Integration.md).
 
 ### Span<T> Validation
 

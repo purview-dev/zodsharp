@@ -43,7 +43,7 @@ var result = userSchema.Validate(userData);
 - Numeric constraints — `minimum`, `maximum`, `multipleOf`; `integer` additionally applies `.Int()`.
 - Objects — `required` and optional fields via `Z.Object().Field(...)`.
 - Arrays — `items`, `minItems`, `maxItems`. A nullable item schema (`items.anyOf` containing a `{"type":"null"}` branch) imports as a nullable element, matching `z.array(T.nullable())` and the shape the generated exporter emits for an allow-null collection.
-- Records — an object with no `properties` and an `additionalProperties` schema imports as a record: every member is validated by the value schema, and a failure is reported at the member's key (`["a"]`). `additionalProperties: true` treats every member as `any`; `false` (and an absent value) keeps the object contract.
+- Records — an object with no `properties` and an `additionalProperties` schema imports as a record: every member is validated by the value schema, and a failure is reported under a typed key segment for the member (`FullPath.ToDottedString()` renders `[a]`; the legacy `Path` is `["a"]`). `additionalProperties: true` treats every member as `any`; `false` (and an absent value) keeps the object contract.
 
 ## Records
 
@@ -58,12 +58,26 @@ var schema = Z.FromJsonSchema(
 );
 
 schema.Validate(new Dictionary<string, object?> { ["a"] = "x" });  // Success
-schema.Validate(new Dictionary<string, object?> { ["a"] = "" });   // Failure at ["a"]
+schema.Validate(new Dictionary<string, object?> { ["a"] = "" });   // Failure at [a] (key segment)
 ```
 
 This is the shape the generated exporter writes for a dictionary property, so a generated dictionary schema
 round-trips through `Z.FromJsonSchema` in either integration package. The result is a record schema (the
 `Z.Record` shape), not an object with fixed properties.
+
+## Failures
+
+Imported schemas report the same structured errors as the equivalent fluent schemas:
+
+- **Type mismatches** describe JSON kinds with Zod's type names - `"Expected string, but got number"` - and
+  never name `JsonElement`, `JToken` or another CLR type. The `expected`/`received` parameters carry the same
+  names.
+- **`minItems`/`maxItems`** report exactly what `ZodArray` reports: `"Array must have at least 2 elements, but got 1"`,
+  origin `array`, both bounds with their inclusivity, and category `too_small`/`too_big`.
+- **Literal mismatches** (`const`, single-member `enum`) name the expected literal and only the *kind* of the
+  received value; the value itself is not echoed.
+- **Array elements and record values** are re-pathed with typed index and key segments (`[1]`, `[a]`), keeping
+  every field of the inner error (origin, bounds, category, parameters).
 
 ## Limitations
 

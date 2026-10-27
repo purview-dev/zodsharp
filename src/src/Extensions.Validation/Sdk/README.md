@@ -32,6 +32,11 @@ builder.Services.AddValidation();
 ZodSharp's resolver ends up first whether `AddValidation()` is called before `AddZodSharpValidation()`, after it,
 or not at all. Types without a ZodSharp validator fall through to the next resolver.
 
+For trimmed and Native AOT apps (including Blazor WebAssembly), register the generated validators with the
+per-assembly extension the source generator emits instead of scanning: `builder.Services.AddZodSharpMyAppSchemas();`
+(`AddZodSharp{Assembly}Schemas()`, the assembly name in PascalCase). `[ValidatableType]` is not needed on a
+`[ZodSchema]` type, and is reported as redundant (`ZODSGEN047`).
+
 ### What each error carries
 
 | `ValidationError` | Value |
@@ -60,8 +65,20 @@ ZodValidationReport? report = context.ZodReport;
 ```
 
 Register an `IZodValidationReportSink` with a per-run lifetime (a scoped service in ASP.NET Core) to receive the
-same errors where the `ValidateContext` is created for you. Outside HTTP and Blazor,
-`ValidationOptions.ValidateAsync(value, services)` validates and returns the report directly.
+same errors where the `ValidateContext` is created for you. Do not register one in Blazor Server, where the scope is
+the circuit. Outside HTTP and Blazor, `ValidationOptions.ValidateAsync(value, services)` validates and returns the
+report directly:
+
+```csharp
+var options = services.GetRequiredService<IOptions<ValidationOptions>>().Value;
+ZodValidationReport report = await options.ValidateAsync(order, services, cancellationToken);
+
+foreach (var error in report.Errors)
+    Console.WriteLine($"{error.FullPath.ToDottedString()}: {error.Message} ({error.Code})");
+```
+
+Errors from other resolvers (DataAnnotations types) are included with code `custom`, their path parsed from the
+Microsoft.Extensions.Validation key.
 
 ### Localization
 

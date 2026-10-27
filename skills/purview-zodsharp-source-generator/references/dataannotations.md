@@ -5,22 +5,21 @@ direct, typed codegen. Nothing is reflected at runtime.
 
 ## Supported attributes
 
-| Attribute | Generated behaviour | Failure code |
+| Attribute | Generated behaviour | `Code` / `Category` |
 | --- | --- | --- |
-| `[Required]` | nullable property must not be null; a string with `AllowEmptyStrings=false` must be non-empty | `missing_field` |
-| `[Length(min, max)]` | min/max size; strings, arrays (including jagged and rectangular), countable collections | `too_small` / `too_big` |
-| `[StringLength(max)]`, `[StringLength(max, MinimumLength=min)]` | string size via direct `.Length` | `too_small` / `too_big` |
-| `[MinLength(n)]` | checked only when `n > 0` | `too_small` |
-| `[MaxLength(n)]` | checked only when `n >= 0` | `too_big` |
-| `[Range(…)]` | inclusive (or exclusive) numeric/parsed bounds | `invalid_range` |
-| `[RegularExpression(pattern)]` | compiled `Regex` field, checked on non-empty strings | `invalid_string` |
-| `[AllowedValues(…)]` | typed equality against the allowed set | `invalid_value` |
-| `[DeniedValues(…)]` | typed equality against the denied set; on an enum property the values are absorbed into the automatic enum rule instead | `invalid_value` |
-| `[EmailAddress]` | reuses `ZodSharp.Rules.EmailRule` on non-empty strings | `invalid_string` |
-| `[Url]`, `[Phone]`, `[CreditCard]`, `[Base64String]` | reuse `UrlRule`, `PhoneRule`, `CreditCardRule`, `Base64StringRule` | `invalid_string` |
-| `[Compare(otherProperty)]` | typed equality between two properties | `mismatch` |
-| `[Display(Name=…)]` | not validated; `Name` is the display name in messages and `{0}` placeholders | — |
-
+| `[Required]` | `RequiredAttribute` semantics: a string is missing when `null`, empty or whitespace-only; `AllowEmptyStrings = true` rejects only `null` | `missing_field` / `invalid_type` |
+| `[Length(min, max)]` | min/max size; strings, arrays (including jagged and rectangular), countable collections | `invalid_length` / `too_small`, `too_big` (both bounds) |
+| `[StringLength(max)]`, `[StringLength(max, MinimumLength=min)]` | string size via direct `.Length` | `invalid_length` / `too_small`, `too_big` (both bounds) |
+| `[MinLength(n)]` | checked only when `n > 0` | `too_small` / `too_small` |
+| `[MaxLength(n)]` | checked only when `n >= 0` | `too_big` / `too_big` |
+| `[Range(…)]` | inclusive or exclusive (`MinimumIsExclusive`/`MaximumIsExclusive`) bounds in `Lower`/`Upper`; origin from the value's Zod type | `invalid_range` / `too_small`, `too_big` |
+| `[RegularExpression(pattern)]` | compiled `Regex` field, checked on non-empty strings; `pattern` parameter | `invalid_string` / `invalid_format` |
+| `[AllowedValues(…)]` | typed equality against the allowed set; enums listed by name in `options` | `invalid_value` / `invalid_value` |
+| `[DeniedValues(…)]` | typed equality against the denied set; on an enum property the values are absorbed into the automatic enum rule instead | `invalid_value` / `invalid_value` |
+| `[EmailAddress]` | reuses `ZodSharp.Rules.EmailRule` on non-empty strings | `invalid_string` / `invalid_format` |
+| `[Url]`, `[Phone]`, `[CreditCard]`, `[Base64String]` | reuse `UrlRule`, `PhoneRule`, `CreditCardRule`, `Base64StringRule` | `invalid_string` / `invalid_format` |
+| `[Compare(otherProperty)]` | typed equality between two properties | `mismatch` / `invalid_value` |
+| `[Display(Name=…)]`, `[Display(Name=…, ResourceType=…)]` | not validated; the display name in messages (`{displayName}`, `{0}`); `ResourceType` is read at runtime | — |
 `[Length]` follows DataAnnotations null semantics: `null` is valid unless `[Required]` is also
 present.
 
@@ -62,10 +61,11 @@ Size attributes generate direct `Length`/`Count` access where possible:
 - `IEnumerable` / `IEnumerable<T>` → one counted pass via `CollectionCountHelper.GetCount`, with fast
   paths for `ICollection<T>`, `IReadOnlyCollection<T>` and non-generic `ICollection`
 
-A structured size failure carries the same metadata as the runtime API: `Code` (`too_small` /
-`too_big`), `Origin` (`string` for strings, `array` for arrays, `collection` for countable and
-`IEnumerable` collections), `Minimum`/`Maximum` (the inclusive bound), `Inclusive` (`true`) and
-`Path`.
+A structured size failure carries the same metadata as the runtime API: `Code` (`invalid_length` for
+`[Length]`/`[StringLength]`, `too_small`/`too_big` for `[MinLength]`/`[MaxLength]`), `Category`
+(`too_small`/`too_big` by direction), `Origin` (`string` for strings, `array` for arrays, `collection`
+for countable and `IEnumerable` collections), `Lower`/`Upper` (both bounds for `[Length]` and
+`[StringLength]`) and `FullPath`.
 
 ```csharp
 [ZodSchema]
@@ -77,7 +77,7 @@ public sealed class Basket
 }
 
 var result = BasketSchema.Validate(new Basket { Items = ["apple"] });
-// Code == "too_small", Minimum == 2, Origin == "array", Inclusive == true
+// Code == "invalid_length", Category == "too_small", Lower == ErrorBound(2, Inclusive: true)
 ```
 
 ## `[Range]`
@@ -94,11 +94,17 @@ Bounds are emitted as static typed fields and compared without running the attri
 
 ## Error messages
 
-`ErrorMessage`, or `ErrorMessageResourceName` + `ErrorMessageResourceType`, are honoured, with `{0}`
-(display name), `{1}` and `{2}` (bound) formatted through
-`string.Format(CultureInfo.CurrentCulture, …)`. Supplying only one half of the resource name/type
-pair is `ZODSGEN005`.
+Messages are formatted **at validation time** by `ZodMessageFormat` from a named template kept in
+`ValidationError.MessageFormat`, with `displayName`, `member`, `declaringType` and the rule's values
+(`minimum`, `maximum`, `pattern`, `options`, …) in `Parameters`. Formatting never throws: a stray brace
+in a custom message renders literally.
 
+`ErrorMessage`, or `ErrorMessageResourceName` + `ErrorMessageResourceType`, replace the text only (the
+code, category and bounds are kept). Positional placeholders keep their DataAnnotations meaning: `{0}` is
+the display name and `{1}`/`{2}` the attribute's values - for `[Length]` `{1}` is the minimum and `{2}`
+the maximum, as `LengthAttribute` formats them; for `[StringLength]` `{1}` is the maximum and `{2}` the
+minimum. Supplying only one half of the resource name/type pair is `ZODSGEN005`; a placeholder the
+attribute does not supply is `ZODSGEN052`.
 ## Applicability is a compile error, not a silent skip
 
 - `[Length]` with `min > max` → `ZODSGEN003`.

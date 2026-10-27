@@ -11,7 +11,24 @@ var schema = Z.Union(Z.String(), Z.Number(), Z.Boolean());
 var result = schema.Validate(42.0); // matches Z.Number()
 ```
 
-When no option matches, a single `invalid_union` error is produced (`"Value does not match any of the union options"`) whose `Parameters["errors"]` carries every option's errors.
+When no option matches, a single `invalid_union` error (category `invalid_union`) is reported at the union's path. Its message names the options with Zod type names (`"Value does not match any of the union options (string, number)"`), the `options` parameter lists them, and the per-option issues - Zod's `unionErrors` - are available through `GetUnionErrors()`:
+
+```csharp
+var error = Z.Union(Z.String().Min(5), Z.Number()).Validate("ab").Errors[0];
+
+// error.Code == ZodIssueCodes.InvalidUnion
+foreach (ImmutableArray<ValidationError> option in error.GetUnionErrors())
+{
+    // option 0: too_small (string must be at least 5 characters)
+    // option 1: invalid_type ("Expected number, received string")
+}
+```
+
+`GetUnionErrors()` (on `ZodIssues`) returns an `ImmutableArray<ImmutableArray<ValidationError>>`, one entry per
+option in declaration order, with paths relative to the union. It is stored under the `unionErrors` parameter
+(`ZodIssueParameters.UnionErrors`); the old mutable list under `errors`, which collided with the RFC 7807
+`errors` member, is gone. Typed and native unions report the same shape (they used to discard the inner
+errors). ProblemDetails projects the union error at its own path, with `unionErrors` as nested issues.
 
 > [!NOTE]
 > On the failure path the accumulated option errors are collected, which allocates. Matching a later option (e.g. number or boolean after a string option) also allocates while the earlier options are attempted — see [Performance](Performance.md).
@@ -84,17 +101,45 @@ var result = union.Validate(new Dictionary<string, object?>
 });
 ```
 
-Failures:
+Failures are reported at the discriminator's path, with category `invalid_union` and the `discriminator` and
+`options` parameters (options in declaration order). The received discriminator value is not echoed.
 
-- No discriminator present → `missing_discriminator`.
-- Value not among the options → `invalid_discriminator` listing the expected values.
-- `null` input → `invalid_type`.
+| Failure | Code | Message |
+|---|---|---|
+| No discriminator present | `missing_discriminator` | `Discriminator field 'type' not found` |
+| Value not among the options | `invalid_discriminator` | `Invalid discriminator value. Expected one of: user, admin` |
+| `null` input | `invalid_type` | `Expected object, received null` (at the root) |
+
+Once an option is selected, its own errors are reported unchanged (for example `invalid_type` at `level`).
+Discriminated unions export to JSON Schema as `oneOf` (see [JSON Schema Export](JsonSchema-Export.md)).
 
 The builder (`ZodDiscriminatedUnionBuilder`) accepts untyped `IZodSchema<object, object>` options via `Option(string value, IZodSchema<object, object> schema)` and typed options via `Option<T>(string value, IZodSchema<T, T> schema)`, which wrap the schema for coercion and `null` handling.
 
+## Unions in generated validators and hosts
+
+The source generator validates a member whose type is a C# 15 union (`public union Pet(Cat, Dog);`) by
+dispatching to the active case's schema, and a member typed as a C# 15 `closed` class by dispatching to the
+derived type's schema. Paths do not include the union's `Value`: an error in the `Cat` case of a member
+`public Pet Pet { get; set; }` is reported at `Pet.Name`, not `Pet.Value.Name`. Every derived type of a closed hierarchy needs its own
+`[ZodSchema]`; one without is reported as `ZODSGEN049` (see
+[Source Generator Diagnostics](Source-Generator-Diagnostics.md)).
+
+On .NET 11 the hosts understand unions too:
+
+- **Minimal APIs.** A JSON-body parameter typed as a union is validated through its active case, both by the
+  Microsoft.Extensions.Validation pipeline (`AddZodSharpValidation()` claims union parameters without an
+  application `AddValidation()` call) and by `WithZodSharpValidation()`. See
+  [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md) and
+  [ASP.NET Core Integration](AspNetCore-Integration.md).
+- **Blazor.** A form model property of union type resolves its field through the case object, so messages
+  land next to the right input. See [Blazor Integration](Blazor-Integration.md).
+- **OpenAPI.** A C# union keeps the platform's `anyOf` shape and gets each case constrained; polymorphic
+  (`[JsonPolymorphic]`) types are described with `oneOf` and a `discriminator`. See
+  [OpenAPI Integration](OpenAPI-Integration.md).
+
 ## Intersection
 
-`ZodIntersection<T>` (created with `Z.Intersection<T>(left, right)` or `.And(other)`) succeeds only when both schemas validate; failures merge both error sets.
+`ZodIntersection<T>` (created with `Z.Intersection<T>(left, right)` or `.And(other)`) succeeds only when both schemas validate; failures merge both error sets, and an issue raised identically by both sides is reported once.
 
 ```csharp
 var schema = Z.String().Min(3).And(Z.String().Max(10));

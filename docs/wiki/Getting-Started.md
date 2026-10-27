@@ -52,7 +52,7 @@ var result = nameSchema.SafeParse("AB"); // non-throwing
 if (!result.IsSuccess)
 {
     foreach (var error in result.Errors)
-        Console.WriteLine($"  - {string.Join(".", error.Path)}: {error.Message}");
+        Console.WriteLine($"  - {error.FullPath.ToDottedString()}: {error.Message}");
 }
 ```
 
