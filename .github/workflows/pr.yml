@@ -48,7 +48,7 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # There are THREE producers of the fixtures vitest reads, in different assemblies, namespaces and
+      # There are FOUR producers of the fixtures vitest reads, in different assemblies, namespaces and
       # classes, so they cannot be selected by one treenode filter:
       #
       #   tests/ts/cross-platform.test.ts    <- src/tests/cross-platform/output/
@@ -58,6 +58,8 @@ jobs:
       #                                         ZodSharp.SourceGenerators/ZodSchemaGeneratorTests
       #   tests/ts/temporal-parity.test.ts   <- src/tests/cross-platform/temporal-parity/
       #                                         ZodSharp.SourceGenerators/ZodSchemaGeneratorTests
+      #   tests/ts/client-validators.test.ts <- src/tests/cross-platform/client-rules/
+      #                                         ZodSharp.Blazor.Ssr/ClientRuleParityFixtureTests
       #
       # They run as separate steps rather than one OR-ed filter: `a|b` is not honoured as a top-level
       # alternation by the treenode filter — it silently selects a different, broader set and skips a
@@ -79,6 +81,12 @@ jobs:
           dotnet test --solution src/ZodSharp.slnx --configuration Debug
           --treenode-filter
           '/*/ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedTemporalSchemas_WritesZodParityArtifacts'
+
+      - name: Run the C# client-validator parity test (writes cross-platform/client-rules)
+        run: >-
+          dotnet test --solution src/ZodSharp.slnx --configuration Debug
+          --treenode-filter
+          '/*/ZodSharp.Blazor.Ssr/ClientRuleParityFixtureTests/ClientRules_GivenEveryMappedRule_WritesParityFixtures'
 
       - name: Run the TypeScript/Zod cross-platform tests
         run: bun run test

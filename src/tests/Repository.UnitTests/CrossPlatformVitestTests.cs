@@ -74,6 +74,7 @@ public sealed class CrossPlatformVitestTests
 			() => new VitestSuite("tests/ts/cross-platform.test.ts", "src/tests/cross-platform/output"),
 			() => new VitestSuite("tests/ts/guid-uuid-parity.test.ts", "src/tests/cross-platform/guid-parity"),
 			() => new VitestSuite("tests/ts/temporal-parity.test.ts", "src/tests/cross-platform/temporal-parity"),
+			() => new VitestSuite("tests/ts/client-validators.test.ts", "src/tests/cross-platform/client-rules"),
 		];
 
 	[Test]

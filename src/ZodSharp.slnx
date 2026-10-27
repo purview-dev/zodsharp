@@ -15,6 +15,7 @@
 	<Folder Name="/tests/">
 		<Project Path="tests/AspNetCore.OpenApi.UnitTests/AspNetCore.OpenApi.UnitTests.csproj" />
 		<Project Path="tests/AspNetCore.UnitTests/AspNetCore.UnitTests.csproj" />
+		<Project Path="tests/Blazor.UnitTests/Blazor.UnitTests.csproj" />
 		<Project Path="tests/Extensions.Validation.UnitTests/Extensions.Validation.UnitTests.csproj" />
 		<Project Path="tests/JsonInterop.UnitTests/JsonInterop.UnitTests.csproj" />
 		<Project Path="tests/NewtonsoftJson.UnitTests/NewtonsoftJson.UnitTests.csproj" />
