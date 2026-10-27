@@ -74,6 +74,48 @@ public static class OptionsServiceCollectionExtensions
 		return builder;
 	}
 
+	/// <summary>
+	/// Validates <typeparamref name="TOptions"/> with its ZodSharp schema, naming failures by the configuration keys
+	/// under <paramref name="configurationSection"/> (<c>Smtp:Servers:0:Host: Host is required (required)</c>), without
+	/// binding the options. The trim- and Native AOT-safe counterpart of <c>BindAndValidateWithZod</c>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Bind the section yourself, before or after this call. <c>BindConfiguration(section)</c> is intercepted by the
+	/// configuration binder source generator (<c>EnableConfigurationBindingGenerator</c>, on by default under
+	/// <c>PublishAot</c>), so the pair is reflection-free:
+	/// </para>
+	/// <code>
+	/// services.AddOptions&lt;SmtpOptions&gt;()
+	///     .BindConfiguration("Smtp")
+	///     .ValidateWithZod("Smtp");
+	/// </code>
+	/// <para>
+	/// The section is only used to name failures; this method never reads configuration.
+	/// </para>
+	/// </remarks>
+	/// <typeparam name="TOptions">The options type.</typeparam>
+	/// <param name="builder">The options builder.</param>
+	/// <param name="configurationSection">The configuration section the options are bound from, for example <c>Smtp</c>.</param>
+	/// <param name="validateOnStart">When <see langword="true"/>, the options are validated at startup.</param>
+	/// <param name="missingValidatorBehavior">How to behave when no validator is registered.</param>
+	/// <returns>The builder for chaining.</returns>
+	public static OptionsBuilder<TOptions> ValidateWithZod<
+		[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TOptions
+	>(
+		this OptionsBuilder<TOptions> builder,
+		string configurationSection,
+		bool validateOnStart = true,
+		MissingValidatorBehavior missingValidatorBehavior = MissingValidatorBehavior.Throw
+	)
+		where TOptions : class
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		ArgumentException.ThrowIfNullOrWhiteSpace(configurationSection);
+
+		return builder.AddZodSchemaValidator(missingValidatorBehavior, validateOnStart, configurationSection);
+	}
+
 	static OptionsBuilder<TOptions> Register<TOptions>(
 		OptionsBuilder<TOptions> builder,
 		MissingValidatorBehavior missingValidatorBehavior,

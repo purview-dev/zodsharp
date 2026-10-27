@@ -10,15 +10,18 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class ZodSharpOptionsBuilderExtensions
 {
+	const string BindRequirement =
+		"Binds through the reflection-based configuration binder. Call BindConfiguration(section) (intercepted by the configuration binder source generator) and ValidateWithZod(section) instead.";
+
 	/// <summary>
 	/// Binds <typeparamref name="TOptions"/> to the configuration section <paramref name="configSectionPath"/> and
 	/// validates it with its ZodSharp schema. Failures name the configuration key of the offending setting
 	/// (<c>Smtp:Servers:0:Host: Host is required (required)</c>), so it can be found in <c>appsettings.json</c>.
 	/// </summary>
 	/// <remarks>
-	/// Binding uses the reflection-based configuration binder. A Native AOT application should call
+	/// Binding uses the reflection-based configuration binder. A trimmed or Native AOT application should call
 	/// <c>BindConfiguration(section)</c> itself (the configuration binder source generator intercepts that call)
-	/// followed by <c>AddZodSchemaValidator(MissingValidatorBehavior.Throw, validateOnStart, section)</c>.
+	/// followed by <c>ValidateWithZod(section)</c>.
 	/// </remarks>
 	/// <typeparam name="TOptions">The options type.</typeparam>
 	/// <param name="builder">The options builder.</param>
@@ -26,12 +29,8 @@ public static class ZodSharpOptionsBuilderExtensions
 	/// <param name="validateOnStart">When <see langword="true"/>, the options are validated at startup.</param>
 	/// <param name="missingValidatorBehavior">How to behave when no validator is registered.</param>
 	/// <returns>The builder for chaining.</returns>
-	[RequiresUnreferencedCode(
-		"Binds through the reflection-based configuration binder. Call BindConfiguration and AddZodSchemaValidator in the application instead."
-	)]
-	[RequiresDynamicCode(
-		"Binds through the reflection-based configuration binder. Call BindConfiguration and AddZodSchemaValidator in the application instead."
-	)]
+	[RequiresUnreferencedCode(BindRequirement)]
+	[RequiresDynamicCode(BindRequirement)]
 	public static OptionsBuilder<TOptions> BindAndValidateWithZod<
 		[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)] TOptions
 	>(
@@ -60,12 +59,8 @@ public static class ZodSharpOptionsBuilderExtensions
 	/// <param name="validateOnStart">When <see langword="true"/>, the options are validated at startup.</param>
 	/// <param name="missingValidatorBehavior">How to behave when no validator is registered.</param>
 	/// <returns>The builder for chaining.</returns>
-	[RequiresUnreferencedCode(
-		"Binds through the reflection-based configuration binder. Call Bind and AddZodSchemaValidator in the application instead."
-	)]
-	[RequiresDynamicCode(
-		"Binds through the reflection-based configuration binder. Call Bind and AddZodSchemaValidator in the application instead."
-	)]
+	[RequiresUnreferencedCode(BindRequirement)]
+	[RequiresDynamicCode(BindRequirement)]
 	public static OptionsBuilder<TOptions> BindAndValidateWithZod<
 		[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)] TOptions
 	>(
