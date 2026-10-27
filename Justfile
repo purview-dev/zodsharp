@@ -122,8 +122,8 @@ publish-aot-sample rid=default_rid *args:
     dotnet publish {{ aot_sample_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/aot-sample/{{ rid }} -warnaserror {{ args }}
 
 # The CI `verify-trim` job runs the same recipe for linux-x64. Windows needs the MSVC C++ build tools, Linux clang.
-# Publish the trim and Native AOT verification harness in both modes (every ZodSharp assembly rooted, then as a plain
-# consumer), failing on any IL2xxx/IL3xxx warning, and run each native binary, which exits non-zero on any mismatch
+# The harness publishes twice - every ZodSharp assembly rooted, then as a plain consumer - and each binary exits non-zero on any mismatch.
+# Publish and run the trim and Native AOT verification harness, failing on any IL2xxx/IL3xxx warning
 [group('Build and Test')]
 verify-trim rid=default_rid *args:
     echo "Publishing {{ BLUE }}{{ trim_verification_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }} (rooted)"
