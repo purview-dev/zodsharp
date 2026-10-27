@@ -203,6 +203,13 @@ public static class ZodClientValidationRules
 	/// </summary>
 	/// <param name="attribute">The attribute.</param>
 	/// <returns>The client rules; empty when the attribute is not a ZodSharp rule attribute or has no client equivalent.</returns>
+	/// <remarks>
+	/// The built-in rule attributes are mapped directly; any other <see cref="ZodRuleAttribute"/>-mapped attribute is read by
+	/// reflection over its properties and its rule's constructors, so this is annotated
+	/// <see cref="RequiresUnreferencedCodeAttribute"/>. <see cref="For(IZodRule)"/> and
+	/// <see cref="FromRule(IZodRule, string, StringComparison)"/> are trim-safe.
+	/// </remarks>
+	[RequiresUnreferencedCode(ZodClientValidationTrimming.Message)]
 	public static IReadOnlyList<ZodClientRule> FromAttribute(ValidationAttribute attribute)
 	{
 		ArgumentNullException.ThrowIfNull(attribute);
@@ -376,17 +383,7 @@ public static class ZodClientValidationRules
 	/// <see cref="IZodRule"/>: the rule is constructed from the attribute's properties, matched to the constructor's
 	/// parameters by name.
 	/// </summary>
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2072:DynamicallyAccessedMembers",
-		Justification = "Rule and attribute types are application types referenced by the model; when the trimmer "
-			+ "removed a constructor or property the attribute simply has no client rule."
-	)]
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2075:DynamicallyAccessedMembers",
-		Justification = "See above: a trimmed member only removes the client rule; the server still validates."
-	)]
+	[RequiresUnreferencedCode(ZodClientValidationTrimming.Message)]
 	static IReadOnlyList<ZodClientRule> FromCustomAttribute(ValidationAttribute attribute)
 	{
 		var attributeType = attribute.GetType();

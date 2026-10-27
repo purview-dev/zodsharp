@@ -32,6 +32,8 @@ public static class ZodSharpClientValidationServiceCollectionExtensions
 		/// </para>
 		/// <para>Client rules only improve the user experience; the server always validates the posted form.</para>
 		/// </remarks>
+		[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(ZodClientValidationTrimming.Message)]
+		[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(ZodClientValidationTrimming.Message)]
 		public IServiceCollection AddZodSharpClientValidation(Action<ZodClientValidationOptions>? configure = null)
 		{
 			ArgumentNullException.ThrowIfNull(services);
@@ -61,12 +63,8 @@ public static class ZodSharpClientValidationServiceCollectionExtensions
 	/// Finds the descriptor <c>AddRazorComponents</c> registers for <see cref="ClientValidationProvider"/> by calling it
 	/// on a scratch collection, so the decorator wraps the real default even when it is registered first.
 	/// </summary>
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "Only the registrations are read; nothing AddRazorComponents registers is resolved here. An "
-			+ "application that renders Razor components has already called it, with the same requirement."
-	)]
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(ZodClientValidationTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(ZodClientValidationTrimming.Message)]
 	static ServiceDescriptor? FindDefaultProvider()
 	{
 		ServiceCollection scratch = new();
@@ -79,6 +77,7 @@ public static class ZodSharpClientValidationServiceCollectionExtensions
 	/// <summary>
 	/// The factory behind the decorated registration; also how repeated calls recognise it.
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(ZodClientValidationTrimming.Message)]
 	sealed class ZodClientValidationRegistration(ServiceDescriptor? inner)
 	{
 		public ZodClientValidationProvider Create(IServiceProvider provider) =>

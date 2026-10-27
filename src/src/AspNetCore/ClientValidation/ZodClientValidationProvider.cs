@@ -31,6 +31,7 @@ namespace ZodSharp.AspNetCore.ClientValidation;
 /// Client rules only improve the user experience: the server always validates the posted form.
 /// </para>
 /// </remarks>
+[RequiresUnreferencedCode(ZodClientValidationTrimming.Message)]
 public sealed class ZodClientValidationProvider : ClientValidationProvider
 {
 	const string ElementName = "blazor-client-validation-data";
@@ -121,9 +122,8 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 			else if (containerType == formType || IsZodValidated(containerType))
 			{
 				rules.AddRange(
-					AttributeRules.GetOrAdd(
-						(containerType, field.FieldName),
-						static key => BuildRules(key.Container, key.Field)
+					AttributeRules.GetOrAdd((containerType, field.FieldName), static key =>
+						BuildRules(key.Container, key.Field)
 					)
 				);
 			}
@@ -138,12 +138,7 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 	bool IsZodValidated(Type type) =>
 		_factory is not null && _factory.TryGetUntypedValidator(type, out var validator) && validator is not null;
 
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2070:DynamicallyAccessedMembers",
-		Justification = "Form model types are application types, preserved because they are rendered and bound; "
-			+ "ASP.NET Core's own DataAnnotations client provider reflects over them the same way."
-	)]
+	[RequiresUnreferencedCode(ZodClientValidationTrimming.Message)]
 	static List<ZodClientRule> BuildRules(Type containerType, string fieldName)
 	{
 		var property = containerType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance);
