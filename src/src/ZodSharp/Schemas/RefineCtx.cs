@@ -10,26 +10,51 @@ namespace ZodSharp.Schemas;
 /// </summary>
 /// <typeparam name="T">The type being validated.</typeparam>
 /// <remarks>
-/// Initializes a new instance of the <see cref="RefineCtx{T}"/> class with the
-/// value under validation and an optional base path.
+/// Issue paths are relative to the refined value; schemas that contain the refined schema (objects, arrays,
+/// records, tuples) prefix them with the value's own location, so a refinement never needs to know where it is
+/// used. Issues default to the <see cref="ZodIssueCategories.Custom"/> category, as Zod's custom issues do.
 /// </remarks>
-/// <param name="value">The validated value.</param>
-/// <param name="path">The base path prepended to any added issues.</param>
-public sealed class RefineCtx<T>(T value, ImmutableArray<string> path)
+public sealed class RefineCtx<T>
 {
 	// The issue list is allocated on the first issue rather than up front, so a refinement that passes
 	// costs a single context allocation and a refinement that never runs costs none.
 	List<ValidationError>? _issues;
 
 	/// <summary>
-	/// The value being validated.
+	/// Initializes a new instance of the <see cref="RefineCtx{T}"/> class with the value under validation and an
+	/// optional base path.
 	/// </summary>
-	public T Value { get; } = value;
+	/// <param name="value">The validated value.</param>
+	/// <param name="path">The base path prepended to any added issues.</param>
+	public RefineCtx(T value, ImmutableArray<string> path)
+		: this(value, ZodPath.FromLegacy(path)) { }
 
 	/// <summary>
-	/// The base path under which issues are reported.
+	/// Initializes a new instance of the <see cref="RefineCtx{T}"/> class with the value under validation and a
+	/// typed base path.
 	/// </summary>
-	public ImmutableArray<string> Path { get; } = path;
+	/// <param name="value">The validated value.</param>
+	/// <param name="path">The base path prepended to any added issues.</param>
+	public RefineCtx(T value, ZodPath path)
+	{
+		Value = value;
+		FullPath = path;
+	}
+
+	/// <summary>
+	/// The value being validated.
+	/// </summary>
+	public T Value { get; }
+
+	/// <summary>
+	/// The base path under which issues are reported, in the legacy string form. Prefer <see cref="FullPath"/>.
+	/// </summary>
+	public ImmutableArray<string> Path => FullPath.LegacySegments;
+
+	/// <summary>
+	/// The typed base path under which issues are reported.
+	/// </summary>
+	public ZodPath FullPath { get; }
 
 	/// <summary>
 	/// The issues added by the refinement so far.
@@ -47,16 +72,56 @@ public sealed class RefineCtx<T>(T value, ImmutableArray<string> path)
 	/// </summary>
 	/// <param name="code">The issue code (e.g. <c>refinement_failed</c>).</param>
 	/// <param name="message">The human-readable issue message.</param>
-	/// <param name="path">An optional relative path appended to <see cref="Path"/>.</param>
-	public void AddIssue(string code, string message, string[]? path = null)
+	/// <param name="path">
+	/// An optional relative path appended to <see cref="Path"/>. Segments of digits (or <c>"[0]"</c>) are
+	/// treated as indexes.
+	/// </param>
+	public void AddIssue(string code, string message, string[]? path = null) =>
+		AddIssue(code, message, ZodPath.FromLegacy(path));
+
+	/// <summary>
+	/// Adds a validation issue at a typed relative path, prefixed by the context's base path.
+	/// </summary>
+	/// <param name="code">The issue code (e.g. <c>refinement_failed</c>).</param>
+	/// <param name="message">The human-readable issue message.</param>
+	/// <param name="path">The path relative to <see cref="FullPath"/>.</param>
+	/// <param name="parameters">Optional issue parameters.</param>
+	/// <param name="category">The issue category; <see cref="ZodIssueCategories.Custom"/> when <see langword="null"/>.</param>
+	public void AddIssue(
+		string code,
+		string message,
+		ZodPath path,
+		IReadOnlyDictionary<string, object?>? parameters = null,
+		string? category = null
+	)
 	{
 		if (string.IsNullOrWhiteSpace(code))
 			throw new ArgumentException("Issue code must not be null or whitespace.", nameof(code));
 		if (string.IsNullOrWhiteSpace(message))
 			throw new ArgumentException("Issue message must not be null or whitespace.", nameof(message));
 
-		var fullPath = BuildPath(Path, path);
-		(_issues ??= []).Add(new ValidationError(code, message, fullPath));
+		Add(
+			ValidationError.Create(
+				code,
+				message,
+				FullPath.Append(path),
+				parameters,
+				category: category ?? ZodIssueCategories.Custom
+			)
+		);
+	}
+
+	/// <summary>
+	/// Adds a fully specified issue (bounds, origin, parameters, message format), prefixed by the context's base
+	/// path. Every field of <paramref name="issue"/> is kept.
+	/// </summary>
+	/// <param name="issue">The issue, with a path relative to <see cref="FullPath"/>.</param>
+	public void AddIssue(ValidationError issue)
+	{
+		if (string.IsNullOrWhiteSpace(issue.Code))
+			throw new ArgumentException("Issue code must not be null or whitespace.", nameof(issue));
+
+		Add(issue.WithPathPrefix(FullPath));
 	}
 
 	/// <summary>
@@ -65,28 +130,10 @@ public sealed class RefineCtx<T>(T value, ImmutableArray<string> path)
 	/// </summary>
 	/// <param name="message">The human-readable issue message.</param>
 	/// <param name="path">An optional relative path appended to <see cref="Path"/>.</param>
-	public void AddIssue(string message, string[]? path = null) => AddIssue("refinement_failed", message, path);
+	public void AddIssue(string message, string[]? path = null) =>
+		AddIssue(ZodIssueCodes.RefinementFailed, message, path);
 
-	static string[] BuildPath(ImmutableArray<string> basePath, string[]? relativePath)
-	{
-		if (basePath.IsDefaultOrEmpty && (relativePath is null || relativePath.Length == 0))
-			return [];
-
-		if (basePath.IsDefaultOrEmpty)
-			return relativePath!;
-
-		if (relativePath is null || relativePath.Length == 0)
-		{
-			var copy = new string[basePath.Length];
-			basePath.CopyTo(copy, 0);
-			return copy;
-		}
-
-		var combined = new string[basePath.Length + relativePath.Length];
-		basePath.CopyTo(combined, 0);
-		relativePath.CopyTo(combined, basePath.Length);
-		return combined;
-	}
+	void Add(ValidationError issue) => (_issues ??= []).Add(issue);
 
 	internal ImmutableArray<ValidationError> ToImmutable() => _issues is { Count: > 0 } ? [.. _issues] : [];
 }

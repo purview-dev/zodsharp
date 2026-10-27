@@ -16,7 +16,7 @@ public readonly record struct RegexRule
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the required pattern.</summary>
+	/// <summary>Gets the message format; <c>{0}</c> is the required pattern. A custom message may use <c>{1}</c> for the offending value.</summary>
 	public const string MessageFormat = "String does not match the required pattern: {0}";
 
 	/// <summary>
@@ -47,7 +47,7 @@ public readonly record struct RegexRule
 	/// </summary>
 	public const int DefaultMatchTimeoutMilliseconds = 2000;
 
-	readonly string _message;
+	readonly string? _message;
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal Regex Pattern { get; }
@@ -61,7 +61,7 @@ public readonly record struct RegexRule
 	public RegexRule(Regex pattern, string? message = null, string? code = null)
 	{
 		Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -116,7 +116,8 @@ public readonly record struct RegexRule
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
-	public string GetErrorMessage(in string value) => RuleMessage.Format(_message ?? MessageFormat, value);
+	public string GetErrorMessage(in string value) =>
+		RuleMessage.Format(_message ?? MessageFormat, Pattern.ToString(), value);
 
 	/// <summary>
 	/// Gets the error message for a failed span validation.
@@ -130,7 +131,17 @@ public readonly record struct RegexRule
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		RuleParameters.Two(
+			Core.ZodIssueParameters.Format,
+			"regex",
+			Core.ZodIssueParameters.Pattern,
+			Pattern.ToString()
+		);
 
 	/// <summary>Applies the JSON Schema <c>pattern</c> constraint.</summary>
 	/// <param name="schema">The schema for the value being validated.</param>

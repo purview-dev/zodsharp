@@ -10,11 +10,11 @@ public readonly record struct UriRule : Core.IValidationRule<string>, Core.IZodR
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the <see cref="UriKind"/> and <c>{1}</c> the value.</summary>
-	public const string MessageFormat = "Invalid Uri, kind: {0}, format: {1}";
+	/// <summary>Gets the default message format; <c>{0}</c> is the <see cref="UriKind"/>. It never contains the input; a custom message may use <c>{1}</c> for the value.</summary>
+	public const string MessageFormat = "Invalid Uri, kind: {0}";
 
 	readonly UriKind _uriKind;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the UriRule struct.
@@ -25,7 +25,7 @@ public readonly record struct UriRule : Core.IValidationRule<string>, Core.IZodR
 	public UriRule(UriKind uriKind, string? message = null, string? code = null)
 	{
 		_uriKind = uriKind;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -57,5 +57,9 @@ public readonly record struct UriRule : Core.IValidationRule<string>, Core.IZodR
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format("uri");
 }

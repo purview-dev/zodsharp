@@ -17,7 +17,7 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 
 	readonly T _exclusiveMinimum;
 
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the GreaterThanRule struct.
@@ -28,7 +28,7 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 	public GreaterThanRule(T exclusiveMinimum, string? message = null, string? code = null)
 	{
 		_exclusiveMinimum = exclusiveMinimum;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -63,5 +63,10 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooSmall;
+
+	// Exclusive: the value must be strictly greater than the bound.
+	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Excluding(_exclusiveMinimum);
 }

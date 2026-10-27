@@ -17,7 +17,7 @@ public readonly record struct LessThanRule<T> : Core.IValidationRule<T>, Core.IZ
 
 	readonly T _exclusiveMaximum;
 
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the LessThanRule struct.
@@ -28,7 +28,7 @@ public readonly record struct LessThanRule<T> : Core.IValidationRule<T>, Core.IZ
 	public LessThanRule(T exclusiveMaximum, string? message = null, string? code = null)
 	{
 		_exclusiveMaximum = exclusiveMaximum;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -63,5 +63,10 @@ public readonly record struct LessThanRule<T> : Core.IValidationRule<T>, Core.IZ
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooBig;
+
+	// Exclusive: the value must be strictly less than the bound.
+	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Excluding(_exclusiveMaximum);
 }

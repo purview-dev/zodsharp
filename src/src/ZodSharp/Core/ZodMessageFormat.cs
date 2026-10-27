@@ -250,16 +250,39 @@ public static class ZodMessageFormat
 			}
 		}
 
-		text = value switch
-		{
-			null => string.Empty,
-			IFormattable formattable => formattable.ToString(itemFormat, provider),
-			_ => value.ToString() ?? string.Empty,
-		};
+		text = Render(value, itemFormat, provider);
 
 		if (alignment != 0)
 			text = alignment > 0 ? text.PadLeft(alignment) : text.PadRight(-alignment);
 
 		return true;
+	}
+
+	// A sequence (an options or keys list) renders as its elements joined by ", " rather than as the
+	// collection's type name.
+	static string Render(object? value, string? itemFormat, IFormatProvider provider) =>
+		value switch
+		{
+			null => string.Empty,
+			string text => text,
+			IFormattable formattable => formattable.ToString(itemFormat, provider),
+			System.Collections.IEnumerable sequence => JoinSequence(sequence, itemFormat, provider),
+			_ => value.ToString() ?? string.Empty,
+		};
+
+	static string JoinSequence(System.Collections.IEnumerable sequence, string? itemFormat, IFormatProvider provider)
+	{
+		StringBuilder builder = new();
+		var first = true;
+		foreach (var item in sequence)
+		{
+			if (!first)
+				builder.Append(", ");
+
+			first = false;
+			builder.Append(Render(item, itemFormat, provider));
+		}
+
+		return builder.ToString();
 	}
 }

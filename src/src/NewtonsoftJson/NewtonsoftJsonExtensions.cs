@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -14,7 +15,14 @@ namespace ZodSharp;
 #endif
 public static class NewtonsoftJsonExtensions
 {
-	static readonly string[] EmptyPath = [];
+	/// <summary>
+	/// The code of every failure to read JSON: malformed JSON, a value that cannot be converted to the target
+	/// type, or a <see langword="null"/> document. The error's <see cref="ValidationError.Category"/> is
+	/// <see cref="ZodIssueCategories.InvalidType"/>, its <see cref="ValidationError.FullPath"/> is the location
+	/// the serializer reported, and its <c>line</c> and <c>position</c> parameters hold the serializer's
+	/// (one-based) line number and line position when it has them.
+	/// </summary>
+	public const string InvalidJsonCode = "invalid_json";
 
 	/// <summary>
 	/// Deserializes JSON and validates it using a Zod schema.
@@ -28,21 +36,9 @@ public static class NewtonsoftJsonExtensions
 		if (schema == null)
 			throw new ArgumentNullException(nameof(schema));
 
-		try
-		{
-			var deserialized = JsonConvert.DeserializeObject<T>(json, settings);
-			return deserialized == null
-				? ValidationResult<T>.Failure(
-					new ValidationError("deserialization_failed", "Failed to deserialize JSON", EmptyPath)
-				)
-				: schema.Validate(deserialized);
-		}
-		catch (JsonException ex)
-		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("json_error", $"JSON parsing error: {ex.Message}", EmptyPath)
-			);
-		}
+		return TryDeserialize<T>(json, settings, out var deserialized, out var errors)
+			? schema.Validate(deserialized)
+			: ValidationResult<T>.Failure(errors);
 	}
 
 	/// <summary>
@@ -55,24 +51,23 @@ public static class NewtonsoftJsonExtensions
 		CancellationToken cancellationToken = default
 	)
 	{
-		try
-		{
+		if (schema == null)
+			throw new ArgumentNullException(nameof(schema));
+		if (jsonStream == null)
+			throw new ArgumentNullException(nameof(jsonStream));
+
 #if NETSTANDARD2_1_OR_GREATER
-			using StreamReader reader = new(jsonStream, Encoding.UTF8, true, 1024, true);
-			var json = await reader.ReadToEndAsync();
+		using StreamReader reader = new(jsonStream, Encoding.UTF8, true, 1024, true);
+		var json = await reader.ReadToEndAsync().ConfigureAwait(false);
 #else
-			using StreamReader reader = new(jsonStream, Encoding.UTF8, leaveOpen: true);
-			var json = await reader.ReadToEndAsync(cancellationToken);
+		using StreamReader reader = new(jsonStream, Encoding.UTF8, leaveOpen: true);
+		var json = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
 #endif
 
-			return schema.DeserializeAndValidate(json, settings);
-		}
-		catch (JsonException ex)
-		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("json_error", $"JSON parsing error: {ex.Message}", EmptyPath)
-			);
-		}
+		// Validate asynchronously, so a schema's async refinements run rather than being skipped.
+		return TryDeserialize<T>(json, settings, out var deserialized, out var errors)
+			? await schema.ValidateAsync(deserialized, cancellationToken).ConfigureAwait(false)
+			: ValidationResult<T>.Failure(errors);
 	}
 
 	/// <summary>
@@ -89,21 +84,52 @@ public static class NewtonsoftJsonExtensions
 		if (token == null)
 			throw new ArgumentNullException(nameof(token));
 
+		serializer ??= JsonSerializer.CreateDefault();
+
+		T? deserialized;
 		try
 		{
-			var deserialized = token.ToObject<T>(serializer ?? JsonSerializer.CreateDefault());
-			return deserialized == null
-				? ValidationResult<T>.Failure(
-					new ValidationError("deserialization_failed", "Failed to deserialize JSON", EmptyPath)
-				)
-				: schema.Validate(deserialized);
+			deserialized = token.ToObject<T>(serializer);
 		}
-		catch (JsonException ex)
+		catch (Exception ex)
+			when (JsonDeserializationErrors.TryMap(ex, serializer.ContractResolver, typeof(T), out var errors))
 		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("json_error", $"JSON parsing error: {ex.Message}", EmptyPath)
-			);
+			return ValidationResult<T>.Failure(errors);
 		}
+
+		return deserialized == null
+			? ValidationResult<T>.Failure(JsonDeserializationErrors.NullValue(serializer.ContractResolver, typeof(T)))
+			: schema.Validate(deserialized);
+	}
+
+	static bool TryDeserialize<T>(
+		string json,
+		JsonSerializerSettings? settings,
+		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out T? deserialized,
+		out ImmutableArray<ValidationError> errors
+	)
+	{
+		var serializer = JsonSerializer.CreateDefault(settings);
+		try
+		{
+			deserialized = JsonConvert.DeserializeObject<T>(json, settings);
+		}
+		catch (Exception ex)
+			when (JsonDeserializationErrors.TryMap(ex, serializer.ContractResolver, typeof(T), out var mapped))
+		{
+			deserialized = default;
+			errors = mapped;
+			return false;
+		}
+
+		if (deserialized == null)
+		{
+			errors = [JsonDeserializationErrors.NullValue(serializer.ContractResolver, typeof(T))];
+			return false;
+		}
+
+		errors = [];
+		return true;
 	}
 
 	/// <summary>

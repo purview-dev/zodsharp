@@ -47,7 +47,7 @@ var options = new JsonSerializerOptions { Converters = { converter } };
 var value = JsonSerializer.Deserialize<User>(json, options);
 ```
 
-`CreateValidatingConverter<T>()` returns a `System.Text.Json.Serialization.JsonConverter<T>`. When the JSON is invalid, deserialization throws `JsonException` with a `"Validation failed: ..."` message. The converter strips itself from the options it uses internally to avoid recursion.
+`CreateValidatingConverter<T>()` returns a `System.Text.Json.Serialization.JsonConverter<T>`. When the JSON is invalid, deserialization throws `ZodJsonValidationException` (a `JsonException`) with a `"Validation failed: ..."` message; its `Errors` property holds the full `ValidationError`s, located under the converted value's JSON path. The converter strips itself from the options it uses internally to avoid recursion.
 
 ## API surface
 
@@ -61,7 +61,7 @@ var value = JsonSerializer.Deserialize<User>(json, options);
 
 ## Failure codes
 
-Deserialize/validation failures produce `ValidationError` entries with codes `deserialization_failed` and `json_error` in addition to the schema's own codes.
+A failure to read the JSON (malformed JSON, a value that cannot be converted, a `null` document, or a type the serializer cannot handle — `JsonException`, `NotSupportedException`, `InvalidOperationException`) produces one `ValidationError` with code `invalid_json` (`SystemTextJsonExtensions.InvalidJsonCode`) and category `invalid_type`. Its `FullPath` is the location the serializer reported (`$.items[1].age` becomes `items[1].age`), its `line` and `position` parameters hold the serializer's zero-based line number and byte position in the line, and its message is the fixed `"The JSON value could not be converted to {expected}."`, where `expected` is a Zod type name (`string`, `number`, `object`, `array`, …). The serializer's own message, which names CLR types and can quote the input, is never surfaced. A failure raised by a validating converter is returned as the schema's own errors, located under the converter's path.
 
 ## JSON Schema import
 

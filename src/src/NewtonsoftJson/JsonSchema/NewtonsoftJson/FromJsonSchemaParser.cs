@@ -429,6 +429,98 @@ public static class FromJsonSchemaParser
 		};
 	}
 
+	// ========== Errors ==========
+
+	const string InvalidTypeFormat = "Expected {expected}, but got {received}";
+	const string InvalidLiteralFormat = "Expected literal value '{expected}', but got {received}";
+	const string TooSmallArrayFormat = "Array must have at least {minimum} elements, but got {count}";
+	const string TooBigArrayFormat = "Array must have at most {maximum} elements, but got {count}";
+
+	/// <summary>
+	/// An <c>invalid_type</c> error naming the expected and received JSON kinds with Zod's type names. Only the
+	/// kind of <paramref name="value"/> is reported, never the value.
+	/// </summary>
+	static ValidationError InvalidType(string expected, object? value) =>
+		CreateError(
+			"invalid_type",
+			InvalidTypeFormat,
+			new Dictionary<string, object?>(StringComparer.Ordinal)
+			{
+				[ZodIssueParameters.Expected] = expected,
+				[ZodIssueParameters.Received] = Json.JsonKinds.OfValue(value),
+			},
+			ZodIssueCategories.InvalidType
+		);
+
+	/// <summary>
+	/// An <c>invalid_literal</c> error. The expected literal comes from the schema; only the kind of the
+	/// received value is reported, never the value.
+	/// </summary>
+	static ValidationError InvalidLiteral<T>(T expected, object? value) =>
+		CreateError(
+			"invalid_literal",
+			InvalidLiteralFormat,
+			new Dictionary<string, object?>(StringComparer.Ordinal)
+			{
+				[ZodIssueParameters.Expected] = string.Create(CultureInfo.InvariantCulture, $"{expected}"),
+				[ZodIssueParameters.Received] = Json.JsonKinds.OfValue(value),
+			},
+			ZodIssueCategories.InvalidValue
+		);
+
+	/// <summary>
+	/// The <c>minItems</c>/<c>maxItems</c> failure for <paramref name="count"/>, shaped exactly like a runtime
+	/// <c>ZodArray</c> length failure (code, origin <c>array</c>, bounds, inclusivity, "elements" wording), or
+	/// <see langword="null"/> when the length is acceptable.
+	/// </summary>
+	static ValidationError? ArrayLengthFailure(int count, int? minItems, int? maxItems)
+	{
+		var tooSmall = minItems is { } min && count < min;
+		if (!tooSmall && !(maxItems is { } max && count > max))
+			return null;
+
+		Dictionary<string, object?> parameters = new(StringComparer.Ordinal) { [ZodIssueParameters.Count] = count };
+		if (minItems is { } minimum)
+			parameters["minimum"] = minimum;
+		if (maxItems is { } maximum)
+			parameters["maximum"] = maximum;
+
+		var format = tooSmall ? TooSmallArrayFormat : TooBigArrayFormat;
+		ValidationError error = new(
+			tooSmall ? "too_small" : "too_big",
+			ZodMessageFormat.Format(format, parameters, CultureInfo.InvariantCulture),
+			path: null,
+			parameters: new Dictionary<string, object?>(StringComparer.Ordinal) { [ZodIssueParameters.Count] = count },
+			origin: "array",
+			minimum: minItems,
+			maximum: maxItems,
+			inclusive: true,
+			category: tooSmall ? ZodIssueCategories.TooSmall : ZodIssueCategories.TooBig
+		);
+
+		return error with
+		{
+			MessageFormat = format,
+		};
+	}
+
+	static ValidationError CreateError(
+		string code,
+		string format,
+		Dictionary<string, object?> parameters,
+		string category
+	) =>
+		new ValidationError(
+			code,
+			ZodMessageFormat.Format(format, parameters, CultureInfo.InvariantCulture),
+			path: null,
+			parameters,
+			category: category
+		) with
+		{
+			MessageFormat = format,
+		};
+
 	// ========== Wrapper Classes ==========
 
 	sealed class StringSchemaWrapper(ZodString inner) : IZodSchema<object, object>
@@ -444,13 +536,7 @@ public static class FromJsonSchemaParser
 				}
 				else
 				{
-					return ValidationResult<object>.Failure(
-						new ValidationError(
-							"invalid_type",
-							$"Expected string, but got {value?.GetType().Name ?? "null"}",
-							[]
-						)
-					);
+					return ValidationResult<object>.Failure(InvalidType("string", value));
 				}
 			}
 
@@ -485,13 +571,7 @@ public static class FromJsonSchemaParser
 			}
 			else
 			{
-				return ValidationResult<object>.Failure(
-					new ValidationError(
-						"invalid_type",
-						$"Expected number, but got {value?.GetType().Name ?? "null"}",
-						[]
-					)
-				);
+				return ValidationResult<object>.Failure(InvalidType("number", value));
 			}
 
 			var result = inner.Validate(num);
@@ -523,13 +603,7 @@ public static class FromJsonSchemaParser
 			}
 			else
 			{
-				return ValidationResult<object>.Failure(
-					new ValidationError(
-						"invalid_type",
-						$"Expected boolean, but got {value?.GetType().Name ?? "null"}",
-						[]
-					)
-				);
+				return ValidationResult<object>.Failure(InvalidType("boolean", value));
 			}
 
 			var result = _inner.Validate(b);
@@ -550,9 +624,7 @@ public static class FromJsonSchemaParser
 		{
 			if (value != null && !(value is JToken jt && jt.Type == JTokenType.Null))
 			{
-				return ValidationResult<object>.Failure(
-					new ValidationError("invalid_type", $"Expected null, but got {value.GetType().Name}", [])
-				);
+				return ValidationResult<object>.Failure(InvalidType("null", value));
 			}
 
 			// If matches, return success with null
@@ -585,13 +657,7 @@ public static class FromJsonSchemaParser
 			}
 			else
 			{
-				return ValidationResult<object>.Failure(
-					new ValidationError(
-						"invalid_type",
-						$"Expected object, but got {value?.GetType().Name ?? "null"}",
-						[]
-					)
-				);
+				return ValidationResult<object>.Failure(InvalidType("object", value));
 			}
 
 			var result = inner.Validate(dict);
@@ -628,13 +694,7 @@ public static class FromJsonSchemaParser
 			}
 			else
 			{
-				return ValidationResult<object>.Failure(
-					new ValidationError(
-						"invalid_type",
-						$"Expected object, but got {value?.GetType().Name ?? "null"}",
-						[]
-					)
-				);
+				return ValidationResult<object>.Failure(InvalidType("object", value));
 			}
 
 			Dictionary<string, object?> validated = [];
@@ -646,24 +706,7 @@ public static class FromJsonSchemaParser
 				if (!result.IsSuccess)
 				{
 					foreach (var error in result.Errors)
-					{
-						var path = new string[error.Path.Length + 1];
-						path[0] = key;
-						error.Path.CopyTo(0, path, 1, error.Path.Length);
-						errors.Add(
-							ValidationError.Create(
-								error.Code,
-								error.Message,
-								System.Collections.Immutable.ImmutableArray.Create(path),
-								error.Parameters,
-								error.Origin,
-								error.Minimum,
-								error.Maximum,
-								error.Inclusive,
-								error.Category
-							)
-						);
-					}
+						errors.Add(error.WithPathPrefix(ZodPathSegment.Key(key)));
 				}
 				else
 				{
@@ -693,35 +736,19 @@ public static class FromJsonSchemaParser
 			{
 				items = [.. jArray.Cast<object?>()];
 			}
-			else if (value is System.Collections.IEnumerable enumerable and not string)
+			// A JToken is enumerable whatever its kind (a JValue enumerates nothing), so only a JArray is an array.
+			else if (value is System.Collections.IEnumerable enumerable and not string and not JToken)
 			{
 				items = [.. enumerable.Cast<object?>()];
 			}
 			else
 			{
-				return ValidationResult<object>.Failure(
-					new ValidationError(
-						"invalid_type",
-						$"Expected array, but got {value?.GetType().Name ?? "null"}",
-						[]
-					)
-				);
+				return ValidationResult<object>.Failure(InvalidType("array", value));
 			}
 
-			// Check length constraints
-			if (minItems.HasValue && items.Count < minItems.Value)
-			{
-				return ValidationResult<object>.Failure(
-					new ValidationError("too_small", $"Array must contain at least {minItems.Value} items", [])
-				);
-			}
-
-			if (maxItems.HasValue && items.Count > maxItems.Value)
-			{
-				return ValidationResult<object>.Failure(
-					new ValidationError("too_big", $"Array must contain at most {maxItems.Value} items", [])
-				);
-			}
+			// Length is checked before any element, exactly as ZodArray does.
+			if (ArrayLengthFailure(items.Count, minItems, maxItems) is { } lengthFailure)
+				return ValidationResult<object>.Failure(lengthFailure);
 
 			// Validate each item
 			List<ValidationError> errors = [];
@@ -737,12 +764,7 @@ public static class FromJsonSchemaParser
 				else
 				{
 					foreach (var error in itemResult.Errors)
-					{
-						var path = new string[error.Path.Length + 1];
-						path[0] = i.ToString(CultureInfo.InvariantCulture);
-						error.Path.CopyTo(0, path, 1, error.Path.Length);
-						errors.Add(new ValidationError(error.Code, error.Message, path, error.Parameters));
-					}
+						errors.Add(error.WithPathPrefix(ZodPathSegment.At(i)));
 				}
 			}
 
@@ -829,9 +851,7 @@ public static class FromJsonSchemaParser
 
 			if (!matches)
 			{
-				return ValidationResult<object>.Failure(
-					new ValidationError("invalid_literal", $"Expected literal value '{_value}', but got '{value}'", [])
-				);
+				return ValidationResult<object>.Failure(InvalidLiteral(_value, value));
 			}
 
 			// If matches, return success with the typed value

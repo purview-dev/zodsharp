@@ -9,6 +9,8 @@ public readonly record struct MaxLengthRule
 	: Core.IValidationRule<string>,
 		Core.IStringValidationRule,
 		Core.IZodRule,
+		Core.IZodFailureDescriber<string>,
+		Core.IZodStringFailureDescriber,
 		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
@@ -19,7 +21,7 @@ public readonly record struct MaxLengthRule
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal int MaxLength { get; }
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the MaxLengthRule struct.
@@ -30,7 +32,7 @@ public readonly record struct MaxLengthRule
 	public MaxLengthRule(int maxLength, string? message = null, string? code = null)
 	{
 		MaxLength = maxLength;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -69,7 +71,17 @@ public readonly record struct MaxLengthRule
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooBig;
+
+	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(MaxLength);
+
+	Core.ZodRuleFailure Core.IZodFailureDescriber<string>.DescribeFailure(in string value) =>
+		new(Parameters: RuleParameters.Count(value.LengthOrDefault()));
+
+	Core.ZodRuleFailure Core.IZodStringFailureDescriber.DescribeFailure(ReadOnlySpan<char> value) =>
+		new(Parameters: RuleParameters.Count(value.Length));
 
 	/// <summary>Applies the JSON Schema <c>maxLength</c> constraint.</summary>
 	/// <param name="schema">The schema for the value being validated.</param>

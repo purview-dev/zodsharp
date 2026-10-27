@@ -36,14 +36,14 @@ public class SystemTextJsonExtensionsTests
 	}
 
 	[Test]
-	public async Task DeserializeAndValidate_GivenMalformedJson_ReturnsJsonErrorFailure()
+	public async Task DeserializeAndValidate_GivenMalformedJson_ReturnsInvalidJsonFailure()
 	{
 		TestUserSchema schema = new();
 
 		var result = schema.DeserializeAndValidate("{bad json");
 
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors[0].Code).IsEqualTo("json_error");
+		await Assert.That(result.Errors[0].Code).IsEqualTo("invalid_json");
 	}
 
 	[Test]
@@ -96,7 +96,7 @@ public class SystemTextJsonExtensionsTests
 	}
 
 	[Test]
-	public async Task DeserializeAndValidateAsync_GivenMalformedJsonStream_ReturnsJsonErrorFailure()
+	public async Task DeserializeAndValidateAsync_GivenMalformedJsonStream_ReturnsInvalidJsonFailure()
 	{
 		TestUserSchema schema = new();
 		var jsonBytes = Encoding.UTF8.GetBytes("{bad json");
@@ -105,7 +105,7 @@ public class SystemTextJsonExtensionsTests
 		var result = await schema.DeserializeAndValidateAsync(stream);
 
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors[0].Code).IsEqualTo("json_error");
+		await Assert.That(result.Errors[0].Code).IsEqualTo("invalid_json");
 	}
 
 	[Test]

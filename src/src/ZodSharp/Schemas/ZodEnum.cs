@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using ZodSharp.Core;
 
@@ -14,7 +15,8 @@ namespace ZodSharp.Schemas;
 [SuppressMessage("Naming", "CA1711", Justification = "Name mirrors Zod's z.enum API.")]
 public class ZodEnum(HashSet<string> allowedValues) : ZodType<string>, JsonSchema.IJsonSchemaEnumInfo
 {
-	static readonly string[] EmptyPath = [];
+	// Ordinal order: the set's own enumeration order follows string hash codes, which differ per process.
+	readonly ImmutableArray<string> _options = [.. allowedValues.Order(StringComparer.Ordinal)];
 
 	/// <summary>
 	/// Gets the set of allowed values.
@@ -32,19 +34,20 @@ public class ZodEnum(HashSet<string> allowedValues) : ZodType<string>, JsonSchem
 	{
 		if (value == null)
 		{
-			return ValidationResult<string>.Failure(
-				new ValidationError("invalid_type", "Expected string, but got null", EmptyPath)
-			);
+			return ValidationResult<string>.Failure(ZodIssues.NullValue(ZodTypeNames.String));
 		}
 
 		// Check if the value is in the allowed values set
 		return allowedValues.Contains(value)
 			? ValidationResult<string>.Success(value)
 			: ValidationResult<string>.Failure(
-				new ValidationError(
-					"invalid_enum_value",
-					$"Expected one of: {string.Join(", ", allowedValues)}, but got '{value}'",
-					EmptyPath
+				ZodIssues.Formatted(
+					ZodIssueCodes.InvalidEnumValue,
+					ZodIssueCategories.InvalidValue,
+					ZodMessages.InvalidEnumValue,
+					ZodPath.Root,
+					ZodTypeNames.Enum,
+					new Dictionary<string, object?>(StringComparer.Ordinal) { [ZodIssueParameters.Options] = _options }
 				)
 			);
 	}

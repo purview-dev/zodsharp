@@ -11,8 +11,6 @@ namespace ZodSharp.Schemas;
 /// </summary>
 public class ZodString : ZodType<string>
 {
-	static readonly string[] EmptyPath = [];
-
 	// Rules that also implement IStringValidationRule, so ValidateSpan/IsValidSpan can validate the
 	// incoming span without materialising a string. When any rule lacks the span contract the list is
 	// abandoned and span validation falls back to the string path.
@@ -47,9 +45,7 @@ public class ZodString : ZodType<string>
 	/// <returns>A validation result</returns>
 	protected override ValidationResult<string> ParseInternal(string value) =>
 		value == null
-			? ValidationResult<string>.Failure(
-				new ValidationError("invalid_type", "Expected string, but got null", EmptyPath)
-			)
+			? ValidationResult<string>.Failure(ZodIssues.NullValue(ZodTypeNames.String))
 			: ValidationResult<string>.Success(value);
 
 	/// <summary>
@@ -105,7 +101,7 @@ public class ZodString : ZodType<string>
 				continue;
 
 			builder ??= ImmutableArray.CreateBuilder<ValidationError>();
-			builder.Add(new ValidationError(ResolveCode(rule), rule.GetErrorMessage(value), EmptyPath));
+			builder.Add(ZodRuleErrors.Create(rule, value, ZodPath.Root));
 		}
 
 		if (builder is null)
@@ -114,14 +110,6 @@ public class ZodString : ZodType<string>
 		errors = builder.ToImmutable();
 		return false;
 	}
-
-	/// <summary>
-	/// Resolves the error code to report for a failed span rule: a rule that implements
-	/// <see cref="IZodRule"/> and supplies a code wins over the rule's intrinsic
-	/// <see cref="IStringValidationRule.Code"/>.
-	/// </summary>
-	static string ResolveCode(IStringValidationRule rule) =>
-		rule is IZodRule zodRule && zodRule.Code is { } code ? code : rule.Code;
 
 	bool SupportsSpanRules => _spanRulesSupported && SupportsSpanValidation && _spanRules.Length == RuleCount;
 
