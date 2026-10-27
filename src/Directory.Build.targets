@@ -15,6 +15,9 @@
 	-->
 	<PropertyGroup Label="NuGet package validation" Condition="'$(IsPackable)' == 'true'">
 		<EnablePackageValidation>true</EnablePackageValidation>
+		<!-- A package that has never shipped sets ZodSharpNoPackageValidationBaseline; it still gets the
+		     cross-TFM checks, just no previous version to compare against. -->
 		<PackageValidationBaselineVersion>2.4.0</PackageValidationBaselineVersion>
+		<PackageValidationBaselineVersion Condition="'$(ZodSharpNoPackageValidationBaseline)' == 'true'" />
 	</PropertyGroup>
 </Project>

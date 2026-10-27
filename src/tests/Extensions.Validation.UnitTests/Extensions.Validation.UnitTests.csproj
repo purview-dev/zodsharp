@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- net11.0 only, like the package under test: .NET 11's Microsoft.Extensions.Validation surface does not
+		     exist on earlier frameworks. Directory.Build.props forces the 'All' set onto test projects, so both
+		     properties are reset here. -->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<RootNamespace>ZodSharp.Extensions.Validation</RootNamespace>
+		<AssemblyName>Purview.ZodSharp.Extensions.Validation.UnitTests</AssemblyName>
+		<PackageId>Purview.ZodSharp.Extensions.Validation.UnitTests</PackageId>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Extensions.Validation\Extensions.Validation.csproj" />
+		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
+		<!-- Runs the ZodSharp generator against the test project, for the [ZodSchema] fixtures. -->
+		<ProjectReference
+			Include="..\..\src\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<!-- Referenced directly, analyzers included, so the Microsoft.Extensions.Validation generator intercepts
+		     the AddValidation() calls in these tests exactly as it would in an application. That is what the
+		     resolver-ordering tests prove ZodSharp stays ahead of. -->
+		<PackageReference Include="Microsoft.Extensions.Validation" />
+	</ItemGroup>
+</Project>

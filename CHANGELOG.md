@@ -12,6 +12,20 @@ Released versions correspond to `v<version>` GitHub releases.
 
 ### Added
 
+- **`Purview.ZodSharp.Extensions.Validation`** (new package, `net11.0`): the bridge to .NET 11's
+  Microsoft.Extensions.Validation, so minimal APIs, Blazor Server and Blazor WebAssembly validate ZodSharp types
+  with ZodSharp. `AddZodSharpValidation()` registers `ZodValidatableInfoResolver` as the first resolver whether
+  `AddValidation()` is called before, after or not at all; errors carry the owning `Container` and leaf `Name`
+  Blazor needs to place messages on nested, collection and dictionary fields; parameters follow
+  Microsoft.Extensions.Validation's path conventions; `MaxDepth` and synchronous-validation behaviour match the
+  platform. Full-fidelity errors are available through `ValidateContext.ZodReport` and an optional
+  `IZodValidationReportSink`; `StringLocalizerZodMessageFormatter` localizes messages (auto-enabled when an
+  `IStringLocalizerFactory` is registered, honouring `ValidationOptions.LocalizerProvider`); and
+  `ValidationOptions.ValidateAsync<T>` validates outside HTTP and Blazor. References the
+  `Microsoft.Extensions.Validation` package only - never the ASP.NET Core shared framework - so it works in
+  WebAssembly clients.
+- **`IZodMessageFormatter`** in `ZodSharp.Core`: formats an error's user-facing message for a culture at a host
+  boundary.
 - **Shared error identities.** `ZodIssueCodes` (codes), `ZodMessages` (named-placeholder templates),
   `ZodIssues` (factories for null/invalid-type/missing-field/refinement/union/collection-size errors and the
   `GetUnionErrors()` extension) and `ZodTypeNames` (`Of(Type)`/`OfValue(object)`: Zod type names such as

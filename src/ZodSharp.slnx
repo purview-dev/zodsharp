@@ -14,6 +14,7 @@
 	</Folder>
 	<Folder Name="/tests/">
 		<Project Path="tests/AspNetCore.UnitTests/AspNetCore.UnitTests.csproj" />
+		<Project Path="tests/Extensions.Validation.UnitTests/Extensions.Validation.UnitTests.csproj" />
 		<Project Path="tests/JsonInterop.UnitTests/JsonInterop.UnitTests.csproj" />
 		<Project Path="tests/NewtonsoftJson.UnitTests/NewtonsoftJson.UnitTests.csproj" />
 		<Project Path="tests/SourceGenerators.UnitTests/SourceGenerators.UnitTests.csproj" />
@@ -24,6 +25,7 @@
 	<Folder Name="/src/">
 		<Project Path="src/AspNetCore/AspNetCore.csproj" />
 		<Project Path="src/CodeFixes/CodeFixes.csproj" />
+		<Project Path="src/Extensions.Validation/Extensions.Validation.csproj" />
 		<Project Path="src/NewtonsoftJson/NewtonsoftJson.csproj" />
 		<Project Path="src/SourceGenerators/SourceGenerators.csproj" />
 		<Project Path="src/SystemTextJson/SystemTextJson.csproj" />

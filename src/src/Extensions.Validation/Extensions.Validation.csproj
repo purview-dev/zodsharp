@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!--
+			net11.0 only: .NET 10's Microsoft.Extensions.Validation is a different design (public abstract base
+			classes and an OnValidationError callback) that .NET 11 deleted.
+		-->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<RootNamespace>ZodSharp.Extensions.Validation</RootNamespace>
+		<!-- Explicit: NamespacePrefix is ZodSharp, so the SDK would otherwise derive ZodSharp.* identities. -->
+		<PackageId>Purview.ZodSharp.Extensions.Validation</PackageId>
+		<AssemblyName>Purview.ZodSharp.Extensions.Validation</AssemblyName>
+		<IsPackable>true</IsPackable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<IsAotCompatible>true</IsAotCompatible>
+		<IsTrimmable>true</IsTrimmable>
+		<Description>
+			Microsoft.Extensions.Validation integration for ZodSharp: registers ZodSharp validators as the first
+			validation resolver, so minimal APIs, Blazor Server and Blazor WebAssembly validate with ZodSharp.
+		</Description>
+		<PackageTags>zod;validation;schema;blazor;minimalapi</PackageTags>
+		<!-- First release: there is no previous version to validate the public API against. -->
+		<ZodSharpNoPackageValidationBaseline>true</ZodSharpNoPackageValidationBaseline>
+		<!-- NU5104: Microsoft.Extensions.Validation 11 is prerelease until .NET 11 GA. Remove with the GA bump. -->
+		<NoWarn>$(NoWarn);NU5104</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!--
+			A PackageReference, never FrameworkReference Microsoft.AspNetCore.App: a Blazor WebAssembly client
+			cannot take the ASP.NET shared framework. On a server app the shared framework supplies the same
+			assembly and the package is pruned; on WebAssembly the package is what flows.
+		-->
+		<PackageReference Include="Microsoft.Extensions.Validation" />
+	</ItemGroup>
+
+	<!--
+		The Microsoft.Extensions.Validation generator must not run on this package: it would intercept the package's
+		own AddValidation() call and compile a generated DataAnnotations resolver and a runtime parameter resolver
+		into this assembly, which AddZodSharpValidation would then register in every application. ExcludeAssets does
+		not stop it (ResolvePackageAssets still yields the package's analyzers), so it is removed before compiling.
+	-->
+	<Target Name="RemoveValidationsGenerator" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+		<ItemGroup>
+			<Analyzer
+				Remove="@(Analyzer)"
+				Condition="'%(Filename)' == 'Microsoft.Extensions.Validation.ValidationsGenerator'"
+			/>
+		</ItemGroup>
+	</Target>
+</Project>
