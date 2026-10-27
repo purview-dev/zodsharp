@@ -18,6 +18,8 @@ dotnet add package Purview.ZodSharp.AspNetCore.OpenApi
 ## Usage
 
 ```csharp
+using Microsoft.AspNetCore.OpenApi; // AddZodSharp(this OpenApiOptions) lives here; it is not an implicit using
+
 builder.Services.AddZodSharp(options => options.ScanAssemblies.Add(typeof(Program).Assembly));
 builder.Services.AddOpenApi(options => options.AddZodSharp());
 
@@ -36,7 +38,7 @@ builder.Services.AddOpenApi(options => options.AddZodSharp(zod =>
 }));
 ```
 
-All three default to `true`.
+All three default to `true` (`ZodOpenApiOptions`). Trimmed and Native AOT apps can register their validators with the generated `AddZodSharp{Assembly}Schemas()` instead of assembly scanning.
 
 ## What it describes
 

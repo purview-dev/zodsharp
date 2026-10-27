@@ -1,6 +1,6 @@
 # Source Generator Diagnostics
 
-The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, and `ZODSGEN042` are warnings, `ZODSGEN041` and `ZODSGEN043` are informational, and the rest are errors.
+The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`, `ZODSGEN051` and `ZODSGEN052` are warnings, `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are informational, and the rest are errors.
 
 | ID | Meaning |
 |---|---|
@@ -11,9 +11,9 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN006 | Unsupported DataAnnotations usage (string-only attributes on non-string targets; `[AllowedValues]`/`[DeniedValues]` on unsupported types; `[RegularExpression]` on non-strings; `[Range]` on unsupported types) |
 | ZODSGEN007 | Custom validation method configured but not found (when a name is explicitly configured) |
 | ZODSGEN008 | Custom method return type is not `ValueTask<ValidationResult<T>>` |
-| ZODSGEN009 | Custom method parameter count is not 2 |
+| ZODSGEN009 | Custom method is not `(T value, CancellationToken ct)` or the service-aware `(T value, IServiceProvider services, CancellationToken ct)` (wrong parameter count, or a three-parameter method whose second parameter is not `IServiceProvider`) |
 | ZODSGEN010 | First custom method parameter is not the model type |
-| ZODSGEN011 | Second custom method parameter is not `CancellationToken` |
+| ZODSGEN011 | Last custom method parameter is not `CancellationToken` |
 | ZODSGEN012 | Custom method is generic |
 | ZODSGEN013 | Custom method must be static when defined on the model type |
 | ZODSGEN014 | Custom method is inaccessible from the generated validator (private/protected) |
@@ -42,8 +42,19 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN042 | (warning) A validation rule (a type implementing `IValidationRule<T>`) does not expose a public `const string ErrorCode` and a public `const string MessageFormat`, so its error identity cannot be asserted in tests without duplicating literals |
 | ZODSGEN043 | (info) A built-in rule marked `[ZodRule]` does not generate a validation attribute, because a constructor parameter cannot be represented as an attribute property; the rule is still reachable through the runtime/fluent API. A derived name that collides with `System.ComponentModel.DataAnnotations` is *not* skipped — the attribute is emitted under a `Zod` suffix instead |
 | ZODSGEN044 | A `[ZodSchema]` type that uses an automatic `[Scalar]` form (`[Scalar<TValue>]` or `[Scalar(typeof(TValue))]`) cannot produce a usable schema, so the value-object generator's generated `Create` would reference a `{Type}Schema` that does not exist or cannot validate. Reported when `[ZodSchema(GenerateValidateMethod = false)]` suppresses the `Validate` method the value-object generator calls, or when the declared underlying type cannot be represented |
+| ZODSGEN045 | (warning) A type that exports JSON Schema references a nested `[ZodSchema]` type whose export is disabled (`[ZodSchema(GenerateJsonSchema = false)]` or the assembly-level `ZodSharpGenerateJsonSchemas=false` switch), so the parent's exported schema falls back to an empty schema for that property (`"Property '{0}' references type '{1}', which disables JSON Schema generation; the exported schema cannot describe it"`) |
+| ZODSGEN046 | (warning) A `[CollectionBehavior]` attribute is applied to a property that is not a collection of nullable elements (or a dictionary of nullable values), so the setting can never take effect |
+| ZODSGEN047 | (info) `[ValidatableType]` (Microsoft.Extensions.Validation) on a `[ZodSchema]` type is redundant: the ZodSharp bridge resolves the generated validator first, and the attribute only makes the Microsoft.Extensions.Validation generator emit a second, DataAnnotations-only validator for the same type. A code fix removes the attribute |
+| ZODSGEN048 | (warning) A type has rules that only run asynchronously (an `AsyncValidationAttribute` member or an `IAsyncValidatableObject` target) but a synchronous `Validate` is generated; that `Validate` throws `InvalidOperationException` rather than skip them, so call `ValidateAsync` |
+| ZODSGEN049 | (warning) A member is typed as a C# 15 `closed` class whose derived type has no `[ZodSchema]`, so a value of that derived type is not validated (`"Property '{0}' is typed as the closed type '{1}', but the derived type '{2}' has no [ZodSchema], ..."`); add `[ZodSchema]` to the derived type |
+| ZODSGEN050 | A generated `IValidateOptions` validator would conflict with a hand-authored `[OptionsValidator]` class (SYSLIB1205), so the ZodSharp validator is not generated. Keep one generator: remove `[OptionsValidator]`, or set `[ZodSchema(SuppressIValidateOptions = true)]` |
+| ZODSGEN051 | (warning) A `[ZodSchema]` type is declared in a Razor component (`.razor`). Razor compiles components with its own source generator, which the ZodSharp generator cannot see, so no schema is generated; move the type to a `.cs` file |
+| ZODSGEN052 | (warning) An attribute's `ErrorMessage` uses a positional placeholder the attribute does not supply, or an unbalanced brace (`"The ErrorMessage of [{0}] on '{1}' contains '{2}', which the attribute does not supply; it is shown literally"`). Messages are formatted with a never-throw engine, so the text is shown literally at runtime; the diagnostic catches the typo at build time |
 
 IDs `ZODSGEN002` and `ZODSGEN022`–`ZODSGEN026` are intentionally unused; rule identifiers are never renumbered or re-used.
+
+The `[ErrorType]` generator, shipped in the same analyzer assembly, reports `ZODSASP001`–`ZODSASP003`,
+`ZODSASP100` and `ZODSASP101`; they are described in [ASP.NET Core Integration](AspNetCore-Integration.md).
 
 ## Suppressing
 

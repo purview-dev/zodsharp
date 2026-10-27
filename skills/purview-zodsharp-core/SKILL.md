@@ -2,7 +2,8 @@
 name: purview-zodsharp-core
 description: >-
   Use when validating data with Purview.ZodSharp at runtime - picking the right package, building
-  schemas with the Z factory, Validate/SafeParse/Parse, reading ValidationResult and ValidationError,
+  schemas with the Z factory, Validate/SafeParse/Parse, reading ValidationResult and ValidationError
+  (codes, categories, typed ZodPath paths, bounds, message formats), localizing messages,
   composing with Transform/Refine/Pipe/Catch/Default, and how null handling and type coercion work.
 license: MIT
 metadata:
@@ -22,6 +23,9 @@ dotnet add package Purview.ZodSharp                    # core, source generator,
 dotnet add package Purview.ZodSharp.SystemTextJson     # STJ deserialize-and-validate + schema import
 dotnet add package Purview.ZodSharp.NewtonsoftJson     # Newtonsoft equivalent
 dotnet add package Purview.ZodSharp.AspNetCore         # ProblemDetails + DI
+dotnet add package Purview.ZodSharp.Extensions.Validation  # net11: Microsoft.Extensions.Validation bridge
+dotnet add package Purview.ZodSharp.AspNetCore.OpenApi     # net11: OpenAPI transformers
+dotnet add package Purview.ZodSharp.Blazor                 # net11: Blazor components
 ```
 
 JSON Schema **export** (`Z.ToJsonSchema`) is in the core package; **import** (`Z.FromJsonSchema`) comes
@@ -47,7 +51,7 @@ if (result.IsSuccess)
 | `Validate(value)` | returns `ValidationResult<T>`; **never throws** |
 | `SafeParse(value)` | alias of `Validate` |
 | `Parse(value)` | returns the validated value, or throws `ZodException` (via `GetValueOrThrow()`) |
-| `ValidateAsync(value, ct)` | `ValueTask` wrapper. The pipeline is synchronous; the token is observed before validation and throws `OperationCanceledException` if already cancelled. Genuinely async work only happens in the source generator's custom async validation. |
+| `ValidateAsync(value, ct)` | `ValueTask` wrapper. The pipeline is synchronous; the token is observed before validation and throws `OperationCanceledException` if already cancelled. Genuinely async work only happens in generated validators (`{Type}Schema.ValidateAsync(value, services, ct)`). |
 
 Reach for `Validate` by default and `Parse` only where a throw is the right control flow. Exceptions
 for expected invalid input are expensive and lose the structured issue list unless you catch.
@@ -67,22 +71,60 @@ concatenates the errors otherwise.
 
 ## `ValidationError`
 
-A `readonly record struct` carrying machine-readable metadata, not just a message:
+A `readonly record struct` in `ZodSharp.Core` carrying machine-readable metadata, not just a message:
 
 | Member | Meaning |
 | --- | --- |
-| `Code` | `invalid_type`, `too_small`, `too_big`, `invalid_union`, `missing_field`, `unrecognized_key`, `validation_failed`, `refinement_failed`, `transform_error`, … |
-| `Message` | human-readable |
-| `Path` | `ImmutableArray<string>` — `["user", "email"]`; array indexes are string segments, `"0"` |
-| `Origin` | category for size issues: `"string"`, `"array"`, `"collection"` |
-| `Minimum` / `Maximum` / `Inclusive` | the bound, for size issues |
-| `Parameters` | `IReadOnlyDictionary<string, object?>`; a union failure carries every option error under `"errors"` |
+| `Code` | ZodSharp's specific identity: a rule's `ErrorCode`, or a `ZodIssueCodes` constant (`invalid_type`, `missing_field`, `refinement_failed`, `invalid_union`, `unrecognized_keys`, …). The same failure has the same code whichever producer reports it |
+| `Category` | the Zod v4 issue code (`ZodIssueCategories`: `invalid_type`, `too_small`, `too_big`, `invalid_format`, `not_multiple_of`, `unrecognized_keys`, `invalid_union`, `invalid_value`, `custom`, …) |
+| `Message` | human-readable; built-in messages never contain the input |
+| `MessageFormat` | the named-placeholder template that produced `Message` (`"{displayName} is required"`), or `null` for a literal message |
+| `FullPath` | the authoritative typed path (`ZodPath`) |
+| `Path` | legacy `ImmutableArray<string>` projection of `FullPath`; indexes are `"0"` |
+| `Origin` | `"string"`, `"number"`, `"array"`, `"date"`, `"enum"`, … |
+| `Lower` / `Upper` | `ErrorBound?` (`Value`, `Inclusive`) of any comparable type; `Minimum`/`Maximum`/`Inclusive` stay for integer bounds |
+| `Parameters` | `ErrorTypeParameters` (also `IReadOnlyDictionary<string, object?>`); names in `ZodIssueParameters` (`expected`, `received`, `options`, `count`, `format`, `pattern`, `displayName`, `member`, `declaringType`, …) |
 
-Build one with
-`ValidationError.Create(code, message, path, parameters, origin, minimum, maximum, inclusive)`.
+Build one with `ValidationError.Create(code, message, path, parameters, origin, minimum, maximum,
+inclusive, category)` (path as `ZodPath` or `ImmutableArray<string>`), then `with { Lower = ..., MessageFormat
+= ... }`. Re-path with `WithPathPrefix(...)` only - it keeps every field. Union failures carry per-option
+issues: `error.GetUnionErrors()`. `ZodIssues` has factories for the shared failures (null, invalid type,
+missing field, refinement, union, collection size).
 
-`ZodException` carries `ImmutableArray<ValidationError> Errors`; its `ToString()` renders one line per
-error as `"{joinedPath}: {Message} ({Code})"`.
+`ZodException` carries `ImmutableArray<ValidationError> Errors`; its message lists up to five issues as
+`"{path}: {Message} ({Code})"` (root renders as `(root)`), and `ToString()` lists every one.
+
+## Paths
+
+`ZodPath` is a sequence of typed `ZodPathSegment`s (`Member`, `At(index)`, `Key(key)`). Render it with
+`ToDottedString()` - the canonical key every host uses, matching Microsoft.Extensions.Validation:
+
+| Path | Dotted |
+| --- | --- |
+| member, index, member | `Items[0].Name` |
+| key `en` | `Map[en]` |
+| key `"0"` (all digits) or `"a.b"` | `Map["0"]`, `Map["a.b"]` |
+| root | `""` |
+
+Also `ToJsonPointer()`, `ToJsonPath()`, `ToConfigurationKey()` and `ToZodPath()`; parse with
+`ParseDotted`/`ParseJsonPath`. Keys are rendered with the invariant culture. A `ZodPathNamer.FromFunc(...)`
+renames members (for example to camelCase) when a host opts into `ZodPathNaming.Json`.
+
+## Messages, culture and PII
+
+- Validation is culture-independent: codes, categories, paths, bounds and parameters are invariant, and
+  messages are produced invariantly.
+- `ZodMessageFormat.Format(format, error, provider)` resolves named placeholders (`{displayName}`,
+  `{minimum}`, `{path}`, …) and never throws; unknown placeholders render literally.
+- Hosts re-render messages in `CultureInfo.CurrentUICulture` through an `IZodMessageFormatter`
+  (`DefaultZodMessageFormatter` in core; `StringLocalizerZodMessageFormatter` in
+  `Purview.ZodSharp.Extensions.Validation` for `IStringLocalizer` resources).
+- `ZodErrorOptions.IncludeReceivedValues` (default `false`) puts the raw input in the `received`
+  parameter. Development only - never in production.
+- `ZodValidationDepth.MaxDepth` (default 32) stops generated validators on cyclic graphs with an
+  `InvalidOperationException`.
+
+See [references/error-model.md](references/error-model.md) for the error contract in detail.
 
 ## The `Z` factory
 
@@ -172,5 +214,6 @@ Object fields and union options wrap typed schemas, so boxed values out of a
 
 `purview-zodsharp-source-generator` for compile-time `[ZodSchema]` validators (which is what you want
 for a DTO), `purview-zodsharp-custom-rules` for writing rules and rule attributes,
-`purview-zodsharp-aspnetcore` for ProblemDetails and DI, and `purview-zodsharp-diagnostics` for the
+`purview-zodsharp-aspnetcore` for ProblemDetails, DI, the .NET 11 validation pipeline and OpenAPI,
+`purview-zodsharp-json` for JSON integration, and `purview-zodsharp-diagnostics` for the
 `ZODSGEN`/`ZODSASP` catalogue.

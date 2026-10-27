@@ -171,11 +171,11 @@ npx skills add purview-dev/zodsharp
 
 | Skill | Answers |
 | --- | --- |
-| `skills/purview-zodsharp-core/` | the runtime API: packages, the `Z` factory, `Validate`/`Parse`, `ValidationResult`, composition, coercion |
-| `skills/purview-zodsharp-source-generator/` | `[ZodSchema]`: what it emits, its options, DataAnnotations, `OnZodValidate`, enum validation, `IValidateOptions` |
+| `skills/purview-zodsharp-core/` | the runtime API: packages, the `Z` factory, `Validate`/`Parse`, `ValidationResult`, the error model (codes, categories, `ZodPath`, bounds, message formats, localization), composition, coercion |
+| `skills/purview-zodsharp-source-generator/` | `[ZodSchema]`: what it emits (member validation, `Paths`, `JsonNames`, trim-safe registration, async graph), its options, DataAnnotations, `OnZodValidate`, enum validation, `IValidateOptions` |
 | `skills/purview-zodsharp-custom-rules/` | writing a rule, `ErrorCode`/`MessageFormat`, `IZodRule`, `[ZodRule]` attributes, scalar value objects |
-| `skills/purview-zodsharp-json/` | System.Text.Json and Newtonsoft integrations, JSON Schema export and import, TypeScript Zod interop |
-| `skills/purview-zodsharp-aspnetcore/` | ProblemDetails, minimal-API validation, `IZodSchemaFactory` registration, options validation, `ErrorType` |
+| `skills/purview-zodsharp-json/` | System.Text.Json and Newtonsoft integrations, `invalid_json` and converter exceptions, JSON Schema export and import, TypeScript Zod interop |
+| `skills/purview-zodsharp-aspnetcore/` | ProblemDetails, minimal-API validation (filter and .NET 11 pipeline), OpenAPI, `IZodSchemaFactory` registration, options validation, `ErrorType` |
 | `skills/purview-zodsharp-diagnostics/` | what a `ZODSGEN` or `ZODSASP` diagnostic means and how to fix it |
 
 Every skill carries the `purview-zodsharp` prefix. Skills install into one flat directory per agent,

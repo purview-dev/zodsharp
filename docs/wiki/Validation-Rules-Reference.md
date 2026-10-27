@@ -18,8 +18,10 @@ public interface IValidationRule<T>
 ```
 
 - String rules additionally implement `ZodSharp.Core.IStringValidationRule` (`bool IsValid(ReadOnlySpan<char>)` / `string GetErrorMessage(ReadOnlySpan<char>)`) so `ZodString.ValidateSpan`/`IsValidSpan` can validate without materialising the input.
-- Every rule exposes its error identity as public constants: `public const string ErrorCode` and `public const string MessageFormat` (a `{0}`-style `string.Format` template). `Code` returns the rule's effective code — a per-usage `code` override when supplied, otherwise `ErrorCode` — and `GetErrorMessage` formats `MessageFormat` with `RuleMessage.Format` (which caches the parsed `CompositeFormat`).
-- A constructor `message` parameter, when supplied, overrides the formatted `MessageFormat`. `MessageFormat` is the fallback, not the only message.
+- Every rule exposes its error identity as public constants: `public const string ErrorCode` and `public const string MessageFormat` (a `{0}`-style positional template). `Code` returns the rule's effective code — a per-usage `code` override when supplied, otherwise `ErrorCode` — and `GetErrorMessage` formats `MessageFormat` with `RuleMessage.Format` (which caches the parsed `CompositeFormat`) using the invariant culture.
+- A constructor `message` parameter, when supplied, overrides the formatted `MessageFormat`. `MessageFormat` is the fallback, not the only message; a rule built without a message and `default(TRule)` behave the same. A custom message may use the rule's positional placeholders, and formatting **never throws**: a stray brace or an index the rule does not supply is written out literally.
+- Default messages do not quote string input: format, prefix/suffix/substring, compare, allowed/denied and null-or-non-whitespace rules describe what was expected (`"String must start with 'PUR-'"`). Numeric rules still state the failing number and length rules the length. `RegexRule`'s `{0}` is the pattern.
+- Every built-in rule implements `IZodRule`, so its failure carries a full structured identity: `Origin` (`string`, `number`, `date`, `enum`, …), `Category` (the Zod issue code: `invalid_format` for string formats, `too_small`/`too_big` by direction for bound, length and range rules, `not_multiple_of`, `invalid_type` for `Int`, `invalid_value` for value lists), `Lower`/`Upper` bounds with the correct inclusivity (`GreaterThan`/`LessThan` are exclusive) and parameters such as `format`, `pattern`, `prefix`, `suffix`, `includes`, `divisor`, `options`, `version`, `expected` and `count`. See [Core Concepts: Error fields](Core-Concepts.md#error-fields).
 - The analyzer reports `ZODSGEN042` when a source-declared rule omits `ErrorCode`/`MessageFormat`. See [Source Generator Diagnostics](Source-Generator-Diagnostics.md).
 
 Rules can be used three ways:
@@ -46,27 +48,27 @@ Tests can assert against the rule's constants instead of duplicating literals:
 ```csharp
 var result = Z.String().Email().Validate("not-an-email");
 await Assert.That(result.Errors[0].Code).IsEqualTo(EmailRule.ErrorCode);          // "invalid_string"
-await Assert.That(result.Errors[0].Message).IsEqualTo(
-    string.Format(CultureInfo.CurrentCulture, EmailRule.MessageFormat, "not-an-email"));
+await Assert.That(result.Errors[0].Message).IsEqualTo(EmailRule.MessageFormat);   // "Invalid email format"
+await Assert.That(result.Errors[0].Category).IsEqualTo(ZodIssueCategories.InvalidFormat);
 ```
 
 ## Error codes
 
-The built-in rules report one of the following Zod-compatible codes:
+The built-in rules report one of the following codes as `Code`. `Category` always carries the matching Zod v4 issue code (`ZodIssueCategories`), so a client can switch on `Category` without knowing ZodSharp's specific codes:
 
 | Code | Meaning | Emitted by |
 |---|---|---|
 | `invalid_string` | A string did not match the required format | all string format rules |
 | `invalid_type` | A value was not the expected type/shape (e.g. not a whole number) | `IntRule<T>` |
 | `too_small` | A length or value fell below a lower bound | `MinLengthRule`, `MinValueRule<T>`, `GreaterThanRule<T>` |
-| `too_big` | A length or value exceeded an upper bound | `MaxLengthRule`, `MaxValueRule<T>`, `LessThanRule<T>`, `SafeIntegerRule` |
+| `too_big` | A length or value exceeded an upper bound | `MaxLengthRule`, `MaxValueRule<T>`, `LessThanRule<T>`, `SafeIntegerRule` (whose `Category` is `too_small` below the range and `invalid_type` for a fraction) |
 | `not_multiple_of` | A number was not a multiple of the divisor | `MultipleOfRule<T>` |
 | `not_finite` | A number was `NaN` or infinite | `FiniteRule<T>` |
 | `invalid_value` | A value was a rejected sentinel or was not in the allowed set | `NonSentinelRule<T>`, `AllowedValuesRule<T>`, `DeniedValuesRule<T>` |
 | `invalid_enum_value` | A value was not a defined member of the enum type, or was an excluded member | `EnumRule<TEnum>` |
 | `missing_field` | A required value was absent (or empty/whitespace-only) | `RequiredRule<T>` |
-| `invalid_length` | A string length fell outside the required range | `LengthRule`, `StringLengthRule` |
-| `invalid_range` | A comparable value fell outside the required range | `RangeRule<T>` |
+| `invalid_length` | A string length fell outside the required range (`Category` `too_small`/`too_big` by direction) | `LengthRule`, `StringLengthRule`, and generated `[StringLength]`/`[Length]` on strings |
+| `invalid_range` | A comparable value fell outside the required range (`Category` `too_small`/`too_big` by direction) | `RangeRule<T>` |
 | `mismatch` | A value did not equal the expected value | `CompareRule` |
 | `validation_failed` | Fallback for rules that do not declare an identity | any rule without `ErrorCode`/`IZodRule` |
 
@@ -87,34 +89,34 @@ Fluent methods live on `ZodString` (`ZodSharp.Schemas`). The `Span` column marks
 
 | Rule | Constructor | Fluent method | Code | Message format | Span |
 |---|---|---|---|---|---|
-| `EmailRule` | `()` | `Email()` | `invalid_string` | `Invalid email format: {0}` | yes |
+| `EmailRule` | `()` | `Email()` | `invalid_string` | `Invalid email format` | yes |
 | `RegexRule` | `(Regex pattern, string? message)` or `(string pattern, string? message)` | `Regex(...)` | `invalid_string` | `String does not match the required pattern: {0}` | yes |
-| `UrlRule` | `(string? message)` | `Url()` | `invalid_string` | `Invalid URL format: {0}` | no |
-| `UriRule` | `(UriKind uriKind, string? message)` | `Uri()`, `Uri(uriKind)` | `invalid_string` | `Invalid Uri, kind: {0}, format: {1}` | no |
-| `PhoneRule` | `(string? message)` | `Phone()` | `invalid_string` | `Invalid phone number format: {0}` | yes |
-| `E164Rule` | `(string? message)` | `E164()` | `invalid_string` | `Invalid E.164 phone number: {0}` | yes |
-| `CreditCardRule` | `(string? message)` | `CreditCard()` | `invalid_string` | `Invalid credit card number format: {0}` | yes |
-| `Base64StringRule` | `(string? message)` | `Base64String()` | `invalid_string` | `Invalid Base64 string format: {0}` | no |
-| `Base64UrlRule` | `(string? message)` | `Base64Url()` | `invalid_string` | `Invalid base64url string: {0}` | yes |
-| `UUIDRule` | `(string? message)` or `(UuidVersion version, string? message)` | `UUID()` / `UUID(version)` | `invalid_string` | `Invalid UUID format: {0}` (or `Invalid UUID v{0} format: {1}`) | yes |
-| `ULIDRule` | `(string? message)` | `ULID()` | `invalid_string` | `Invalid ULID: {0}` | yes |
-| `JWTRule` | `(string? message)` | `JWT()` | `invalid_string` | `Invalid JWT: {0}` | yes |
-| `IPAddressRule` | `(string? message, string? code)` or `(IPAddressRuleType ruleType, string? message, string? code)` | `IP()` / `IP(ruleType)` | `invalid_string` | `Invalid {1} address: {0}` | yes |
-| `HexRule` | `(string? message)` | `Hex()` | `invalid_string` | `Invalid hexadecimal string: {0}` | yes |
-| `DateStringRule` | `(string? message)` | `Date()` | `invalid_string` | `Invalid date: {0}` | yes |
-| `TimeStringRule` | `(string? message)` | `Time()` | `invalid_string` | `Invalid time: {0}` | yes |
-| `DatetimeStringRule` | `(string? message)` | `Datetime()` | `invalid_string` | `Invalid date-time: {0}` | yes |
-| `NanoidRule` | `(string? message)` | `Nanoid()` | `invalid_string` | `Invalid nanoid: {0}` | yes |
-| `Cuid2Rule` | `(string? message)` | `Cuid2()` | `invalid_string` | `Invalid CUID2: {0}` | yes |
-| `StartsWithRule` | `(string prefix, StringComparison comparison = StringComparison.Ordinal, string? message, string? code)` | `StartsWith(prefix, comparison)` | `invalid_string` | `String must start with '{0}', but got '{1}'` | yes |
-| `EndsWithRule` | `(string suffix, StringComparison comparison = StringComparison.Ordinal, string? message, string? code)` | `EndsWith(suffix, comparison)` | `invalid_string` | `String must end with '{0}', but got '{1}'` | yes |
-| `IncludesRule` | `(string substring, string? message, string? code)` | `Includes(substring)` | `invalid_string` | `String must contain '{0}', but got '{1}'` | yes |
-| `EmojiRule` | `(string? message)` | `Emoji()` | `invalid_string` | `Invalid emoji: {0}` | yes |
-| `XidRule` | `(string? message)` | `Xid()` | `invalid_string` | `Invalid XID: {0}` | yes |
-| `KsuidRule` | `(string? message)` | `Ksuid()` | `invalid_string` | `Invalid KSUID: {0}` | yes |
-| `DurationRule` | `(string? message)` | `Duration()` | `invalid_string` | `Invalid duration: {0}` | yes |
-| `GuidRule` | `(string? message)` | `Guid()` | `invalid_string` | `Invalid GUID: {0}` | yes |
-| `CidrRule` | `(CidrRuleType ruleType, string? message, string? code)` | `Cidr()` / `Cidr(ruleType)` | `invalid_string` | `Invalid {1} CIDR: {0}` | yes |
+| `UrlRule` | `(string? message)` | `Url()` | `invalid_string` | `Invalid URL format` | no |
+| `UriRule` | `(UriKind uriKind, string? message)` | `Uri()`, `Uri(uriKind)` | `invalid_string` | `Invalid Uri, kind: {0}` | no |
+| `PhoneRule` | `(string? message)` | `Phone()` | `invalid_string` | `Invalid phone number format` | yes |
+| `E164Rule` | `(string? message)` | `E164()` | `invalid_string` | `Invalid E.164 phone number` | yes |
+| `CreditCardRule` | `(string? message)` | `CreditCard()` | `invalid_string` | `Invalid credit card number format` | yes |
+| `Base64StringRule` | `(string? message)` | `Base64String()` | `invalid_string` | `Invalid Base64 string format` | no |
+| `Base64UrlRule` | `(string? message)` | `Base64Url()` | `invalid_string` | `Invalid base64url string` | yes |
+| `UUIDRule` | `(string? message)` or `(UuidVersion version, string? message)` | `UUID()` / `UUID(version)` | `invalid_string` | `Invalid UUID format` (or `VersionedMessageFormat`, `Invalid UUID v{1} format`) | yes |
+| `ULIDRule` | `(string? message)` | `ULID()` | `invalid_string` | `Invalid ULID` | yes |
+| `JWTRule` | `(string? message)` | `JWT()` | `invalid_string` | `Invalid JWT` | yes |
+| `IPAddressRule` | `(string? message, string? code)` or `(IPAddressRuleType ruleType, string? message, string? code)` | `IP()` / `IP(ruleType)` | `invalid_string` | `Invalid {1} address` | yes |
+| `HexRule` | `(string? message)` | `Hex()` | `invalid_string` | `Invalid hexadecimal string` | yes |
+| `DateStringRule` | `(string? message)` | `Date()` | `invalid_string` | `Invalid date` | yes |
+| `TimeStringRule` | `(string? message)` | `Time()` | `invalid_string` | `Invalid time` | yes |
+| `DatetimeStringRule` | `(string? message)` | `Datetime()` | `invalid_string` | `Invalid date-time` | yes |
+| `NanoidRule` | `(string? message)` | `Nanoid()` | `invalid_string` | `Invalid nanoid` | yes |
+| `Cuid2Rule` | `(string? message)` | `Cuid2()` | `invalid_string` | `Invalid CUID2` | yes |
+| `StartsWithRule` | `(string prefix, StringComparison comparison = StringComparison.Ordinal, string? message, string? code)` | `StartsWith(prefix, comparison)` | `invalid_string` | `String must start with '{0}'` | yes |
+| `EndsWithRule` | `(string suffix, StringComparison comparison = StringComparison.Ordinal, string? message, string? code)` | `EndsWith(suffix, comparison)` | `invalid_string` | `String must end with '{0}'` | yes |
+| `IncludesRule` | `(string substring, string? message, string? code)` | `Includes(substring)` | `invalid_string` | `String must contain '{0}'` | yes |
+| `EmojiRule` | `(string? message)` | `Emoji()` | `invalid_string` | `Invalid emoji` | yes |
+| `XidRule` | `(string? message)` | `Xid()` | `invalid_string` | `Invalid XID` | yes |
+| `KsuidRule` | `(string? message)` | `Ksuid()` | `invalid_string` | `Invalid KSUID` | yes |
+| `DurationRule` | `(string? message)` | `Duration()` | `invalid_string` | `Invalid duration` | yes |
+| `GuidRule` | `(string? message)` | `Guid()` | `invalid_string` | `Invalid GUID` | yes |
+| `CidrRule` | `(CidrRuleType ruleType, string? message, string? code)` | `Cidr()` / `Cidr(ruleType)` | `invalid_string` | `Invalid {1} CIDR` | yes |
 
 Every rule constructor also accepts an optional `string? code = null` after `message`; when set it overrides the reported error code (otherwise the rule's own `ErrorCode` is reported).
 
@@ -178,7 +180,7 @@ Behaviour notes:
 | Rule | Constructor | Fluent method | Code | Message format |
 |---|---|---|---|---|
 | `NonSentinelRule<T>` | `(string? message)` | `NonSentinel()` | `invalid_value` | `Value has a sentinel value, but got {0}` |
-| `NullOrNonWhiteSpaceRule` | `(string? message, string? code)` | — | `invalid_string` | `Value must be null or non-whitespace, but got '{0}'` |
+| `NullOrNonWhiteSpaceRule` | `(string? message, string? code)` | — | `invalid_string` | `Value must be null or non-whitespace` |
 
 `NonSentinelRule<T>` rejects the framework default/boundary values an ORM commonly stores to mean "no value": `Guid.Empty`; `DateTime`, `DateTimeOffset`, `DateOnly`, and `TimeOnly` `MinValue`/`MaxValue`; and `null`/empty/whitespace strings. Types without a known sentinel always pass, so the rule never rejects a type it does not understand. It detects sentinels with a `typeof(T)` dispatch and reinterprets the value in place, so no boxing occurs. The `{0}` argument is a **description** of the sentinel (`an empty GUID`, `DateTime.MinValue`, `an empty string`, …) rather than the raw value, and a type-level `[NonSentinel]` on a `[Scalar]` type replaces the message's `Value` subject with the scalar's name — see [Value Objects Integration](Value-Objects-Integration.md#message-overrides). Its JSON Schema mapping is exact for `DateOnly`, `TimeOnly`, the deterministic `DateTime` wire forms, and `DateTimeOffset` (the default pattern is offset-aware); the optional UTC contract narrows the accepted offset — see [JSON Schema Export](JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
 
@@ -206,15 +208,15 @@ These rules mirror `System.ComponentModel.DataAnnotations` attributes as first-c
 
 | Rule | Constructor | Fluent method | Code | Message format |
 |---|---|---|---|---|
-| `RequiredRule<T>` | `(bool allowEmptyStrings = false, bool trimWhitespace = false, string? message, string? code)` | `ZodString.Required(...)` | `missing_field` | `Field is required` |
+| `RequiredRule<T>` | `(bool allowEmptyStrings = false, bool trimWhitespace = false, string? message, string? code)` | `ZodString.Required(...)` | `missing_field` | `{0} is required` (`{0}` is the display name, `Value` when unknown) |
 | `RangeRule<T>` | `(T minimum, T maximum, bool minimumIsExclusive = false, bool maximumIsExclusive = false, string? message, string? code)` | `ZodNumber.Range(...)`, `ZodBigInt.Range(...)`, `ZodDate.Range(...)` | `invalid_range` | `Value must be between {0} and {1}, but got {2}` |
 | `LengthRule` | `(int minimum, int maximum, string? message, string? code)` | `ZodString.Length(min, max)` | `invalid_length` | `String length must be between {0} and {1} characters, but got {2}` |
 | `StringLengthRule` | `(int maximumLength, int minimumLength = 0, string? message, string? code)` | `ZodString.StringLength(max, min)` | `invalid_length` | `String must be at most {0} characters long and at least {1}, but got {2}` |
-| `CompareRule` | `(string other, StringComparison comparison = Ordinal, string? message, string? code)` | `ZodString.Compare(...)` | `mismatch` | `Value must match '{0}', but got '{1}'` |
-| `AllowedValuesRule<T>` | `(T[] values, string? message, string? code)` | `AllowedValues(values)` | `invalid_value` | `Value '{0}' is not one of the allowed values` |
-| `DeniedValuesRule<T>` | `(T[] values, string? message, string? code)` | `DeniedValues(values)` | `invalid_value` | `Value '{0}' is one of the denied values` |
+| `CompareRule` | `(string other, StringComparison comparison = Ordinal, string? message, string? code)` | `ZodString.Compare(...)` | `mismatch` | `Value does not match the expected value` |
+| `AllowedValuesRule<T>` | `(T[] values, string? message, string? code)` | `AllowedValues(values)` | `invalid_value` | `Value is not one of the allowed values` |
+| `DeniedValuesRule<T>` | `(T[] values, string? message, string? code)` | `DeniedValues(values)` | `invalid_value` | `Value is one of the denied values` |
 
-`RequiredRule<T>` always rejects `null`. When `allowEmptyStrings` is `false` an empty string is rejected as well; `trimWhitespace` additionally treats a whitespace-only string as empty (leading/trailing whitespace on a non-empty value is preserved). The `ZodString.Required` fluent method is a covariant convenience over the generic rule.
+`RequiredRule<T>` always rejects `null`. Its default message is `"Value is required"` and it reports the shared `"{displayName} is required"` template (`ZodMessages.Required`) as `MessageFormat`, so a host that knows the member can re-render it with the display name. When `allowEmptyStrings` is `false` an empty string is rejected as well; `trimWhitespace` additionally treats a whitespace-only string as empty (leading/trailing whitespace on a non-empty value is preserved). The `ZodString.Required` fluent method is a covariant convenience over the generic rule.
 
 `AllowedValuesRule<T>` and `DeniedValuesRule<T>` accept both a single value (`new AllowedValuesRule<int>(5)`) and an array. The generated `[AllowedValuesZod]` / `[DeniedValuesZod]` attributes surface the array as a `params object[]` (plus a single-value overload), so `[AllowedValuesZod("a", "b", "c")]` works on a `string` member and `[DeniedValuesZod(1, 2, 3)]` on an `int` member; the resolver converts each element to the member type.
 

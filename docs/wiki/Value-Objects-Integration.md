@@ -143,7 +143,7 @@ public const string MessageFormat = "Value must not be empty.";
 ```
 
 - `ErrorCode` is the rule's canonical code — the value a test compares against (`Assert.That(error.Code).IsEqualTo(NotEmptyRule<AssetId>.ErrorCode)`).
-- `MessageFormat` is a `string.Format` template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments; use it with `string.Format(CultureInfo.CurrentCulture, MessageFormat, …)`.
+- `MessageFormat` is a `string.Format` template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments; format it with `RuleMessage.Format(MessageFormat, …)` (invariant culture, never throws).
 - The constants may be inherited from a base rule class, and **abstract bases are exempt**, so a shared base can host them for its concrete derivations.
 
 A rule that omits either constant is reported as **ZODSGEN042** (a warning).

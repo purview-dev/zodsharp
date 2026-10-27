@@ -6,7 +6,8 @@ description: >-
   WithZodSharpValidation or the .NET 11 built-in validation pipeline (AddZodSharpValidation), ZodTypedResults,
   the shared ZodProblemDetailsWriter, registering
   IZodSchemaFactory with AddZodSharp or AddZodSharpFactory, validating options objects (including .NET 11
-  async startup validation), and mapping error codes to HTTP statuses with ErrorType.
+  async startup validation), describing validated endpoints in OpenAPI with Purview.ZodSharp.AspNetCore.OpenApi,
+  and mapping error codes to HTTP statuses with ErrorType.
 license: MIT
 metadata:
   product: Purview.ZodSharp.AspNetCore
@@ -137,7 +138,7 @@ bridge's `IZodValidationReportSink`) and composes `ProblemDetailsOptions.Customi
 - `WithZodSharpValidation()` on a pipeline-validated endpoint skips the parameters the bridge covers (one
   `Debug` log when the endpoint is built), so nothing validates twice. With `DisableValidation()` it
   validates as usual.
-- OpenAPI: the `Purview.ZodSharp.AspNetCore.OpenApi` operation transformer adds the error response.
+- OpenAPI: the `Purview.ZodSharp.AspNetCore.OpenApi` operation transformer adds the error response (below).
 
 | | Filter (`WithZodSharpValidation`) | Pipeline (`AddZodSharpValidation`) |
 | --- | --- | --- |
@@ -146,6 +147,41 @@ bridge's `IZodValidationReportSink`) and composes `ProblemDetailsOptions.Customi
 | DataAnnotations parameters | not validated | validated and merged into one body |
 | Binding-failure handling | `OnBindingFailure` | ASP.NET Core's own |
 | Endpoint metadata | adds the 400 response | via the OpenAPI transformer |
+
+The bridge itself (`Purview.ZodSharp.Extensions.Validation`, `net11.0`, WebAssembly-safe) also works outside
+HTTP: `ZodValidationOptions` sets `Placement` (`First`/`AfterGenerated`), `AlsoRunDataAnnotations`, `PathNamer`,
+`MessageFormatter` and trim-safe `Sources`; `ValidateContext.ZodReport` holds the full ZodSharp errors of a run;
+`ValidationOptions.ValidateAsync(value, services)` validates a value in a worker or test. `[ValidatableType]` on a
+`[ZodSchema]` type is redundant (`ZODSGEN047`). Blazor forms are covered by the `purview-zodsharp-blazor` skill.
+
+## OpenAPI (.NET 11)
+
+```bash
+dotnet add package Purview.ZodSharp.AspNetCore.OpenApi
+```
+
+```csharp
+using Microsoft.AspNetCore.OpenApi;   // AddZodSharp on OpenApiOptions lives here
+
+builder.Services.AddZodSharp(o => o.ScanAssemblies.Add(typeof(Order).Assembly));
+builder.Services.AddOpenApi(options => options.AddZodSharp(zod =>
+{
+    zod.EmitVendorExtensions = true;       // x-zod-* for rules with no JSON Schema keyword
+    zod.DiscriminatedUnionsAsOneOf = true; // oneOf + discriminator for [JsonPolymorphic] types
+    zod.DescribeValidationProblems = true; // 400/422 problem responses on validated operations
+}));
+app.MapOpenApi();
+```
+
+`ZodOpenApiOptions` defaults all three to `true`. Schema, operation and document transformers make the 3.1 and
+3.2 documents describe what ZodSharp enforces, from the type's own JSON Schema (`BuildJsonSchema()` or a factory
+registered runtime schema): lengths, bounds (exclusive bounds in the 3.1+ form), `multipleOf`, integer
+narrowing, patterns (several become `allOf`), formats (including `[EmailAddress]`), `enum`/`not`,
+`contentEncoding`, `required` and `type: [x, "null"]`. ZodSharp wins when a DataAnnotation disagrees. C# unions
+keep the platform's `anyOf` with each case constrained. Operations binding a ZodSharp-validated parameter list
+`400` (and `422` when a registered `ErrorType` uses it) as `application/problem+json` with the shared
+`ZodValidationProblemDetails`/`ZodValidationIssue` components, merged into a declared
+`ProducesValidationProblem()`. Types ZodSharp does not know are left as the platform produced them.
 
 ## Manual results and exceptions
 
@@ -174,7 +210,7 @@ thrown from `Parse` inside a handler is mapped by `ZodExceptionHandler` to the i
 ```csharp
 var writer = ZodProblemDetailsWriter.GetOrCreate(httpContext.RequestServices);
 HttpValidationProblemDetails problem = writer.Create(errors, httpContext);
-writer.Apply(existingProblem, errors, httpContext);   // keeps non-ZodSharp `errors` entries
+writer.Apply(existingProblem, errors.AsSpan(), httpContext);   // keeps non-ZodSharp `errors` entries; span only
 await writer.WriteAsync(httpContext, problem);
 ```
 
@@ -242,7 +278,7 @@ builder.Services.AddOptions<SmtpOptions>()
 ```
 
 - Failures read `{name}: {location}: {message} ({code})` - `Smtp:Servers:0:Host: Host is required
-  (required)` with a section, `Servers[0].Host: …` without; the name is omitted for the default options.
+  (missing_field)` with a section, `Servers[0].Host: …` without; the name is omitted for the default options.
 - `ZodValidateOptionsResult` carries the full `Errors`.
 - **.NET 11:** `ZodSchemaOptionsValidator<T>` also implements `IAsyncValidateOptions<T>` and registers via
   `OptionsBuilder<T>.Validate<TValidator>()`. `ValidateOnStart()` runs async and service-aware rules (in a
@@ -254,4 +290,5 @@ builder.Services.AddOptions<SmtpOptions>()
 ## Related skills
 
 `purview-zodsharp-core` for the runtime API and error model, `purview-zodsharp-source-generator` for the
-validators this resolves, and `purview-zodsharp-diagnostics` for `ZODSASP*`.
+validators this resolves, `purview-zodsharp-json` for JSON Schema export, and `purview-zodsharp-diagnostics`
+for `ZODSASP*`.

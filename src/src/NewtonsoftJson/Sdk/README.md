@@ -45,6 +45,19 @@ var converter = userSchema.CreateValidatingConverter();
 var value = JsonConvert.DeserializeObject<User>(json, converter);
 ```
 
+## Errors
+
+A failure to read the JSON (malformed text, a `null` document, a value the serializer cannot convert) is reported as one
+error with code `invalid_json` (`NewtonsoftJsonExtensions.InvalidJsonCode`), category `invalid_type` and the fixed
+message `"The JSON value could not be converted to {expected}."`. The serializer's path becomes the error's `FullPath`
+(`items[1].age`) and its line and position become the `line` and `position` parameters. The serializer's own message
+is never surfaced, because it names CLR types and can quote the input. `DeserializeAndValidateAsync` awaits the
+schema's `ValidateAsync`, so asynchronous refinements run.
+
+The validating converter throws `ZodNewtonsoftJsonValidationException` (namespace `ZodSharp.Json`, a
+`JsonSerializationException`) carrying the schema's full `Errors`, located under the converter's JSON path; its
+message still starts with `"Validation failed: "`. `DeserializeAndValidate` unwraps it into the result.
+
 ## UTC DateTimeOffset contract
 
 The default `PreserveOffset` schema is exact and needs no converter. When the generated JSON Schema uses

@@ -49,7 +49,7 @@ var converter = userSchema.CreateValidatingConverter();
 var value = JsonConvert.DeserializeObject<User>(json, converter);
 ```
 
-`CreateValidatingConverter<T>()` returns a non-generic `Newtonsoft.Json.JsonConverter`. Invalid JSON throws `ZodNewtonsoftJsonValidationException` (a `JsonSerializationException`) with a `"Validation failed: ..."` message; its `Errors` property holds the full `ValidationError`s, located under the converted value's JSON path. The converter clones the `JsonSerializer` (without itself) to avoid recursion.
+`CreateValidatingConverter<T>()` returns a non-generic `Newtonsoft.Json.JsonConverter`. Invalid JSON throws `ZodNewtonsoftJsonValidationException` (namespace `ZodSharp.Json`, a `JsonSerializationException`, so existing `catch` blocks keep working) with a `"Validation failed: ..."` message; its `Errors` property holds the full `ValidationError`s, located under the converted value's JSON path. The converter clones the `JsonSerializer` (without itself) to avoid recursion.
 
 ## API surface
 
@@ -64,7 +64,7 @@ var value = JsonConvert.DeserializeObject<User>(json, converter);
 
 ## Failure codes
 
-A failure to read the JSON (malformed JSON, a value that cannot be converted, a `null` document or token) produces one `ValidationError` with code `invalid_json` (`NewtonsoftJsonExtensions.InvalidJsonCode`) and category `invalid_type`. Its `FullPath` is the location the serializer reported (`items[1].age`), its `line` and `position` parameters hold the serializer's one-based line number and line position, and its message is the fixed `"The JSON value could not be converted to {expected}."`, where `expected` is a Zod type name (`string`, `number`, `object`, `array`, …). The serializer's own message, which names CLR types and can quote the input, is never surfaced. A failure raised by a validating converter is returned as the schema's own errors, located under the converter's path. The stream overload validates with `ValidateAsync`, so asynchronous refinements run.
+A failure to read the JSON (malformed JSON, a value that cannot be converted, a `null` document or token) produces one `ValidationError` with code `invalid_json` (`NewtonsoftJsonExtensions.InvalidJsonCode`) and category `invalid_type`. Its `FullPath` is the location the serializer reported (`items[1].age`), its `line` and `position` parameters hold the serializer's one-based line number and line position, and its message is the fixed `"The JSON value could not be converted to {expected}."`, where `expected` is a Zod type name (`string`, `number`, `object`, `array`, …). The serializer's own message, which names CLR types and can quote the input, is never surfaced. A failure raised by a validating converter is returned as the schema's own errors, located under the converter's path. The stream overload validates with `ValidateAsync`, so asynchronous refinements run (it used to call the synchronous `Validate`). A document that fails to read at `{ "Items": [ { "Age": 1 }, { "Age": "x" } ] }` reports `invalid_json` at `Items[1].Age` with `expected` `number`; when the expected type cannot be described, `expected` is the generic `"the expected type"`.
 
 ## JSON Schema import
 
@@ -86,7 +86,7 @@ See [JSON Schema Import](JsonSchema-Import.md) for the supported keywords, `$ref
 | Converter return | generic `JsonConverter<T>` | non-generic `JsonConverter` |
 | `JToken` overload | no | yes |
 | Formatting control | via `JsonSerializerOptions` | explicit `Newtonsoft.Json.Formatting` argument |
-| Invalid-data exception | `System.Text.Json.JsonException` | `JsonSerializationException` |
+| Invalid-data exception | `ZodJsonValidationException` (a `JsonException`) | `ZodNewtonsoftJsonValidationException` (a `JsonSerializationException`) |
 | JSON plumbing | `JsonElement` | `JToken`/`JObject`/`JArray` |
 
 > [!NOTE]
