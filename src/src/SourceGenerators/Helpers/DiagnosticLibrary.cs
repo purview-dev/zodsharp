@@ -72,7 +72,7 @@ static class DiagnosticLibrary
 	public static readonly DiagnosticDescriptor CustomValidationInvalidParameterCount = new(
 		id: "ZODSGEN009",
 		title: "Invalid custom validation method parameter count",
-		messageFormat: "Custom validation method '{0}' on schema type '{1}' must accept exactly two parameters: (T value, CancellationToken cancellationToken)",
+		messageFormat: "Custom validation method '{0}' on schema type '{1}' must accept (T value, CancellationToken cancellationToken) or, to use the caller's services, (T value, IServiceProvider services, CancellationToken cancellationToken)",
 		category: Category,
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true

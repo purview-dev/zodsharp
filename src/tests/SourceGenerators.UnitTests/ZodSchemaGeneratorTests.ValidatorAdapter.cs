@@ -149,7 +149,11 @@ namespace Testing
 		var gizmo = Activator.CreateInstance(gizmoType);
 		var gizmoSchemaValidator = Activator.CreateInstance(gizmoSchemaType);
 
-		var method = gizmoSchemaType.GetMethod(nameof(IZodSchemaValidator<>.ValidateAsync));
+		// The adapter also exposes the service-aware ValidateAsync overload, so select by signature.
+		var method = gizmoSchemaType.GetMethod(
+			nameof(IZodSchemaValidator<>.ValidateAsync),
+			[gizmoType!, typeof(CancellationToken)]
+		);
 		await Assert.That(method).IsNotNull();
 
 		var valueTaskResult = method!.Invoke(gizmoSchemaValidator, [gizmo, cancellationToken])!;

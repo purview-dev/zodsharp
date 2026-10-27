@@ -198,7 +198,9 @@ partial class ZodSchemaGeneratorTests
 				"new global::Purview.ValueObjects.ScalarRuleAdapter<global::Testing.TenantId, global::System.Guid, global::Testing.NonSentinelRule<global::System.Guid>>("
 			);
 		await Assert.That(generated).ContainsGeneratedCode(".IsValid(value)");
-		await Assert.That(generated).ContainsGeneratedCode("EmptyPath, origin:");
+		await Assert
+			.That(generated)
+			.ContainsGeneratedCode("EmptyPath, (object)tenantIdCustomRuleInner0 as global::ZodSharp.Core.IZodRule)");
 		// The wrapped rule owns the identity, not the adapter.
 		await Assert
 			.That(generated)

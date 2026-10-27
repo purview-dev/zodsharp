@@ -1,4 +1,3 @@
-using System.Globalization;
 using ZodSharp.SourceGenerators.Helpers;
 using ZodSharp.SourceGenerators.Models;
 using ZodSharp.SourceGenerators.Models.DataAttributes;
@@ -7,6 +6,8 @@ namespace ZodSharp.SourceGenerators;
 
 partial class ZodSchemaGenerator
 {
+	const string StringOrigin = "\"string\"";
+
 	static void GenerateStringValidations(CodeWriter writer, ZodPropertyDescriptor property)
 	{
 		StringLengthValidators(writer, property);
@@ -14,176 +15,146 @@ partial class ZodSchemaGenerator
 		var emailAttribute = property.ValidationAttributes.EmailAddress;
 		if (emailAttribute.ShouldProcess && emailAttribute.Value.Exists)
 		{
-			var propertyName = property.Name;
-			var displayName = property.DisplayName;
-			var messageExpression = BuildErrorMessageExpression(
+			GenerateFormatValidation(
+				writer,
+				property,
 				emailAttribute.Value.ValidationAttributeData,
-				"Field '{0}' must be a valid email address.",
-				displayName.StringLiteral()
+				"Field '{displayName}' must be a valid email address.",
+				valueName => $"!global::ZodSharp.Rules.EmailRule.EmailRegex.IsMatch({valueName})",
+				"email"
 			);
-
-			using (writer.OpenBlockScope())
-			{
-				var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
-				writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-				using (
-					writer.IfBlockScope(
-						$"{propertyValueName}.Length != 0 && !global::ZodSharp.Rules.EmailRule.EmailRegex.IsMatch({propertyValueName})"
-					)
-				)
-				{
-					WriteValidationError(
-						writer,
-						"invalid_string",
-						messageExpression,
-						CodeGenHelpers.GetPathFieldName(propertyName),
-						"string"
-					);
-				}
-			}
-
-			writer.NewLine();
 		}
 
 		var regularExpressionAttribute = property.ValidationAttributes.RegularExpression;
 		if (regularExpressionAttribute.ShouldProcess && regularExpressionAttribute.Value.Exists)
 		{
-			var propertyName = property.Name;
-			var displayName = property.DisplayName;
 			var pattern = regularExpressionAttribute.Value.Pattern ?? string.Empty;
-			var messageExpression = BuildErrorMessageExpression(
+			GenerateFormatValidation(
+				writer,
+				property,
 				regularExpressionAttribute.Value.ValidationAttribute,
-				"Field '{0}' must match the regular expression '{1}'.",
-				displayName.StringLiteral(),
-				pattern.StringLiteral()
+				"Field '{displayName}' must match the regular expression '{pattern}'.",
+				valueName => $"!{GetRegexFieldName(property.Name)}.IsMatch({valueName})",
+				"regex",
+				[("pattern", pattern.StringLiteral())],
+				"pattern"
 			);
-
-			using (writer.OpenBlockScope())
-			{
-				var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
-				writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-				using (
-					writer.IfBlockScope(
-						$"{propertyValueName}.Length != 0 && !{GetRegexFieldName(propertyName)}.IsMatch({propertyValueName})"
-					)
-				)
-				{
-					WriteValidationError(
-						writer,
-						"invalid_string",
-						messageExpression,
-						CodeGenHelpers.GetPathFieldName(propertyName),
-						"string"
-					);
-				}
-			}
-
-			writer.NewLine();
 		}
 
-		GenerateURLValidation(writer, property);
-		GeneratePhoneValidation(writer, property);
-		GenerateCreditCardValidation(writer, property);
-		GenerateBase64StringValidation(writer, property);
-	}
-
-	static void GenerateURLValidation(CodeWriter writer, ZodPropertyDescriptor property)
-	{
-		var urlAttribute = property.ValidationAttributes.Url;
-		if (!urlAttribute.ShouldProcess || !urlAttribute.Value.Exists)
-			return;
-
 		GenerateStringRuleValidation(
 			writer,
 			property,
-			urlAttribute.Value.ValidationAttribute,
+			property.ValidationAttributes.Url,
 			"global::ZodSharp.Rules.UrlRule",
-			"Field '{0}' must be a valid URL.",
-			"invalid_string"
+			"Field '{displayName}' must be a valid URL.",
+			"url"
 		);
-	}
-
-	static void GeneratePhoneValidation(CodeWriter writer, ZodPropertyDescriptor property)
-	{
-		var phoneAttribute = property.ValidationAttributes.Phone;
-		if (!phoneAttribute.ShouldProcess || !phoneAttribute.Value.Exists)
-			return;
-
 		GenerateStringRuleValidation(
 			writer,
 			property,
-			phoneAttribute.Value.ValidationAttribute,
+			property.ValidationAttributes.Phone,
 			"global::ZodSharp.Rules.PhoneRule",
-			"Field '{0}' must be a valid phone number.",
-			"invalid_string"
+			"Field '{displayName}' must be a valid phone number.",
+			"phone"
 		);
-	}
-
-	static void GenerateCreditCardValidation(CodeWriter writer, ZodPropertyDescriptor property)
-	{
-		var creditCardAttribute = property.ValidationAttributes.CreditCard;
-		if (!creditCardAttribute.ShouldProcess || !creditCardAttribute.Value.Exists)
-			return;
-
 		GenerateStringRuleValidation(
 			writer,
 			property,
-			creditCardAttribute.Value.ValidationAttribute,
+			property.ValidationAttributes.CreditCard,
 			"global::ZodSharp.Rules.CreditCardRule",
-			"Field '{0}' must be a valid credit card number.",
-			"invalid_string"
+			"Field '{displayName}' must be a valid credit card number.",
+			"credit_card"
 		);
-	}
-
-	static void GenerateBase64StringValidation(CodeWriter writer, ZodPropertyDescriptor property)
-	{
-		var base64StringAttribute = property.ValidationAttributes.Base64String;
-		if (!base64StringAttribute.ShouldProcess || !base64StringAttribute.Value.Exists)
-			return;
-
 		GenerateStringRuleValidation(
 			writer,
 			property,
-			base64StringAttribute.Value.ValidationAttribute,
+			property.ValidationAttributes.Base64String,
 			"global::ZodSharp.Rules.Base64StringRule",
-			"Field '{0}' must be a valid Base64 string.",
-			"invalid_string"
+			"Field '{displayName}' must be a valid Base64 string.",
+			"base64"
 		);
 	}
 
-	static void GenerateStringRuleValidation(
+	static void GenerateStringRuleValidation<TAttribute>(
+		CodeWriter writer,
+		ZodPropertyDescriptor property,
+		GeneratorResult<TAttribute> attribute,
+		string ruleType,
+		string defaultFormat,
+		string format
+	)
+		where TAttribute : struct
+	{
+		if (!attribute.ShouldProcess || !TryGetValidationAttribute(attribute.Value, out var data))
+			return;
+
+		GenerateFormatValidation(
+			writer,
+			property,
+			data,
+			defaultFormat,
+			valueName => $"!new {ruleType}().IsValid({valueName})",
+			format
+		);
+	}
+
+	static bool TryGetValidationAttribute<TAttribute>(TAttribute attribute, out ValidationAttributeData data)
+	{
+		switch (attribute)
+		{
+			case UrlAttribute { Exists: true } url:
+				data = url.ValidationAttribute;
+				return true;
+			case PhoneAttribute { Exists: true } phone:
+				data = phone.ValidationAttribute;
+				return true;
+			case CreditCardAttributeData { Exists: true } creditCard:
+				data = creditCard.ValidationAttribute;
+				return true;
+			case Base64StringAttributeData { Exists: true } base64:
+				data = base64.ValidationAttribute;
+				return true;
+			default:
+				data = default;
+				return false;
+		}
+	}
+
+	/// <summary>
+	/// Emits a string format check (email, regex, URL, …): an empty string is valid, as in DataAnnotations, and
+	/// a failure reports <c>invalid_string</c> with category <c>invalid_format</c> and the format name.
+	/// </summary>
+	static void GenerateFormatValidation(
 		CodeWriter writer,
 		ZodPropertyDescriptor property,
 		ValidationAttributeData validationAttribute,
-		string ruleType,
 		string defaultFormat,
-		string errorCode
+		Func<string, string> invalidCondition,
+		string format,
+		(string Name, string ValueExpression)[]? extraValues = null,
+		params string[] ordinalNames
 	)
 	{
-		var propertyName = property.Name;
-		var displayName = property.DisplayName;
-		var messageExpression = BuildErrorMessageExpression(
-			validationAttribute,
-			defaultFormat,
-			displayName.StringLiteral()
-		);
+		var propertyValueName = CodeGenHelpers.GetLocalIdentifier(property.Name, "Value");
+		var message = BuildMessageTemplate(validationAttribute, defaultFormat, ordinalNames);
+		(string Name, string ValueExpression)[] values = [("format", format.Surround()), .. extraValues ?? []];
 
 		using (writer.OpenBlockScope())
 		{
-			var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
-			writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-			using (
-				writer.IfBlockScope(
-					$"{propertyValueName}.Length != 0 && !new {ruleType}().IsValid({propertyValueName})"
-				)
-			)
+			writer.Assignment("var", propertyValueName, $"value.{property.Name}");
+			using (writer.IfBlockScope($"{propertyValueName}.Length != 0 && {invalidCondition(propertyValueName)}"))
 			{
-				WriteValidationError(
+				WriteAddError(
 					writer,
-					errorCode,
-					messageExpression,
-					CodeGenHelpers.GetPathFieldName(propertyName),
-					"string"
+					ErrorExpression(
+						"\"invalid_string\"",
+						message,
+						PathOf(property),
+						MemberOf(property),
+						origin: StringOrigin,
+						category: Category("InvalidFormat"),
+						valuesExpression: ValuesExpression(values)
+					)
 				);
 			}
 		}
@@ -194,10 +165,9 @@ partial class ZodSchemaGenerator
 	static void StringLengthValidators(CodeWriter writer, ZodPropertyDescriptor property)
 	{
 		var propertyName = property.Name;
-		var displayName = property.DisplayName;
-		var propertyPath = CodeGenHelpers.GetPathFieldName(propertyName);
 		var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
 		var propertyLengthName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Length");
+		var countValues = ValuesExpression(("count", propertyLengthName));
 
 		var lengthAttr = property.ValidationAttributes.Length;
 		if (lengthAttr.ShouldProcess && lengthAttr.Value.Exists)
@@ -205,57 +175,31 @@ partial class ZodSchemaGenerator
 			var length = lengthAttr.Value;
 			if (length.MinimumLength >= 0 && length.MaximumLength >= length.MinimumLength)
 			{
-				using (writer.OpenBlockScope())
-				{
-					var tooSmallMessage = BuildMessageExpression(
-						length.ValidationAttribute,
-						$"{$"Field '{displayName}' must contain at least ".StringLiteral()} + FormatCount({length.MinimumLength}, {"character".Surround()}, {"characters".Surround()}) + {".".Surround()}",
-						displayName.StringLiteral(),
-						length.MaximumLength.ToString(CultureInfo.InvariantCulture),
-						length.MinimumLength.ToString(CultureInfo.InvariantCulture)
-					);
-					var tooBigMessage = BuildMessageExpression(
-						length.ValidationAttribute,
-						$"{$"Field '{displayName}' must contain no more than ".StringLiteral()} + FormatCount({length.MaximumLength}, {"character".Surround()}, {"characters".Surround()}) + {".".Surround()}",
-						displayName.StringLiteral(),
-						length.MaximumLength.ToString(CultureInfo.InvariantCulture),
-						length.MinimumLength.ToString(CultureInfo.InvariantCulture)
-					);
+				// LengthAttribute formats a custom message with (name, MinimumLength, MaximumLength).
+				var tooSmall = BuildMessageTemplate(
+					length.ValidationAttribute,
+					AtLeast(length.MinimumLength, "character", "characters"),
+					"minimum",
+					"maximum"
+				);
+				var tooBig = BuildMessageTemplate(
+					length.ValidationAttribute,
+					NoMoreThan(length.MaximumLength, "character", "characters"),
+					"minimum",
+					"maximum"
+				);
 
-					writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-					using (writer.IfBlockScope($"({propertyValueName} is not null)"))
-					{
-						writer.Assignment("var", propertyLengthName, $"{propertyValueName}.Length");
-
-						writer
-							.IfBlock(
-								$"{propertyLengthName} < {length.MinimumLength}",
-								w =>
-									WriteValidationError(
-										w,
-										"too_small",
-										tooSmallMessage,
-										propertyPath,
-										"string",
-										minimum: length.MinimumLength
-									)
-							)
-							.ElseIf(
-								$"{propertyLengthName} > {length.MaximumLength}",
-								w =>
-									WriteValidationError(
-										w,
-										"too_big",
-										tooBigMessage,
-										propertyPath,
-										"string",
-										maximum: length.MaximumLength
-									)
-							);
-					}
-				}
-
-				writer.NewLine();
+				WriteStringLengthCheck(
+					writer,
+					property,
+					"global::ZodSharp.Rules.LengthRule.ErrorCode",
+					length.MinimumLength,
+					length.MaximumLength,
+					tooSmall,
+					tooBig,
+					checkNull: true,
+					countValues
+				);
 			}
 		}
 
@@ -263,80 +207,62 @@ partial class ZodSchemaGenerator
 		if (stringLengthAttr.ShouldProcess && stringLengthAttr.Value.Exists)
 		{
 			var stringLength = stringLengthAttr.Value;
-			using (writer.OpenBlockScope())
-			{
-				var tooSmallMessage = BuildMessageExpression(
-					stringLength.ValidationAttribute,
-					$"{$"Field '{displayName}' must contain at least ".StringLiteral()} + FormatCount({stringLength.MinimumLength}, {"character".Surround()}, {"characters".Surround()}) + {".".Surround()}",
-					displayName.StringLiteral(),
-					stringLength.MaximumLength.ToString(CultureInfo.InvariantCulture),
-					stringLength.MinimumLength.ToString(CultureInfo.InvariantCulture)
-				);
-				var tooBigMessage = BuildMessageExpression(
-					stringLength.ValidationAttribute,
-					$"{$"Field '{displayName}' must contain no more than ".StringLiteral()} + FormatCount({stringLength.MaximumLength}, {"character".Surround()}, {"characters".Surround()}) + {".".Surround()}",
-					displayName.StringLiteral(),
-					stringLength.MaximumLength.ToString(CultureInfo.InvariantCulture),
-					stringLength.MinimumLength.ToString(CultureInfo.InvariantCulture)
-				);
 
-				writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-				writer.Assignment("var", propertyLengthName, $"{propertyValueName}.Length");
-				if (stringLength.MinimumLength > 0)
-				{
-					using (writer.IfBlockScope($"{propertyLengthName} < {stringLength.MinimumLength}"))
-					{
-						WriteValidationError(
-							writer,
-							"too_small",
-							tooSmallMessage,
-							propertyPath,
-							"string",
-							minimum: stringLength.MinimumLength
-						);
-					}
-				}
+			// StringLengthAttribute formats a custom message with (name, MaximumLength, MinimumLength).
+			var tooSmall = BuildMessageTemplate(
+				stringLength.ValidationAttribute,
+				AtLeast(stringLength.MinimumLength, "character", "characters"),
+				"maximum",
+				"minimum"
+			);
+			var tooBig = BuildMessageTemplate(
+				stringLength.ValidationAttribute,
+				NoMoreThan(stringLength.MaximumLength, "character", "characters"),
+				"maximum",
+				"minimum"
+			);
 
-				using (writer.IfBlockScope($"{propertyLengthName} > {stringLength.MaximumLength}"))
-				{
-					WriteValidationError(
-						writer,
-						"too_big",
-						tooBigMessage,
-						propertyPath,
-						"string",
-						maximum: stringLength.MaximumLength
-					);
-				}
-			}
-
-			writer.NewLine();
+			WriteStringLengthCheck(
+				writer,
+				property,
+				"global::ZodSharp.Rules.StringLengthRule.ErrorCode",
+				stringLength.MinimumLength,
+				stringLength.MaximumLength,
+				tooSmall,
+				tooBig,
+				checkNull: false,
+				countValues
+			);
 		}
 
 		var minLengthAttr = property.ValidationAttributes.MinLength;
 		if (minLengthAttr.ShouldProcess && minLengthAttr.Value.Exists && minLengthAttr.Value.Length > 0)
 		{
 			var minLength = minLengthAttr.Value.Length;
+			var message = BuildMessageTemplate(
+				minLengthAttr.Value.ValidationAttribute,
+				AtLeast(minLength, "character", "characters"),
+				"minimum"
+			);
+
 			using (writer.OpenBlockScope())
 			{
-				var messageExpression = BuildMessageExpression(
-					minLengthAttr.Value.ValidationAttribute,
-					$"{$"Field '{displayName}' must contain at least ".StringLiteral()} + FormatCount({minLength}, {"character".Surround()}, {"characters".Surround()}) + {".".Surround()}",
-					displayName.StringLiteral(),
-					minLength.ToString(CultureInfo.InvariantCulture)
-				);
-
 				writer.Assignment("var", propertyValueName, $"value.{propertyName}");
 				writer.Assignment("var", propertyLengthName, $"{propertyValueName}.Length");
 				using (writer.IfBlockScope($"{propertyLengthName} < {minLength}"))
 				{
-					WriteValidationError(
+					WriteAddError(
 						writer,
-						"too_small",
-						messageExpression,
-						propertyPath,
-						"string",
-						minimum: minLength
+						ErrorExpression(
+							"\"too_small\"",
+							message,
+							PathOf(property),
+							MemberOf(property),
+							origin: StringOrigin,
+							category: Category("TooSmall"),
+							lowerExpression: Including(minLength),
+							valuesExpression: countValues
+						)
 					);
 				}
 			}
@@ -348,26 +274,30 @@ partial class ZodSchemaGenerator
 		if (maxLengthAttr.ShouldProcess && maxLengthAttr.Value.Exists && maxLengthAttr.Value.Length >= 0)
 		{
 			var maxLength = maxLengthAttr.Value.Length;
+			var message = BuildMessageTemplate(
+				maxLengthAttr.Value.ValidationAttribute,
+				NoMoreThan(maxLength, "character", "characters"),
+				"maximum"
+			);
+
 			using (writer.OpenBlockScope())
 			{
-				var messageExpression = BuildMessageExpression(
-					maxLengthAttr.Value.ValidationAttribute,
-					$"{$"Field '{displayName}' must contain no more than ".StringLiteral()} + FormatCount({maxLength}, {"character".Surround()}, {"characters".Surround()}) + {".".Surround()}",
-					displayName.StringLiteral(),
-					maxLength.ToString(CultureInfo.InvariantCulture)
-				);
-
 				writer.Assignment("var", propertyValueName, $"value.{propertyName}");
 				writer.Assignment("var", propertyLengthName, $"{propertyValueName}.Length");
 				using (writer.IfBlockScope($"{propertyLengthName} > {maxLength}"))
 				{
-					WriteValidationError(
+					WriteAddError(
 						writer,
-						"too_big",
-						messageExpression,
-						propertyPath,
-						"string",
-						maximum: maxLength
+						ErrorExpression(
+							"\"too_big\"",
+							message,
+							PathOf(property),
+							MemberOf(property),
+							origin: StringOrigin,
+							category: Category("TooBig"),
+							upperExpression: Including(maxLength),
+							valuesExpression: countValues
+						)
 					);
 				}
 			}
@@ -375,4 +305,84 @@ partial class ZodSchemaGenerator
 			writer.NewLine();
 		}
 	}
+
+	/// <summary>
+	/// Emits a two-sided string length check that reports the rule's own code (<c>invalid_length</c>, the same
+	/// code the runtime <c>LengthRule</c>/<c>StringLengthRule</c> report), with the category by direction and
+	/// both bounds.
+	/// </summary>
+	static void WriteStringLengthCheck(
+		CodeWriter writer,
+		ZodPropertyDescriptor property,
+		string codeExpression,
+		int minimum,
+		int maximum,
+		MessageTemplate tooSmall,
+		MessageTemplate tooBig,
+		bool checkNull,
+		string countValues
+	)
+	{
+		var propertyValueName = CodeGenHelpers.GetLocalIdentifier(property.Name, "Value");
+		var propertyLengthName = CodeGenHelpers.GetLocalIdentifier(property.Name, "Length");
+		var lower = Including(minimum);
+		var upper = Including(maximum);
+
+		using (writer.OpenBlockScope())
+		{
+			writer.Assignment("var", propertyValueName, $"value.{property.Name}");
+			CodeWriter.BlockScope? nullGuard = checkNull
+				? writer.IfBlockScope($"({propertyValueName} is not null)")
+				: null;
+
+			writer.Assignment("var", propertyLengthName, $"{propertyValueName}.Length");
+			writer
+				.IfBlock(
+					$"{propertyLengthName} < {minimum}",
+					w =>
+						WriteAddError(
+							w,
+							ErrorExpression(
+								codeExpression,
+								tooSmall,
+								PathOf(property),
+								MemberOf(property),
+								origin: StringOrigin,
+								category: Category("TooSmall"),
+								lowerExpression: lower,
+								upperExpression: upper,
+								valuesExpression: countValues
+							)
+						)
+				)
+				.ElseIf(
+					$"{propertyLengthName} > {maximum}",
+					w =>
+						WriteAddError(
+							w,
+							ErrorExpression(
+								codeExpression,
+								tooBig,
+								PathOf(property),
+								MemberOf(property),
+								origin: StringOrigin,
+								category: Category("TooBig"),
+								lowerExpression: lower,
+								upperExpression: upper,
+								valuesExpression: countValues
+							)
+						)
+				);
+
+			nullGuard?.Dispose();
+		}
+
+		writer.NewLine();
+	}
+
+	static string AtLeast(int count, string singular, string plural) =>
+		$"Field '{{displayName}}' must contain at least {{minimum}} {(count == 1 ? singular : plural)}.";
+
+	static string NoMoreThan(int count, string singular, string plural) =>
+		$"Field '{{displayName}}' must contain no more than {{maximum}} {(count == 1 ? singular : plural)}.";
 }

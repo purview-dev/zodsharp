@@ -61,7 +61,7 @@ partial class ZodSchemaGeneratorTests
 			.That(generated)
 			.ContainsGeneratedCode("new global::Testing.NotEmptyRule<global::Testing.AssetId>(");
 		await Assert.That(generated).ContainsGeneratedCode(".IsValid(value)");
-		await Assert.That(generated).ContainsGeneratedCode("EmptyPath, origin:");
+		await Assert.That(generated).ContainsGeneratedCode("ZodRuleErrors.Create(assetIdCustomRule0, value, EmptyPath");
 		await Assert
 			.That(generated)
 			.ContainsGeneratedCode("((global::ZodSharp.Core.IZodRule)assetIdCustomRule0).Code ?? \"invalid_asset_id\"");
@@ -134,7 +134,7 @@ partial class ZodSchemaGeneratorTests
 			);
 		await Assert
 			.That(generated)
-			.ContainsGeneratedCode("origin: ((global::ZodSharp.Core.IZodRule)assetIdCustomRule0).Origin");
+			.ContainsGeneratedCode("ZodRuleErrors.Create(assetIdCustomRule0, value, EmptyPath, code:");
 	}
 
 	/// <summary>

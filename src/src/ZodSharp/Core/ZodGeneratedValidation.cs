@@ -152,30 +152,26 @@ public static class ZodGeneratedValidation
 			MessageFormat = named,
 		};
 
-		return error with { Message = ZodMessageFormat.Format(named, in error, System.Globalization.CultureInfo.InvariantCulture) };
+		return error with
+		{
+			Message = ZodMessageFormat.Format(named, in error, System.Globalization.CultureInfo.InvariantCulture),
+		};
 	}
 
 	/// <summary>
-	/// Creates the error for a failed rule, copying the rule's structured identity
-	/// (<see cref="ZodRuleErrors.Build"/>) and adding the member's parameters.
+	/// Adds the member's parameters (<c>displayName</c>, <c>member</c>, <c>declaringType</c>) to an error built
+	/// elsewhere (a shared <see cref="ZodIssues"/> factory or <see cref="ZodRuleErrors"/>), and optionally
+	/// replaces its message with a template such as an attribute's <c>ErrorMessage</c>.
 	/// </summary>
-	/// <param name="code">The error code.</param>
-	/// <param name="ruleMessage">The rule's own message, used when no <paramref name="messageFormat"/> is supplied.</param>
-	/// <param name="path">The error path.</param>
+	/// <param name="error">The error.</param>
 	/// <param name="member">The member that failed.</param>
-	/// <param name="rule">The rule instance; its <see cref="IZodRule"/> identity is copied when implemented.</param>
-	/// <param name="fallbackOrigin">The origin used when the rule reports none.</param>
-	/// <param name="fallbackCategory">The category used when the rule reports none.</param>
-	/// <param name="messageFormat">A message template that replaces the rule's message (an attribute <c>ErrorMessage</c>).</param>
+	/// <param name="fallbackCategory">The category used when the error has none.</param>
+	/// <param name="messageFormat">A message template that replaces the error's message.</param>
 	/// <param name="ordinalNames">The names positional placeholders in <paramref name="messageFormat"/> bind to.</param>
 	/// <returns>The error.</returns>
-	public static ValidationError RuleError(
-		string code,
-		string? ruleMessage,
-		ZodPath path,
+	public static ValidationError ForMember(
+		in ValidationError error,
 		ZodGeneratedMember member,
-		object? rule,
-		string? fallbackOrigin = null,
 		string? fallbackCategory = null,
 		string? messageFormat = null,
 		string[]? ordinalNames = null
@@ -183,19 +179,20 @@ public static class ZodGeneratedValidation
 	{
 		ArgumentNullException.ThrowIfNull(member);
 
-		var zodRule = rule as IZodRule;
-		var error = ZodRuleErrors.Build(code, ruleMessage ?? string.Empty, path, zodRule, fallbackOrigin);
-		error = error.WithParameters(CreateParameters(member, error.Parameters, null)) with
+		var result = error.WithParameters(CreateParameters(member, error.Parameters, null)) with
 		{
 			Category = error.Category ?? fallbackCategory,
 		};
 
 		if (messageFormat is null)
-			return error;
+			return result;
 
 		var named = ToNamedFormat(messageFormat, ordinalNames);
-		error = error with { MessageFormat = named };
-		return error with { Message = ZodMessageFormat.Format(named, in error, System.Globalization.CultureInfo.InvariantCulture) };
+		result = result with { MessageFormat = named };
+		return result with
+		{
+			Message = ZodMessageFormat.Format(named, in result, System.Globalization.CultureInfo.InvariantCulture),
+		};
 	}
 
 	/// <summary>
@@ -427,6 +424,24 @@ public static class ZodGeneratedValidation
 	/// <returns>The result.</returns>
 	public static ValidationResult<T> ToResult<T>(T value, List<ValidationError>? errors) =>
 		errors is null ? ValidationResult<T>.Success(value) : ValidationResult<T>.Failure(errors);
+
+	/// <summary>
+	/// Projects a pending result onto its errors (empty when valid), completing synchronously when the
+	/// validation did.
+	/// </summary>
+	/// <typeparam name="T">The validated type.</typeparam>
+	/// <param name="pending">The pending result.</param>
+	/// <returns>The errors.</returns>
+	public static ValueTask<ImmutableArray<ValidationError>> ToErrorsAsync<T>(ValueTask<ValidationResult<T>> pending)
+	{
+		return pending.IsCompletedSuccessfully ? new(ToErrors(pending.Result)) : AwaitErrors(pending);
+
+		static async ValueTask<ImmutableArray<ValidationError>> AwaitErrors(ValueTask<ValidationResult<T>> pending) =>
+			ToErrors(await pending.ConfigureAwait(false));
+	}
+
+	static ImmutableArray<ValidationError> ToErrors<T>(in ValidationResult<T> result) =>
+		result.IsSuccess || result.Errors.IsDefault ? [] : result.Errors;
 
 	/// <summary>
 	/// Resolves the element of <paramref name="collection"/> addressed by an index segment, without

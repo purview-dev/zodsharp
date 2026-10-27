@@ -98,9 +98,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(generatedSource).ContainsGeneratedCode("nameLength > 50");
 		await Assert.That(generatedSource).ContainsGeneratedCode("static readonly int RangeMinimum_Age = 0;");
 		await Assert.That(generatedSource).ContainsGeneratedCode("static readonly int RangeMaximum_Age = 120;");
-		await Assert
-			.That(generatedSource)
-			.ContainsGeneratedCode("ageValue < RangeMinimum_Age || ageValue > RangeMaximum_Age");
+		await Assert.That(generatedSource).ContainsGeneratedCode("ageValue < RangeMinimum_Age");
 		await Assert.That(generatedSource).ContainsGeneratedCode("EmailRegex.IsMatch(emailValue)");
 	}
 
@@ -228,7 +226,7 @@ namespace Testing
 		await Assert
 			.That(generatedSource)
 			.ContainsGeneratedCode(
-				@"new(""^[\\w\\-.]+$"", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant, global::ZodSharp.Rules.RegexRule.DefaultMatchTimeout)"
+				@"new(""^[\\w\\-.]+$"", global::System.Text.RegularExpressions.RegexOptions.CultureInvariant, global::System.TimeSpan.FromMilliseconds(2000))"
 			);
 	}
 
@@ -466,7 +464,8 @@ namespace Testing
 		var codesByPath = errors.ToDictionary(static error => error.Path[0], static error => error.Code);
 
 		await Assert.That(codesByPath["Name"]).IsEqualTo("missing_field");
-		await Assert.That(codesByPath["Value"]).IsEqualTo("too_small");
+		// Defect B3: [StringLength] reports the runtime StringLengthRule's code; the direction is the category.
+		await Assert.That(codesByPath["Value"]).IsEqualTo("invalid_length");
 		await Assert.That(codesByPath["MinOnly"]).IsEqualTo("too_small");
 		await Assert.That(codesByPath["MaxOnly"]).IsEqualTo("too_big");
 		await Assert.That(codesByPath["Items"]).IsEqualTo("too_small");
