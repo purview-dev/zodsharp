@@ -74,10 +74,20 @@ The platform's message store holds strings only, so Route 1 cannot carry codes o
 ```razor
 <EditForm Model="order" OnValidSubmit="Save">
     <ZodValidator ValidateOn="ZodValidationTrigger.Input" DebounceMilliseconds="250" />
-    <InputText @bind-Value="order.Customer.Email" @bind-Value:event="oninput" />
+    <LiveInputText @bind-Value="order.Customer.Email" />
     <ZodValidationMessage For="() => order.Customer.Email" ShowCode="true" />
     <ZodValidationSummary GroupByPath="true" />
 </EditForm>
+```
+
+`Input` debounces changes, so the input has to report one per keystroke. `InputText` commits on `onchange`, and a
+component binding has no event to choose (`@bind-Value:event="oninput"` on `InputText` fails at runtime), so derive
+from it:
+
+```razor
+@* LiveInputText.razor *@
+@inherits InputText
+<input @attributes="AdditionalAttributes" class="@CssClass" @bind="CurrentValueAsString" @bind:event="oninput" />
 ```
 
 | Parameter | Default | Meaning |
@@ -221,3 +231,49 @@ against the C# verdicts on the same inputs.
   localized messages need `AddLocalization()`, satellite assemblies and a startup culture.
 - WebAssembly is single-threaded: the obsolete synchronous `EditContext.Validate()` throws for models with
   async-only rules instead of blocking. Use `ValidateAsync`.
+
+## Sample
+
+`src/src/Examples.Blazor` (server) and `src/src/Examples.Blazor.Client` (WebAssembly) are a Blazor Web App with every
+render mode enabled. Both validate the `[ZodSchema]` models of `src/src/Examples.Shared` - the same types
+`Examples.MinimalApi` binds - and both `Program.cs` files register them the same way:
+
+```csharp
+builder.Services.AddZodSharpZodSharpExamplesSharedSchemas();   // generated, trim-safe
+builder.Services.AddZodSharpBlazor();
+```
+
+| Page | Render mode | Shows |
+| --- | --- | --- |
+| `/orders` | Interactive Server | Route 1: `<DataAnnotationsValidator />` over `CreateOrderRequest` - a nested `ShippingAddress`, a list of `Lines` and a dictionary of `AdditionalAddresses` - with field-level validation and each message next to its input. |
+| `/register` | Interactive WebAssembly | Route 2: `<ZodValidator ValidateOn="Change \| Input" DebounceMilliseconds="300">`, `ZodValidationMessage ShowCode`, the service-aware async email-uniqueness rule (its registry calls the server from the browser) with a pending indicator from `IsValidationPending`, and a button that posts without validating so the server's ProblemDetails are mapped back with `AddZodProblemDetails`. |
+| `/returns` | Static SSR | `FormName` + `[SupplyParameterFromForm]`, server validation of the posted form, and browser-side checks of `[StartsWith]` and `[UUID]` from `AddZodSharpClientValidation()`. |
+
+The server also exposes the minimal API the WebAssembly form posts to (`POST /api/customers`, validated by the .NET 11
+pipeline through the bridge `AddZodSharpBlazor` registers) and a culture switch (`/culture/set?culture=fr`). One
+`StringLocalizerZodMessageFormatter` over `SampleMessages.fr.resx` localizes the ProblemDetails, both form routes and
+the WebAssembly client, which adopts the server-rendered `<html lang>` at startup so `RunAsync` loads the French
+satellite assembly.
+
+```bash
+dotnet run --project src/src/Examples.Blazor
+just wasm-size          # trimmed WebAssembly publish (fails on IL2xxx/IL3xxx) + the size budget
+```
+
+### Verification
+
+- `Examples.Blazor.IntegrationTests` hosts the sample in memory (`WebApplicationFactory`): the static-SSR page's
+  `data-rules` carry `zod-startswith` and `zod-uuid`, an invalid nested and collection POST re-renders each message
+  next to its input (AngleSharp), and `POST /api/customers` returns the ZodValidationProblemDetails contract,
+  localized for `Accept-Language: fr`.
+- The `wasm-trimmed` PR job publishes the client trimmed with `-warnaserror` and checks the Brotli size of each
+  `Purview.ZodSharp*` assembly against `.config/wasm-size-baseline.json` (more than 10% growth fails;
+  `scripts/check-wasm-size.ps1 -Update` rewrites the baseline after an intended change).
+- The nightly `wasm-nightly.yml` workflow publishes the client with `RunAOTCompilation=true` (the `wasm-tools`
+  workload) and runs `tests/e2e/blazor-sample.e2e.mjs` against the published sample in Chromium.
+- The client does not reference Microsoft.Extensions.Validation directly and has no `[ValidatableType]`; nested,
+  collection and dictionary validation still works in the browser because the ZodSharp resolver supplies the type
+  info.
+- In a trimmed or AOT publish the `ZodSharp.Reflection.IsSupported` feature switch is off. Generated `[ZodSchema]`
+  models place every error exactly; a runtime schema's errors attach to the nearest object the trimmed app can still
+  resolve.

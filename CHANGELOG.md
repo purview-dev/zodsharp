@@ -196,6 +196,20 @@ Released versions correspond to `v<version>` GitHub releases.
   publishes with `PublishAot=true` and zero IL2xxx/IL3xxx warnings: a new `aot-sample` PR job publishes it for
   `linux-x64` with `-warnaserror` and smoke-tests the native binary, `just publish-aot-sample` runs the same publish
   locally, and `Examples.MinimalApi.IntegrationTests` starts it in memory.
+- **Examples.Blazor sample** (`src/src/Examples.Blazor` and its WebAssembly client `src/src/Examples.Blazor.Client`,
+  `net11.0`, not packed): a Blazor Web App over the same `Examples.Shared` models (plus a new `ReturnRequest` with
+  `[StartsWith]` and `[UUID]`). An interactive Server form uses `<DataAnnotationsValidator />` over a nested address,
+  order lines and a dictionary of addresses; an interactive WebAssembly form uses `<ZodValidator>` with debounced
+  `Change | Input` validation, `ZodValidationMessage` codes, a service-aware async uniqueness check with
+  `IsValidationPending`, and server ProblemDetails mapped back with `AddZodProblemDetails`; a static-SSR form gets
+  ZodSharp client rules from `AddZodSharpClientValidation()`. Messages switch between English and French. Both
+  `Program.cs` files register with `AddZodSharpZodSharpExamplesSharedSchemas()` and `AddZodSharpBlazor()`.
+  `Examples.Blazor.IntegrationTests` covers the client rules, the posted static-SSR form and the API contract.
+- **WebAssembly CI:** the `wasm-trimmed` PR job publishes the client trimmed with `-warnaserror` (zero IL2xxx/IL3xxx
+  warnings) and holds the Brotli size of every `Purview.ZodSharp*` assembly to `.config/wasm-size-baseline.json`
+  within 10% (`scripts/check-wasm-size.ps1`, `just wasm-size`). A nightly workflow (`wasm-nightly.yml`, also on
+  demand) publishes it with `RunAOTCompilation=true` and drives the published sample in Chromium, one form per render
+  mode.
 ### Breaking behaviour changes
 
 - **Dropped net8.0 and net9.0; supported target frameworks are net10.0 and net11.0.** Every package ships
