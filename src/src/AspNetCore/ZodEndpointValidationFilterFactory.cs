@@ -253,20 +253,30 @@ static class ZodEndpointValidationFilterFactory
 	/// <summary>
 	/// Adapts a validator registered without an untyped view (<see cref="IZodSchemaFactory.Register(Type, IZodSchemaValidator)"/>
 	/// with a validator that does not implement <see cref="IZodUntypedValidator"/>, as assembly scanning does for
-	/// validators generated before untyped support). Needs dynamic code, so it is skipped under Native AOT, where
-	/// validators must implement <see cref="IZodUntypedValidator"/> or be registered through
-	/// <see cref="IZodSchemaFactory.Register{T}(IZodSchemaValidator{T})"/>.
+	/// validators generated before untyped support, or a custom factory that does not implement
+	/// <see cref="IZodSchemaFactory.TryGetUntypedValidator"/>). Needs dynamic code, so it is skipped under Native AOT,
+	/// where such a parameter is not validated (or fails the endpoint build with <c>ThrowIfNoValidator</c>). Every
+	/// validator the current generator emits implements <see cref="IZodUntypedValidator"/>, and
+	/// <see cref="IZodSchemaFactory.Register{T}(IZodSchemaValidator{T})"/> adds the untyped view itself, so neither path
+	/// reaches this.
 	/// </summary>
+	/// <remarks>
+	/// The reflection is limited to closing <see cref="Adapt{T}"/>, a private method with no
+	/// <c>[DynamicallyAccessedMembers]</c> requirement on <c>T</c>, which is why the IL2060 suppression is safe.
+	/// </remarks>
 	[UnconditionalSuppressMessage(
 		"Trimming",
 		"IL2060:MakeGenericMethod",
 		Justification = "Adapt<T> has no DynamicallyAccessedMembers requirements on T."
 	)]
+#if !NET9_0_OR_GREATER
 	[UnconditionalSuppressMessage(
 		"AOT",
 		"IL3050:RequiresDynamicCode",
-		Justification = "Guarded by RuntimeFeature.IsDynamicCodeSupported; under Native AOT the adapter is not created."
+		Justification = "Guarded by RuntimeFeature.IsDynamicCodeSupported, which Native AOT compiles to false. net8.0's "
+			+ "reference assembly does not mark it [FeatureGuard], so only that target needs the suppression."
 	)]
+#endif
 	static IZodUntypedValidator? AdaptRegisteredValidator(IZodSchemaFactory factory, Type validatedType)
 	{
 		if (!RuntimeFeature.IsDynamicCodeSupported || validatedType.ContainsGenericParameters)
