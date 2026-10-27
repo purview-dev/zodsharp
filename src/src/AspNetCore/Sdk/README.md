@@ -66,6 +66,21 @@ pipeline's response and mirrors the status (an `ErrorType` with 422, `StatusCode
 `WithZodSharpValidation()` on a pipeline-validated endpoint skips the parameters the pipeline already covers,
 so nothing is validated twice.
 
+### .NET 11: client-side validation for static-SSR Blazor forms
+
+```csharp
+builder.Services.AddRazorComponents();
+builder.Services.AddZodSharpClientValidation();   // before or after AddRazorComponents
+builder.Services.AddZodSharpBlazor();             // Purview.ZodSharp.Blazor ships the browser validators
+```
+
+Statically rendered `EditForm`s then carry client rules for ZodSharp rule attributes (`[StartsWith]`, `[UUID]`,
+`[MinValue]`, …) beside ASP.NET Core's DataAnnotations rules, and for runtime schemas registered with
+`o.AddSchema<TModel>(schema)`. ASP.NET Core has no public composition API, so the registered
+`ClientValidationProvider` is decorated and its rendered payload merged; a provider registered later replaces it,
+which a Development startup check reports. Client rules only improve the user experience - the server still
+validates every post.
+
 ## Exception handling
 
 Thrown `ZodException`s (e.g. from a value object's strict deserialization) are converted automatically by
