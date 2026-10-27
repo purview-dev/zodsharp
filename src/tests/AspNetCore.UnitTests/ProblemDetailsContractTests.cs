@@ -12,7 +12,7 @@ namespace ZodSharp.AspNetCore;
 
 /// <summary>
 /// One ProblemDetails contract on every path: the endpoint filter, a thrown <see cref="ZodException"/> handled by
-/// <see cref="ZodExceptionHandler"/>, and the manual results.
+/// <see cref="ZodExceptionHandler"/>, the manual results and, on .NET 11, the built-in validation pipeline.
 /// </summary>
 public class ProblemDetailsContractTests
 {
@@ -38,6 +38,31 @@ public class ProblemDetailsContractTests
 
 	static readonly OrderRequest InvalidOrder = new() { Email = "nope", Items = [new() { Quantity = 0 }] };
 
+	static readonly string[] Paths =
+	[
+		"/filter",
+		"/exception",
+		"/manual",
+		"/typed",
+		"/problem",
+#if NET11_0_OR_GREATER
+		"/pipeline",
+		"/pipeline-and-filter",
+#endif
+	];
+
+	/// <summary>
+	/// On .NET 11 the built-in validation pipeline would answer first; the endpoints that exercise the other paths
+	/// opt out of it so each path is the one that writes the response.
+	/// </summary>
+	static TBuilder ModeBOnly<TBuilder>(TBuilder builder)
+		where TBuilder : IEndpointConventionBuilder =>
+#if NET11_0_OR_GREATER
+		builder.DisableValidation();
+#else
+		builder;
+#endif
+
 	[Test]
 	public async Task ProblemDetails_GivenTheSameErrors_IsIdenticalOnEveryPath(CancellationToken cancellationToken)
 	{
@@ -49,44 +74,61 @@ public class ProblemDetailsContractTests
 					options.ConfigureFactory = static factory => factory.Register(new OrderRequestValidator())
 				);
 				services.AddZodSharpProblemDetails(static options => options.Registry = new ErrorTypeRegistry());
+#if NET11_0_OR_GREATER
+				// Mode A: the built-in validation pipeline validates every endpoint below that does not opt out.
+				services.AddZodSharpValidation();
+#endif
 			},
 			app =>
 			{
 				app.UseExceptionHandler();
 
-				app.MapPost("/filter", (OrderRequest order) => TypedResults.Ok()).WithZodSharpValidation();
-				app.MapPost(
-					"/exception",
-					IResult (OrderRequest order) => throw new ZodException(OrderRequestValidator.Check(order))
+				ModeBOnly(app.MapPost("/filter", (OrderRequest order) => TypedResults.Ok()).WithZodSharpValidation());
+				ModeBOnly(
+					app.MapPost(
+						"/exception",
+						IResult (OrderRequest order) => throw new ZodException(OrderRequestValidator.Check(order))
+					)
 				);
-				app.MapPost(
-					"/manual",
-					IResult (OrderRequest order, IZodSchemaFactory factory, HttpContext context) =>
-						factory.Validate(order) is { IsSuccess: false } result
-							? result.ToValidationProblem(context)
-							: TypedResults.Ok()
+				ModeBOnly(
+					app.MapPost(
+						"/manual",
+						IResult (OrderRequest order, IZodSchemaFactory factory, HttpContext context) =>
+							factory.Validate(order) is { IsSuccess: false } result
+								? result.ToValidationProblem(context)
+								: TypedResults.Ok()
+					)
 				);
-				app.MapPost(
-					"/typed",
-					IResult (OrderRequest order, IZodSchemaFactory factory, HttpContext context) =>
-						factory.Validate(order) is { IsSuccess: false } result
-							? ZodTypedResults.ValidationProblem(result, context)
-							: TypedResults.Ok()
+				ModeBOnly(
+					app.MapPost(
+						"/typed",
+						IResult (OrderRequest order, IZodSchemaFactory factory, HttpContext context) =>
+							factory.Validate(order) is { IsSuccess: false } result
+								? ZodTypedResults.ValidationProblem(result, context)
+								: TypedResults.Ok()
+					)
 				);
-				app.MapPost(
-					"/problem",
-					IResult (OrderRequest order, IZodSchemaFactory factory, HttpContext context) =>
-						factory.Validate(order) is { IsSuccess: false } result
-							? ZodTypedResults.Problem(result, context)
-							: TypedResults.Ok()
+				ModeBOnly(
+					app.MapPost(
+						"/problem",
+						IResult (OrderRequest order, IZodSchemaFactory factory, HttpContext context) =>
+							factory.Validate(order) is { IsSuccess: false } result
+								? ZodTypedResults.Problem(result, context)
+								: TypedResults.Ok()
+					)
 				);
+#if NET11_0_OR_GREATER
+				// Mode A alone, and Mode A with the (then no-op) filter.
+				app.MapPost("/pipeline", (OrderRequest order) => TypedResults.Ok());
+				app.MapPost("/pipeline-and-filter", (OrderRequest order) => TypedResults.Ok()).WithZodSharpValidation();
+#endif
 			},
 			cancellationToken
 		);
 
 		// Act
 		List<(string Path, int Status, string? ContentType, string Body)> responses = [];
-		foreach (var path in new[] { "/filter", "/exception", "/manual", "/typed", "/problem" })
+		foreach (var path in Paths)
 		{
 			using var response = await app.Client.PostAsJsonAsync(path, InvalidOrder, cancellationToken);
 			var body = await response.Content.ReadAsStringAsync(cancellationToken);

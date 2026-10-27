@@ -49,7 +49,11 @@ partial class ZodSchemaGeneratorTests
 				"public global::Microsoft.Extensions.Options.ValidateOptionsResult Validate(string? name, global::Testing.AdminPortal options)"
 			);
 		await Assert.That(generated).ContainsGeneratedCode("var schemaResult = AdminPortalSchema.Validate(options);");
-		await Assert.That(generated).ContainsGeneratedCode("schemaResult.Errors.Select(static error => error.Message)");
+		await Assert
+			.That(generated)
+			.ContainsGeneratedCode(
+				"schemaResult.Errors.Select(static error => global::ZodSharp.Core.ZodGeneratedValidation.FormatOptionsFailure(error))"
+			);
 	}
 
 	[Test]

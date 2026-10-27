@@ -49,7 +49,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert
 			.That(generated)
 			.ContainsGeneratedCode(
-				"((global::ZodSharp.Core.IZodRule)statusEnumRule).Code ?? global::ZodSharp.Rules.EnumRule<global::Testing.ExampleEnum>.ErrorCode"
+				"global::ZodSharp.Core.ZodRuleErrors.Create(statusEnumRule, statusEnumRuleValue, Paths.Status, \"enum\")"
 			);
 	}
 

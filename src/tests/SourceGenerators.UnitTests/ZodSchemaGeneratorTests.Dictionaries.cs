@@ -50,7 +50,7 @@ namespace Testing
 		var generated = driverResult.GetSource("WebAppKitOptionsSchema");
 		await Assert.That(generated).IsNotNull();
 		await Assert.That(generated!).Contains("variantsEntry.Value");
-		await Assert.That(generated!).Contains("variantsEntry.Key.ToString()");
+		await Assert.That(generated!).Contains("ZodPathSegment.Key(variantsEntry.Key)");
 	}
 
 	[Test]
@@ -124,7 +124,7 @@ namespace Testing
 
 		var generated = driverResult.GetSource("ContainerSchema");
 		await Assert.That(generated).IsNotNull();
-		await Assert.That(generated!).ContainsGeneratedCode("ChildSchema.Validate(");
+		await Assert.That(generated!).ContainsGeneratedCode("ChildSchema.ValidateCore(");
 
 		// Act
 		var (isSuccess, errors) = ValidateDictionary(assembly!, "Container", "Items", ("a", "Name", "x"));

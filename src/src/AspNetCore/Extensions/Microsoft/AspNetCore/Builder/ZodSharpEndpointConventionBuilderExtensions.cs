@@ -32,6 +32,12 @@ public static class ZodSharpEndpointConventionBuilderExtensions
 	/// The endpoint also advertises a <c>400</c> <c>application/problem+json</c> response, so OpenAPI documents
 	/// show the error contract without extra annotations.
 	/// </para>
+	/// <para>
+	/// On .NET 11, when <c>AddZodSharpValidation()</c> registers ZodSharp with the built-in validation pipeline and
+	/// the endpoint has not opted out with <c>DisableValidation()</c>, parameters the pipeline already validates
+	/// with ZodSharp are skipped (logged once, at <c>Debug</c>, when the endpoint is built), so nothing is validated
+	/// twice.
+	/// </para>
 	/// </remarks>
 	/// <typeparam name="TBuilder">The builder type.</typeparam>
 	/// <param name="builder">The endpoint convention builder.</param>
@@ -48,9 +54,7 @@ public static class ZodSharpEndpointConventionBuilderExtensions
 		ZodEndpointValidationOptions options = new();
 		configure?.Invoke(options);
 
-		builder.AddEndpointFilterFactory(
-			ZodEndpointValidationFilterFactory.Create(options, requiredType: null, requiredTypeResolver: null)
-		);
+		ZodEndpointValidationFilterFactory.AddTo(builder, options, requiredType: null, requiredTypeResolver: null);
 		AddValidationMetadata(builder, options);
 		return builder;
 	}

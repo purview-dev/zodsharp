@@ -40,6 +40,32 @@ they produce the same body: `errors` keyed by dotted paths (`Items[0].Quantity`)
 structured `ValidationIssue`s (`path`, `segments`, `code`, `category`, `origin`, typed `minimum`/`maximum`,
 `inclusive`, `message`, safe `parameters`, `unionErrors`) and a `traceId`. Configure it with
 `ZodProblemDetailsOptions` (path naming, error-type registry, status selection, parameter merging).
+
+### .NET 11: the built-in validation pipeline
+
+On `net11.0`, pair `AddZodSharpProblemDetails()` with `AddZodSharpValidation()` from
+[Purview.ZodSharp.Extensions.Validation](https://www.nuget.org/packages/Purview.ZodSharp.Extensions.Validation).
+ASP.NET Core then validates every endpoint and route group itself, and the response is the same ZodSharp
+contract. DataAnnotations errors are merged into it.
+
+```csharp
+builder.Services.AddZodSharp(o => o.ScanAssemblies.Add(typeof(Order).Assembly));
+builder.Services.AddZodSharpValidation();
+builder.Services.AddValidation();   // when DataAnnotations parameters/types or union bodies are used
+builder.Services.AddZodSharpProblemDetails();
+
+var orders = app.MapGroup("/orders");                // validated automatically
+orders.MapPost("/", (Order order, [Range(1, 100)] int page) => TypedResults.Ok());
+orders.MapPost("/import", (Import i) => TypedResults.Ok()).DisableValidation();
+```
+
+`AddZodSharpProblemDetails()` registers `AddProblemDetails()` and a scoped `ZodRequestValidationReport` that
+collects the bridge's full errors. It also composes a `CustomizeProblemDetails` callback, which rewrites the
+pipeline's response and mirrors the status (an `ErrorType` with 422, `StatusCodeSelector`,
+`StatusCodeOverride`). The ZodSharp callback runs first, and any callback of your own runs after it.
+`WithZodSharpValidation()` on a pipeline-validated endpoint skips the parameters the pipeline already covers,
+so nothing is validated twice.
+
 ## Exception handling
 
 Thrown `ZodException`s (e.g. from a value object's strict deserialization) are converted automatically by

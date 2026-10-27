@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,18 +22,30 @@ static class ZodEndpointValidationFilterFactory
 {
 	internal const string InvalidJsonCode = "invalid_json";
 
-	public static Func<EndpointFilterFactoryContext, EndpointFilterDelegate, EndpointFilterDelegate> Create(
+	/// <summary>
+	/// Adds the filter factory to every endpoint <paramref name="builder"/> builds. The factory sees the endpoint's
+	/// final metadata (it runs after every convention), which the double-validation guard needs.
+	/// </summary>
+	public static void AddTo<TBuilder>(
+		TBuilder builder,
 		ZodEndpointValidationOptions options,
 		Type? requiredType,
 		Func<IZodSchemaFactory, IZodUntypedValidator?>? requiredTypeResolver
-	) => (context, next) => Build(context, next, options, requiredType, requiredTypeResolver);
+	)
+		where TBuilder : IEndpointConventionBuilder =>
+		builder.Add(endpoint =>
+			endpoint.FilterFactories.Add(
+				(context, next) => Build(context, next, options, requiredType, requiredTypeResolver, endpoint.Metadata)
+			)
+		);
 
 	static EndpointFilterDelegate Build(
 		EndpointFilterFactoryContext context,
 		EndpointFilterDelegate next,
 		ZodEndpointValidationOptions options,
 		Type? requiredType,
-		Func<IZodSchemaFactory, IZodUntypedValidator?>? requiredTypeResolver
+		Func<IZodSchemaFactory, IZodUntypedValidator?>? requiredTypeResolver,
+		IList<object> endpointMetadata
 	)
 	{
 		var services = context.ApplicationServices;
@@ -40,6 +53,12 @@ static class ZodEndpointValidationFilterFactory
 		var isService = services.GetService<IServiceProviderIsService>();
 		var method = context.MethodInfo;
 		var parameters = method.GetParameters();
+#if NET11_0_OR_GREATER
+		var pipeline = ZodValidationPipelineGuard.Create(services, endpointMetadata);
+		List<string>? coveredByPipeline = null;
+#else
+		_ = endpointMetadata;
+#endif
 
 		if (factory is null && (requiredType is not null || options.ThrowIfNoValidator))
 		{
@@ -55,6 +74,17 @@ static class ZodEndpointValidationFilterFactory
 			var parameter = parameters[index];
 			var parameterType = parameter.ParameterType;
 			var validatedType = Nullable.GetUnderlyingType(parameterType) ?? parameterType;
+
+#if NET11_0_OR_GREATER
+			// The built-in pipeline already validates this parameter with ZodSharp (outermost filter, before this one).
+			if (pipeline?.Covers(parameter) == true)
+			{
+				(coveredByPipeline ??= []).Add(
+					parameter.Name ?? index.ToString(System.Globalization.CultureInfo.InvariantCulture)
+				);
+				continue;
+			}
+#endif
 
 			IZodUntypedValidator? validator = null;
 			if (requiredType is not null)
@@ -93,6 +123,11 @@ static class ZodEndpointValidationFilterFactory
 				)
 			);
 		}
+
+#if NET11_0_OR_GREATER
+		if (coveredByPipeline is not null)
+			pipeline!.LogCovered(DescribeHandler(method), coveredByPipeline);
+#endif
 
 		if (targets.Count == 0)
 			return next;

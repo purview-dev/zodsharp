@@ -58,23 +58,15 @@ partial class ZodSchemaGenerator
 
 		var propertyName = property.Name;
 		var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
-		var displayName = property.DisplayName;
-		var messageExpression = BuildErrorMessageExpression(
+		var message = BuildMessageTemplate(
 			allowedValues.Value.ValidationAttribute,
-			"Field '{0}' must be one of the following values: {1}.",
-			displayName.StringLiteral(),
-			displayValues.StringLiteral()
+			"Field '{displayName}' must be one of the following values: {options}.",
+			"options"
 		);
 
 		writer.IfBlock(
 			$"!({comparisonExpression.Replace("propertyValue", propertyValueName)})",
-			ifBody =>
-				WriteValidationError(
-					ifBody,
-					"invalid_value",
-					messageExpression,
-					CodeGenHelpers.GetPathFieldName(propertyName)
-				)
+			ifBody => WriteAddError(ifBody, ValueSetError(property, message, displayValues))
 		);
 
 		writer.NewLine();
@@ -101,27 +93,34 @@ partial class ZodSchemaGenerator
 
 		var propertyName = property.Name;
 		var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
-		var displayName = property.DisplayName;
-		var messageExpression = BuildErrorMessageExpression(
+		var message = BuildMessageTemplate(
 			deniedValues.Value.ValidationAttribute,
-			"Field '{0}' contains a denied value. Disallowed values: {1}.",
-			displayName.StringLiteral(),
-			displayValues.StringLiteral()
+			"Field '{displayName}' contains a denied value. Disallowed values: {options}.",
+			"options"
 		);
 
 		writer.IfBlock(
 			$"{comparisonExpression.Replace("propertyValue", propertyValueName)}",
-			ifBody =>
-				WriteValidationError(
-					ifBody,
-					"invalid_value",
-					messageExpression,
-					CodeGenHelpers.GetPathFieldName(propertyName)
-				)
+			ifBody => WriteAddError(ifBody, ValueSetError(property, message, displayValues))
 		);
 
 		writer.NewLine();
 	}
+
+	/// <summary>
+	/// The <c>invalid_value</c> error for an allowed/denied value set, carrying the listed values as the
+	/// <c>options</c> parameter and the value's Zod type as its origin.
+	/// </summary>
+	static string ValueSetError(ZodPropertyDescriptor property, MessageTemplate message, string displayValues) =>
+		ErrorExpression(
+			"\"invalid_value\"",
+			message,
+			PathOf(property),
+			MemberOf(property),
+			origin: $"global::ZodSharp.Core.ZodTypeNames.Of(typeof({property.PropertyType.AsTypeReference()}))",
+			category: Category("InvalidValue"),
+			valuesExpression: ValuesExpression(("options", displayValues.StringLiteral()))
+		);
 
 	static bool TryBuildValueSetComparison(
 		CodeWriter writer,
@@ -173,13 +172,34 @@ partial class ZodSchemaGenerator
 			}
 
 			parts.Add(
-				value.Value is string text
-					? text
-					: Convert.ToString(value.Value, CultureInfo.InvariantCulture) ?? string.Empty
+				value.Value is string text ? text
+				: TryGetEnumMemberName(value, out var memberName) ? memberName
+				: Convert.ToString(value.Value, CultureInfo.InvariantCulture) ?? string.Empty
 			);
 		}
 
 		return string.Join(", ", parts);
+	}
+
+	/// <summary>
+	/// Resolves the member name of an enum constant, so a value set lists <c>Active</c> rather than <c>1</c>.
+	/// </summary>
+	static bool TryGetEnumMemberName(TypedConstant constant, out string memberName)
+	{
+		memberName = string.Empty;
+		if (constant.Type is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType || constant.Value is null)
+			return false;
+
+		foreach (var member in enumType.GetMembers())
+		{
+			if (member is IFieldSymbol { HasConstantValue: true } field && Equals(field.ConstantValue, constant.Value))
+			{
+				memberName = field.Name;
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	static bool TryBuildTypedConstantExpression(

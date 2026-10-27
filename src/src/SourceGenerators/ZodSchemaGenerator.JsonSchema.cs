@@ -342,7 +342,7 @@ partial class ZodSchemaGenerator
 		// A scalar rule adapter wraps a rule written against the scalar's underlying value; the wrapped rule
 		// owns the JSON Schema meaning, so construct that one. The adapter itself has none.
 		var ruleType = (rule.AdaptedFrom ?? rule.RuleType).AsTypeReference().RenderFullName;
-		var arguments = rule.Arguments.Count == 0 ? string.Empty : $"({string.Join(", ", rule.Arguments)})";
+		var arguments = $"({string.Join(", ", rule.Arguments)})";
 		return $"new {ruleType}{arguments}";
 	}
 

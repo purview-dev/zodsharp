@@ -78,6 +78,67 @@ the same `HttpValidationProblemDetails` payload produced by `ToHttpValidationPro
 passes through to the handler. `ToValidationProblem()` is the handler-side equivalent, returning a status-400
 `Results.ValidationProblem` `IResult`.
 
+## .NET 11: the built-in validation pipeline
+
+On .NET 11, ASP.NET Core validates minimal-API parameters itself through Microsoft.Extensions.Validation.
+`AddZodSharpValidation()` (package `Purview.ZodSharp.Extensions.Validation`) makes ZodSharp the first
+validation resolver, and on `net11.0` `AddZodSharpProblemDetails()` turns the pipeline's response into the
+full ZodSharp contract:
+
+```csharp
+builder.Services.AddZodSharp(options => options.ScanAssemblies.Add(typeof(Order).Assembly));
+builder.Services.AddZodSharpValidation();
+builder.Services.AddValidation();          // when DataAnnotations parameters/types or union bodies are used
+builder.Services.AddZodSharpProblemDetails();
+
+var app = builder.Build();
+
+var orders = app.MapGroup("/orders");      // every endpoint is validated - no per-endpoint call
+orders.MapPost("/", (Order order, [Range(1, 100)] int page) => TypedResults.Ok());
+orders.MapPost("/import", (ImportRequest request) => TypedResults.Ok()).DisableValidation();
+```
+
+How it works:
+
+- `AddZodSharpProblemDetails()` registers a scoped `ZodRequestValidationReport`, which is the bridge's
+  `IZodValidationReportSink`. The bridge appends every full-fidelity ZodSharp error of the request to it.
+- It composes `ProblemDetailsOptions.CustomizeProblemDetails` with a post-configure step. The ZodSharp callback
+  runs **first**, then whatever callback the application configured, whether before or after the call or
+  through its `problemDetails` argument. The application can therefore still change the result. A later
+  `PostConfigure` that replaces the callback outright removes the ZodSharp one.
+- It calls `AddProblemDetails()`, without which the callback never runs.
+
+In the callback, for an `HttpValidationProblemDetails`:
+
+| Report | Result |
+|---|---|
+| ZodSharp errors reported | `ZodProblemDetailsWriter.Apply` rebuilds `errors` and `issues`. ZodSharp keys are replaced and DataAnnotations entries are kept, each with a `dataannotations` issue. `status`, `title`, `type` and `detail` come from the highest `ErrorType`, then `StatusCodeSelector` and `StatusCodeOverride` are applied. The status is mirrored to the response. |
+| Empty (DataAnnotations-only failure) | The payload is left untouched, apart from the `issues` projection (`ProjectDataAnnotationsIssues`, default `true`). |
+
+The body is byte-identical (apart from `traceId`) to the one the endpoint filter, `ZodExceptionHandler` and
+`ToValidationProblem()` produce.
+
+Notes:
+
+- **Localization**: register `AddLocalization()` and an `IZodMessageFormatter`, for example
+  `new StringLocalizerZodMessageFormatter(factory, sharedResourceType: typeof(ValidationMessages))`. Messages
+  follow `Accept-Language` (with `UseRequestLocalization`); codes and paths are unchanged.
+- **Unions**: a union parameter is claimed by the runtime parameter resolver, which the application's
+  `AddValidation()` call adds. The active case is reported under `Value` (`Value.Email`).
+- **Double validation**: `WithZodSharpValidation()` on an endpoint the pipeline validates skips the parameters
+  the bridge covers, logging that once at `Debug` when the endpoint is built. On a `DisableValidation()` endpoint
+  it validates as usual.
+- **OpenAPI**: the `Purview.ZodSharp.AspNetCore.OpenApi` operation transformer adds the validation problem
+  response for endpoints with a ZodSharp-known parameter. No endpoint metadata is added by the pipeline path.
+
+| | `WithZodSharpValidation()` filter | Built-in pipeline |
+|---|---|---|
+| Frameworks | net8.0 to net11.0 | net11.0 |
+| Scope | endpoints and groups you mark | every endpoint; opt out with `DisableValidation()` |
+| DataAnnotations parameters | not validated | validated and merged into one body |
+| Binding failures | `OnBindingFailure` | ASP.NET Core's own response |
+| Response metadata | adds the 400 response | the OpenAPI transformer |
+
 ## Exception handling
 
 A thrown `ZodException` (for example from `Parse`, `GetValueOrThrow()`, or a value object's generated

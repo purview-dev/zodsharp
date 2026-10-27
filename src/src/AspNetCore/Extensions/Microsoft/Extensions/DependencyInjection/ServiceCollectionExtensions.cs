@@ -134,6 +134,14 @@ public static class ServiceCollectionExtensions
 		/// Also adds the ZodSharp ProblemDetails JSON metadata to the minimal-API <c>JsonOptions</c> resolver chain,
 		/// so the payload serializes under Native AOT.
 		/// </para>
+		/// <para>
+		/// On .NET 11 it also enriches the built-in Microsoft.Extensions.Validation pipeline (<c>AddZodSharpValidation()</c>):
+		/// it registers a scoped <c>ZodRequestValidationReport</c> as the bridge's report sink and composes a
+		/// <see cref="ProblemDetailsOptions.CustomizeProblemDetails"/> callback that rewrites the pipeline's
+		/// <see cref="HttpValidationProblemDetails"/> with <see cref="ZodProblemDetailsWriter.Apply"/> and mirrors the
+		/// status to the response. The ZodSharp callback runs first and any callback the application configures - before
+		/// or after this call - runs after it, so the application keeps the last word.
+		/// </para>
 		/// </remarks>
 		public IServiceCollection AddZodSharpProblemDetails(
 			Action<ZodProblemDetailsOptions>? configure = null,
@@ -147,10 +155,34 @@ public static class ServiceCollectionExtensions
 
 			AddProblemDetailsWriter(services);
 			services.AddExceptionHandler<ZodExceptionHandler>();
+#if NET11_0_OR_GREATER
+			AddValidationPipelineEnrichment(services);
+#endif
 
 			return services;
 		}
 	}
+
+#if NET11_0_OR_GREATER
+	/// <summary>
+	/// Enriches the built-in Microsoft.Extensions.Validation pipeline's ProblemDetails with the ZodSharp contract: a
+	/// scoped <see cref="ZodRequestValidationReport"/> collects the bridge's full errors for the request, and a
+	/// composed <see cref="ProblemDetailsOptions.CustomizeProblemDetails"/> callback rewrites the response from it.
+	/// </summary>
+	static void AddValidationPipelineEnrichment(IServiceCollection services)
+	{
+		services.TryAddScoped<ZodRequestValidationReport>();
+		services.TryAddScoped<ZodSharp.Extensions.Validation.IZodValidationReportSink>(static sp =>
+			sp.GetRequiredService<ZodRequestValidationReport>()
+		);
+		services.TryAddEnumerable(
+			ServiceDescriptor.Singleton<
+				IPostConfigureOptions<ProblemDetailsOptions>,
+				ZodValidationProblemDetailsCustomizer
+			>()
+		);
+	}
+#endif
 
 	static void AddProblemDetailsWriter(IServiceCollection services)
 	{

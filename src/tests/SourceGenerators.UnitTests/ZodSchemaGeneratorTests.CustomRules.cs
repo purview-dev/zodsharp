@@ -49,7 +49,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(generated).ContainsGeneratedCode("\"No spaces allowed.\"");
 		await Assert.That(generated).ContainsGeneratedCode(".IsValid(");
 		await Assert.That(generated).ContainsGeneratedCode("\"invalid_string\"");
-		await Assert.That(generated).ContainsGeneratedCode("origin: \"string\"");
+		await Assert.That(generated).ContainsGeneratedCode("fallbackOrigin: \"string\"");
 	}
 
 	[Test]

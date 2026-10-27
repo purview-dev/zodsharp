@@ -27,9 +27,7 @@ public static class ZodSharpRouteHandlerBuilderExtensions
 		ArgumentNullException.ThrowIfNull(builder);
 
 		ZodEndpointValidationOptions options = new();
-		builder.AddEndpointFilterFactory(
-			ZodEndpointValidationFilterFactory.Create(options, typeof(T), ResolveTyped<T>)
-		);
+		ZodEndpointValidationFilterFactory.AddTo(builder, options, typeof(T), ResolveTyped<T>);
 		ZodSharpEndpointConventionBuilderExtensions.AddValidationMetadata(builder, options);
 		return builder;
 	}

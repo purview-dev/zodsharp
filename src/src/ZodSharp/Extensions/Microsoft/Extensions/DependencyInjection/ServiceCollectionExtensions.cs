@@ -22,7 +22,8 @@ public static class ServiceCollectionExtensions
 		/// <remarks>
 		/// The factory is registered only if one is not already present — repeated calls (with any
 		/// <paramref name="configure"/> callback) are ignored so earlier registrations are never
-		/// overwritten.
+		/// overwritten. Every <see cref="ZodSchemaRegistration"/> in the container (added by the generated
+		/// <c>AddZodSharp{Assembly}Schemas()</c> extensions) is applied before <paramref name="configure"/>.
 		/// </remarks>
 		public IServiceCollection AddZodSharpFactory(Action<IZodSchemaFactory>? configure = null)
 		{
@@ -30,10 +31,30 @@ public static class ServiceCollectionExtensions
 			{
 				ZodSchemaFactory factory = new();
 
+				foreach (var registration in sp.GetServices<ZodSchemaRegistration>())
+					registration.Register(factory);
+
 				configure?.Invoke(factory);
 
 				return factory;
 			});
+
+			return services;
+		}
+
+		/// <summary>
+		/// Adds a deferred validator registration, applied when the <see cref="IZodSchemaFactory"/> is first
+		/// resolved, and ensures a factory is registered. Generated <c>AddZodSharp{Assembly}Schemas()</c>
+		/// extensions call this with the assembly's generated registration method.
+		/// </summary>
+		/// <param name="register">Registers validators into the factory.</param>
+		/// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
+		public IServiceCollection AddZodSchemaRegistration(Action<IZodSchemaFactory> register)
+		{
+			ArgumentNullException.ThrowIfNull(register);
+
+			services.AddSingleton(new ZodSchemaRegistration(register));
+			services.AddZodSharpFactory();
 
 			return services;
 		}

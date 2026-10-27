@@ -20,15 +20,18 @@ namespace ZodSharp.Extensions.Validation;
 public sealed class ZodValidatableParameterInfo : IValidatableParameterInfo
 {
 	readonly ZodValidatableTypeInfo? _typeInfo;
+	readonly IValidatableTypeInfo? _delegateInfo;
 
 	internal ZodValidatableParameterInfo(
 		string name,
 		Type parameterType,
 		bool allowsNull,
 		bool isCollection,
-		ZodValidatableTypeInfo? typeInfo
+		ZodValidatableTypeInfo? typeInfo,
+		IValidatableTypeInfo? delegateInfo = null
 	)
 	{
+		_delegateInfo = delegateInfo;
 		Name = name;
 		ParameterType = parameterType;
 		AllowsNull = allowsNull;
@@ -64,6 +67,12 @@ public sealed class ZodValidatableParameterInfo : IValidatableParameterInfo
 
 		if (value is null && AllowsNull)
 			return;
+
+		if (_delegateInfo is not null)
+		{
+			_delegateInfo.Validate(value, context);
+			return;
+		}
 
 		if (_typeInfo is not null || value is not IEnumerable elements)
 		{
@@ -102,6 +111,12 @@ public sealed class ZodValidatableParameterInfo : IValidatableParameterInfo
 
 		if (value is null && AllowsNull)
 			return;
+
+		if (_delegateInfo is not null)
+		{
+			await _delegateInfo.ValidateAsync(value, context, cancellationToken).ConfigureAwait(false);
+			return;
+		}
 
 		if (_typeInfo is not null || value is not IEnumerable elements)
 		{

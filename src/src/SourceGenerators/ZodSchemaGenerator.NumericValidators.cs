@@ -6,6 +6,12 @@ namespace ZodSharp.SourceGenerators;
 
 partial class ZodSchemaGenerator
 {
+	/// <summary>
+	/// Emits the <c>[Range]</c> check. A failure reports the runtime <c>RangeRule</c>'s code
+	/// (<c>invalid_range</c>) with the category by direction (<c>too_small</c>/<c>too_big</c>), the origin of the
+	/// value's Zod type, and both bounds with their exclusivity (<c>MinimumIsExclusive</c>,
+	/// <c>MaximumIsExclusive</c>).
+	/// </summary>
 	static void GenerateRangeValidations(CodeWriter writer, ZodPropertyDescriptor property)
 	{
 		var rangeAttribute = property.ValidationAttributes.Range;
@@ -17,38 +23,79 @@ partial class ZodSchemaGenerator
 			return;
 
 		var propertyName = property.Name;
-		var displayName = property.DisplayName;
 		var propertyValueName = CodeGenHelpers.GetLocalIdentifier(propertyName, "Value");
+		var minimumField = GetRangeMinimumFieldName(propertyName);
+		var maximumField = GetRangeMaximumFieldName(propertyName);
 		var minComparison = range.MinimumIsExclusive ? "<=" : "<";
 		var maxComparison = range.MaximumIsExclusive ? ">=" : ">";
 		var minimumDescription = range.MinimumIsExclusive ? "greater than" : "greater than or equal to";
 		var maximumDescription = range.MaximumIsExclusive ? "less than" : "less than or equal to";
+
+		// The bounds are reported as typed values (Lower/Upper); the message keeps the attribute's literal
+		// rendering, so a converted range ("1.5", a date string) reads exactly as declared.
 		var minimumDisplay = Convert.ToString(range.Minimum, CultureInfo.InvariantCulture) ?? string.Empty;
 		var maximumDisplay = Convert.ToString(range.Maximum, CultureInfo.InvariantCulture) ?? string.Empty;
-		var messageExpression = BuildMessageExpression(
+		var message = BuildMessageTemplate(
 			range.ValidationAttribute,
-			$"Field '{displayName}' must be {minimumDescription} {minimumDisplay} and {maximumDescription} {maximumDisplay}.".StringLiteral(),
-			displayName.StringLiteral(),
-			minimumDisplay.StringLiteral(),
-			maximumDisplay.StringLiteral()
+			$"Field '{{displayName}}' must be {minimumDescription} {{minimum}} and {maximumDescription} {{maximum}}.",
+			"minimum",
+			"maximum"
 		);
+		var values = ValuesExpression(
+			("minimum", minimumDisplay.StringLiteral()),
+			("maximum", maximumDisplay.StringLiteral())
+		);
+		var lower = Bound(minimumField, !range.MinimumIsExclusive);
+		var upper = Bound(maximumField, !range.MaximumIsExclusive);
+		var origin = $"global::ZodSharp.Core.ZodTypeNames.Of(typeof({property.PropertyType.AsTypeReference()}))";
 
-		var comparisonExpression = property.CompareViaCompareTo
-			? $"{propertyValueName}.CompareTo({GetRangeMinimumFieldName(propertyName)}) {minComparison} 0 || {propertyValueName}.CompareTo({GetRangeMaximumFieldName(propertyName)}) {maxComparison} 0"
-			: $"{propertyValueName} {minComparison} {GetRangeMinimumFieldName(propertyName)} || {propertyValueName} {maxComparison} {GetRangeMaximumFieldName(propertyName)}";
+		var tooSmallCondition = property.CompareViaCompareTo
+			? $"{propertyValueName}.CompareTo({minimumField}) {minComparison} 0"
+			: $"{propertyValueName} {minComparison} {minimumField}";
+		var tooBigCondition = property.CompareViaCompareTo
+			? $"{propertyValueName}.CompareTo({maximumField}) {maxComparison} 0"
+			: $"{propertyValueName} {maxComparison} {maximumField}";
 
 		using (writer.OpenBlockScope())
 		{
 			writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-			using (writer.IfBlockScope(comparisonExpression))
-			{
-				WriteValidationError(
-					writer,
-					"invalid_range",
-					messageExpression,
-					CodeGenHelpers.GetPathFieldName(propertyName)
+			writer
+				.IfBlock(
+					tooSmallCondition,
+					w =>
+						WriteAddError(
+							w,
+							ErrorExpression(
+								"global::ZodSharp.Rules.RangeRule<int>.ErrorCode",
+								message,
+								PathOf(property),
+								MemberOf(property),
+								origin: origin,
+								category: Category("TooSmall"),
+								lowerExpression: lower,
+								upperExpression: upper,
+								valuesExpression: values
+							)
+						)
+				)
+				.ElseIf(
+					tooBigCondition,
+					w =>
+						WriteAddError(
+							w,
+							ErrorExpression(
+								"global::ZodSharp.Rules.RangeRule<int>.ErrorCode",
+								message,
+								PathOf(property),
+								MemberOf(property),
+								origin: origin,
+								category: Category("TooBig"),
+								lowerExpression: lower,
+								upperExpression: upper,
+								valuesExpression: values
+							)
+						)
 				);
-			}
 		}
 
 		writer.NewLine();

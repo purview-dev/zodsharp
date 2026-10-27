@@ -3,7 +3,8 @@ name: purview-zodsharp-aspnetcore
 description: >-
   Use when wiring Purview.ZodSharp into ASP.NET Core or any DI host - ProblemDetails from a
   ValidationResult or a thrown ZodException, minimal-API endpoint and route-group validation with
-  WithZodSharpValidation, ZodTypedResults, the shared ZodProblemDetailsWriter, registering
+  WithZodSharpValidation or the .NET 11 built-in validation pipeline (AddZodSharpValidation), ZodTypedResults,
+  the shared ZodProblemDetailsWriter, registering
   IZodSchemaFactory with AddZodSharp or AddZodSharpFactory, validating options objects (including .NET 11
   async startup validation), and mapping error codes to HTTP statuses with ErrorType.
 license: MIT
@@ -103,6 +104,48 @@ endpoint filter **factory** picks the parameters once, when the endpoint is buil
   `OnBindingFailure = PassThrough` (default) keeps ASP.NET Core's response; `ConvertToProblemDetails`
   writes the ZodSharp contract. A malformed JSON body never reaches filters.
 - Adds 400 `application/problem+json` response metadata (`ProducesStatusCode`), so OpenAPI shows it.
+
+## .NET 11: the built-in validation pipeline (Mode A)
+
+```csharp
+builder.Services.AddZodSharp(o => o.ScanAssemblies.Add(typeof(Order).Assembly));
+builder.Services.AddZodSharpValidation();       // Purview.ZodSharp.Extensions.Validation bridge
+builder.Services.AddValidation();               // only for DataAnnotations parameters/types and unions
+builder.Services.AddZodSharpProblemDetails();
+
+var orders = app.MapGroup("/orders");           // validated automatically - no per-endpoint call
+orders.MapPost("/", (Order order, [Range(1, 100)] int page) => …);
+orders.MapPost("/import", (Import i) => …).DisableValidation();   // the standard opt-out
+```
+
+On `net11.0`, `AddZodSharpProblemDetails()` also registers a scoped `ZodRequestValidationReport` (the
+bridge's `IZodValidationReportSink`) and composes `ProblemDetailsOptions.CustomizeProblemDetails`:
+
+- **ZodSharp errors reported** - the pipeline's `HttpValidationProblemDetails` is rewritten with
+  `ZodProblemDetailsWriter.Apply`: ZodSharp keys replaced, DataAnnotations entries kept (with
+  `dataannotations` issues), status from `ErrorType`/selector/override mirrored to the response. The body
+  is byte-identical to the filter, exception and manual paths (apart from `traceId`).
+- **DataAnnotations only** - left as written, plus the `issues` projection (`ProjectDataAnnotationsIssues`).
+- **Ordering** - ZodSharp's callback runs first, then any callback configured before or after (including
+  the `problemDetails` argument), so the application has the last word. It is a post-configure step: a
+  later `PostConfigure` that *replaces* the callback drops ZodSharp's.
+- `AddProblemDetails()` is registered for you; without it the callback never runs.
+- Localize with `AddLocalization()` plus an `IZodMessageFormatter` such as the bridge's
+  `StringLocalizerZodMessageFormatter(factory, sharedResourceType: typeof(Messages))`.
+- Union parameters are claimed by the runtime parameter resolver, so call `AddValidation()`; the active
+  case is reported under `Value` (`Value.Email`).
+- `WithZodSharpValidation()` on a pipeline-validated endpoint skips the parameters the bridge covers (one
+  `Debug` log when the endpoint is built), so nothing validates twice. With `DisableValidation()` it
+  validates as usual.
+- OpenAPI: the `Purview.ZodSharp.AspNetCore.OpenApi` operation transformer adds the error response.
+
+| | Filter (`WithZodSharpValidation`) | Pipeline (`AddZodSharpValidation`) |
+| --- | --- | --- |
+| Frameworks | net8.0-net11.0 | net11.0 |
+| Scope | endpoints/groups you mark | every endpoint; opt out with `DisableValidation()` |
+| DataAnnotations parameters | not validated | validated and merged into one body |
+| Binding-failure handling | `OnBindingFailure` | ASP.NET Core's own |
+| Endpoint metadata | adds the 400 response | via the OpenAPI transformer |
 
 ## Manual results and exceptions
 

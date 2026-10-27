@@ -115,13 +115,50 @@ partial class SourceGenLibrary
 		}
 
 		// Exactly one valid method.
+		var method = validCandidates[0];
 		return new CustomValidationMethodData(
 			IsConfigured: true,
 			Exists: true,
 			IsValid: true,
 			MethodName: methodName,
 			InvocationKind: invocationKind
-		);
+		)
+		{
+			RequiresServices = method.Parameters.Length == 3,
+			AsyncMembers = GetAsyncMembers(method),
+		};
+	}
+
+	/// <summary>
+	/// Reads the member names declared by <c>[ZodAsyncMember(...)]</c> on the custom validation method, in
+	/// declaration order and without duplicates.
+	/// </summary>
+	static EquatableArray<string> GetAsyncMembers(IMethodSymbol method)
+	{
+		var builder = ImmutableArray.CreateBuilder<string>();
+		HashSet<string> seen = new(StringComparer.Ordinal);
+		foreach (var attribute in method.GetAttributes())
+		{
+			if (
+				attribute.AttributeClass is not { Name: "ZodAsyncMemberAttribute" } attributeClass
+				|| attributeClass.ContainingNamespace?.ToDisplayString() != TypeLibraryGenerator.ZodSharpNamespace
+			)
+			{
+				continue;
+			}
+
+			foreach (var argument in attribute.ConstructorArguments)
+			{
+				var values = argument.Kind == TypedConstantKind.Array ? argument.Values : [argument];
+				foreach (var value in values)
+				{
+					if (value.Value is string { Length: > 0 } name && seen.Add(name))
+						builder.Add(name);
+				}
+			}
+		}
+
+		return new(builder.ToImmutable());
 	}
 
 	static (INamedTypeSymbol?, List<IMethodSymbol>) FindCandidatesFromSchemaValidator(
@@ -264,8 +301,9 @@ partial class SourceGenLibrary
 			}
 		}
 
-		// Must have exactly two parameters.
-		if (method.Parameters.Length != 2)
+		// Must have two parameters (value, CancellationToken), or three for the service-aware shape
+		// (value, IServiceProvider, CancellationToken).
+		if (method.Parameters.Length is not (2 or 3))
 		{
 			diagnostics.Add(
 				ReportableDiagnostic.Create(
@@ -296,8 +334,22 @@ partial class SourceGenLibrary
 			);
 		}
 
-		// Second parameter must be CancellationToken.
-		var secondParam = method.Parameters[1];
+		// A service-aware method takes the caller's services second.
+		if (method.Parameters.Length == 3 && !IsServiceProvider(method.Parameters[1].Type))
+		{
+			diagnostics.Add(
+				ReportableDiagnostic.Create(
+					DiagnosticLibrary.CustomValidationInvalidParameterCount,
+					true,
+					methodLocation,
+					method.Name,
+					typeName
+				)
+			);
+		}
+
+		// The last parameter must be CancellationToken.
+		var secondParam = method.Parameters[method.Parameters.Length - 1];
 		if (!TypeLibraryGenerator.CancellationToken.Equals(secondParam.Type))
 		{
 			diagnostics.Add(
@@ -359,6 +411,10 @@ partial class SourceGenLibrary
 				classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
 			)
 		);
+
+	static bool IsServiceProvider(ITypeSymbol type) =>
+		type is INamedTypeSymbol { Name: "IServiceProvider", ContainingNamespace.Name: "System" } named
+		&& named.ContainingNamespace.ContainingNamespace is { IsGlobalNamespace: true };
 
 	static bool IsValidIdentifier(string name) =>
 		!string.IsNullOrWhiteSpace(name) && SyntaxFacts.IsValidIdentifier(name);
