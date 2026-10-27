@@ -50,6 +50,9 @@
 		<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="11.0.0-rc.3.26522.148" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="11.0.0-rc.3.26522.148" />
 		<PackageVersion Include="Microsoft.Extensions.Localization" Version="$(MicrosoftExtensionsVersion)" />
+		<!-- Test-only: hosts the Blazor sample in memory and parses its HTML (Examples.Blazor.IntegrationTests). -->
+		<PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(AspNetCoreTestHostVersion)" />
+		<PackageVersion Include="AngleSharp" Version="1.8.6" />
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsVersion)" />
 		<PackageVersion
 			Include="Microsoft.Extensions.DependencyInjection.Abstractions"
