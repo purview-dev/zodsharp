@@ -13,7 +13,7 @@ namespace ZodSharp.Rules;
 /// <c>System.ComponentModel.DataAnnotations</c>.
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct RangeRule<T> : Core.IValidationRule<T>, Core.IZodRule
+public readonly record struct RangeRule<T> : Core.IValidationRule<T>, Core.IZodRule, Core.IZodFailureDescriber<T>
 	where T : IComparable<T>
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
@@ -26,7 +26,7 @@ public readonly record struct RangeRule<T> : Core.IValidationRule<T>, Core.IZodR
 	readonly T _maximum;
 	readonly bool _minimumIsExclusive;
 	readonly bool _maximumIsExclusive;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="RangeRule{T}"/> struct.
@@ -50,7 +50,7 @@ public readonly record struct RangeRule<T> : Core.IValidationRule<T>, Core.IZodR
 		_maximum = maximum;
 		_minimumIsExclusive = minimumIsExclusive;
 		_maximumIsExclusive = maximumIsExclusive;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -83,5 +83,17 @@ public readonly record struct RangeRule<T> : Core.IValidationRule<T>, Core.IZodR
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	Core.ErrorBound? Core.IZodRule.Lower => new Core.ErrorBound(_minimum, !_minimumIsExclusive);
+
+	Core.ErrorBound? Core.IZodRule.Upper => new Core.ErrorBound(_maximum, !_maximumIsExclusive);
+
+	// The Zod issue code follows the bound that failed.
+	Core.ZodRuleFailure Core.IZodFailureDescriber<T>.DescribeFailure(in T value)
+	{
+		var comparison = value.CompareTo(_minimum);
+		var belowMinimum = _minimumIsExclusive ? comparison <= 0 : comparison < 0;
+		return new(belowMinimum ? Core.ZodIssueCategories.TooSmall : Core.ZodIssueCategories.TooBig);
+	}
 }

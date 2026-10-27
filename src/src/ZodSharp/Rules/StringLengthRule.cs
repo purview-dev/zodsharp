@@ -9,7 +9,12 @@ namespace ZodSharp.Rules;
 /// declared by <c>System.ComponentModel.DataAnnotations</c>.
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct StringLengthRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct StringLengthRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		Core.IZodFailureDescriber<string>,
+		Core.IZodStringFailureDescriber
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_length";
@@ -19,7 +24,7 @@ public readonly record struct StringLengthRule : Core.IValidationRule<string>, C
 
 	readonly int _maximumLength;
 	readonly int _minimumLength;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="StringLengthRule"/> struct.
@@ -32,7 +37,7 @@ public readonly record struct StringLengthRule : Core.IValidationRule<string>, C
 	{
 		_maximumLength = maximumLength;
 		_minimumLength = minimumLength;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -75,5 +80,22 @@ public readonly record struct StringLengthRule : Core.IValidationRule<string>, C
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Including(_minimumLength);
+
+	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(_maximumLength);
+
+	Core.ZodRuleFailure Core.IZodFailureDescriber<string>.DescribeFailure(in string value) =>
+		Describe(value.LengthOrDefault());
+
+	Core.ZodRuleFailure Core.IZodStringFailureDescriber.DescribeFailure(ReadOnlySpan<char> value) =>
+		Describe(value.Length);
+
+	// The Zod issue code follows the bound that failed.
+	Core.ZodRuleFailure Describe(int length) =>
+		new(
+			length < _minimumLength ? Core.ZodIssueCategories.TooSmall : Core.ZodIssueCategories.TooBig,
+			RuleParameters.Count(length)
+		);
 }

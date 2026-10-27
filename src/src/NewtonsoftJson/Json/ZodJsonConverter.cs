@@ -17,20 +17,32 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 		JsonSerializer serializer
 	)
 	{
+		// Capture the location before the value is consumed, so validation errors are reported under it.
+		var path = reader.Path;
+		var (line, position) = LineInfo(reader as IJsonLineInfo);
+
 		var token = JToken.Load(reader);
 		var validationSerializer = CreateSerializerWithoutThisConverter(serializer);
-		var deserialized =
-			token.ToObject<T>(validationSerializer)
-			?? throw new JsonSerializationException("Failed to deserialize JSON");
 
-		var result = schema.Validate(deserialized);
-		if (!result.IsSuccess)
+		T deserialized;
+		try
 		{
-			var errorMessages = string.Join(", ", result.Errors.Select(e => e.Message));
-			throw new JsonSerializationException($"Validation failed: {errorMessages}");
+			deserialized =
+				token.ToObject<T>(validationSerializer)
+				?? throw new JsonSerializationException("Failed to deserialize JSON", path, line, position, null);
+		}
+		catch (ZodNewtonsoftJsonValidationException nested)
+		{
+			// A validating converter for a nested value only knows its path within this token; locate it
+			// under this value's path too.
+			throw new ZodNewtonsoftJsonValidationException(nested.Errors, path, line, position);
 		}
 
-		return result.Value;
+		var result = schema.Validate(deserialized);
+
+		return result.IsSuccess
+			? result.Value
+			: throw new ZodNewtonsoftJsonValidationException(result.Errors, path, line, position);
 	}
 
 	public override void WriteJson(JsonWriter writer, T? value, JsonSerializer serializer)
@@ -43,14 +55,14 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 
 		var result = schema.Validate(value);
 		if (!result.IsSuccess)
-		{
-			var errorMessages = string.Join(", ", result.Errors.Select(e => e.Message));
-			throw new JsonSerializationException($"Validation failed: {errorMessages}");
-		}
+			throw new ZodNewtonsoftJsonValidationException(result.Errors, writer.Path, 0, 0);
 
 		var token = JToken.FromObject(value, CreateSerializerWithoutThisConverter(serializer));
 		token.WriteTo(writer);
 	}
+
+	static (int Line, int Position) LineInfo(IJsonLineInfo? info) =>
+		info is { } lineInfo && lineInfo.HasLineInfo() ? (lineInfo.LineNumber, lineInfo.LinePosition) : (0, 0);
 
 	JsonSerializer CreateSerializerWithoutThisConverter(JsonSerializer serializer)
 	{

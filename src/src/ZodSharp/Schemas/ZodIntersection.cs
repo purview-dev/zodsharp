@@ -27,7 +27,19 @@ public class ZodIntersection<T>(IZodSchema<T, T> left, IZodSchema<T, T> right) :
 		if (leftResult.IsSuccess && rightResult.IsSuccess)
 			return ValidationResult<T>.Success(value);
 
-		List<ValidationError> allErrors = [.. leftResult.Errors, .. rightResult.Errors];
+		// Both sides often report the same issue (a shared base schema); report it once.
+		List<ValidationError> allErrors = [.. leftResult.Errors];
+		foreach (var error in rightResult.Errors)
+		{
+			if (!allErrors.Exists(existing => IsSameIssue(existing, error)))
+				allErrors.Add(error);
+		}
+
 		return ValidationResult<T>.Failure(allErrors);
 	}
+
+	static bool IsSameIssue(ValidationError left, ValidationError right) =>
+		string.Equals(left.Code, right.Code, StringComparison.Ordinal)
+		&& left.FullPath == right.FullPath
+		&& string.Equals(left.Message, right.Message, StringComparison.Ordinal);
 }

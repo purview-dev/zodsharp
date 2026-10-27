@@ -35,11 +35,11 @@ public readonly record struct CidrRule : Core.IValidationRule<string>, Core.IStr
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value and <c>{1}</c> the required type.</summary>
-	public const string MessageFormat = "Invalid {1} CIDR: {0}";
+	/// <summary>Gets the default message format; <c>{1}</c> is the required type. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Invalid {1} CIDR";
 
 	readonly CidrRuleType _ruleType;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="CidrRule"/> struct with the default rule type (Any).
@@ -51,7 +51,6 @@ public readonly record struct CidrRule : Core.IValidationRule<string>, Core.IStr
 	public CidrRule()
 	{
 		_ruleType = CidrRuleType.Any;
-		_message = MessageFormat;
 	}
 
 	/// <summary>
@@ -71,7 +70,7 @@ public readonly record struct CidrRule : Core.IValidationRule<string>, Core.IStr
 	public CidrRule(CidrRuleType ruleType = CidrRuleType.Any, string? message = null, string? code = null)
 	{
 		_ruleType = ruleType;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -116,12 +115,7 @@ public readonly record struct CidrRule : Core.IValidationRule<string>, Core.IStr
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
-	public string GetErrorMessage(in string value) =>
-		RuleMessage.Format(
-			_message ?? MessageFormat,
-			value,
-			_ruleType == CidrRuleType.Any ? "IPv4/IPv6" : _ruleType.ToString()
-		);
+	public string GetErrorMessage(in string value) => RuleMessage.Format(_message ?? MessageFormat, value, TypeName);
 
 	/// <summary>
 	/// Gets the error message for a failed span validation.
@@ -129,18 +123,36 @@ public readonly record struct CidrRule : Core.IValidationRule<string>, Core.IStr
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(ReadOnlySpan<char> value) =>
-		RuleMessage.Format(
-			_message ?? MessageFormat,
-			value.ToString(),
-			_ruleType == CidrRuleType.Any ? "IPv4/IPv6" : _ruleType.ToString()
-		);
+		RuleMessage.Format(_message ?? MessageFormat, value.ToString(), TypeName);
+
+	string TypeName =>
+		_ruleType switch
+		{
+			CidrRuleType.IPv4 => "IPv4",
+			CidrRuleType.IPv6 => "IPv6",
+			CidrRuleType.Any => "IPv4/IPv6",
+			_ => "IPv4/IPv6",
+		};
+
+	string FormatName =>
+		_ruleType switch
+		{
+			CidrRuleType.IPv4 => "cidrv4",
+			CidrRuleType.IPv6 => "cidrv6",
+			CidrRuleType.Any => "cidr",
+			_ => "cidr",
+		};
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format(FormatName);
 
 	/// <summary>
 	/// CIDR notation has no JSON Schema format, so the rule is recorded as unsupported and described by the

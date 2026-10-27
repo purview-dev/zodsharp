@@ -33,10 +33,35 @@ public class ZodDiscriminatedUnion(
 
 	static readonly Func<object, string?> MissingDiscriminatorAccessor = static _ => null;
 
+	// The option keys in a deterministic order for messages and parameters: declaration order when built by
+	// ZodDiscriminatedUnionBuilder, otherwise ordinal order. The dictionary's own enumeration order is
+	// hash-based, so it could differ between processes.
+	readonly ImmutableArray<string> _optionKeys = [.. options.Keys.Order(StringComparer.Ordinal)];
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="ZodDiscriminatedUnion"/> class, listing the options in
+	/// <paramref name="optionOrder"/> in messages and parameters.
+	/// </summary>
+	/// <param name="discriminator">The discriminator field name.</param>
+	/// <param name="options">The union options.</param>
+	/// <param name="optionOrder">The option keys in declaration order.</param>
+	internal ZodDiscriminatedUnion(
+		string discriminator,
+		ImmutableDictionary<string, IZodSchema<object, object>> options,
+		ImmutableArray<string> optionOrder
+	)
+		: this(discriminator, options)
+	{
+		_optionKeys = optionOrder;
+	}
+
 	// Exposed to the JSON Schema exporter, which exports the union as oneOf with the discriminator recorded.
 	internal string Discriminator => discriminator;
 
 	internal ImmutableDictionary<string, IZodSchema<object, object>> Options => options;
+
+	internal ImmutableArray<string> OptionKeys => _optionKeys;
+
 	/// <summary>
 	/// Parses and validates the value using the discriminated union.
 	/// </summary>
@@ -46,9 +71,7 @@ public class ZodDiscriminatedUnion(
 	{
 		if (value == null)
 		{
-			return ValidationResult<object>.Failure(
-				new ValidationError("invalid_type", "Expected object, but got null", [])
-			);
+			return ValidationResult<object>.Failure(ZodIssues.NullValue(ZodTypeNames.Object));
 		}
 
 		var discriminatorValue = GetDiscriminatorValue(value);
@@ -56,24 +79,36 @@ public class ZodDiscriminatedUnion(
 		if (discriminatorValue is null)
 		{
 			return ValidationResult<object>.Failure(
-				new ValidationError("missing_discriminator", $"Discriminator field '{discriminator}' not found", [])
+				DiscriminatorError(ZodIssueCodes.MissingDiscriminator, ZodMessages.MissingDiscriminator)
 			);
 		}
 
 		if (!options.TryGetValue(discriminatorValue, out var schema))
 		{
 			return ValidationResult<object>.Failure(
-				new ValidationError(
-					"invalid_discriminator",
-					$"Invalid discriminator value '{discriminatorValue}'. Expected one of: {string.Join(", ", options.Keys)}",
-					[]
-				)
+				DiscriminatorError(ZodIssueCodes.InvalidDiscriminator, ZodMessages.InvalidDiscriminator)
 			);
 		}
 
 		// Success!
 		return schema.Validate(value);
 	}
+
+	// Discriminator failures are reported at the discriminator's own path, as Zod does. The received value is
+	// not echoed: it is caller input.
+	ValidationError DiscriminatorError(string code, string template) =>
+		ZodIssues.Formatted(
+			code,
+			ZodIssueCategories.InvalidUnion,
+			template,
+			ZodPath.Member(discriminator),
+			null,
+			new Dictionary<string, object?>(StringComparer.Ordinal)
+			{
+				[ZodIssueParameters.Discriminator] = discriminator,
+				[ZodIssueParameters.Options] = _optionKeys,
+			}
+		);
 
 	string? GetDiscriminatorValue(object value)
 	{

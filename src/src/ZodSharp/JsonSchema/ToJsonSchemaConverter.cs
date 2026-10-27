@@ -318,8 +318,11 @@ public static class ToJsonSchemaConverter
 		JsonSchemaDefinition result = new() { OneOf = [] };
 		result.SetVendorExtension("x-zod-discriminator", schema.Discriminator);
 
-		foreach (var (value, option) in schema.Options.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+		foreach (var value in schema.OptionKeys)
 		{
+			if (!schema.Options.TryGetValue(value, out var option))
+				continue;
+
 			var converted = ConvertSchema(option, ctx);
 			converted.SetVendorExtension("x-zod-discriminatorValue", value);
 			result.OneOf.Add(converted);

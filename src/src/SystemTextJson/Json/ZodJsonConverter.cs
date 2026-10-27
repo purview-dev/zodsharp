@@ -34,17 +34,24 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 	{
 		// Buffer the current token so we can re-read it after extracting the value.
 		using var document = JsonDocument.ParseValue(ref reader);
-		var deserialized =
-			JsonSerializer.Deserialize(document.RootElement, TypeInfoFor(options))
-			?? throw new JsonException("Failed to deserialize JSON");
-		var result = schema.Validate(deserialized);
-		if (!result.IsSuccess)
+		T deserialized;
+		try
 		{
-			var errorMessages = string.Join(", ", result.Errors.Select(e => e.Message));
-			throw new JsonException($"Validation failed: {errorMessages}");
+			deserialized =
+				JsonSerializer.Deserialize(document.RootElement, TypeInfoFor(options))
+				?? throw new JsonException("Failed to deserialize JSON");
 		}
+		catch (ZodJsonValidationException nested)
+		{
+			// A validating converter for a nested value was located within this element only. Its errors
+			// already carry that relative path; a fresh exception lets the outer serializer add this value's.
+			throw new ZodJsonValidationException(nested.Errors);
+		}
+		var result = schema.Validate(deserialized);
 
-		return result.Value;
+		// The serializer adds the converted value's path to the exception as it leaves the converter, so the
+		// errors are reported under it (see ZodJsonValidationException.Errors).
+		return result.IsSuccess ? result.Value : throw new ZodJsonValidationException(result.Errors);
 	}
 
 	public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
@@ -57,10 +64,7 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 
 		var result = schema.Validate(value);
 		if (!result.IsSuccess)
-		{
-			var errorMessages = string.Join(", ", result.Errors.Select(e => e.Message));
-			throw new JsonException($"Validation failed: {errorMessages}");
-		}
+			throw new ZodJsonValidationException(result.Errors);
 
 		JsonSerializer.Serialize(writer, result.Value, TypeInfoFor(options));
 	}

@@ -17,7 +17,7 @@ public readonly record struct OddRule<T> : Core.IValidationRule<T>, Core.IZodRul
 	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
 	public const string MessageFormat = "Number must be odd, but got {0}";
 
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the OddRule struct.
@@ -26,7 +26,7 @@ public readonly record struct OddRule<T> : Core.IValidationRule<T>, Core.IZodRul
 	/// <param name="code">Optional error code override. If one is not specified then the <see cref="ErrorCode"/> is used.</param>
 	public OddRule(string? message = null, string? code = null)
 	{
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -57,5 +57,7 @@ public readonly record struct OddRule<T> : Core.IValidationRule<T>, Core.IZodRul
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.Custom;
 }

@@ -17,10 +17,10 @@ public readonly record struct IncludesRule
 	public const string ErrorCode = "invalid_string";
 
 	/// <summary>Gets the message format; <c>{0}</c> is the required substring and <c>{1}</c> the value.</summary>
-	public const string MessageFormat = "String must contain '{0}', but got '{1}'";
+	public const string MessageFormat = "String must contain '{0}'";
 
 	readonly string _substring;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the IncludesRule struct.
@@ -31,7 +31,7 @@ public readonly record struct IncludesRule
 	public IncludesRule(string substring, string? message = null, string? code = null)
 	{
 		_substring = substring ?? throw new ArgumentNullException(nameof(substring));
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -78,5 +78,10 @@ public readonly record struct IncludesRule
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		RuleParameters.Two(Core.ZodIssueParameters.Format, "includes", Core.ZodIssueParameters.Includes, _substring);
 }

@@ -35,12 +35,18 @@ public readonly record struct RequiredRule<T>
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "missing_field";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Field is required";
+	/// <summary>
+	/// Gets the message format; <c>{0}</c> is the display name (<c>"Value"</c> when the rule does not know the
+	/// member it validates), as in <c>System.ComponentModel.DataAnnotations</c>. Hosts that know the member can
+	/// re-format the reported <see cref="Core.ZodMessages.Required"/> template instead.
+	/// </summary>
+	public const string MessageFormat = "{0} is required";
+
+	const string DefaultDisplayName = "Value";
 
 	readonly bool _allowEmptyStrings;
 	readonly bool _trimWhitespace;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="RequiredRule{T}"/> struct.
@@ -58,7 +64,7 @@ public readonly record struct RequiredRule<T>
 	{
 		_allowEmptyStrings = allowEmptyStrings;
 		_trimWhitespace = trimWhitespace;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -90,7 +96,7 @@ public readonly record struct RequiredRule<T>
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
-	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, value);
+	public string GetErrorMessage(in T value) => RuleMessage.Format(_message ?? MessageFormat, DefaultDisplayName);
 
 	/// <summary>
 	/// Applies nothing: presence is expressed by the object schema's <c>required</c> list, which the exporter
@@ -109,4 +115,10 @@ public readonly record struct RequiredRule<T>
 	string? Core.IZodRule.Code => Code;
 
 	string? Core.IZodRule.Origin => null;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidType;
+
+	// The shared "{displayName} is required" template, so a host that knows the member (the generator, the
+	// ProblemDetails mapper) can name it; a custom message is reported as-is.
+	string? Core.IZodRule.MessageFormat => _message is null ? Core.ZodMessages.Required : null;
 }

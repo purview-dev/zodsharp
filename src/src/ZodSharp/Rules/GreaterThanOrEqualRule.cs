@@ -20,7 +20,7 @@ public readonly record struct GreaterThanOrEqualRule<T>
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal T MinValue { get; }
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the GreaterThanOrEqualRule struct.
@@ -31,7 +31,7 @@ public readonly record struct GreaterThanOrEqualRule<T>
 	public GreaterThanOrEqualRule(T minValue, string? message = null, string? code = null)
 	{
 		MinValue = minValue;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -65,5 +65,9 @@ public readonly record struct GreaterThanOrEqualRule<T>
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooSmall;
+
+	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Including(MinValue);
 }

@@ -146,7 +146,7 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 
 	static string TwoDigits(int value) => value.ToString("00", CultureInfo.InvariantCulture);
 
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="NonSentinelRule{T}"/> struct.
@@ -155,7 +155,7 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 	/// <param name="code">Optional error code override. If one is not specified then the <see cref="ErrorCode"/> is used.</param>
 	public NonSentinelRule(string? message = null, string? code = null)
 	{
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -269,7 +269,9 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidValue;
 }
 
 /// <summary>

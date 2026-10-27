@@ -40,7 +40,14 @@ public class ZodTransform<TInput, TOutput>(IZodSchema<TInput, TInput> inputSchem
 			// internal detail to whoever made the request. Only the fixed code and message are reported.
 			_ = ex;
 
-			return ValidationResult<TOutput>.Failure(new ValidationError("transform_error", "Transform failed.", []));
+			return ValidationResult<TOutput>.Failure(
+				ValidationError.Create(
+					ZodIssueCodes.TransformError,
+					ZodMessages.TransformFailed,
+					ZodPath.Root,
+					category: ZodIssueCategories.Custom
+				)
+			);
 		}
 	}
 

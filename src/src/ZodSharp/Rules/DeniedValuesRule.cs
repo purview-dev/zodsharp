@@ -17,11 +17,11 @@ public readonly record struct DeniedValuesRule<T> : Core.IValidationRule<T>, Cor
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_value";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Value '{0}' is one of the denied values";
+	/// <summary>Gets the default message format. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Value is one of the denied values";
 
 	readonly T[]? _values;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DeniedValuesRule{T}"/> struct that rejects a single value.
@@ -41,7 +41,7 @@ public readonly record struct DeniedValuesRule<T> : Core.IValidationRule<T>, Cor
 	public DeniedValuesRule(T[]? values, string? message = null, string? code = null)
 	{
 		_values = values is { Length: > 0 } ? values : null;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -73,5 +73,7 @@ public readonly record struct DeniedValuesRule<T> : Core.IValidationRule<T>, Cor
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidValue;
 }
