@@ -4,3 +4,6 @@ src/src/ZodSharp/Unions/NativeUnion.cs
 src/tests/Extensions.Validation.UnitTests/Fixtures/Unions.cs
 src/tests/AspNetCore.OpenApi.UnitTests/Fixtures/PetUnion.cs
 src/tests/AspNetCore.UnitTests/Fixtures/OrderOrReference.cs
+
+# Agent worktrees and local tooling state are not part of the repository.
+.claude/

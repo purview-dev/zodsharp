@@ -1,6 +1,5 @@
 #if NET11_0_OR_GREATER
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace ZodSharp.AspNetCore;
@@ -43,7 +42,7 @@ sealed class ZodValidationProblemDetailsCustomizer : IPostConfigureOptions<Probl
 			return;
 
 		var writer = ZodProblemDetailsWriter.GetOrCreate(services);
-		if (services.GetService<ZodRequestValidationReport>() is { HasErrors: true } report)
+		if (ZodRequestValidationReport.Get(httpContext) is { HasErrors: true } report)
 		{
 			writer.Apply(problem, report.Errors.AsSpan(), httpContext);
 			if (problem.Status is { } status)

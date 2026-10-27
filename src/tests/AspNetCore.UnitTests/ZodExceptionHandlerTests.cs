@@ -80,7 +80,8 @@ public class ZodExceptionHandlerTests
 		await Assert
 			.That(root.GetProperty("errors").GetProperty("")[0].GetString())
 			.IsEqualTo("Aggregate 'agg-123' failed to save");
-		await Assert.That(root.GetProperty("aggregateId").GetString()).IsEqualTo("agg-123");
+		// Parameters are only written per issue unless MergeParametersIntoExtensions is enabled.
+		await Assert.That(root.TryGetProperty("aggregateId", out _)).IsFalse();
 		await Assert
 			// Defect D4: issue parameter keys are camel-cased, like the top-level extensions.
 			.That(root.GetProperty("issues")[0].GetProperty("parameters").GetProperty("aggregateId").GetString())

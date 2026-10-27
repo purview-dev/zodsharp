@@ -123,10 +123,10 @@ public class ZodDiscriminatedUnion(
 		}
 
 		var type = value.GetType();
-		var accessors = DiscriminatorAccessors.GetValue(
-			type,
-			static _ => new ConcurrentDictionary<string, Func<object, string?>>(StringComparer.OrdinalIgnoreCase)
-		);
+		var accessors = DiscriminatorAccessors.GetValue(type, static _ => new ConcurrentDictionary<
+			string,
+			Func<object, string?>
+		>(StringComparer.OrdinalIgnoreCase));
 		var accessor = accessors.GetOrAdd(
 			discriminator,
 			static (name, candidateType) =>

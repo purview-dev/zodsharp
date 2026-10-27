@@ -281,23 +281,20 @@ partial class ZodSchemaGenerator
 			return;
 		}
 
-		writer.IfBlock(
-			$"{underlyingExpression} is {{ }} scalarValue",
-			body =>
-			{
-				var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
-				WriteRuleFailure(
-					body,
-					rule,
-					ruleVariable,
-					identity,
-					"scalarValue",
-					pathExpression,
-					memberExpression,
-					fallbackOrigin
-				);
-			}
-		);
+		writer.IfBlock($"{underlyingExpression} is {{ }} scalarValue", body =>
+		{
+			var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
+			WriteRuleFailure(
+				body,
+				rule,
+				ruleVariable,
+				identity,
+				"scalarValue",
+				pathExpression,
+				memberExpression,
+				fallbackOrigin
+			);
+		});
 
 		writer.NewLine();
 	}
@@ -402,9 +399,8 @@ partial class ZodSchemaGenerator
 				)
 				: $"{GeneratedValidation}.ForMember({ruleError}, {memberExpression}, fallbackCategory: {Category("Custom")})";
 
-		writer.IfBlock(
-			invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})",
-			ifBody => WriteAddError(ifBody, errorExpression)
+		writer.IfBlock(invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})", ifBody =>
+			WriteAddError(ifBody, errorExpression)
 		);
 	}
 

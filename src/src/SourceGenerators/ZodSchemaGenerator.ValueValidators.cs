@@ -64,9 +64,8 @@ partial class ZodSchemaGenerator
 			"options"
 		);
 
-		writer.IfBlock(
-			$"!({comparisonExpression.Replace("propertyValue", propertyValueName)})",
-			ifBody => WriteAddError(ifBody, ValueSetError(property, message, displayValues))
+		writer.IfBlock($"!({comparisonExpression.Replace("propertyValue", propertyValueName)})", ifBody =>
+			WriteAddError(ifBody, ValueSetError(property, message, displayValues))
 		);
 
 		writer.NewLine();
@@ -99,9 +98,8 @@ partial class ZodSchemaGenerator
 			"options"
 		);
 
-		writer.IfBlock(
-			$"{comparisonExpression.Replace("propertyValue", propertyValueName)}",
-			ifBody => WriteAddError(ifBody, ValueSetError(property, message, displayValues))
+		writer.IfBlock($"{comparisonExpression.Replace("propertyValue", propertyValueName)}", ifBody =>
+			WriteAddError(ifBody, ValueSetError(property, message, displayValues))
 		);
 
 		writer.NewLine();

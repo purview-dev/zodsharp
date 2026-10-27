@@ -22,18 +22,15 @@ static class FixtureApi
 
 	public static Task<JsonObject> GetAsync(OpenApiSpecVersion version, bool zodSharp = true) =>
 		Documents
-			.GetOrAdd(
-				(version, zodSharp),
-				key => new Lazy<Task<JsonObject>>(() =>
-					OpenApiTestHost.GetDocumentAsync(
-						key.Version,
-						Map,
-						CancellationToken.None,
-						services: RegisterRuntimeSchemas,
-						addZodSharp: key.ZodSharp
-					)
+			.GetOrAdd((version, zodSharp), key => new Lazy<Task<JsonObject>>(() =>
+				OpenApiTestHost.GetDocumentAsync(
+					key.Version,
+					Map,
+					CancellationToken.None,
+					services: RegisterRuntimeSchemas,
+					addZodSharp: key.ZodSharp
 				)
-			)
+			))
 			.Value;
 
 	public static void RegisterRuntimeSchemas(IServiceCollection services) =>

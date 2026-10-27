@@ -90,9 +90,8 @@ static class ZodMemberLocator
 					container = current;
 					memberName = segment.Name ?? string.Empty;
 
-					var property = Properties.GetOrAdd(
-						(current.GetType(), memberName),
-						static key => FindProperty(key.Type, key.Name)
+					var property = Properties.GetOrAdd((current.GetType(), memberName), static key =>
+						FindProperty(key.Type, key.Name)
 					);
 					if (property is null || !TryGetValue(property, current, out current))
 						return false;

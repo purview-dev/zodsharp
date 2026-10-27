@@ -28,70 +28,67 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 
 		var generationValueProviders = SourceGenLibrary.GetGeneratorValueProviders(context);
 
-		context.RegisterSourceOutput(
-			generationValueProviders,
-			static (spc, model) =>
+		context.RegisterSourceOutput(generationValueProviders, static (spc, model) =>
+		{
+			if (model.Context.Settings.IsSourceGeneratorDisabled)
+				return;
+
+			if (!model.Context.Capabilities.HasRequiredAttribute)
+				return;
+
+			List<ZodSchemaDescriptor> processed = [];
+			foreach (var schema in model.ZodSchemas)
 			{
-				if (model.Context.Settings.IsSourceGeneratorDisabled)
-					return;
+				if (schema.ShouldProcess)
+					processed.Add(schema.Value);
+			}
 
-				if (!model.Context.Capabilities.HasRequiredAttribute)
-					return;
+			// Which schemas need asynchronous validation is a property of the whole graph (a nested schema
+			// can make its parent asynchronous), so it is decided once per output from the collected schemas.
+			AsyncSchemaIndex asyncIndex = new(processed);
 
-				List<ZodSchemaDescriptor> processed = [];
-				foreach (var schema in model.ZodSchemas)
-				{
-					if (schema.ShouldProcess)
-						processed.Add(schema.Value);
-				}
-
-				// Which schemas need asynchronous validation is a property of the whole graph (a nested schema
-				// can make its parent asynchronous), so it is decided once per output from the collected schemas.
-				AsyncSchemaIndex asyncIndex = new(processed);
-
-				foreach (var schema in model.ZodSchemas)
-				{
-					if (!schema.ShouldProcess)
-						continue;
-
-					try
-					{
-						SchemaGenerationOutputContext outputContext = new(model.Context, schema.Value, asyncIndex);
-						BuildSchema(outputContext, spc, schema.Value.IsPrimary);
-					}
-					// CodeWriterScopeValidationException was caught here and rethrown, to fail loudly on a
-					// generator bug. It reached the consumer as CS8785 instead, which discards every file this
-					// generator produced for the compilation and buries the real cause under the 'type or
-					// namespace not found' errors that follow (PSGFR44). It now takes the same path as any
-					// other failure: the exception message lists every open scope, so the diagnostic is no less
-					// loud, and the rest of the generated output still arrives.
-					catch (Exception ex)
-					{
-						var diagnostic = ReportableDiagnostic.Create(
-							DiagnosticLibrary.UnhandledException,
-							true,
-							schema.Value.TargetType.Name,
-							ex.Message
-						);
-
-						spc.ReportDiagnostic(diagnostic.ToDiagnostic());
-					}
-				}
+			foreach (var schema in model.ZodSchemas)
+			{
+				if (!schema.ShouldProcess)
+					continue;
 
 				try
 				{
-					GenerateAssemblyRegistration(spc, model, processed);
+					SchemaGenerationOutputContext outputContext = new(model.Context, schema.Value, asyncIndex);
+					BuildSchema(outputContext, spc, schema.Value.IsPrimary);
 				}
+				// CodeWriterScopeValidationException was caught here and rethrown, to fail loudly on a
+				// generator bug. It reached the consumer as CS8785 instead, which discards every file this
+				// generator produced for the compilation and buries the real cause under the 'type or
+				// namespace not found' errors that follow (PSGFR44). It now takes the same path as any
+				// other failure: the exception message lists every open scope, so the diagnostic is no less
+				// loud, and the rest of the generated output still arrives.
 				catch (Exception ex)
 				{
-					spc.ReportDiagnostic(
-						ReportableDiagnostic
-							.Create(DiagnosticLibrary.UnhandledException, true, "assembly registration", ex.Message)
-							.ToDiagnostic()
+					var diagnostic = ReportableDiagnostic.Create(
+						DiagnosticLibrary.UnhandledException,
+						true,
+						schema.Value.TargetType.Name,
+						ex.Message
 					);
+
+					spc.ReportDiagnostic(diagnostic.ToDiagnostic());
 				}
 			}
-		);
+
+			try
+			{
+				GenerateAssemblyRegistration(spc, model, processed);
+			}
+			catch (Exception ex)
+			{
+				spc.ReportDiagnostic(
+					ReportableDiagnostic
+						.Create(DiagnosticLibrary.UnhandledException, true, "assembly registration", ex.Message)
+						.ToDiagnostic()
+				);
+			}
+		});
 
 		context.RegisterSourceOutput(
 			generationValueProviders.Combine(GetRuleAttributeProvider(context).Collect()),

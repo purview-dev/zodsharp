@@ -58,20 +58,17 @@ public static class CompiledValidator
 	{
 		ArgumentNullException.ThrowIfNull(schema);
 
-		return ValidatorCache<T>.Parsers.GetValue(
-			schema,
-			static key =>
+		return ValidatorCache<T>.Parsers.GetValue(schema, static key =>
+		{
+			var validate = Compile(key);
+
+			return input =>
 			{
-				var validate = Compile(key);
+				var result = validate(input);
 
-				return input =>
-				{
-					var result = validate(input);
-
-					return result.IsSuccess ? result.Value : throw new ZodException(result.Errors);
-				};
-			}
-		);
+				return result.IsSuccess ? result.Value : throw new ZodException(result.Errors);
+			};
+		});
 	}
 
 	// One table per T. ConditionalWeakTable is thread-safe and holds its keys weakly, so caching here

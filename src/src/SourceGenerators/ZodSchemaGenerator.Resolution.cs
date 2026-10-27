@@ -187,20 +187,11 @@ partial class ZodSchemaGenerator
 		{
 			writer.IfBlock("offset >= path.Length", body => body.Return());
 			writer.Assignment("var", "segment", "path[offset]");
-			writer.IfBlock(
-				$"segment.Kind != {SegmentKindType}.Member",
-				body =>
-				{
-					body.MethodCall(
-						$"{GeneratedValidation}.AppendRemaining",
-						"path",
-						"offset",
-						"namingPolicy",
-						"segments"
-					);
-					body.Return();
-				}
-			);
+			writer.IfBlock($"segment.Kind != {SegmentKindType}.Member", body =>
+			{
+				body.MethodCall($"{GeneratedValidation}.AppendRemaining", "path", "offset", "namingPolicy", "segments");
+				body.Return();
+			});
 			writer.Assignment("var", "name", "segment.Name!");
 			writer.MethodCallOn(
 				"segments",
@@ -314,9 +305,8 @@ partial class ZodSchemaGenerator
 		if (property.ValidationKind == PropertyValidationKind.Collection)
 		{
 			// An error on an element itself (a null element) belongs to the collection member.
-			writer.IfBlock(
-				"offset + 2 >= path.Length",
-				body => body.Return($"path[offset + 1].Kind != {SegmentKindType}.Member")
+			writer.IfBlock("offset + 2 >= path.Length", body =>
+				body.Return($"path[offset + 1].Kind != {SegmentKindType}.Member")
 			);
 
 			if (property.NestedSchemaType is not { } elementSchema || !property.NestedSchemaIsModern)

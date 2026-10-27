@@ -75,10 +75,7 @@ public class ValidationErrorModelTests
 	public async Task Lower_GivenExplicitBound_PrefersIt()
 	{
 		// Act
-		var error = ValidationError.Create("too_small", "x", ZodPath.Root) with
-		{
-			Lower = ErrorBound.Excluding(0.5),
-		};
+		var error = ValidationError.Create("too_small", "x", ZodPath.Root) with { Lower = ErrorBound.Excluding(0.5) };
 
 		// Assert
 		await Assert.That(error.Lower).IsEqualTo(new ErrorBound(0.5, false));

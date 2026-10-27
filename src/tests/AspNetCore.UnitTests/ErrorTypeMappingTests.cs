@@ -74,7 +74,7 @@ public class ErrorTypeMappingTests
 		// Assert
 		await Assert.That(details.Title).IsEqualTo("Resource is locked");
 		await Assert.That(details.Status).IsEqualTo(StatusCodes.Status423Locked);
-		await Assert.That(details.Extensions["resourceId"]).IsEqualTo("res-42");
+		await Assert.That(details.Extensions.ContainsKey("resourceId")).IsFalse();
 		await Assert.That(issues).HasSingleItem();
 		await Assert.That(issues[0].Parameters).IsNotNull();
 		await Assert.That(issues[0].Parameters!["ResourceId"]).IsEqualTo("res-42");

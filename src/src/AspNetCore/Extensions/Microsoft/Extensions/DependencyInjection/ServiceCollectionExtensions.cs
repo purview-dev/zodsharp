@@ -136,7 +136,7 @@ public static class ServiceCollectionExtensions
 		/// </para>
 		/// <para>
 		/// On .NET 11 it also enriches the built-in Microsoft.Extensions.Validation pipeline (<c>AddZodSharpValidation()</c>):
-		/// it registers a scoped <c>ZodRequestValidationReport</c> as the bridge's report sink and composes a
+		/// it registers a report sink that collects the bridge's full errors on the current request (<c>ZodRequestValidationReport</c>, in <c>HttpContext.Features</c>) and composes a
 		/// <see cref="ProblemDetailsOptions.CustomizeProblemDetails"/> callback that rewrites the pipeline's
 		/// <see cref="HttpValidationProblemDetails"/> with <see cref="ZodProblemDetailsWriter.Apply"/> and mirrors the
 		/// status to the response. The ZodSharp callback runs first and any callback the application configures - before
@@ -166,15 +166,18 @@ public static class ServiceCollectionExtensions
 #if NET11_0_OR_GREATER
 	/// <summary>
 	/// Enriches the built-in Microsoft.Extensions.Validation pipeline's ProblemDetails with the ZodSharp contract: a
-	/// scoped <see cref="ZodRequestValidationReport"/> collects the bridge's full errors for the request, and a
+	/// per-request <see cref="ZodRequestValidationReport"/> (in <c>HttpContext.Features</c>) collects the bridge's full errors, and a
 	/// composed <see cref="ProblemDetailsOptions.CustomizeProblemDetails"/> callback rewrites the response from it.
 	/// </summary>
 	static void AddValidationPipelineEnrichment(IServiceCollection services)
 	{
-		services.TryAddScoped<ZodRequestValidationReport>();
-		services.TryAddScoped<ZodSharp.Extensions.Validation.IZodValidationReportSink>(static sp =>
-			sp.GetRequiredService<ZodRequestValidationReport>()
-		);
+		// The sink stores errors on the current HTTP request, not in the DI scope: a Blazor Server circuit is one
+		// long-lived scope, and a scoped collector there would only ever grow.
+		services.AddHttpContextAccessor();
+		services.TryAddSingleton<
+			ZodSharp.Extensions.Validation.IZodValidationReportSink,
+			HttpRequestValidationReportSink
+		>();
 		services.TryAddEnumerable(
 			ServiceDescriptor.Singleton<
 				IPostConfigureOptions<ProblemDetailsOptions>,

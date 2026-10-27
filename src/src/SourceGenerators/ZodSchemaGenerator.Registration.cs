@@ -53,9 +53,8 @@ partial class ZodSchemaGenerator
 				writer.XmlReturn("The factory, for chaining.");
 				using (writer.OpenBlockScope($"public static {factoryType} Register({factoryType} factory)"))
 				{
-					writer.IfBlock(
-						"factory is null",
-						body => body.Line("throw new global::System.ArgumentNullException(nameof(factory));")
+					writer.IfBlock("factory is null", body =>
+						body.Line("throw new global::System.ArgumentNullException(nameof(factory));")
 					);
 
 					foreach (var schema in registrable)

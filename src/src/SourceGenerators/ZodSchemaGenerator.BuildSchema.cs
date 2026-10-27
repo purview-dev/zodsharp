@@ -87,9 +87,8 @@ partial class ZodSchemaGenerator
 			for (var index = 0; index < hook.DeclarationChain.Count - 1; index++)
 				wrapperBlocks.Add(writer.TypeScope(hook.DeclarationChain[index]));
 
-			writer.Type(
-				hook.DeclarationChain[hook.DeclarationChain.Count - 1],
-				body => EmitRefinementHook(body, outputContext.ZodSchema)
+			writer.Type(hook.DeclarationChain[hook.DeclarationChain.Count - 1], body =>
+				EmitRefinementHook(body, outputContext.ZodSchema)
 			);
 
 			foreach (var block in wrapperBlocks)
@@ -574,9 +573,8 @@ partial class ZodSchemaGenerator
 						method =>
 						{
 							method.Assignment("var", "schemaResult", $"{schema.SchemaType.Name}.Validate(options)");
-							method.IfBlock(
-								"schemaResult.IsSuccess",
-								ifBody => ifBody.Return($"{validateOptionsResult}.Success")
+							method.IfBlock("schemaResult.IsSuccess", ifBody =>
+								ifBody.Return($"{validateOptionsResult}.Success")
 							);
 							method.NewLine();
 							method.Return(
@@ -687,9 +685,8 @@ partial class ZodSchemaGenerator
 
 					method.IfBlock("!result.IsSuccess", ifBody => ifBody.Return("result"));
 					method.NewLine();
-					method.IfBlock(
-						"!additionalValidation(value)",
-						ifBody => WriteFailure(ifBody, $"Additional validation failed for {schema.TargetType.Name}")
+					method.IfBlock("!additionalValidation(value)", ifBody =>
+						WriteFailure(ifBody, $"Additional validation failed for {schema.TargetType.Name}")
 					);
 					method.NewLine();
 					method.Return("result");
@@ -718,9 +715,8 @@ partial class ZodSchemaGenerator
 					method.Assignment("var", "result", "Validate(value)");
 					method.IfBlock("result.IsSuccess", ifBody => ifBody.Return("result"));
 					method.NewLine();
-					method.IfBlock(
-						"alternativeValidation(value)",
-						ifBody => ifBody.Return($"{validationResultType}.Success(value)")
+					method.IfBlock("alternativeValidation(value)", ifBody =>
+						ifBody.Return($"{validationResultType}.Success(value)")
 					);
 					method.NewLine();
 					WriteFailure(method, $"Neither validation passed for {schema.TargetType.Name}");
@@ -749,9 +745,8 @@ partial class ZodSchemaGenerator
 					method.Assignment("var", "result", "Validate(value)");
 					method.IfBlock("!result.IsSuccess", ifBody => ifBody.Return("result"));
 					method.NewLine();
-					method.IfBlock(
-						"!refinement(value)",
-						ifBody => WriteFailure(ifBody, $"Refinement validation failed for {schema.TargetType.Name}")
+					method.IfBlock("!refinement(value)", ifBody =>
+						WriteFailure(ifBody, $"Refinement validation failed for {schema.TargetType.Name}")
 					);
 					method.NewLine();
 					method.Return("result");

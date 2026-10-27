@@ -337,41 +337,37 @@ partial class ZodSchemaGenerator
 
 			writer.Assignment("var", propertyLengthName, $"{propertyValueName}.Length");
 			writer
-				.IfBlock(
-					$"{propertyLengthName} < {minimum}",
-					w =>
-						WriteAddError(
-							w,
-							ErrorExpression(
-								codeExpression,
-								tooSmall,
-								PathOf(property),
-								MemberOf(property),
-								origin: StringOrigin,
-								category: Category("TooSmall"),
-								lowerExpression: lower,
-								upperExpression: upper,
-								valuesExpression: countValues
-							)
+				.IfBlock($"{propertyLengthName} < {minimum}", w =>
+					WriteAddError(
+						w,
+						ErrorExpression(
+							codeExpression,
+							tooSmall,
+							PathOf(property),
+							MemberOf(property),
+							origin: StringOrigin,
+							category: Category("TooSmall"),
+							lowerExpression: lower,
+							upperExpression: upper,
+							valuesExpression: countValues
 						)
+					)
 				)
-				.ElseIf(
-					$"{propertyLengthName} > {maximum}",
-					w =>
-						WriteAddError(
-							w,
-							ErrorExpression(
-								codeExpression,
-								tooBig,
-								PathOf(property),
-								MemberOf(property),
-								origin: StringOrigin,
-								category: Category("TooBig"),
-								lowerExpression: lower,
-								upperExpression: upper,
-								valuesExpression: countValues
-							)
+				.ElseIf($"{propertyLengthName} > {maximum}", w =>
+					WriteAddError(
+						w,
+						ErrorExpression(
+							codeExpression,
+							tooBig,
+							PathOf(property),
+							MemberOf(property),
+							origin: StringOrigin,
+							category: Category("TooBig"),
+							lowerExpression: lower,
+							upperExpression: upper,
+							valuesExpression: countValues
 						)
+					)
 				);
 
 			nullGuard?.Dispose();

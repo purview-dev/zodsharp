@@ -383,12 +383,10 @@ partial class ZodSchemaGenerator
 	{
 		if (schema.TargetCanBeNull)
 		{
-			writer.IfBlock(
-				"value is null",
-				ifBody =>
-					ifBody.Return(
-						$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
-					)
+			writer.IfBlock("value is null", ifBody =>
+				ifBody.Return(
+					$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
+				)
 			);
 			writer.NewLine();
 		}
@@ -519,9 +517,8 @@ partial class ZodSchemaGenerator
 		);
 		using (method.IfBlockScope("refineContext.HasIssues"))
 		{
-			method.Foreach(
-				"var refinementIssue in refineContext.Issues",
-				foreachBody => foreachBody.MethodCall($"{GeneratedValidation}.Add", "ref errors", "refinementIssue")
+			method.Foreach("var refinementIssue in refineContext.Issues", foreachBody =>
+				foreachBody.MethodCall($"{GeneratedValidation}.Add", "ref errors", "refinementIssue")
 			);
 		}
 	}
@@ -582,12 +579,10 @@ partial class ZodSchemaGenerator
 		{
 			if (schema.TargetCanBeNull)
 			{
-				writer.IfBlock(
-					"value is null",
-					ifBody =>
-						ifBody.Return(
-							$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
-						)
+				writer.IfBlock("value is null", ifBody =>
+					ifBody.Return(
+						$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
+					)
 				);
 			}
 
@@ -1180,14 +1175,11 @@ partial class ZodSchemaGenerator
 			{
 				if (property.ElementTypeCanBeNull)
 				{
-					writer.IfBlock(
-						$"{itemName} is null",
-						body =>
-						{
-							body.Line($"{indexName}++;");
-							body.Line("continue;");
-						}
-					);
+					writer.IfBlock($"{itemName} is null", body =>
+					{
+						body.Line($"{indexName}++;");
+						body.Line("continue;");
+					});
 				}
 
 				writer.Assignment("var", resultName, NestedValidateAsyncCall(schemaType, itemExpression));

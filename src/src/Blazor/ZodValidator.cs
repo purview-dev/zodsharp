@@ -309,9 +309,8 @@ public sealed partial class ZodValidator : ComponentBase, IDisposable
 				? TimeSpan.FromMilliseconds(DebounceMilliseconds)
 				: TimeSpan.Zero;
 
-		_editContext.RegisterAsyncFieldValidator(
-			field,
-			cancellationToken => ValidateFieldAsync(field, plan.Value, debounce, cancellationToken)
+		_editContext.RegisterAsyncFieldValidator(field, cancellationToken =>
+			ValidateFieldAsync(field, plan.Value, debounce, cancellationToken)
 		);
 	}
 

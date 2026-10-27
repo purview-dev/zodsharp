@@ -60,41 +60,37 @@ partial class ZodSchemaGenerator
 		{
 			writer.Assignment("var", propertyValueName, $"value.{propertyName}");
 			writer
-				.IfBlock(
-					tooSmallCondition,
-					w =>
-						WriteAddError(
-							w,
-							ErrorExpression(
-								"global::ZodSharp.Rules.RangeRule<int>.ErrorCode",
-								message,
-								PathOf(property),
-								MemberOf(property),
-								origin: origin,
-								category: Category("TooSmall"),
-								lowerExpression: lower,
-								upperExpression: upper,
-								valuesExpression: values
-							)
+				.IfBlock(tooSmallCondition, w =>
+					WriteAddError(
+						w,
+						ErrorExpression(
+							"global::ZodSharp.Rules.RangeRule<int>.ErrorCode",
+							message,
+							PathOf(property),
+							MemberOf(property),
+							origin: origin,
+							category: Category("TooSmall"),
+							lowerExpression: lower,
+							upperExpression: upper,
+							valuesExpression: values
 						)
+					)
 				)
-				.ElseIf(
-					tooBigCondition,
-					w =>
-						WriteAddError(
-							w,
-							ErrorExpression(
-								"global::ZodSharp.Rules.RangeRule<int>.ErrorCode",
-								message,
-								PathOf(property),
-								MemberOf(property),
-								origin: origin,
-								category: Category("TooBig"),
-								lowerExpression: lower,
-								upperExpression: upper,
-								valuesExpression: values
-							)
+				.ElseIf(tooBigCondition, w =>
+					WriteAddError(
+						w,
+						ErrorExpression(
+							"global::ZodSharp.Rules.RangeRule<int>.ErrorCode",
+							message,
+							PathOf(property),
+							MemberOf(property),
+							origin: origin,
+							category: Category("TooBig"),
+							lowerExpression: lower,
+							upperExpression: upper,
+							valuesExpression: values
 						)
+					)
 				);
 		}
 

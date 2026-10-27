@@ -45,12 +45,13 @@ public sealed class ZodProblemDetailsOptions
 
 	/// <summary>
 	/// When <c>true</c>, every error's parameters are also merged (camel-cased) into the top-level extensions,
-	/// where the last error wins. Defaults to <c>true</c> for compatibility; the parameters are always present per
-	/// issue in <c>issues[].parameters</c>, which is the reliable place to read them. Reserved member names
-	/// (<c>type</c>, <c>title</c>, <c>status</c>, <c>detail</c>, <c>instance</c>, <c>errors</c>, <c>issues</c>,
-	/// <c>traceId</c>) are never overwritten; a colliding parameter is written as <c>param_{name}</c>.
+	/// where the last error wins. Defaults to <c>false</c> (it was the 2.4 behaviour): the parameters are always
+	/// present per issue in <c>issues[].parameters</c>, which is the reliable place to read them. Enable only for
+	/// clients that still read the top-level copy. Reserved member names (<c>type</c>, <c>title</c>,
+	/// <c>status</c>, <c>detail</c>, <c>instance</c>, <c>errors</c>, <c>issues</c>, <c>traceId</c>) are never
+	/// overwritten; a colliding parameter is written as <c>param_{name}</c>.
 	/// </summary>
-	public bool MergeParametersIntoExtensions { get; set; } = true;
+	public bool MergeParametersIntoExtensions { get; set; }
 
 	/// <summary>
 	/// When <c>true</c>, <c>errors</c> entries that did not come from ZodSharp (for example DataAnnotations errors

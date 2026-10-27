@@ -277,9 +277,8 @@ static class AdvancedExamples
 	{
 		Console.WriteLine("--- Schema Caching Examples ---");
 
-		var schema = SchemaCache.GetOrCreate(
-			"user",
-			static () => Z.Object().Field("name", Z.String().Min(1)).Field("age", Z.Number().Min(0)).Build()
+		var schema = SchemaCache.GetOrCreate("user", static () =>
+			Z.Object().Field("name", Z.String().Min(1)).Field("age", Z.Number().Min(0)).Build()
 		);
 
 		if (SchemaCache.TryGet("user", out ZodObject cachedSchema))

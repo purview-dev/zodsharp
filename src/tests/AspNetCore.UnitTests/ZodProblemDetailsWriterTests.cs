@@ -94,7 +94,7 @@ public class ZodProblemDetailsWriterTests
 	}
 
 	[Test]
-	public async Task ToHttpValidationProblemDetails_GivenNoRegistry_StillMergesParameters()
+	public async Task ToHttpValidationProblemDetails_GivenMergeEnabledAndNoRegistry_StillMergesParameters()
 	{
 		// Defect D3: parameters were merged into the extensions only by the registry/lookup overloads.
 
@@ -109,7 +109,10 @@ public class ZodProblemDetailsWriterTests
 		);
 
 		// Act
-		var details = result.ToHttpValidationProblemDetails();
+		var details = result.ToHttpValidationProblemDetails(
+			new ZodProblemDetailsOptions { MergeParametersIntoExtensions = true },
+			httpContext: null
+		);
 
 		// Assert
 		await Assert.That(details.Extensions["resourceId"]).IsEqualTo("res-1");
@@ -158,7 +161,8 @@ public class ZodProblemDetailsWriterTests
 		);
 
 		// Act
-		var details = CreateWriter().Create([error], new DefaultHttpContext { TraceIdentifier = "real-trace" });
+		var details = CreateWriter(static options => options.MergeParametersIntoExtensions = true)
+			.Create([error], new DefaultHttpContext { TraceIdentifier = "real-trace" });
 		var json = Serialize(details);
 
 		// Assert
@@ -260,7 +264,10 @@ public class ZodProblemDetailsWriterTests
 		]);
 
 		// Act
-		var details = exception.ToValidationProblemDetails();
+		var details = exception.ToValidationProblemDetails(
+			new ZodProblemDetailsOptions { MergeParametersIntoExtensions = true },
+			httpContext: null
+		);
 
 		// Assert
 		await Assert.That(details.Extensions.ContainsKey("issues")).IsTrue();

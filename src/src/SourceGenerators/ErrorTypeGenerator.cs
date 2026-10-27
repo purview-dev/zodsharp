@@ -49,49 +49,46 @@ public sealed partial class ErrorTypeGenerator : IIncrementalGenerator
 			"CollectErrorTypeFields"
 		);
 
-		context.RegisterSourceOutput(
-			generationModels,
-			static (spc, model) =>
+		context.RegisterSourceOutput(generationModels, static (spc, model) =>
+		{
+			if (model.Context.Settings.IsSourceGeneratorDisabled)
+				return;
+
+			if (
+				!model.Context.Capabilities.HasErrorType
+				|| !model.Context.Capabilities.HasErrorTypeParameter
+				|| !model.Context.Capabilities.HasErrorTypeParameters
+			)
+				return;
+
+			foreach (var result in model.Fields)
 			{
-				if (model.Context.Settings.IsSourceGeneratorDisabled)
-					return;
+				foreach (var diagnostic in result.Diagnostics)
+					spc.ReportDiagnostic(diagnostic.ToDiagnostic());
 
-				if (
-					!model.Context.Capabilities.HasErrorType
-					|| !model.Context.Capabilities.HasErrorTypeParameter
-					|| !model.Context.Capabilities.HasErrorTypeParameters
-				)
-					return;
+				if (!result.ShouldProcess)
+					continue;
 
-				foreach (var result in model.Fields)
+				try
 				{
-					foreach (var diagnostic in result.Diagnostics)
-						spc.ReportDiagnostic(diagnostic.ToDiagnostic());
-
-					if (!result.ShouldProcess)
-						continue;
-
-					try
-					{
-						var writer = model.Context.CreateCodeWriter();
-						Emit(writer, result.Value);
-						spc.AddSource(result.Value.HintName, writer);
-					}
-					catch (Exception ex)
-					{
-						spc.ReportDiagnostic(
-							ReportableDiagnostic
-								.Create(
-									DiagnosticLibrary.ErrorTypeUnhandledException,
-									true,
-									[result.Value.ClassName, ex.Message]
-								)
-								.ToDiagnostic()
-						);
-					}
+					var writer = model.Context.CreateCodeWriter();
+					Emit(writer, result.Value);
+					spc.AddSource(result.Value.HintName, writer);
+				}
+				catch (Exception ex)
+				{
+					spc.ReportDiagnostic(
+						ReportableDiagnostic
+							.Create(
+								DiagnosticLibrary.ErrorTypeUnhandledException,
+								true,
+								[result.Value.ClassName, ex.Message]
+							)
+							.ToDiagnostic()
+					);
 				}
 			}
-		);
+		});
 	}
 
 	static SourceText ErrorTypeAttributeSource()

@@ -147,7 +147,7 @@ Released versions correspond to `v<version>` GitHub releases.
   New `ToValidationProblem(HttpContext)`, `ToHttpValidationProblemDetails(HttpContext)` and
   `ZodProblemDetailsOptions` overloads.
 - **`ZodProblemDetailsOptions`:** `PathNaming` (`ZodPathNaming.MemberName` default, or `Json` from the minimal-API
-  `JsonOptions` naming policy), `IncludeIssues`, `MergeParametersIntoExtensions` (default `true`),
+  `JsonOptions` naming policy), `IncludeIssues`, `MergeParametersIntoExtensions` (default `false`),
   `ProjectDataAnnotationsIssues`, `ErrorTypeResolver`, `DefaultStatusCode` and `StatusCodeOverride`.
 - **`ValidationIssue` serializes a Zod-style shape:** `path` (dotted key), `segments` (strings and integer
   indexes), `code`, `category`, `origin`, typed `minimum`/`maximum` from `Lower`/`Upper` (numbers, or ISO-8601 for
@@ -173,6 +173,7 @@ Released versions correspond to `v<version>` GitHub releases.
   locally, and `Examples.MinimalApi.IntegrationTests` starts it in memory.
 ### Breaking behaviour changes
 
+- **ProblemDetails no longer copies error parameters to the top level.** In 2.4 every error's parameters were also merged (camel-cased, last error wins) into the root of the ProblemDetails body. They are now only written per issue, in `issues[].parameters`. Set `ZodProblemDetailsOptions.MergeParametersIntoExtensions = true` to restore the old top-level copy.
 - **`[Required]` on a string now matches `RequiredAttribute`** (source generator, defect G1). The generated
   check was inverted: the default (`AllowEmptyStrings = false`) only rejected `null`, so `""` passed, while
   `AllowEmptyStrings = true` rejected `""`. The default now rejects `null`, `""` and whitespace-only text, and

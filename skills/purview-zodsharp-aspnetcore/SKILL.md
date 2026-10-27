@@ -184,7 +184,7 @@ await writer.WriteAsync(httpContext, problem);
 - `FormatMessages` (`true`) - use the matched `ErrorType.MessageFormat`, **only when every placeholder
   resolves** (from parameters or built-ins `path`, `code`, `origin`, `minimum`, `maximum`, `displayName`).
 - `PathNaming`, `IncludeIssues`, `DefaultStatusCode` (400).
-- `MergeParametersIntoExtensions` (`true`) - also copy parameters to the top level. Reserved names
+- `MergeParametersIntoExtensions` (`false`) - also copy parameters to the top level (the 2.4 behaviour). Reserved names
   (`type`, `title`, `status`, `detail`, `instance`, `errors`, `issues`, `traceId`) become `param_{name}`.
 - `ProjectDataAnnotationsIssues` (`true`) - `Apply` gives foreign entries a `dataannotations` issue.
 - `StatusCodeSelector(errors)` then `StatusCodeOverride(errors, computed)` - run last and win.
