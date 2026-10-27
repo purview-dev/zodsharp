@@ -20,6 +20,10 @@ public readonly record struct UrlRule : Core.IValidationRule<string>, Core.IZodR
 	/// <summary>Gets the default message format. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
 	public const string MessageFormat = "Invalid URL format";
 
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	static readonly Regex UrlRegex = new(
 		@"^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$",
 		RegexOptions.Compiled | RegexOptions.IgnoreCase,
@@ -73,6 +77,9 @@ public readonly record struct UrlRule : Core.IValidationRule<string>, Core.IZodR
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

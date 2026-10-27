@@ -13,13 +13,20 @@ namespace ZodSharp.Rules;
 /// constructor.
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct CountRangeRule : Core.IValidationRule<IEnumerable>, Core.IZodRule
+public readonly record struct CountRangeRule
+	: Core.IValidationRule<IEnumerable>,
+		Core.IZodRule,
+		Core.IZodFailureDescriber<IEnumerable>
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_count";
 
 	/// <summary>Gets the message format; <c>{0}</c> is the minimum, <c>{1}</c> the maximum and <c>{2}</c> the actual count.</summary>
 	public const string MessageFormat = "Collection must contain between {0} and {1} element(s), but got {2}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Minimum, RuleMessage.Maximum, Core.ZodIssueParameters.Count];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly string? _message;
 
@@ -72,9 +79,22 @@ public readonly record struct CountRangeRule : Core.IValidationRule<IEnumerable>
 
 	string? Core.IZodRule.Code => Code;
 
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Array;
 
 	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Including(Minimum);
 
 	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(Maximum);
+
+	// The Zod issue code follows the bound that failed.
+	Core.ZodRuleFailure Core.IZodFailureDescriber<IEnumerable>.DescribeFailure(in IEnumerable value)
+	{
+		var count = CollectionCount.Of(value);
+		return new(
+			count < Minimum ? Core.ZodIssueCategories.TooSmall : Core.ZodIssueCategories.TooBig,
+			RuleParameters.Count(count)
+		);
+	}
 }

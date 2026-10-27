@@ -41,6 +41,11 @@ parameters, then from the built-ins `displayName`, `member`, `path`, `code`, `ca
 brace is written literally. It never throws - a stray brace in a custom message cannot turn a failure
 into an exception. `TryFormatComplete` succeeds only when every placeholder resolved.
 
+Every built-in rule reports its template through `IZodRule.MessageFormat`, so runtime-schema errors carry
+one too (`Z.String().Min(3)`: `"String must be at least {minimum} characters long, but got {count}"`). A
+custom rule message is reported with its positional placeholders renamed (`{0}` → `{minimum}`); the
+value's position becomes `{received}`.
+
 ```csharp
 using ZodSharp.Core;
 
@@ -94,9 +99,11 @@ A union failure is one `invalid_union` issue at the union's path. Its per-option
 
 ## PII
 
-`ZodErrorOptions.IncludeReceivedValues` is process-wide and defaults to `false`. When off, `received`
-holds only the type name (`"string"`). Built-in default messages never contain the input either way;
-a custom message can still opt in with a positional `{0}`.
+`ZodErrorOptions.IncludeReceivedValues` is process-wide and defaults to `false`. When off, a rule failure
+carries no `received` parameter and an invalid-type failure's `received` holds only the type name
+(`"string"`). Built-in default messages never contain the input either way - numeric rules included
+(`"Value must be between 1 and 10"`); a custom message can still opt in with the rule's positional value
+placeholder (`{0}`, or `{1}`/`{2}` after the bounds).
 
 ## Depth
 

@@ -19,6 +19,10 @@ public readonly record struct DurationRule
 	/// <summary>Gets the default message format. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
 	public const string MessageFormat = "Invalid duration";
 
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	/// <summary>
 	/// Regular expression for ISO 8601-1 durations. Does not accept the 8601-2 extensions (negative
 	/// durations or fractional/negative components), matching Zod.
@@ -100,6 +104,9 @@ public readonly record struct DurationRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

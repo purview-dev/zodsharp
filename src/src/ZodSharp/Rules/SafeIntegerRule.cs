@@ -19,8 +19,12 @@ public readonly record struct SafeIntegerRule
 		"int"
 	);
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Number must be a safe integer, but got {0}";
+	/// <summary>Gets the message format. The default never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Number must be a safe integer";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly string? _message;
 
@@ -64,6 +68,9 @@ public readonly record struct SafeIntegerRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Number;
 

@@ -18,6 +18,10 @@ public readonly record struct CompareRule : Core.IValidationRule<string>, Core.I
 	/// <summary>Gets the default message format, which contains neither value; a custom message may use <c>{0}</c> for the expected value and <c>{1}</c> for the actual value.</summary>
 	public const string MessageFormat = "Value does not match the expected value";
 
+	static readonly string?[] TemplateNames = [null, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	readonly string _other;
 	readonly StringComparison _comparison;
 	readonly string? _message;
@@ -75,6 +79,9 @@ public readonly record struct CompareRule : Core.IValidationRule<string>, Core.I
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

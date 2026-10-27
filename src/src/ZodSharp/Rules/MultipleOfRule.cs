@@ -14,8 +14,12 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "not_multiple_of";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the divisor and <c>{1}</c> the offending value.</summary>
-	public const string MessageFormat = "Number must be a multiple of {0}, but got {1}";
+	/// <summary>Gets the message format; <c>{0}</c> is the divisor. The default never contains the input; a custom message may use <c>{1}</c> for the offending value.</summary>
+	public const string MessageFormat = "Number must be a multiple of {0}";
+
+	static readonly string?[] TemplateNames = [Core.ZodIssueParameters.Divisor, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	/// <summary>
 	/// The relative tolerance applied when comparing the distance to the nearest multiple.
@@ -86,6 +90,9 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
 

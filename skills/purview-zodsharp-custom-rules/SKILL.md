@@ -67,7 +67,11 @@ public readonly record struct EmailRule : IValidationRule<string>
   rule-specific arguments. Format it with `ZodSharp.Rules.RuleMessage.Format`: invariant culture (hosts
   localize at the boundary through `IZodMessageFormatter`) and it never throws on a stray brace.
 - **Keep the input out of the default message.** Errors reach ProblemDetails, logs and UI, so describe
-  what was expected rather than quoting the value.
+  what was expected rather than quoting the value. Pass the value anyway (after the rule's own
+  arguments), so a custom message can still use it.
+- To make the message localizable by template, implement `IZodRule.MessageFormat` with a
+  named-placeholder form (`"Must be at least {minimum}"`) and `IZodRule.Parameters` with any value it
+  needs beyond the built-ins; the built-in rules all do.
 - The constants may be inherited from a base rule class, and **abstract bases are exempt**, so a
   shared base can host them for its concrete derivations.
 

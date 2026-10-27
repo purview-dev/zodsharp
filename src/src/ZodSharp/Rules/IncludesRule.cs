@@ -19,6 +19,10 @@ public readonly record struct IncludesRule
 	/// <summary>Gets the message format; <c>{0}</c> is the required substring and <c>{1}</c> the value.</summary>
 	public const string MessageFormat = "String must contain '{0}'";
 
+	static readonly string?[] TemplateNames = [Core.ZodIssueParameters.Includes, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	readonly string _substring;
 	readonly string? _message;
 
@@ -77,6 +81,9 @@ public readonly record struct IncludesRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

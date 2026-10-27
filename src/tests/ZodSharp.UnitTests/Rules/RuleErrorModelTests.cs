@@ -241,7 +241,7 @@ public class RuleErrorModelTests
 		}
 
 		// Assert
-		await Assert.That(message).IsEqualTo("Value must be at least 2.5, but got 1.25");
+		await Assert.That(message).IsEqualTo("Value must be at least 2.5");
 	}
 
 	[Test]

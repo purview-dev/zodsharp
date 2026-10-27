@@ -21,6 +21,12 @@ var error = OrderSchema.Validate(new Order { CustomerName = "x" }).Errors[0];
 // error.MessageFormat "Field '{displayName}' must contain at least {minimum} characters."
 ```
 
+Runtime schemas report templates too: every built-in rule exposes one through `IZodRule.MessageFormat`, so
+`Z.String().Min(3)` reports `"String must be at least {minimum} characters long, but got {count}"` and
+`Z.Number().Range(1, 10)` reports `"Value must be between {minimum} and {maximum}"`. Localize them by those English
+templates, exactly as for a generated validator. A rule built with a custom message reports that message with its
+positional placeholders renamed (`"At least {0}"` becomes `"At least {minimum}"`).
+
 Placeholders resolve from the error's `Parameters`, then from its built-in fields. See
 [Core Concepts](Core-Concepts.md#error-fields) for the full list of error fields.
 

@@ -272,6 +272,20 @@ Released versions correspond to `v<version>` GitHub releases.
   with, includes, regex, UUID/GUID and every other string format, allowed/denied values, null-or-non-whitespace).
   A custom message can still use the positional placeholders. `UUIDRule` custom and default messages now receive
   the same arguments (`{0}` value, `{1}` version as an integer); `RegexRule`'s `{0}` is the pattern, as documented.
+- **Number rule defaults no longer contain the input either.** `RangeRule`, `MultipleOfRule`, `IntRule`,
+  `SafeIntegerRule`, `MinValueRule`/`MaxValueRule`, `GreaterThanRule`/`LessThanRule` (and their `OrEqual`
+  forms), `EvenRule`, `OddRule` and `FiniteRule` read `"Value must be between 1 and 10"`,
+  `"Number must be a multiple of 5"`, `"Expected integer, received float"`, `"Value must be at least 3"` and so on
+  (was `"…, but got 11"`); `EnumRule` reads `"Value is not a defined member of Colour"` (was `"'42' is not …"`).
+  The value is still passed in the same position, so a custom message using `{1}` (or `{2}` for `RangeRule`) is
+  unchanged.
+- **Every built-in rule reports a `MessageFormat`.** Runtime-schema errors (`Z.String().Min(3)`, `.Email()`,
+  `.Regex()`, `Z.Number().Range()`, …) carried `MessageFormat = null`; each rule now implements
+  `IZodRule.MessageFormat` with a named template (`"String must be at least {minimum} characters long, but got
+  {count}"`) and the `IZodRule.Parameters` it needs, so `DefaultZodMessageFormatter` and
+  `StringLocalizerZodMessageFormatter` localize them by template. A custom message is reported with its positional
+  placeholders renamed (`"At least {0}"` → `"At least {minimum}"`; the value's position becomes `{received}`). The
+  count rules report `count`, and `CountRangeRule` the `too_small`/`too_big` category by direction.
 - Rules no longer store their default message as the custom message (`message.Or(MessageFormat)`), so a rule built
   without a message and `default(TRule)` behave the same.
 - `ZodIntersection` reports an issue raised identically by both sides once.

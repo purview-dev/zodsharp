@@ -27,6 +27,12 @@ public readonly record struct UUIDRule
 	/// </summary>
 	public const string VersionedMessageFormat = "Invalid UUID v{1} format";
 
+	static readonly string?[] TemplateNames = [RuleMessage.Received, Core.ZodIssueParameters.Version];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
+	static readonly string VersionedDefaultTemplate = RuleMessage.Template(VersionedMessageFormat, TemplateNames);
+
 	const string NilUuid = "00000000-0000-0000-0000-000000000000";
 	const string MaxUuid = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 
@@ -229,6 +235,11 @@ public readonly record struct UUIDRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is not null ? RuleMessage.Template(_message, TemplateNames)
+		: _version is null ? DefaultTemplate
+		: VersionedDefaultTemplate;
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

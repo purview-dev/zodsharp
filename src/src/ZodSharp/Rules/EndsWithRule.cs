@@ -19,6 +19,10 @@ public readonly record struct EndsWithRule
 	/// <summary>Gets the message format; <c>{0}</c> is the required suffix and <c>{1}</c> the value.</summary>
 	public const string MessageFormat = "String must end with '{0}'";
 
+	static readonly string?[] TemplateNames = [Core.ZodIssueParameters.Suffix, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	readonly string _suffix;
 	readonly StringComparison _comparison;
 	readonly string? _message;
@@ -85,6 +89,9 @@ public readonly record struct EndsWithRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

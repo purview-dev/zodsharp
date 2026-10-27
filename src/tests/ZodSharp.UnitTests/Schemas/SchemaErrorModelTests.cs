@@ -331,7 +331,7 @@ public class SchemaErrorModelTests
 		// Assert
 		var error = result.Errors.Single();
 		await Assert.That(error.Code).IsEqualTo(Rules.EnumRule<Colour>.ErrorCode);
-		await Assert.That(error.Message).IsEqualTo("'42' is not a defined member of Colour");
+		await Assert.That(error.Message).IsEqualTo("Value is not a defined member of Colour");
 		await Assert.That(error.Origin).IsEqualTo("enum");
 		await Assert
 			.That(error.Parameters!.Get<ImmutableArray<string>>(ZodIssueParameters.Options))

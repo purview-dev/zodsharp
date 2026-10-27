@@ -19,6 +19,10 @@ public readonly record struct MinLengthRule
 	/// <summary>Gets the message format; <c>{0}</c> is the minimum length and <c>{1}</c> the actual length.</summary>
 	public const string MessageFormat = "String must be at least {0} characters long, but got {1}";
 
+	static readonly string?[] TemplateNames = [RuleMessage.Minimum, Core.ZodIssueParameters.Count];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal int MinLength { get; }
 	readonly string? _message;
@@ -70,6 +74,9 @@ public readonly record struct MinLengthRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

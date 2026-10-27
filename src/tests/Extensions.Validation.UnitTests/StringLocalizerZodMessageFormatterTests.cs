@@ -236,6 +236,47 @@ public class StringLocalizerZodMessageFormatterTests
 		await Assert.That(context.Single().ErrorMessage).IsEqualTo("Sku must be at least 3 characters");
 	}
 
+	[Test]
+	public async Task Format_GivenRuntimeSchemaErrors_LocalizesThemByTheRuleTemplates()
+	{
+		// Arrange
+		var minLength = FirstError(Z.String().Min(3), "a", "Sku");
+		var range = FirstError(Z.Number().Range(1, 10), 11d, "Qty");
+		var email = FirstError(Z.String().Email(), "nope", "Mail");
+		var formatter = CreateFormatter(
+			new()
+			{
+				["fr-FR:String must be at least {minimum} characters long, but got {count}"] =
+					"{displayName} : au moins {minimum} caractères (reçu {count})",
+				["fr-FR:Value must be between {minimum} and {maximum}"] =
+					"{displayName} : entre {minimum} et {maximum}",
+				["fr-FR:Invalid email format"] = "{displayName} : adresse e-mail invalide",
+			}
+		);
+		var french = CultureInfo.GetCultureInfo("fr-FR");
+
+		// Act
+		string[] messages =
+		[
+			formatter.Format(minLength, typeof(OrderLine), french),
+			formatter.Format(range, typeof(OrderLine), french),
+			formatter.Format(email, typeof(OrderLine), french),
+		];
+
+		// Assert
+		await Assert
+			.That(messages)
+			.IsEquivalentTo([
+				"Sku : au moins 3 caractères (reçu 1)",
+				"Qty : entre 1 et 10",
+				"Mail : adresse e-mail invalide",
+			]);
+	}
+
+	// A runtime schema's error, located under a member as an object schema would place it.
+	static ZodValidationError FirstError<T>(ZodType<T> schema, T value, string member) =>
+		schema.Validate(value).Errors.Single().WithPathPrefix(ZodPathSegment.Member(member));
+
 	static StringLocalizerZodMessageFormatter CreateFormatter(Dictionary<string, string> resources) =>
 		new(new FakeStringLocalizerFactory(resources));
 

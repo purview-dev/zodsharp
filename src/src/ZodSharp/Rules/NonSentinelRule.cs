@@ -35,13 +35,21 @@ namespace ZodSharp.Rules;
 /// </para>
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core.IZodRule, JsonSchema.IJsonSchemaRule
+public readonly record struct NonSentinelRule<T>
+	: Core.IValidationRule<T>,
+		Core.IZodRule,
+		Core.IZodFailureDescriber<T>,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_value";
 
 	/// <summary>Gets the message format; <c>{0}</c> is a description of the offending sentinel value.</summary>
 	public const string MessageFormat = "Value has a sentinel value, but got {0}";
+
+	static readonly string?[] TemplateNames = ["sentinel"];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	/// <summary>
 	/// The JSON Schema <c>pattern</c> for a canonical Guid that is not the all-zero <see cref="Guid.Empty"/>.
@@ -269,9 +277,16 @@ public readonly record struct NonSentinelRule<T> : Core.IValidationRule<T>, Core
 
 	string? Core.IZodRule.Code => Code;
 
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
 
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidValue;
+
+	// The description names the sentinel (for example "an empty GUID"), a known constant rather than user input.
+	Core.ZodRuleFailure Core.IZodFailureDescriber<T>.DescribeFailure(in T value) =>
+		new(Parameters: RuleParameters.One("sentinel", SentinelValues<T>.Describe(value)));
 }
 
 /// <summary>

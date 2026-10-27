@@ -13,13 +13,20 @@ namespace ZodSharp.Rules;
 /// <c>[RequiresUnreferencedCode]</c> constructor.
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct MaxCountRule : Core.IValidationRule<IEnumerable>, Core.IZodRule
+public readonly record struct MaxCountRule
+	: Core.IValidationRule<IEnumerable>,
+		Core.IZodRule,
+		Core.IZodFailureDescriber<IEnumerable>
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "too_big";
 
 	/// <summary>Gets the message format; <c>{0}</c> is the maximum count and <c>{1}</c> the actual count.</summary>
 	public const string MessageFormat = "Collection must contain at most {0} element(s), but got {1}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Maximum, Core.ZodIssueParameters.Count];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly string? _message;
 
@@ -60,9 +67,15 @@ public readonly record struct MaxCountRule : Core.IValidationRule<IEnumerable>, 
 
 	string? Core.IZodRule.Code => Code;
 
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Array;
 
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooBig;
 
 	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(MaxCount);
+
+	Core.ZodRuleFailure Core.IZodFailureDescriber<IEnumerable>.DescribeFailure(in IEnumerable value) =>
+		new(Parameters: RuleParameters.Count(CollectionCount.Of(value)));
 }

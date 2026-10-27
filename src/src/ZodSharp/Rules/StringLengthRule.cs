@@ -22,6 +22,10 @@ public readonly record struct StringLengthRule
 	/// <summary>Gets the message format; <c>{0}</c> is the maximum, <c>{1}</c> the minimum and <c>{2}</c> the actual length.</summary>
 	public const string MessageFormat = "String must be at most {0} characters long and at least {1}, but got {2}";
 
+	static readonly string?[] TemplateNames = [RuleMessage.Maximum, RuleMessage.Minimum, Core.ZodIssueParameters.Count];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	readonly int _maximumLength;
 	readonly int _minimumLength;
 	readonly string? _message;
@@ -79,6 +83,9 @@ public readonly record struct StringLengthRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

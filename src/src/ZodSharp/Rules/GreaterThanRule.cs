@@ -12,8 +12,12 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "too_small";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the bound and <c>{1}</c> the offending value.</summary>
-	public const string MessageFormat = "Value must be greater than {0}, but got {1}";
+	/// <summary>Gets the message format; <c>{0}</c> is the bound. The default never contains the input; a custom message may use <c>{1}</c> for the offending value.</summary>
+	public const string MessageFormat = "Value must be greater than {0}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Minimum, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly T _exclusiveMinimum;
 
@@ -62,6 +66,9 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
 

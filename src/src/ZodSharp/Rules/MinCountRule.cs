@@ -19,13 +19,20 @@ namespace ZodSharp.Rules;
 /// </para>
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct MinCountRule : Core.IValidationRule<IEnumerable>, Core.IZodRule
+public readonly record struct MinCountRule
+	: Core.IValidationRule<IEnumerable>,
+		Core.IZodRule,
+		Core.IZodFailureDescriber<IEnumerable>
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "too_small";
 
 	/// <summary>Gets the message format; <c>{0}</c> is the minimum count and <c>{1}</c> the actual count.</summary>
 	public const string MessageFormat = "Collection must contain at least {0} element(s), but got {1}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Minimum, Core.ZodIssueParameters.Count];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly string? _message;
 
@@ -66,9 +73,15 @@ public readonly record struct MinCountRule : Core.IValidationRule<IEnumerable>, 
 
 	string? Core.IZodRule.Code => Code;
 
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Array;
 
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooSmall;
 
 	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Including(MinCount);
+
+	Core.ZodRuleFailure Core.IZodFailureDescriber<IEnumerable>.DescribeFailure(in IEnumerable value) =>
+		new(Parameters: RuleParameters.Count(CollectionCount.Of(value)));
 }

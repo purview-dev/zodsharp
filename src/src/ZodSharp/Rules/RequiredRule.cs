@@ -119,6 +119,10 @@ public readonly record struct RequiredRule<T>
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidType;
 
 	// The shared "{displayName} is required" template, so a host that knows the member (the generator, the
-	// ProblemDetails mapper) can name it; a custom message is reported as-is.
-	string? Core.IZodRule.MessageFormat => _message is null ? Core.ZodMessages.Required : null;
+	// ProblemDetails mapper) can name it; a custom message is reported with {0} bound to the display name.
+	// The display name resolves from the error's path, or "Value" when the error has no member segment.
+	string? Core.IZodRule.MessageFormat =>
+		_message is null
+			? Core.ZodMessages.Required
+			: RuleMessage.Template(_message, Core.ZodIssueParameters.DisplayName);
 }

@@ -13,6 +13,8 @@ public readonly record struct UriRule : Core.IValidationRule<string>, Core.IZodR
 	/// <summary>Gets the default message format; <c>{0}</c> is the <see cref="UriKind"/>. It never contains the input; a custom message may use <c>{1}</c> for the value.</summary>
 	public const string MessageFormat = "Invalid Uri, kind: {0}";
 
+	static readonly string?[] TemplateNames = [null, RuleMessage.Received];
+
 	readonly UriKind _uriKind;
 	readonly string? _message;
 
@@ -56,6 +58,9 @@ public readonly record struct UriRule : Core.IValidationRule<string>, Core.IZodR
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		RuleMessage.Template(_message ?? MessageFormat, 0, _uriKind.ToString(), TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

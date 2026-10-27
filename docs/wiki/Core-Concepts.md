@@ -168,14 +168,22 @@ sequence parameter (an options or keys list) renders as its elements joined by `
 ## PII
 
 Errors leave the process - in ProblemDetails, logs and UI - and the input may be a card number, a token or another
-secret. Built-in default messages therefore never quote string input - formats, patterns, prefixes, allowed and
-denied values, enums, literals, discriminators and JSON read failures describe what was expected, not what was
-received - and the `received` parameter holds only the input's type name (for example `"string"`). Numeric rules
-still state the failing number (`"Value must be between 1 and 10, but got 11"`), and size rules the count.
+secret. Built-in default messages therefore never quote the input - formats, patterns, prefixes, allowed and
+denied values, enums, literals, discriminators, numbers (`"Value must be between 1 and 10"`,
+`"Number must be a multiple of 5"`, `"Expected integer, received float"`) and JSON read failures describe what was
+expected, not what was received. Size rules state the count (`"…, but got 1"`), which is not the input.
 
 `ZodErrorOptions.IncludeReceivedValues` (process-wide, default `false`) adds the raw input as the `received`
-parameter of rule failures. It is for local development and diagnostics only: **never enable it in production**.
-Built-in messages stay value-free either way; a custom message can still use a rule's positional placeholders.
+parameter of rule failures; with it off, rule failures carry no `received` parameter at all. It is for local
+development and diagnostics only: **never enable it in production**. Built-in messages stay value-free either way;
+a custom message can still use a rule's positional placeholders (the value is still passed, for example as `{1}`
+of `MinValueRule` or `{2}` of `RangeRule`).
+
+Every built-in rule reports its message template as `MessageFormat`, with named placeholders (`{minimum}`,
+`{maximum}`, `{count}`, `{divisor}`, `{pattern}`, …) that resolve from the error, so a host can localize a runtime
+schema's errors by template exactly as it does a generated validator's. A custom message is reported with its
+positional placeholders renamed (`"At least {0}"` becomes `"At least {minimum}"`); the value's position becomes
+`{received}`, which only resolves when `IncludeReceivedValues` is on, so a formatter falls back to `Message`.
 
 ## Depth limit
 

@@ -19,6 +19,10 @@ public readonly record struct RegexRule
 	/// <summary>Gets the message format; <c>{0}</c> is the required pattern. A custom message may use <c>{1}</c> for the offending value.</summary>
 	public const string MessageFormat = "String does not match the required pattern: {0}";
 
+	static readonly string?[] TemplateNames = [Core.ZodIssueParameters.Pattern, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	/// <summary>
 	/// The match timeout applied to every pattern this library compiles itself.
 	/// </summary>
@@ -130,6 +134,9 @@ public readonly record struct RegexRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

@@ -42,6 +42,8 @@ public readonly record struct CidrRule
 	/// <summary>Gets the default message format; <c>{1}</c> is the required type. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
 	public const string MessageFormat = "Invalid {1} CIDR";
 
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
+
 	readonly CidrRuleType _ruleType;
 	readonly string? _message;
 
@@ -151,6 +153,8 @@ public readonly record struct CidrRule
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat => RuleMessage.Template(_message ?? MessageFormat, 1, TypeName, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
 

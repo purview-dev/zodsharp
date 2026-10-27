@@ -26,8 +26,10 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_enum_value";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value and <c>{1}</c> the enum name.</summary>
-	public const string MessageFormat = "'{0}' is not a defined member of {1}";
+	/// <summary>Gets the message format; <c>{1}</c> is the enum name. The default never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Value is not a defined member of {1}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
 
 	// Resolving the defined members once per closed generic type avoids the per-validation
 	// Enum.IsDefined reflection path.
@@ -102,6 +104,9 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
+
+	string? Core.IZodRule.MessageFormat =>
+		RuleMessage.Template(_message ?? MessageFormat, 1, typeof(TEnum).Name, TemplateNames);
 
 	string? Core.IZodRule.Origin => Core.ZodTypeNames.Enum;
 

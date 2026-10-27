@@ -151,18 +151,18 @@ Fluent methods live on `ZodNumber` (`ZodSharp.Schemas`), which validates `double
 
 | Rule | Constructor | Fluent method | Code | Message format |
 |---|---|---|---|---|
-| `MinValueRule<T>` | `(T minValue)` | `Min(v)`, `NonNegative()` | `too_small` | `Value must be at least {0}, but got {1}` |
-| `MaxValueRule<T>` | `(T maxValue)` | `Max(v)`, `NonPositive()` | `too_big` | `Value must be at most {0}, but got {1}` |
-| `GreaterThanRule<T>` | `(T exclusiveMinimum)` | `Gt(v)`, `Positive()` | `too_small` | `Value must be greater than {0}, but got {1}` |
-| `LessThanRule<T>` | `(T exclusiveMaximum)` | `Lt(v)`, `Negative()` | `too_big` | `Value must be less than {0}, but got {1}` |
-| `GreaterThanOrEqualRule<T>` | `(T minValue, string? message)` | `Gte(v)` | `too_small` | `Value must be greater than or equal to {0}, but got {1}` |
-| `LessThanOrEqualRule<T>` | `(T maxValue, string? message)` | `Lte(v)` | `too_big` | `Value must be less than or equal to {0}, but got {1}` |
-| `EvenRule<T>` | `(string? message)` | `Even()` | `invalid_value` | `Number must be even, but got {0}` |
-| `OddRule<T>` | `(string? message)` | `Odd()` | `invalid_value` | `Number must be odd, but got {0}` |
-| `MultipleOfRule<T>` | `(T divisor, string? message)` | `MultipleOf(divisor)` | `not_multiple_of` | `Number must be a multiple of {0}, but got {1}` |
-| `FiniteRule<T>` | `(string? message)` | `Finite()` | `not_finite` | `Number must be finite, but got {0}` |
-| `SafeIntegerRule` | `(string? message)` | `Safe()` | `too_big` | `Number must be a safe integer, but got {0}` |
-| `IntRule<T>` | `()` | `Int()` | `invalid_type` | `Expected integer, but got {0}` |
+| `MinValueRule<T>` | `(T minValue)` | `Min(v)`, `NonNegative()` | `too_small` | `Value must be at least {0}` |
+| `MaxValueRule<T>` | `(T maxValue)` | `Max(v)`, `NonPositive()` | `too_big` | `Value must be at most {0}` |
+| `GreaterThanRule<T>` | `(T exclusiveMinimum)` | `Gt(v)`, `Positive()` | `too_small` | `Value must be greater than {0}` |
+| `LessThanRule<T>` | `(T exclusiveMaximum)` | `Lt(v)`, `Negative()` | `too_big` | `Value must be less than {0}` |
+| `GreaterThanOrEqualRule<T>` | `(T minValue, string? message)` | `Gte(v)` | `too_small` | `Value must be greater than or equal to {0}` |
+| `LessThanOrEqualRule<T>` | `(T maxValue, string? message)` | `Lte(v)` | `too_big` | `Value must be less than or equal to {0}` |
+| `EvenRule<T>` | `(string? message)` | `Even()` | `invalid_value` | `Number must be even` |
+| `OddRule<T>` | `(string? message)` | `Odd()` | `invalid_value` | `Number must be odd` |
+| `MultipleOfRule<T>` | `(T divisor, string? message)` | `MultipleOf(divisor)` | `not_multiple_of` | `Number must be a multiple of {0}` |
+| `FiniteRule<T>` | `(string? message)` | `Finite()` | `not_finite` | `Number must be finite` |
+| `SafeIntegerRule` | `(string? message)` | `Safe()` | `too_big` | `Number must be a safe integer` |
+| `IntRule<T>` | `()` | `Int()` | `invalid_type` | `Expected integer, received float` |
 
 Behaviour notes:
 
@@ -174,6 +174,8 @@ Behaviour notes:
 - **`FiniteRule<T>`** rejects `NaN` and infinities via `T.IsFinite`.
 - **`SafeIntegerRule`** is intentionally `double`-only ("safe integer" is a JavaScript `Number` concept); it requires a whole number within `int.MinValue`..`int.MaxValue`.
 - **`IntRule<T>`** requires `value % T.One == T.Zero`, which also rejects infinities (a truncate comparison would accept them).
+
+No default number message contains the input. Each rule still passes the value to a custom message, after the arguments its default uses: `{1}` for the bound rules and `MultipleOfRule<T>`, `{2}` for `RangeRule<T>`, and `{0}` for `IntRule<T>`, `FiniteRule<T>`, `SafeIntegerRule`, `EvenRule<T>` and `OddRule<T>`. The reported `MessageFormat` is the named form (`Value must be at least {minimum}`, `Number must be a multiple of {divisor}`), in which the value's position becomes `{received}`.
 
 ## Value rules
 
@@ -209,7 +211,7 @@ These rules mirror `System.ComponentModel.DataAnnotations` attributes as first-c
 | Rule | Constructor | Fluent method | Code | Message format |
 |---|---|---|---|---|
 | `RequiredRule<T>` | `(bool allowEmptyStrings = false, bool trimWhitespace = false, string? message, string? code)` | `ZodString.Required(...)` | `missing_field` | `{0} is required` (`{0}` is the display name, `Value` when unknown) |
-| `RangeRule<T>` | `(T minimum, T maximum, bool minimumIsExclusive = false, bool maximumIsExclusive = false, string? message, string? code)` | `ZodNumber.Range(...)`, `ZodBigInt.Range(...)`, `ZodDate.Range(...)` | `invalid_range` | `Value must be between {0} and {1}, but got {2}` |
+| `RangeRule<T>` | `(T minimum, T maximum, bool minimumIsExclusive = false, bool maximumIsExclusive = false, string? message, string? code)` | `ZodNumber.Range(...)`, `ZodBigInt.Range(...)`, `ZodDate.Range(...)` | `invalid_range` | `Value must be between {0} and {1}` |
 | `LengthRule` | `(int minimum, int maximum, string? message, string? code)` | `ZodString.Length(min, max)` | `invalid_length` | `String length must be between {0} and {1} characters, but got {2}` |
 | `StringLengthRule` | `(int maximumLength, int minimumLength = 0, string? message, string? code)` | `ZodString.StringLength(max, min)` | `invalid_length` | `String must be at most {0} characters long and at least {1}, but got {2}` |
 | `CompareRule` | `(string other, StringComparison comparison = Ordinal, string? message, string? code)` | `ZodString.Compare(...)` | `mismatch` | `Value does not match the expected value` |
@@ -224,7 +226,7 @@ These rules mirror `System.ComponentModel.DataAnnotations` attributes as first-c
 
 | Rule | Constructor | Fluent method | Code | Message format |
 |---|---|---|---|---|
-| `EnumRule<TEnum>` | `()` or `(TEnum[]? disallowed, string? message, string? code)` | `Enum()` | `invalid_enum_value` | `'{0}' is not a defined member of {1}` |
+| `EnumRule<TEnum>` | `()` or `(TEnum[]? disallowed, string? message, string? code)` | `Enum()` | `invalid_enum_value` | `Value is not a defined member of {1}` |
 
 `EnumRule<TEnum>` is generic over `TEnum : struct, Enum` and rejects a value that is not a defined member of the enum type, or that resolves to a member the rule excludes. It is equivalent to Zod's `z.nativeEnum(Enum)` semantics. The defined members are resolved once per closed generic type, so the validation path performs no reflection.
 

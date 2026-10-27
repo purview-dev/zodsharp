@@ -19,8 +19,15 @@ public readonly record struct RangeRule<T> : Core.IValidationRule<T>, Core.IZodR
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_range";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the minimum, <c>{1}</c> the maximum and <c>{2}</c> the value.</summary>
-	public const string MessageFormat = "Value must be between {0} and {1}, but got {2}";
+	/// <summary>
+	/// Gets the message format; <c>{0}</c> is the minimum and <c>{1}</c> the maximum. The default never contains
+	/// the input; a custom message may use <c>{2}</c> for the offending value.
+	/// </summary>
+	public const string MessageFormat = "Value must be between {0} and {1}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Minimum, RuleMessage.Maximum, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly T _minimum;
 	readonly T _maximum;
@@ -88,6 +95,9 @@ public readonly record struct RangeRule<T> : Core.IValidationRule<T>, Core.IZodR
 	Core.ErrorBound? Core.IZodRule.Lower => new Core.ErrorBound(_minimum, !_minimumIsExclusive);
 
 	Core.ErrorBound? Core.IZodRule.Upper => new Core.ErrorBound(_maximum, !_maximumIsExclusive);
+
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
 
 	// The Zod issue code follows the bound that failed.
 	Core.ZodRuleFailure Core.IZodFailureDescriber<T>.DescribeFailure(in T value)

@@ -491,7 +491,7 @@ Mapping rules:
 public readonly record struct MultipleOfRule(int Factor = 1, string? Message = null) : IValidationRule<int>
 {
     public const string ErrorCode = "not_multiple_of";
-    public const string MessageFormat = "Number must be a multiple of {0}, but got {1}";
+    public const string MessageFormat = "Number must be a multiple of {0}";
 
     public bool IsValid(in int value) => Factor != 0 && value % Factor == 0;
 
