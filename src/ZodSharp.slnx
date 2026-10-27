@@ -11,10 +11,13 @@
 	</Folder>
 	<Folder Name="/src/examples/">
 		<Project Path="src/Examples.CLI/Examples.CLI.csproj" />
+		<Project Path="src/Examples.MinimalApi/Examples.MinimalApi.csproj" />
+		<Project Path="src/Examples.Shared/Examples.Shared.csproj" />
 	</Folder>
 	<Folder Name="/tests/">
 		<Project Path="tests/AspNetCore.OpenApi.UnitTests/AspNetCore.OpenApi.UnitTests.csproj" />
 		<Project Path="tests/AspNetCore.UnitTests/AspNetCore.UnitTests.csproj" />
+		<Project Path="tests/Examples.MinimalApi.IntegrationTests/Examples.MinimalApi.IntegrationTests.csproj" />
 		<Project Path="tests/Extensions.Validation.UnitTests/Extensions.Validation.UnitTests.csproj" />
 		<Project Path="tests/JsonInterop.UnitTests/JsonInterop.UnitTests.csproj" />
 		<Project Path="tests/NewtonsoftJson.UnitTests/NewtonsoftJson.UnitTests.csproj" />
