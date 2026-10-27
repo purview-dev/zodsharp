@@ -8,6 +8,42 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## [Unreleased]
+
+### Breaking behaviour changes
+
+- **JSON read failures use one code, `invalid_json`.** `DeserializeAndValidate`/`DeserializeAndValidateAsync`
+  in both JSON packages used to report `json_error` (with the serializer's exception text in the message) or
+  `deserialization_failed` (for a `null` document). Every failure to read the JSON now reports a single
+  `invalid_json` error (`SystemTextJsonExtensions.InvalidJsonCode`, `NewtonsoftJsonExtensions.InvalidJsonCode`)
+  with category `invalid_type` and the fixed message `"The JSON value could not be converted to {expected}."`,
+  where `expected` is a Zod type name. The serializer's message is no longer surfaced, because it names CLR
+  types and can quote the input.
+- **Validating converters throw a structured exception.** The System.Text.Json converter throws
+  `ZodJsonValidationException` (a `JsonException`) and the Newtonsoft converter throws
+  `ZodNewtonsoftJsonValidationException` (a `JsonSerializationException`). Both still carry the
+  `"Validation failed: …"` message, so existing `catch` blocks keep working, and `DeserializeAndValidate` now
+  returns the schema's full errors instead of one flattened message.
+- **JSON Schema import messages describe JSON kinds.** Type mismatches read `"Expected string, but got number"`
+  instead of naming `JsonElement`/`JToken`/CLR types, `minItems`/`maxItems` failures read
+  `"Array must have at least 2 elements, but got 1"` (matching `ZodArray`), and a literal mismatch no longer
+  echoes the received value.
+
+### Fixed
+
+- **JSON read failures keep their location.** The serializer's path becomes the error's `FullPath`
+  (`$.items[1].age` and Newtonsoft's `items[1].age` both become `items[1].age`), and its line and position
+  become the `line` and `position` parameters.
+- **System.Text.Json `NotSupportedException` and `InvalidOperationException`** thrown while deserializing are
+  reported as `invalid_json` instead of escaping `DeserializeAndValidate`.
+- **Validating-converter errors keep every field and their path**, located under the converter's JSON path
+  (`Owner.Name` for a failing nested `Owner`), including when validating converters are nested.
+- **Newtonsoft `DeserializeAndValidateAsync` validates asynchronously.** It called the synchronous `Validate`,
+  so asynchronous refinements never ran; it now awaits `ValidateAsync`.
+- **JSON Schema import paths and metadata.** Array element and record value errors are re-pathed with typed
+  index and key segments and keep every field (origin, bounds, category, parameters); `minItems`/`maxItems`
+  failures carry origin `array`, both bounds, inclusivity and the `too_small`/`too_big` category, like
+  `ZodArray`. A Newtonsoft `JValue` is no longer treated as an empty array.
 ## 2.4.1
 
 ### Fixed

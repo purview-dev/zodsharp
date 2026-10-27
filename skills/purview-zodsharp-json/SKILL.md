@@ -52,7 +52,9 @@ var json = userSchema.ValidateAndSerialize(user);              // ValidationResu
 await userSchema.ValidateAndSerializeAsync(user, outputStream);
 ```
 
-Failures add `deserialization_failed` and `json_error` codes alongside the schema's own.
+A failure to read the JSON is one error with code `invalid_json` (category `invalid_type`), located at the
+serializer's reported path, with `line`/`position` parameters and a fixed message that never quotes the input or
+names CLR types. Schema failures keep the schema's own codes.
 
 ## Validating converters
 
@@ -65,8 +67,10 @@ var value = JsonSerializer.Deserialize<User>(json, options);
 var value2 = JsonConvert.DeserializeObject<User>(json, userSchema.CreateValidatingConverter());
 ```
 
-Invalid JSON **throws** — `JsonException` (STJ) or `JsonSerializationException` (Newtonsoft), with a
-`"Validation failed: …"` message. Each converter removes itself from the options/serializer it uses
+Invalid JSON **throws** — `ZodJsonValidationException : JsonException` (STJ) or
+`ZodNewtonsoftJsonValidationException : JsonSerializationException` (Newtonsoft), with a `"Validation failed: …"`
+message and the full errors in `Errors`, located under the converted value's path. `DeserializeAndValidate`
+unwraps them into the result. Each converter removes itself from the options/serializer it uses
 internally, to avoid recursing into itself.
 
 ## Which package differs how
