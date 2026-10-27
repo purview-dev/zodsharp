@@ -4,6 +4,7 @@ root_folder := "src"
 solution := root_folder / "ZodSharp.slnx"
 perf_tests_project := root_folder / "src" / "Benchmarks" / "Benchmarks.csproj"
 aot_sample_project := root_folder / "src" / "Examples.MinimalApi" / "Examples.MinimalApi.csproj"
+trim_verification_project := root_folder / "tests" / "TrimSafety.Verification" / "TrimSafety.Verification.csproj"
 # Native AOT cannot cross-compile between operating systems, so the sample publishes for this machine by default.
 default_rid := (if os_family() == "windows" { "win" } else if os() == "macos" { "osx" } else { "linux" }) + "-" + (if arch() == "aarch64" { "arm64" } else { "x64" })
 build_configuration := "Debug"
@@ -119,6 +120,18 @@ pack publish_folder=artifacts_folder *args:
 publish-aot-sample rid=default_rid *args:
     echo "Publishing {{ BLUE }}{{ aot_sample_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }}"
     dotnet publish {{ aot_sample_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/aot-sample/{{ rid }} -warnaserror {{ args }}
+
+# The CI `verify-trim` job runs the same recipe for linux-x64. Windows needs the MSVC C++ build tools, Linux clang.
+# Publish the trim and Native AOT verification harness in both modes (every ZodSharp assembly rooted, then as a plain
+# consumer), failing on any IL2xxx/IL3xxx warning, and run each native binary, which exits non-zero on any mismatch
+[group('Build and Test')]
+verify-trim rid=default_rid *args:
+    echo "Publishing {{ BLUE }}{{ trim_verification_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }} (rooted)"
+    dotnet publish {{ trim_verification_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/trim-verification/{{ rid }}/rooted -p:TrimVerificationMode=Rooted -warnaserror {{ args }}
+    {{ artifacts_folder }}/trim-verification/{{ rid }}/rooted/ZodSharp.TrimSafety.Verification
+    echo "Publishing {{ BLUE }}{{ trim_verification_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }} (consumer)"
+    dotnet publish {{ trim_verification_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer -p:TrimVerificationMode=Consumer -warnaserror {{ args }}
+    {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer/ZodSharp.TrimSafety.Verification
 
 # Displays the current version of the project.
 # Requires Bun.

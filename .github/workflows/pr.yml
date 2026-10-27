@@ -153,6 +153,52 @@ jobs:
             exit 1
           fi
 
+  # Proves the whole trim-safe surface, not just what one sample calls. The harness publishes with PublishAot=true twice:
+  # once with every Purview.ZodSharp assembly except NewtonsoftJson rooted whole, so ILC analyses all of their code, and
+  # once as a plain consumer. Any IL2xxx/IL3xxx warning fails the publish, and each native binary exercises runtime
+  # schemas, generated validators, System.Text.Json, JSON Schema, the validation bridge, ProblemDetails and options
+  # validation, exiting non-zero on any mismatch. See src/tests/TrimSafety.Verification.
+  verify-trim:
+    name: Trim and Native AOT verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Native AOT links with clang and needs the zlib headers; the hosted image may not carry both.
+      - name: Install the Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # -warnaserror and the project's TreatWarningsAsErrors fail the publish on any trim or AOT warning. The grep is a
+      # second gate in case a warning is ever logged without failing the step.
+      - name: Publish and run the harness (every ZodSharp assembly rooted)
+        shell: bash
+        run: |
+          dotnet publish src/tests/TrimSafety.Verification/TrimSafety.Verification.csproj \
+            --configuration Release --runtime linux-x64 --output artifacts/trim-verification/rooted \
+            -p:TrimVerificationMode=Rooted -warnaserror 2>&1 | tee publish-rooted.log
+          if grep -E 'warning IL[23][0-9]{3}' publish-rooted.log; then
+            echo "::error::The rooted Native AOT publish reported trim or AOT warnings."
+            exit 1
+          fi
+          ./artifacts/trim-verification/rooted/ZodSharp.TrimSafety.Verification
+
+      - name: Publish and run the harness (as a consumer)
+        shell: bash
+        run: |
+          dotnet publish src/tests/TrimSafety.Verification/TrimSafety.Verification.csproj \
+            --configuration Release --runtime linux-x64 --output artifacts/trim-verification/consumer \
+            -p:TrimVerificationMode=Consumer -warnaserror 2>&1 | tee publish-consumer.log
+          if grep -E 'warning IL[23][0-9]{3}' publish-consumer.log; then
+            echo "::error::The consumer Native AOT publish reported trim or AOT warnings."
+            exit 1
+          fi
+          ./artifacts/trim-verification/consumer/ZodSharp.TrimSafety.Verification
   # Pack validation checks the IL-merged generator is present in the .nupkg; it cannot check that the
   # assembly loads and generates. That merge has regressed twice (#36, #38), both times breaking consumers
   # while the in-repo tests stayed green, because those run against the unmerged generator.
