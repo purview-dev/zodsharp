@@ -7,9 +7,9 @@
 		version ships. This lives in the repo because the baseline is package-specific; Purview.BuildSdk has no
 		default for it.
 
-		2.4.0 validates against 2.3.0 with no suppressions: the dictionary validation, record JSON Schema and
-		minProperties/maxProperties additions are additive public API. An intended change from here needs a
-		CompatibilitySuppressions.xml next to the project that owns it (generate one with
+		3.0.0 validates against 2.4.2. It drops net8.0 and net9.0, so every project that shipped in 2.4.2 carries a
+		CompatibilitySuppressions.xml for the removed target frameworks (and any intended API change). An intended
+		change needs a CompatibilitySuppressions.xml next to the project that owns it (generate one with
 		`dotnet pack /p:GenerateCompatibilitySuppressionFile=true`), and that file is then the evidence behind the
 		matching upgrade note — a change that is not listed in both is a defect.
 	-->
@@ -17,7 +17,7 @@
 		<EnablePackageValidation>true</EnablePackageValidation>
 		<!-- A package that has never shipped sets ZodSharpNoPackageValidationBaseline; it still gets the
 		     cross-TFM checks, just no previous version to compare against. -->
-		<PackageValidationBaselineVersion>2.4.0</PackageValidationBaselineVersion>
+		<PackageValidationBaselineVersion>2.4.2</PackageValidationBaselineVersion>
 		<PackageValidationBaselineVersion Condition="'$(ZodSharpNoPackageValidationBaseline)' == 'true'" />
 	</PropertyGroup>
 </Project>
