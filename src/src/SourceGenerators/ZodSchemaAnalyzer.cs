@@ -470,7 +470,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 	/// <returns><see langword="true"/> when JSON Schema export is enabled for the compilation.</returns>
 	static bool ReadGenerateJsonSchemas(AnalyzerOptions options) =>
 		!options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
-			$"build_property:{PropertyLibrary.GenerateJsonSchemasProperty}",
+			PropertyLibrary.BuildPropertyKey(PropertyLibrary.GenerateJsonSchemasProperty),
 			out var value
 		)
 		|| !bool.TryParse(value, out var enabled)

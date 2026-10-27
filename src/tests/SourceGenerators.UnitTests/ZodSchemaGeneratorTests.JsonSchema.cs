@@ -381,7 +381,7 @@ namespace Testing
 		{
 			CompileToAssembly = true,
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpEnumSerialization",
+				"build_property.ZodSharpEnumSerialization",
 				"String"
 			),
 		};
@@ -405,8 +405,8 @@ namespace Testing
 		{
 			CompileToAssembly = true,
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>
-				.Empty.Add("build_property:ZodSharpEnumSerialization", "String")
-				.Add("build_property:ZodSharpEnumNamingPolicy", "CamelCase"),
+				.Empty.Add("build_property.ZodSharpEnumSerialization", "String")
+				.Add("build_property.ZodSharpEnumNamingPolicy", "CamelCase"),
 		};
 
 		// Act

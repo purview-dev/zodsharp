@@ -3,6 +3,9 @@
 		<CompilerVisibleProperty Include="DisableZodSharpSourceGenerator">
 			<Description>Specifies whether to disable Purview.ZodSharp source generators.</Description>
 		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="DisableErrorTypeGenerator">
+			<Description>Specifies whether to disable the Purview.ZodSharp [ErrorType] generator.</Description>
+		</CompilerVisibleProperty>
 		<CompilerVisibleProperty Include="ZodSharpAutoGenerateOptionsValidators">
 			<Description>Enables auto-detection of IValidateOptions validators for types with a configured name suffix.</Description>
 		</CompilerVisibleProperty>

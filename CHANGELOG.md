@@ -320,6 +320,13 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **The `ZodSharp*` MSBuild switches now reach the generator and analyzers.** They were read with the key
+  `build_property:Name`, but the compiler exposes a `CompilerVisibleProperty` as `build_property.Name`, so
+  `ZodSharpAutoGenerateOptionsValidators`, `ZodSharpAutoGenerateOptionsValidatorSuffixes`,
+  `ZodSharpGenerateJsonSchemas`, `ZodSharpEnumSerialization`, `ZodSharpEnumNamingPolicy`, `ZodSharpAllowNulls` and
+  `ZodSharpDateTimeOffsetSerialization` set in a project file had no effect. `DisableErrorTypeGenerator` is now
+  declared compiler-visible by `buildTransitive/Purview.ZodSharp.props` too. *Behaviour change:* a project that
+  already sets one of these switches now gets the behaviour it asked for.
 - Source generator: a custom `ErrorMessage` containing `{1}` or a stray brace no longer fails the build or throws at
   validation time (G2, G14); `[Display(ResourceType)]` is honoured (G19); `[JsonPropertyName]` is available to
   hosts through `JsonNames`/`ToJsonNamedPath` (G3); allowed/denied enum values are listed by name (G17); custom

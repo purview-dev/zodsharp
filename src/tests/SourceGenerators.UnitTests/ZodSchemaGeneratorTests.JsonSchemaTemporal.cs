@@ -98,7 +98,7 @@ public partial class ZodSchemaGeneratorTests
 		{
 			CompileToAssembly = true,
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpDateTimeOffsetSerialization",
+				"build_property.ZodSharpDateTimeOffsetSerialization",
 				"Utc"
 			),
 		};
@@ -194,7 +194,7 @@ public partial class ZodSchemaGeneratorTests
 		{
 			CompileToAssembly = true,
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpDateTimeOffsetSerialization",
+				"build_property.ZodSharpDateTimeOffsetSerialization",
 				"Utc"
 			),
 		};
@@ -240,7 +240,7 @@ public partial class ZodSchemaGeneratorTests
 		{
 			CompileToAssembly = true,
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpDateTimeOffsetSerialization",
+				"build_property.ZodSharpDateTimeOffsetSerialization",
 				"Utc"
 			),
 		};
@@ -289,7 +289,7 @@ public partial class ZodSchemaGeneratorTests
 		{
 			CompileToAssembly = true,
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpDateTimeOffsetSerialization",
+				"build_property.ZodSharpDateTimeOffsetSerialization",
 				"Utc"
 			),
 		};

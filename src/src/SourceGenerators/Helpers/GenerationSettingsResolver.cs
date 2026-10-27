@@ -36,7 +36,7 @@ static class GenerationSettingsResolver
 		// Auto-detection is on by default; only an explicit "false" disables it.
 		var autoGenerate =
 			!provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.AutoGenerateIValidateOptionsProperty),
 				out var autoGenerateValue
 			)
 			|| !bool.TryParse(autoGenerateValue, out var autoGenerateEnabled)
@@ -44,7 +44,7 @@ static class GenerationSettingsResolver
 
 		var suffixes = ParseAutoGenerateIValidateOptionsSuffixes(
 			provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsSuffixesProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.AutoGenerateIValidateOptionsSuffixesProperty),
 				out var suffixValue
 			)
 				? suffixValue
@@ -54,7 +54,7 @@ static class GenerationSettingsResolver
 		// JSON Schema export is on by default; the assembly-level switch disables it for every type.
 		var generateJsonSchemas =
 			!provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.GenerateJsonSchemasProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.GenerateJsonSchemasProperty),
 				out var generateJsonSchemasValue
 			)
 			|| !bool.TryParse(generateJsonSchemasValue, out var generateJsonSchemasEnabled)
@@ -69,7 +69,7 @@ static class GenerationSettingsResolver
 		// them; only an explicit true enables it, so an unparsable value keeps the default.
 		var allowNulls =
 			provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AllowNullsProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.AllowNullsProperty),
 				out var allowNullsValue
 			)
 			&& bool.TryParse(allowNullsValue, out var allowNullsEnabled)
@@ -131,7 +131,7 @@ static class GenerationSettingsResolver
 	static DateTimeOffsetSerialization ReadDateTimeOffsetSerialization(AnalyzerConfigOptionsProvider provider)
 	{
 		var value = provider.GlobalOptions.TryGetValue(
-			$"build_property:{PropertyLibrary.DateTimeOffsetSerializationProperty}",
+			PropertyLibrary.BuildPropertyKey(PropertyLibrary.DateTimeOffsetSerializationProperty),
 			out var configured
 		)
 			? configured?.Trim()
@@ -143,12 +143,16 @@ static class GenerationSettingsResolver
 	}
 
 	static bool ReadEnumSerializationAsString(AnalyzerConfigOptionsProvider provider) =>
-		provider.GlobalOptions.TryGetValue($"build_property:{PropertyLibrary.EnumSerializationProperty}", out var value)
-		&& string.Equals(value?.Trim(), "String", StringComparison.OrdinalIgnoreCase);
+		provider.GlobalOptions.TryGetValue(
+			PropertyLibrary.BuildPropertyKey(PropertyLibrary.EnumSerializationProperty),
+			out var value
+		) && string.Equals(value?.Trim(), "String", StringComparison.OrdinalIgnoreCase);
 
 	static EnumJsonNamingPolicy ReadEnumNamingPolicy(AnalyzerConfigOptionsProvider provider) =>
-		provider.GlobalOptions.TryGetValue($"build_property:{PropertyLibrary.EnumNamingPolicyProperty}", out var value)
-		&& string.Equals(value?.Trim(), "CamelCase", StringComparison.OrdinalIgnoreCase)
+		provider.GlobalOptions.TryGetValue(
+			PropertyLibrary.BuildPropertyKey(PropertyLibrary.EnumNamingPolicyProperty),
+			out var value
+		) && string.Equals(value?.Trim(), "CamelCase", StringComparison.OrdinalIgnoreCase)
 			? EnumJsonNamingPolicy.CamelCase
 			: EnumJsonNamingPolicy.Unchanged;
 

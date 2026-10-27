@@ -127,7 +127,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new()
 		{
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpAutoGenerateOptionsValidators",
+				"build_property.ZodSharpAutoGenerateOptionsValidators",
 				"false"
 			),
 		};
@@ -161,7 +161,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new()
 		{
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpAutoGenerateOptionsValidatorSuffixes",
+				"build_property.ZodSharpAutoGenerateOptionsValidatorSuffixes",
 				"Config"
 			),
 		};
