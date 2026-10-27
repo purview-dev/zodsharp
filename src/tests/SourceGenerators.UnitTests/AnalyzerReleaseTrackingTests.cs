@@ -11,7 +11,8 @@ namespace ZodSharp.SourceGenerators;
 /// <remarks>
 /// <para>
 /// <c>ZODSGEN037</c>–<c>ZODSGEN044</c> are recorded under a <c>## Release 2.0.2</c> block,
-/// <c>ZODSGEN045</c> under <c>## Release 2.1.0</c>, and <c>ZODSGEN046</c> under <c>## Release 2.2.0</c>. A
+/// <c>ZODSGEN045</c> under <c>## Release 2.1.0</c>, <c>ZODSGEN046</c> under <c>## Release 2.2.0</c>, and
+/// <c>ZODSGEN047</c>–<c>ZODSGEN054</c> under <c>## Release 3.0.0</c>. A
 /// rule stays recorded under the release that introduced it, so an existing block is never rewritten. The
 /// unshipped file declares no rules; the next diagnostic added goes there and moves across when it ships.
 /// </para>
@@ -87,14 +88,7 @@ public partial class AnalyzerReleaseTrackingTests
 		"ZODSGEN045",
 		// Release 2.2.0.
 		"ZODSGEN046",
-	];
-
-	/// <summary>
-	/// Rules added since the last release. A new or changed diagnostic is added here and moves into
-	/// <c>AnalyzerReleases.Shipped.md</c> when it ships.
-	/// </summary>
-	static readonly string[] ExpectedUnshippedRuleIds =
-	[
+		// Release 3.0.0.
 		"ZODSGEN047",
 		"ZODSGEN048",
 		"ZODSGEN049",
@@ -104,6 +98,12 @@ public partial class AnalyzerReleaseTrackingTests
 		"ZODSGEN053",
 		"ZODSGEN054",
 	];
+
+	/// <summary>
+	/// Rules added since the last release. A new or changed diagnostic is added here and moves into
+	/// <c>AnalyzerReleases.Shipped.md</c> when it ships.
+	/// </summary>
+	static readonly string[] ExpectedUnshippedRuleIds = [];
 
 	[Test]
 	public async Task ShippedReleases_GivenEveryRelease_DeclareEveryDiagnosticId(CancellationToken cancellationToken)
@@ -118,6 +118,8 @@ public partial class AnalyzerReleaseTrackingTests
 		await Assert.That(markdown).Contains("## Release 2.0.0");
 		await Assert.That(markdown).Contains("## Release 2.0.2");
 		await Assert.That(markdown).Contains("## Release 2.1.0");
+		await Assert.That(markdown).Contains("## Release 2.2.0");
+		await Assert.That(markdown).Contains("## Release 3.0.0");
 		await Assert.That(SortedRuleIds(ruleIds)).IsEqualTo(SortedRuleIds(ExpectedShippedRuleIds));
 	}
 

@@ -8,12 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
-## [Unreleased]
+## 3.0.0-prerelease.1
 
 ### Added
 
 - **Trimming and Native AOT across every package.** Every shipping package is `IsTrimmable`/`IsAotCompatible` on
-  `net8.0`+ and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
+  every target framework and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
   suppressed. `src/tests/TrimSafety.Verification` publishes with `PublishAot=true` (every ZodSharp assembly except
   NewtonsoftJson rooted, then as a plain consumer), fails on any IL warning and runs the native binary
   (`just verify-trim`, CI job `verify-trim`). See [Trimming and Native AOT](docs/wiki/Trimming-and-AOT.md).
@@ -198,6 +198,10 @@ Released versions correspond to `v<version>` GitHub releases.
   locally, and `Examples.MinimalApi.IntegrationTests` starts it in memory.
 ### Breaking behaviour changes
 
+- **Dropped net8.0 and net9.0; supported target frameworks are net10.0 and net11.0.** Every package ships
+  `lib/net10.0` and `lib/net11.0` only (the .NET 11 integrations stay `net11.0`-only); the source generator and
+  analyzers stay on `netstandard2.0`. The `Microsoft.Extensions.*` dependency lines for 8.x and 9.x are gone, and
+  the net8.0-only trim suppressions were replaced by the feature guards every remaining target understands.
 - **Newly annotated APIs (not binary breaks; trimmed and AOT applications now get IL2026/IL3050 at the call site).**
   `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` were added to: every `Purview.ZodSharp.NewtonsoftJson` API
   that reaches Newtonsoft serialization (`NewtonsoftJsonExtensions.DeserializeAndValidate`,
@@ -317,8 +321,8 @@ Released versions correspond to `v<version>` GitHub releases.
   `displayName`); a partly-filled template used to be returned with `{placeholders}` left in.
 - **`StatusCodeSelector` wins.** It runs after the highest `ErrorType.HttpStatus` is computed (it was overridden by
   it, contrary to the docs).
-- **Parameters are merged into the top-level extensions on every overload** (they were merged only by the
-  registry/lookup overloads), and only safe scalar values are serialized. A parameter whose camel-cased name is a
+- **With `MergeParametersIntoExtensions` enabled, parameters are merged into the top-level extensions on every
+  overload** (they were merged only by the registry/lookup overloads), and only safe scalar values are serialized. A parameter whose camel-cased name is a
   reserved member (`type`, `title`, `status`, `detail`, `instance`, `errors`, `issues`, `traceId`) is written as
   `param_{name}`. `issues[].parameters` keys are camel-cased (they kept the raw key).
 - **`issues[].path` is the dotted key** (`"Items[0].Quantity"`, was a string array); the array is `segments`, with
@@ -405,8 +409,7 @@ Released versions correspond to `v<version>` GitHub releases.
   inside a value read by `CreateValidatingConverter` (both JSON packages) was reported at its path within that
   value (`Age`); it is now reported under the converted value's path too (`items[1].age`).
 - **`invalid_json` names the expected type in more places.** `expected` is found through list, array and
-  dictionary element contracts on every target framework (it fell back to `"the expected type"` before .NET 9), and
-  binary members (`byte[]`, `Memory<byte>`) are `string`.
+  dictionary element contracts, and binary members (`byte[]`, `Memory<byte>`) are `string`.
 - **System.Text.Json `NotSupportedException` and `InvalidOperationException`** thrown while deserializing are
   reported as `invalid_json` instead of escaping `DeserializeAndValidate`.
 - **Validating-converter errors keep every field and their path**, located under the converter's JSON path
@@ -424,6 +427,50 @@ Released versions correspond to `v<version>` GitHub releases.
   header or form binding failure keeps ASP.NET Core's 400 unless `OnBindingFailure = ConvertToProblemDetails`), and
   every argument validated with a build-time registration check.
 - **Options (O1):** failures keep their path, code and options name; asynchronous rules run at startup on .NET 11.
+
+### Upgrade notes
+
+Each note names the old form, the new form, and the edit to make.
+
+- **Target frameworks.** `net8.0`/`net9.0` → `net10.0`/`net11.0` only. Retarget the consuming project to `net10.0` or
+  later, or stay on 2.4.x.
+- **Trim/AOT annotations.** The APIs listed under *Breaking behaviour changes* now raise IL2026/IL3050 in a trimmed
+  or AOT build. Move to the named alternative: `Purview.ZodSharp.SystemTextJson` with a `JsonTypeInfo<T>` instead of
+  Newtonsoft; the generated `AddZodSharp{Assembly}Schemas()` or `AddZodSharpAssembly` instead of
+  `AddZodSharpAssemblyGraph`/`ScanAssemblyGraphs`; `ZodModelSchema.For<TModel>(IZodSchema<TModel, TModel>)` instead
+  of the `ZodObject` overload; `BindConfiguration(section).ValidateWithZod(section)` instead of
+  `BindAndValidateWithZod`.
+- **`Option<T>` forwarding.** Generic code that passes an unannotated type parameter to `Option<T>` gets IL2091 →
+  annotate it `[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]`.
+- **Reflection fallbacks under trimming.** A discriminated-union POCO not added with `Option<T>` is now reported as
+  missing its discriminator, and graph scanning registers nothing → add each option with `Option<T>` and use
+  generated validators and registration.
+- **ProblemDetails top-level parameters.** Parameters copied to the body root → only `issues[].parameters`. Read
+  them per issue, or set `ZodProblemDetailsOptions.MergeParametersIntoExtensions = true`.
+- **ProblemDetails `issues[].path`.** A string array → the dotted key (`"Items[0].Quantity"`); the array is now
+  `segments`. Read `segments` where you indexed `path`.
+- **Collection paths.** `ZodArray`/`ZodTuple` element `ValidationError.Path` `"[0]"` → `"0"`, and collection/dictionary errors use
+  typed segments (`Items[0].Name`). Update code that matched path strings; use `FullPath.ToDottedString()`.
+- **`[Required]` on a string.** `""` passed a bare `[Required]` → it is rejected, like `RequiredAttribute`. Supply a
+  value or set `AllowEmptyStrings = true`.
+- **Error codes.** `validation_failed` (`ApplyAnd`/`ApplyOr`/`ApplyRefine`) → `refinement_failed`; `too_small`/
+  `too_big` from generated `[StringLength]`/`[Length]` on a string → `invalid_length`; `unrecognized_key` per key →
+  one `unrecognized_keys` with a `keys` parameter; `json_error`/`deserialization_failed` → `invalid_json`; generated
+  collection-size origin `collection` → `array` (`record` for a dictionary). Update code that switches on them.
+- **Messages.** Default messages no longer contain the input and use Zod type names (`"{displayName} is
+  required"`, `"Expected number, received string"`). Match on `Code`/`Category`, not message text; custom messages
+  keep their positional placeholders.
+- **Union errors.** A flattened `errors` parameter → `unionErrors` (`ImmutableArray<ImmutableArray<ValidationError>>`).
+  Read the per-option arrays.
+- **JSON converters.** Validation failures throw `ZodJsonValidationException` (System.Text.Json) or
+  `ZodNewtonsoftJsonValidationException` (Newtonsoft); both derive from the previous exception types, so existing
+  `catch` blocks keep working. Catch the new types to read the full errors.
+- **Options failures.** `"{message}"` → `"{name}: {path}: {message} ({code})"`, and
+  `OptionsBuilder<T>.AddZodSchemaValidator()` validates only the builder's name. Update log or test assertions, and
+  register a validator per name if you relied on the old scope.
+- **Endpoint filter.** `WithZodSharpValidation<T>()` threw on every request when no validator was registered → it
+  fails when the endpoint is built. Register the validator (or factory) before mapping the endpoint.
+
 ## 2.4.1
 
 ### Fixed
