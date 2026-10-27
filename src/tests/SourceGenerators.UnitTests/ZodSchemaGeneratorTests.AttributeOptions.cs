@@ -94,7 +94,7 @@ partial class ZodSchemaGeneratorTests
 	}
 
 	[Test]
-	public async Task LengthValidation_GivenCollectionProperty_ReportsCollectionOrigin(
+	public async Task LengthValidation_GivenCollectionProperty_ReportsArrayOriginLikeTheRuntimeSchemas(
 		CancellationToken cancellationToken
 	)
 	{
@@ -121,8 +121,8 @@ partial class ZodSchemaGeneratorTests
 		var schema = driverResult.GetSource("BasketSchema.g.cs", HintNameMatchMode.Suffix);
 
 		// Assert
-		await Assert.That(schema).ContainsGeneratedCode("origin: \"collection\"");
-		await Assert.That(schema).DoesNotContain("origin: \"array\"");
+		await Assert.That(schema).ContainsGeneratedCode("origin: \"array\"");
+		await Assert.That(schema).DoesNotContain("origin: \"collection\"");
 	}
 
 	[Test]

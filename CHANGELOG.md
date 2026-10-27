@@ -337,6 +337,10 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **Generated collection size failures report the Zod origin.** `[MinLength]`/`[MaxLength]`/`[Length]` (and
+  `[MinCount]`/`[MaxCount]`/`[CountRange]`) on a `List<T>` or other collection reported `Origin = "collection"`,
+  which no other producer uses; they now report `array` (`record` for a dictionary), like `ZodArray`, `ZodRecord`,
+  the count rules and the generator's own null-element errors. *Behaviour change* for code matching `"collection"`.
 - **Generated `[Range]` parameters are typed.** A number range's `minimum`/`maximum` parameters were strings
   (`"1"`), so `issues[].parameters` in ProblemDetails carried JSON strings. They are now numbers of the member's type
   (`1`, `0.5`); messages are unchanged. A converted non-number range (dates, times) keeps the declared text.

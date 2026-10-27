@@ -63,8 +63,8 @@ Size attributes generate direct `Length`/`Count` access where possible:
 
 A structured size failure carries the same metadata as the runtime API: `Code` (`invalid_length` for
 `[Length]`/`[StringLength]`, `too_small`/`too_big` for `[MinLength]`/`[MaxLength]`), `Category`
-(`too_small`/`too_big` by direction), `Origin` (`string` for strings, `array` for arrays, `collection`
-for countable and `IEnumerable` collections), `Lower`/`Upper` (both bounds for `[Length]` and
+(`too_small`/`too_big` by direction), `Origin` (`string` for strings, `record` for dictionaries, `array`
+for arrays and every other countable or `IEnumerable` collection), `Lower`/`Upper` (both bounds for `[Length]` and
 `[StringLength]`) and `FullPath`.
 
 ```csharp

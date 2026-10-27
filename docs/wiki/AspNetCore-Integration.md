@@ -467,7 +467,7 @@ var error = ConcurrentErrorType.CreateSaveFailed(
     "agg-123",
     "Invoice",
     path: ["order", "items", "[0]"],
-    origin: "collection",
+    origin: "array",
     minimum: 1,
     maximum: 10,
     inclusive: true);

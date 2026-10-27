@@ -1258,13 +1258,17 @@ static partial class SourceGenLibrary
 
 		if (propertyType is INamedTypeSymbol namedType)
 		{
+			// The origin is the Zod type of the JSON the member reads, as the runtime schemas and the null-element
+			// errors report it: a dictionary is a record, every other collection an array.
+			var origin = TryGetMapArguments(namedType, out _, out _) ? "record" : "array";
+
 			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.Generic.ICollection))
-				return new("propertyValue.Count", "collection", true);
+				return new("propertyValue.Count", origin, true);
 
 			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.IEnumerable))
 				return new(
 					"global::ZodSharp.Optimizations.CollectionCountHelper.GetCount(propertyValue)",
-					"collection",
+					origin,
 					true
 				);
 		}

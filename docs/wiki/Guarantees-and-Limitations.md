@@ -32,7 +32,7 @@
 
 ### Size-failure Origin values
 
-The generator reports `Origin = "string"` for string size failures, `Origin = "array"` for arrays, and `Origin = "collection"` for countable/`IEnumerable` collections. `ZodArray` reports `"array"`.
+The generator reports `Origin = "string"` for string size failures, `Origin = "record"` for dictionaries, and `Origin = "array"` for arrays and every other countable/`IEnumerable` collection, exactly as `ZodArray`, `ZodRecord`, the count rules and the null-element errors do.
 
 ### Rule messages are not templates
 

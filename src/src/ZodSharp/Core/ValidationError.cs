@@ -55,7 +55,7 @@ public readonly record struct ValidationError
 	}
 
 	/// <summary>
-	/// The origin category for structured issues (e.g. "string", "array", "collection").
+	/// The origin category for structured issues: the Zod type of the failing value (e.g. "string", "number", "array", "record").
 	/// </summary>
 	public string? Origin { get; init; }
 

@@ -598,7 +598,7 @@ Other supported DataAnnotations validators:
 Structured size failures expose:
 
 - `Code`: `too_small` or `too_big`
-- `Origin`: `string`, `array`, or `collection`
+- `Origin`: `string`, `array` or `record`
 - `Minimum` / `Maximum`
 - `Inclusive`
 - `Path`

@@ -73,7 +73,7 @@ Size attributes generate direct `Length` or `Count` access when possible:
 Structured size failures expose the same metadata as the runtime API:
 
 - `Code`: `too_small` or `too_big`.
-- `Origin`: `string` for strings, `array` for arrays, `collection` for countable/`IEnumerable` collections.
+- `Origin`: `string` for strings, `record` for dictionaries, `array` for arrays and every other countable/`IEnumerable` collection (the Zod type of the JSON, as the runtime schemas report it).
 - `Minimum` / `Maximum`: the inclusive bound.
 - `Inclusive`: `true`.
 - `Path`: the property path.
@@ -95,7 +95,7 @@ var result = BasketSchema.Validate(new Basket { Items = ["apple"] });
 ```
 
 > [!NOTE]
-> The generator reports `Origin = "array"` for arrays and `Origin = "collection"` for countable/`IEnumerable` collections.
+> The generator reports `Origin = "array"` for arrays and collections (a `List<string>` is a JSON array) and `Origin = "record"` for dictionaries, matching `ZodArray`, `ZodRecord` and the null-element errors.
 
 ## Collection null items
 
