@@ -34,11 +34,11 @@ public readonly record struct IPAddressRule : Core.IValidationRule<string>, Core
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Invalid {1} address: {0}";
+	/// <summary>Gets the default message format; <c>{1}</c> is the required address type. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Invalid {1} address";
 
 	readonly IPAddressRuleType _ruleType;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="IPAddressRule"/> struct with the default rule type (Any).
@@ -50,7 +50,6 @@ public readonly record struct IPAddressRule : Core.IValidationRule<string>, Core
 	public IPAddressRule()
 	{
 		_ruleType = IPAddressRuleType.Any;
-		_message = MessageFormat;
 	}
 
 	/// <summary>
@@ -74,7 +73,7 @@ public readonly record struct IPAddressRule : Core.IValidationRule<string>, Core
 	)
 	{
 		_ruleType = ruleType;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -114,8 +113,7 @@ public readonly record struct IPAddressRule : Core.IValidationRule<string>, Core
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
-	public string GetErrorMessage(in string value) =>
-		RuleMessage.Format(_message, value, _ruleType == IPAddressRuleType.Any ? "IPv4/IPv6" : _ruleType.ToString());
+	public string GetErrorMessage(in string value) => RuleMessage.Format(_message ?? MessageFormat, value, TypeName);
 
 	/// <summary>
 	/// Gets the error message for a failed span validation.
@@ -123,16 +121,34 @@ public readonly record struct IPAddressRule : Core.IValidationRule<string>, Core
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
 	public string GetErrorMessage(ReadOnlySpan<char> value) =>
-		RuleMessage.Format(
-			_message,
-			value.ToString(),
-			_ruleType == IPAddressRuleType.Any ? "IPv4/IPv6" : _ruleType.ToString()
-		);
+		RuleMessage.Format(_message ?? MessageFormat, value.ToString(), TypeName);
+
+	string TypeName =>
+		_ruleType switch
+		{
+			IPAddressRuleType.IPv4 => "IPv4",
+			IPAddressRuleType.IPv6 => "IPv6",
+			IPAddressRuleType.Any => "IPv4/IPv6",
+			_ => "IPv4/IPv6",
+		};
+
+	string FormatName =>
+		_ruleType switch
+		{
+			IPAddressRuleType.IPv4 => "ipv4",
+			IPAddressRuleType.IPv6 => "ipv6",
+			IPAddressRuleType.Any => "ip",
+			_ => "ip",
+		};
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public string Code => field.Or(ErrorCode);
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format(FormatName);
 }

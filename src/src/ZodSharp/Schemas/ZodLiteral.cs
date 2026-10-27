@@ -28,16 +28,28 @@ public class ZodLiteral<T>(T value) : ZodType<T, T>, JsonSchema.IJsonSchemaLiter
 	{
 		if (value is null)
 		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("invalid_literal", $"Expected literal value {_value}, but got null", [])
-			);
+			return ValidationResult<T>.Failure(LiteralError(ZodTypeNames.Null));
 		}
 
 		// Check if the value is equal to the literal value
 		return value.Equals(_value)
 			? ValidationResult<T>.Success(value)
-			: ValidationResult<T>.Failure(
-				new ValidationError("invalid_literal", $"Expected literal value {_value}, but got {value}", [])
-			);
+			: ValidationResult<T>.Failure(LiteralError(ZodTypeNames.OfValue(value)));
 	}
+
+	// The expected literal is schema configuration, so it is safe to report; the received value is caller
+	// input, so only its type name is.
+	ValidationError LiteralError(string receivedType) =>
+		ZodIssues.Formatted(
+			ZodIssueCodes.InvalidLiteral,
+			ZodIssueCategories.InvalidValue,
+			ZodMessages.InvalidLiteral,
+			ZodPath.Root,
+			null,
+			new Dictionary<string, object?>(StringComparer.Ordinal)
+			{
+				[ZodIssueParameters.Expected] = _value,
+				[ZodIssueParameters.Received] = receivedType,
+			}
+		);
 }

@@ -12,12 +12,13 @@ namespace ZodSharp.Schemas;
 /// <param name="elementSchema">The schema for array elements</param>
 public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, JsonSchema.IJsonSchemaArrayInfo
 {
-	static readonly string[] EmptyPath = [];
-
 	int? _minLength;
 	int? _maxLength;
 
-	string? _errorMessage;
+	// One message per bound: a shared message meant Min(2).Max(5) reported a too_small failure with the
+	// Max message. Null means "use the default template", which reports the count.
+	string? _minMessage;
+	string? _maxMessage;
 
 	// IJsonSchemaArrayInfo: the JSON Schema exporter's non-generic seam. It previously reflected on private
 	// field names that do not exist, so bounds and the element schema were silently dropped from every
@@ -37,9 +38,7 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 	{
 		if (value == null)
 		{
-			return ValidationResult<T[]>.Failure(
-				new ValidationError("invalid_type", "Expected array, but got null", EmptyPath)
-			);
+			return ValidationResult<T[]>.Failure(ZodIssues.NullValue(ZodTypeNames.Array));
 		}
 
 		// The length constraints depend only on the array's length, so they are checked before any element
@@ -51,7 +50,10 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 		// This does change which error is reported when an array is both the wrong length and has invalid
 		// elements: the length failure now wins. That is the more useful answer, and it matches the
 		// container constraint being the outer one.
-		if (LengthFailure(value.Length) is { } lengthFailure)
+		if (
+			ZodIssues.CollectionSize(value.Length, _minLength, _maxLength, _minMessage, _maxMessage) is
+			{ } lengthFailure
+		)
 			return ValidationResult<T[]>.Failure(lengthFailure);
 
 		List<ValidationError>? errors = null;
@@ -63,18 +65,11 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 			if (!itemResult.IsSuccess)
 			{
 				errors ??= [];
+				// The index is the prefix and the element's own path follows it, so a nested failure renders
+				// as "[0].email". WithPathPrefix keeps every other field of the element's error.
+				var segment = ZodPathSegment.At(i);
 				foreach (var error in itemResult.Errors)
-				{
-					// The index is the prefix, and the element's own path follows it, so a nested
-					// failure reads "[0].email". Use the 4-argument CopyTo: the 2-argument overload
-					// takes a *destination* index, which would copy the element path to the end and
-					// then have it overwritten by the index segment below.
-					var path = new string[error.Path.Length + 1];
-					path[0] = $"[{i}]";
-
-					error.Path.CopyTo(0, path, 1, error.Path.Length);
-					errors.Add(new(error.Code, error.Message, path, error.Parameters));
-				}
+					errors.Add(error.WithPathPrefix(segment));
 			}
 			else
 			{
@@ -96,44 +91,6 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 		// When every element passed through unchanged, the input array is already
 		// the validated result, so reuse it instead of copying.
 		return rebuilt is not null ? ValidationResult<T[]>.Success([.. rebuilt]) : ValidationResult<T[]>.Success(value);
-	}
-
-	/// <summary>
-	/// The length-constraint failure for <paramref name="count"/>, or <see langword="null"/> when the length
-	/// is acceptable.
-	/// </summary>
-	ValidationError? LengthFailure(int count)
-	{
-		if (_minLength.HasValue && count < _minLength.Value)
-		{
-			return new ValidationError(
-				"too_small",
-				_errorMessage ?? $"Array must have at least {_minLength.Value} elements, but got {count}",
-				EmptyPath,
-				parameters: null,
-				origin: "array",
-				minimum: _minLength.Value,
-				maximum: _maxLength,
-				inclusive: true
-			);
-		}
-
-		if (_maxLength.HasValue && count > _maxLength.Value)
-		{
-			return new ValidationError(
-				"too_big",
-				_errorMessage ?? $"Array must have at most {_maxLength.Value} elements, but got {count}",
-				EmptyPath,
-				parameters: null,
-				origin: "array",
-				minimum: _minLength,
-				maximum: _maxLength.Value,
-				inclusive: true
-			);
-		}
-
-		// No length failure.
-		return null;
 	}
 
 	/// <summary>
@@ -159,7 +116,7 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 	public ZodArray<T> Min(int minLength, string? message = null)
 	{
 		_minLength = minLength;
-		_errorMessage = message.Or($"Array must have at least {minLength} elements");
+		_minMessage = message.OrNull();
 
 		return this;
 	}
@@ -173,7 +130,7 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 	public ZodArray<T> Max(int maxLength, string? message = null)
 	{
 		_maxLength = maxLength;
-		_errorMessage = message.Or($"Array must have at most {maxLength} elements");
+		_maxMessage = message.OrNull();
 
 		return this;
 	}
@@ -188,7 +145,8 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 	{
 		_minLength = length;
 		_maxLength = length;
-		_errorMessage = message.Or($"Array must have exactly {length} elements");
+		_minMessage = message.OrNull();
+		_maxMessage = _minMessage;
 
 		return this;
 	}
@@ -201,7 +159,7 @@ public class ZodArray<T>(IZodSchema<T, T> elementSchema) : ZodType<T[], T[]>, Js
 	public ZodArray<T> NonEmpty(string? message = null)
 	{
 		_minLength = 1;
-		_errorMessage = message.Or("Array must not be empty");
+		_minMessage = message.OrNull() ?? ZodMessages.ArrayNonEmpty;
 
 		return this;
 	}

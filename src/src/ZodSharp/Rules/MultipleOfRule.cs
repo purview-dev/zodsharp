@@ -24,7 +24,7 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal T Divisor { get; }
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the MultipleOfRule struct.
@@ -38,7 +38,7 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 			throw new ArgumentException("Divisor cannot be zero", nameof(divisor));
 
 		Divisor = divisor;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -87,5 +87,10 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.NotMultipleOf;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		RuleParameters.One(Core.ZodIssueParameters.Divisor, Divisor);
 }

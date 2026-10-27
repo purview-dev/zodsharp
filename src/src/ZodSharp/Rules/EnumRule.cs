@@ -33,8 +33,10 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 	// Enum.IsDefined reflection path.
 	static readonly HashSet<TEnum> DefinedValues = [.. Enum.GetValues<TEnum>()];
 
+	static readonly System.Collections.Immutable.ImmutableArray<string> DefinedNames = [.. Enum.GetNames<TEnum>()];
+
 	readonly TEnum[]? _disallowed;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="EnumRule{TEnum}"/> struct that accepts every defined
@@ -55,7 +57,7 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 	public EnumRule(TEnum[]? disallowed, string? message = null, string? code = null)
 	{
 		_disallowed = disallowed is { Length: > 0 } ? disallowed : null;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -101,5 +103,27 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Enum;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidValue;
+
+	// The allowed member names, in declaration order (enum members are configuration, not caller input).
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters
+	{
+		get
+		{
+			var disallowed = _disallowed;
+			return RuleParameters.One(
+				Core.ZodIssueParameters.Options,
+				disallowed is null
+					? DefinedNames
+					:
+					[
+						.. Enum.GetValues<TEnum>()
+							.Where(value => Array.IndexOf(disallowed, value) < 0)
+							.Select(static value => value.ToString()),
+					]
+			);
+		}
+	}
 }

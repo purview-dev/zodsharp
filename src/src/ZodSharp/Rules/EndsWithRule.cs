@@ -17,11 +17,11 @@ public readonly record struct EndsWithRule
 	public const string ErrorCode = "invalid_string";
 
 	/// <summary>Gets the message format; <c>{0}</c> is the required suffix and <c>{1}</c> the value.</summary>
-	public const string MessageFormat = "String must end with '{0}', but got '{1}'";
+	public const string MessageFormat = "String must end with '{0}'";
 
 	readonly string _suffix;
 	readonly StringComparison _comparison;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the EndsWithRule struct.
@@ -39,7 +39,7 @@ public readonly record struct EndsWithRule
 	{
 		_suffix = suffix.OrNull() ?? throw new ArgumentNullException(nameof(suffix));
 		_comparison = comparison;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -85,5 +85,10 @@ public readonly record struct EndsWithRule
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		RuleParameters.Two(Core.ZodIssueParameters.Format, "ends_with", Core.ZodIssueParameters.Suffix, _suffix);
 }

@@ -78,4 +78,28 @@ public static class ZodIssueParameters
 
 	/// <summary>The count (length, number of elements) that failed a size bound.</summary>
 	public const string Count = "count";
+
+	/// <summary>The string format a format rule enforces (Zod's <c>format</c>: <c>email</c>, <c>uuid</c>, …).</summary>
+	public const string Format = "format";
+
+	/// <summary>The divisor of a <see cref="ZodIssueCategories.NotMultipleOf"/> issue.</summary>
+	public const string Divisor = "divisor";
+
+	/// <summary>The regular expression a string must match.</summary>
+	public const string Pattern = "pattern";
+
+	/// <summary>The prefix a string must start with.</summary>
+	public const string Prefix = "prefix";
+
+	/// <summary>The suffix a string must end with.</summary>
+	public const string Suffix = "suffix";
+
+	/// <summary>The substring a string must contain.</summary>
+	public const string Includes = "includes";
+
+	/// <summary>The required version (for example of a UUID), as an integer.</summary>
+	public const string Version = "version";
+
+	/// <summary>A single unrecognized key (per-key <see cref="ZodIssueCodes.UnrecognizedKey"/> issues).</summary>
+	public const string Key = "key";
 }

@@ -66,6 +66,7 @@ public class UuidRuleGuidTests
 
 		// Assert
 		await Assert.That(message).Contains("v4");
-		await Assert.That(message).Contains(V7);
+		// Defect B9: the default message never echoes the input.
+		await Assert.That(message).DoesNotContain(V7);
 	}
 }

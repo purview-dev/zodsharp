@@ -117,7 +117,7 @@ public class ZodObjectShapeTests
 
 		// Assert — the right (strict) policy wins over the left (strip).
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors.Any(static e => e.Code == "unrecognized_key")).IsTrue();
+		await Assert.That(result.Errors.Any(static e => e.Code == "unrecognized_keys")).IsTrue();
 	}
 
 	[Test]
@@ -336,7 +336,7 @@ public class ZodObjectShapeTests
 
 		// Assert
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors.Any(static e => e.Code == "unrecognized_key")).IsTrue();
+		await Assert.That(result.Errors.Any(static e => e.Code == "unrecognized_keys")).IsTrue();
 	}
 
 	[Test]

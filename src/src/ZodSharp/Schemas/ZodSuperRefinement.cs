@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
@@ -17,8 +16,6 @@ namespace ZodSharp.Schemas;
 /// <param name="refinement">The context-aware refinement callback.</param>
 public class ZodSuperRefinement<T>(IZodSchema<T> baseSchema, Action<RefineCtx<T>> refinement) : ZodType<T>
 {
-	static readonly ImmutableArray<string> EmptyPath = [];
-
 	/// <summary>
 	/// Parses and validates the value with the context-aware refinement.
 	/// </summary>
@@ -30,7 +27,10 @@ public class ZodSuperRefinement<T>(IZodSchema<T> baseSchema, Action<RefineCtx<T>
 		if (!baseResult.IsSuccess)
 			return baseResult;
 
-		RefineCtx<T> ctx = new(baseResult.Value, EmptyPath);
+		// Issues are relative to the refined value. A containing schema (object field, array element, record
+		// value, tuple element) prefixes them with this value's location via ValidationError.WithPathPrefix, so
+		// the base path is always the root here.
+		RefineCtx<T> ctx = new(baseResult.Value, ZodPath.Root);
 		refinement(ctx);
 
 		return ctx.HasIssues
