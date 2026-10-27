@@ -12,6 +12,40 @@ Released versions correspond to `v<version>` GitHub releases.
 
 ### Added
 
+- **Source generator — field-level validation and member resolution.** Every generated `{Type}Schema` now has
+  `ValidateMember(value, memberName)`, `ValidateMemberAsync(value, memberName, services, ct)` and
+  `IsValidatableMember(memberName)` (the member's own rules only: no nested recursion, type rules,
+  `IValidatableObject` or refinement), `TryResolveMember(value, path, out container, out memberName)`
+  (reflection-free), `Paths.{Member}` `ZodPath` constants, a `JsonNames.Get(member)` table and
+  `ToJsonNamedPath(path, namingPolicy)`. `Validate` calls one method per member. The `{Type}SchemaValidator`
+  adapter implements `IZodMemberValidator<T>`, `IZodMemberResolver<T>`, `IZodUntypedValidator` and the new
+  `IZodJsonPathMapper`.
+- **Source generator — async graph.** `{Type}Schema.ValidateAsync(value, services, ct)` awaits nested schemas'
+  async validation and threads the caller's services; it completes synchronously when nothing in the graph is
+  asynchronous (`{Type}Schema.RequiresAsyncValidation` is a compile-time constant). A custom async method may take
+  `(T value, IServiceProvider services, CancellationToken ct)`, and `[ZodAsyncMember(nameof(X))]` makes
+  `ValidateMemberAsync` run it for that member only.
+- **Source generator — DataAnnotations inputs.** `IValidatableObject` runs after the members and type rules (as in
+  DataAnnotations and Microsoft.Extensions.Validation); on .NET 11 `IAsyncValidatableObject` and
+  `AsyncValidationAttribute` members run in `ValidateAsync`. `[Display(Name, ResourceType)]` reads the resource
+  property at runtime.
+- **Source generator — C# 15.** A member typed as a union dispatches to the active case's schema, and a member
+  typed as a closed class to the derived type's schema (paths do not include the union's `Value`).
+- **Source generator — trim-safe registration.** Each assembly gets
+  `ZodSharp.Generated.{Assembly}ZodSharpSchemas.Register(IZodSchemaFactory)` and, with dependency injection,
+  `services.AddZodSharp{Assembly}Schemas()`; both name every validator directly (no attribute scanning or
+  `Activator`). `AddZodSharpFactory` applies every `ZodSchemaRegistration` added with `AddZodSchemaRegistration`.
+- **Source generator — options.** On .NET 11 the generated `{Type}Validator` also implements
+  `IAsyncValidateOptions<T>` when the type has asynchronous rules.
+- `ZodValidationDepth` (`MaxDepth`, default 32): generated validators throw `InvalidOperationException` at the
+  limit, like Microsoft.Extensions.Validation, instead of overflowing the stack on a cyclic graph.
+- `ErrorType.Origin` (init-only); the generated `Create*` helpers apply it and the `MessageFormat`.
+- `RegexRule.DefaultMatchTimeoutMilliseconds`.
+- Diagnostics `ZODSGEN047` (redundant `[ValidatableType]`, with a code fix), `ZODSGEN048` (async-only rules
+  behind a synchronous `Validate`), `ZODSGEN049` (closed-hierarchy derived type without `[ZodSchema]`),
+  `ZODSGEN050` (generated options validator conflicts with `[OptionsValidator]`, SYSLIB1205),
+  `ZODSGEN051` (`[ZodSchema]` type in a Razor file) and `ZODSGEN052` (an `ErrorMessage` placeholder the
+  attribute does not supply).
 - **Shared error identities.** `ZodIssueCodes` (codes), `ZodMessages` (named-placeholder templates),
   `ZodIssues` (factories for null/invalid-type/missing-field/refinement/union/collection-size errors and the
   `GetUnionErrors()` extension) and `ZodTypeNames` (`Of(Type)`/`OfValue(object)`: Zod type names such as
@@ -35,7 +69,28 @@ Released versions correspond to `v<version>` GitHub releases.
   `AllowEmptyStrings = true` rejected `""`. The default now rejects `null`, `""` and whitespace-only text, and
   `AllowEmptyStrings = true` rejects only `null`. *Migration:* a model that relied on `""` passing a bare
   `[Required]` must either supply a value or set `AllowEmptyStrings = true`.
-
+- **Generated error messages are formatted at runtime** from a named template kept in
+  `ValidationError.MessageFormat`, with `displayName`, `member`, `declaringType` and the rule's values in
+  `Parameters`. Attribute-specific texts are unchanged; positional placeholders in a custom `ErrorMessage` keep
+  their DataAnnotations meaning. Shared failures now use the runtime schemas' identity:
+  - `[Required]`: `"{displayName} is required"` (was `"Required field '{0}' is null"`), category `invalid_type`.
+  - A null non-nullable member, a null root and a rejected null element: `"Expected {expected}, received null"`
+    (was `"Field '…' cannot be null"`, `"Value cannot be null"`, `"Field '…' cannot contain null …"`).
+  - `ApplyAnd`/`ApplyOr`/`ApplyRefine` failures: code `refinement_failed`, category `custom` (was
+    `validation_failed`).
+  - `[StringLength]`/`[Length]` on a string report the runtime rules' code `invalid_length` (was
+    `too_small`/`too_big`), with the direction in `Category` and both bounds.
+- **Typed generated paths.** Collection and dictionary errors are located with index and key segments
+  (`Items[0].Name`, `Map["a.b"].Value` from `FullPath.ToDottedString()`); keys are rendered with the invariant
+  culture. Nested re-pathing keeps every field of the nested error.
+- **`[Range]`** reports `Category` `too_small`/`too_big`, origin from the value's Zod type and `Lower`/`Upper`
+  with `MinimumIsExclusive`/`MaximumIsExclusive` honoured. **`[Length]`'s custom message** binds `{1}` to the
+  minimum and `{2}` to the maximum, like `LengthAttribute` (it was swapped).
+- **Generated options validators** report `"{path}: {message} ({code})"` per failure (was the message only).
+- **Async-only inputs fail loudly**: a synchronous `Validate` of a type with an `AsyncValidationAttribute` member or
+  `IAsyncValidatableObject` throws `InvalidOperationException`.
+- **Nested types' async rules run**: `ValidateAsync` now awaits nested schemas, so a nested type's custom async
+  method reports its errors (under the member's path) where they were silently dropped.
 - **Index paths.** `ZodArray` and `ZodTuple` element errors are located with typed index segments; the legacy
   `ValidationError.Path` renders them as `"0"` (was `"[0]"`), matching Zod. `FullPath.ToDottedString()` renders
   `Items[0].Name`.
@@ -88,6 +143,12 @@ Released versions correspond to `v<version>` GitHub releases.
 
 ### Fixed
 
+- Source generator: a custom `ErrorMessage` containing `{1}` or a stray brace no longer fails the build or throws at
+  validation time (G2, G14); `[Display(ResourceType)]` is honoured (G19); `[JsonPropertyName]` is available to
+  hosts through `JsonNames`/`ToJsonNamedPath` (G3); allowed/denied enum values are listed by name (G17); custom
+  string rules and enum rules report an origin (G16, G18); `IValidatableObject` is no longer ignored (G23);
+  cyclic graphs no longer overflow the stack (G24); a rule without constructor arguments no longer breaks the
+  generated JSON Schema.
 - Re-pathing an element, field, catchall, record value or tuple element error no longer drops its origin,
   bounds, inclusivity, category or message format (`WithPathPrefix` everywhere).
 - `ZodArray.Min(2).Max(5)` reported a too-small failure with the maximum's message.
