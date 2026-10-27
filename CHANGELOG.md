@@ -24,6 +24,18 @@ Released versions correspond to `v<version>` GitHub releases.
   `ValidationOptions.ValidateAsync<T>` validates outside HTTP and Blazor. References the
   `Microsoft.Extensions.Validation` package only - never the ASP.NET Core shared framework - so it works in
   WebAssembly clients.
+- **Minimal APIs on .NET 11: full-fidelity ProblemDetails from the built-in validation pipeline.** On
+  `net11.0`, `Purview.ZodSharp.AspNetCore` now depends on `Purview.ZodSharp.Extensions.Validation` (that target
+  framework only). `AddZodSharpProblemDetails()` registers a scoped `ZodRequestValidationReport` (the bridge's
+  `IZodValidationReportSink`) and composes `ProblemDetailsOptions.CustomizeProblemDetails`. The ZodSharp callback
+  runs first, then any callback configured before or after it. It rewrites the pipeline's
+  `HttpValidationProblemDetails` with `ZodProblemDetailsWriter.Apply`: DataAnnotations entries are merged with
+  `dataannotations` issues, and the `ErrorType`, `StatusCodeSelector` and `StatusCodeOverride` status is mirrored
+  to the response. A DataAnnotations-only failure only gains the `issues` projection. Endpoints and route
+  groups validated by `AddZodSharpValidation()` therefore return the same body, byte for byte apart from
+  `traceId`, as the endpoint filter, `ZodExceptionHandler` and the manual results. `WithZodSharpValidation()`
+  on an endpoint the pipeline also validates skips the parameters the bridge covers, logged once at `Debug`, so
+  nothing is validated twice.
 - **`IZodMessageFormatter`** in `ZodSharp.Core`: formats an error's user-facing message for a culture at a host
   boundary.
 - **`Purview.ZodSharp.AspNetCore.OpenApi`** (new package, `net11.0`). `options.AddZodSharp()` on

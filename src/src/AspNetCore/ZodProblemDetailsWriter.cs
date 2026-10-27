@@ -177,6 +177,39 @@ public sealed class ZodProblemDetailsWriter
 	}
 
 	/// <summary>
+	/// Adds an <c>issues</c> entry (code <see cref="DataAnnotationsCode"/>) for every existing <c>errors</c> message,
+	/// leaving the rest of <paramref name="problemDetails"/> untouched. Does nothing when
+	/// <see cref="ZodProblemDetailsOptions.IncludeIssues"/> or <see cref="ZodProblemDetailsOptions.ProjectDataAnnotationsIssues"/>
+	/// is off, when there are no errors, or when the payload already has an <c>issues</c> extension.
+	/// </summary>
+	internal void ProjectExternalIssues(HttpValidationProblemDetails problemDetails)
+	{
+		if (
+			!_options.IncludeIssues
+			|| !_options.ProjectDataAnnotationsIssues
+			|| problemDetails.Errors.Count == 0
+			|| problemDetails.Extensions.ContainsKey("issues")
+		)
+		{
+			return;
+		}
+
+		List<ValidationIssue> issues = [];
+		foreach (var pair in problemDetails.Errors)
+		{
+			foreach (var message in pair.Value ?? [])
+				issues.Add(CreateExternalIssue(pair.Key, message));
+		}
+
+		// Ahead of traceId, matching the order every ZodSharp payload uses.
+		var hasTraceId = problemDetails.Extensions.TryGetValue("traceId", out var traceId);
+		problemDetails.Extensions.Remove("traceId");
+		problemDetails.Extensions["issues"] = issues.ToArray();
+		if (hasTraceId)
+			problemDetails.Extensions["traceId"] = traceId;
+	}
+
+	/// <summary>
 	/// Creates the ProblemDetails for <paramref name="errors"/> and writes it to the response.
 	/// </summary>
 	/// <param name="httpContext">The request.</param>
@@ -255,6 +288,11 @@ public sealed class ZodProblemDetailsWriter
 		target.Title = highest?.Title ?? DefaultTitle;
 		target.Type = highest?.Type ?? GetDefaultType(status);
 		target.Detail = highest?.Description ?? (mergeExistingErrors ? target.Detail : null);
+
+		// Re-added below in a fixed order (issues, parameters, traceId), so a payload rewritten by Apply - which may
+		// already carry a traceId from the ProblemDetails defaults - serializes exactly like one built by Create.
+		target.Extensions.Remove("issues");
+		target.Extensions.Remove("traceId");
 
 		if (issues is not null)
 			target.Extensions["issues"] = issues.ToArray();

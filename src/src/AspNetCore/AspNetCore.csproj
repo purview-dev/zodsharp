@@ -22,4 +22,13 @@
 	<ItemGroup>
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
 	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
+		<!--
+			net11.0 only: the Microsoft.Extensions.Validation bridge exists only there. It supplies the report sink
+			that AddZodSharpProblemDetails uses to enrich the built-in validation pipeline's ProblemDetails, so the
+			package dependency appears in the net11.0 group alone.
+		-->
+		<ProjectReference Include="..\Extensions.Validation\Extensions.Validation.csproj" />
+	</ItemGroup>
 </Project>
