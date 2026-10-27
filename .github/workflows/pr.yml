@@ -83,6 +83,68 @@ jobs:
       - name: Run the TypeScript/Zod cross-platform tests
         run: bun run test
 
+  # The only reliable proof that the minimal-API integration is trim- and Native AOT-safe end to end
+  # (generated registration, the Microsoft.Extensions.Validation bridge, ProblemDetails and the OpenAPI
+  # transformers): publish the sample with PublishAot=true, fail on any IL2xxx/IL3xxx warning, then run the
+  # native binary and check one failing request still returns the ProblemDetails contract. The analyzers that
+  # run during the normal build only see each assembly on its own; ILC sees the whole application.
+  aot-sample:
+    name: Native AOT sample (publish and smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Native AOT links with clang and needs the zlib headers; the hosted image may not carry both.
+      - name: Install the Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # -warnaserror turns every warning ILC reports (IL2xxx trim, IL3xxx AOT) into an error, so the publish
+      # itself fails. The grep is a second gate in case a warning is ever logged without failing the step.
+      - name: Publish Examples.MinimalApi with Native AOT (fails on any trim or AOT warning)
+        shell: bash
+        run: |
+          dotnet publish src/src/Examples.MinimalApi/Examples.MinimalApi.csproj \
+            --configuration Release --runtime linux-x64 --output artifacts/aot-sample \
+            -warnaserror 2>&1 | tee publish.log
+          if grep -E 'warning IL[23][0-9]{3}' publish.log; then
+            echo "::error::The Native AOT publish reported trim or AOT warnings."
+            exit 1
+          fi
+          test -x artifacts/aot-sample/ZodSharp.Examples.MinimalApi
+
+      - name: Run the native binary and check a failing request returns ProblemDetails
+        shell: bash
+        working-directory: artifacts/aot-sample
+        run: |
+          ASPNETCORE_URLS=http://127.0.0.1:5080 ./ZodSharp.Examples.MinimalApi > app.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            curl --silent --fail --output /dev/null http://127.0.0.1:5080/openapi/v1.json && break
+            sleep 1
+          done
+
+          result=$(curl --silent --show-error --output body.json \
+            --write-out '%{http_code} %{content_type}' \
+            --request POST http://127.0.0.1:5080/orders \
+            --header 'Content-Type: application/json' \
+            --data '{"customerEmail":"not-an-email","lines":[{"sku":"abc","quantity":0}]}')
+          echo "$result"
+          cat body.json; echo
+
+          if [[ "$result" != "400 application/problem+json"* ]] || ! grep -q '"issues"' body.json; then
+            echo "::error::Expected a 400 application/problem+json response with ZodSharp issues."
+            cat app.log
+            exit 1
+          fi
+
   # Pack validation checks the IL-merged generator is present in the .nupkg; it cannot check that the
   # assembly loads and generates. That merge has regressed twice (#36, #38), both times breaking consumers
   # while the in-repo tests stayed green, because those run against the unmerged generator.
