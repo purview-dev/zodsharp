@@ -16,3 +16,4 @@ ZODSGEN049 | ZodSharp.SourceGenerator | Warning | A member typed as a closed cla
 ZODSGEN050 | ZodSharp.SourceGenerator | Error | A generated IValidateOptions validator conflicts with a hand-authored [OptionsValidator] class (SYSLIB1205)
 ZODSGEN051 | ZodSharp.SourceGenerator | Warning | A [ZodSchema] type is declared in a Razor file, which the generator cannot see
 ZODSGEN052 | ZodSharp.SourceGenerator | Warning | An attribute ErrorMessage uses a placeholder the attribute does not supply, or an unbalanced brace
+ZODSGEN053 | ZodSharp.SourceGenerator | Warning | [MinLength]/[MaxLength]/[Length] on a collection member in a trimmed or AOT project; use [MinCount]/[MaxCount]/[CountRange]

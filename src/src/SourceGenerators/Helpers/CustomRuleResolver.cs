@@ -101,6 +101,11 @@ static class CustomRuleResolver
 			if (IsBuiltInDataAnnotation(attributeClass))
 				continue;
 
+			// So do the collection-count attributes on a collection: they are emitted through the [MinLength]/
+			// [MaxLength]/[Length] collection-size path (SourceGenLibrary.ApplyCollectionCountAttributes).
+			if (IsCollectionCountAttribute(attributeClass) && IsCountableCollectionType(ruleTargetType))
+				continue;
+
 			if (!TryGetRuleMapping(attributeClass, out var mapping))
 				continue;
 
@@ -220,6 +225,36 @@ static class CustomRuleResolver
 
 	static bool IsBuiltInDataAnnotation(INamedTypeSymbol attributeClass) =>
 		attributeClass.ContainingNamespace.ToDisplayString() == TypeLibraryGenerator.SystemDataAnnotations;
+
+	/// <summary>
+	/// Determines whether <paramref name="attributeClass"/> is one of the ZodSharp collection-count attributes
+	/// (<c>[MinCount]</c>, <c>[MaxCount]</c>, <c>[CountRange]</c>) generated from the built-in count rules.
+	/// </summary>
+	/// <param name="attributeClass">The attribute type to test.</param>
+	/// <returns><see langword="true"/> for a collection-count attribute.</returns>
+	internal static bool IsCollectionCountAttribute(INamedTypeSymbol attributeClass) =>
+		attributeClass.Name is "MinCountAttribute" or "MaxCountAttribute" or "CountRangeAttribute"
+		&& attributeClass.ContainingNamespace.ToDisplayString() == TypeLibraryGenerator.ZodSharpRulesNamespace;
+
+	/// <summary>
+	/// Determines whether <paramref name="type"/> is collection-shaped: an array or a non-string type that
+	/// implements <c>IEnumerable</c>, so its element count is what a size rule constrains.
+	/// </summary>
+	/// <param name="type">The member type, optionally <see cref="Nullable{T}"/>.</param>
+	/// <returns><see langword="true"/> for a collection-shaped type.</returns>
+	internal static bool IsCountableCollectionType(ITypeSymbol type)
+	{
+		type = TypeHelpers.UnwrapNullableType(type);
+
+		return type is IArrayTypeSymbol
+			|| (
+				type.SpecialType != SpecialType.System_String
+				&& (
+					TypeHelpers.IsOrImplements(type, TypeLibrary.System.Collections.IEnumerable)
+					|| TypeHelpers.IsOrImplements(type, TypeLibrary.System.Collections.Generic.IEnumerable)
+				)
+			);
+	}
 
 	/// <summary>
 	/// Determines whether <paramref name="attributeClass"/> is mapped to a validation rule through

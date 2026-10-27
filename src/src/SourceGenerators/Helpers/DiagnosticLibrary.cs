@@ -560,4 +560,19 @@ static class DiagnosticLibrary
 		defaultSeverity: DiagnosticSeverity.Warning,
 		isEnabledByDefault: true
 	);
+
+	/// <summary>
+	/// ZODSGEN053: <c>[MinLength]</c>, <c>[MaxLength]</c> or <c>[Length]</c> is applied to a collection member of a
+	/// <c>[ZodSchema]</c> type in a project that is trimmed or AOT-compiled (or analyzed as such). The BCL attributes'
+	/// constructors are <c>[RequiresUnreferencedCode]</c>, so every usage raises IL2026; the ZodSharp collection-count
+	/// attributes validate the same count, with the same error identity, without it.
+	/// </summary>
+	public static readonly DiagnosticDescriptor UseTrimSafeCollectionCountAttribute = new(
+		id: "ZODSGEN053",
+		title: "Use the trim-safe ZodSharp collection-count attribute",
+		messageFormat: "[{0}] on the collection member '{1}' is not trim-safe (its constructor is [RequiresUnreferencedCode]); use [{2}] from ZodSharp.Rules, which the generator validates identically",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
 }

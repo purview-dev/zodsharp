@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<IsRoslynComponent>true</IsRoslynComponent>
 		<AssemblyName>Purview.ZodSharp.SourceGenerators</AssemblyName>
@@ -21,6 +21,12 @@
 		<PurviewGeneratorVisibleProperty Include="ZodSharpEnumNamingPolicy" />
 		<PurviewGeneratorVisibleProperty Include="ZodSharpAllowNulls" />
 		<PurviewGeneratorVisibleProperty Include="ZodSharpDateTimeOffsetSerialization" />
+		<PurviewGeneratorVisibleProperty Include="PublishTrimmed" />
+		<PurviewGeneratorVisibleProperty Include="PublishAot" />
+		<PurviewGeneratorVisibleProperty Include="IsTrimmable" />
+		<PurviewGeneratorVisibleProperty Include="IsAotCompatible" />
+		<PurviewGeneratorVisibleProperty Include="EnableTrimAnalyzer" />
+		<PurviewGeneratorVisibleProperty Include="EnableAotAnalyzer" />
 	</ItemGroup>
 
 	<ItemGroup Label="Analyzer Release Files">

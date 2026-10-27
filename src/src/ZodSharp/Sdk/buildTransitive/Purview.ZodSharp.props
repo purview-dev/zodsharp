@@ -25,4 +25,18 @@
 			<Description>Assembly-wide DateTimeOffset wire form assumed by JSON Schema generation; Utc requires a zero offset and makes the non-sentinel mapping exact, PreserveOffset (the default) keeps the value's offset.</Description>
 		</CompilerVisibleProperty>
 	</ItemGroup>
+
+	<!--
+		Read by the ZODSGEN053 analyzer, which suggests the trim-safe [MinCount]/[MaxCount]/[CountRange] over
+		[MinLength]/[MaxLength]/[Length] on collection members only in a trimmed or Native AOT project. The SDK
+		already exposes some of these; declaring them again is harmless.
+	-->
+	<ItemGroup Label="Compiler Visible Trimming Properties">
+		<CompilerVisibleProperty Include="PublishTrimmed" />
+		<CompilerVisibleProperty Include="PublishAot" />
+		<CompilerVisibleProperty Include="IsTrimmable" />
+		<CompilerVisibleProperty Include="IsAotCompatible" />
+		<CompilerVisibleProperty Include="EnableTrimAnalyzer" />
+		<CompilerVisibleProperty Include="EnableAotAnalyzer" />
+	</ItemGroup>
 </Project>

@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using System.Diagnostics.CodeAnalysis;
+using ZodSharp.Rules;
 
 namespace ZodSharp.Examples;
 
@@ -18,18 +18,11 @@ public sealed class CreateOrderRequest
 	[Required]
 	public Address? ShippingAddress { get; set; }
 
-	// The [ZodSchema] generator reads [MinLength]/[MaxLength] at compile time and emits the count check itself, so
-	// the attributes' reflection (a 'Count' lookup for types that are not ICollection) is never what validates this
-	// member. .NET marks both constructors [RequiresUnreferencedCode] regardless, and ZodSharp has no
-	// trim-annotated collection-count attribute of its own, so the warning is suppressed here with that reasoning.
-	[MinLength(1)]
-	[MaxLength(20)]
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "Validated by the generated CreateOrderRequestSchema; IList<T> implements ICollection, so "
-			+ "the attribute's reflective Count lookup is never needed."
-	)]
+	// [MinCount]/[MaxCount] rather than [MinLength]/[MaxLength]: the BCL attributes' constructors are
+	// [RequiresUnreferencedCode], so they raise IL2026 in a trimmed or Native AOT application (ZODSGEN053). The
+	// generator validates both spellings identically, with the same error identity.
+	[MinCount(1)]
+	[MaxCount(20)]
 	public IList<OrderLine> Lines { get; init; } = [];
 
 	public IDictionary<string, Address> AdditionalAddresses { get; init; } = new Dictionary<string, Address>();

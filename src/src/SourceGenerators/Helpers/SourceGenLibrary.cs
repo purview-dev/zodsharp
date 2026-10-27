@@ -614,6 +614,17 @@ static partial class SourceGenLibrary
 			);
 		}
 
+		ApplyCollectionCountAttributes(
+			property.Name,
+			validationAttributes,
+			originalPropertyType,
+			validationKind == PropertyValidationKind.Collection && lengthAccessor.IsSupported,
+			ref minLengthAttribute,
+			ref maxLengthAttribute,
+			ref lengthAttribute,
+			diagnostics
+		);
+
 		var rangeAttribute = RangeAttributeData.FromAttributeData(validationAttributes, out attribute);
 		var rangeAttributeResult = TryBuildRangeBoundaryExpressions(
 			originalPropertyType,
@@ -1342,6 +1353,123 @@ static partial class SourceGenLibrary
 			if (valuesAttribute is not null)
 				AddUnsupportedDataAnnotationsUsage(propertyName, valuesAttribute, diagnostics);
 		}
+	}
+
+	/// <summary>
+	/// Maps the ZodSharp collection-count attributes (<c>[MinCount]</c>, <c>[MaxCount]</c>, <c>[CountRange]</c>) onto
+	/// the <c>[MinLength]</c>/<c>[MaxLength]</c>/<c>[Length]</c> slots, so a collection member is validated - and
+	/// exported to JSON Schema - by the same collection-size emitter, with the same error identity. They are the
+	/// trim-safe spelling: the BCL attributes' constructors are <c>[RequiresUnreferencedCode]</c>.
+	/// </summary>
+	/// <param name="propertyName">The member name, for diagnostics.</param>
+	/// <param name="validationAttributes">The member's validation attributes.</param>
+	/// <param name="propertyType">The member type.</param>
+	/// <param name="isCountableCollection">Whether the member is a collection the size emitter can count.</param>
+	/// <param name="minLength">The <c>[MinLength]</c> slot; filled from <c>[MinCount]</c> when it is empty.</param>
+	/// <param name="maxLength">The <c>[MaxLength]</c> slot; filled from <c>[MaxCount]</c> when it is empty.</param>
+	/// <param name="length">The <c>[Length]</c> slot; filled from <c>[CountRange]</c> when it is empty.</param>
+	/// <param name="diagnostics">Receives ZODSGEN030 for a count attribute on a member that is not a countable collection.</param>
+	static void ApplyCollectionCountAttributes(
+		string propertyName,
+		ImmutableArray<AttributeData> validationAttributes,
+		ITypeSymbol propertyType,
+		bool isCountableCollection,
+		ref MinLengthAttributeData minLength,
+		ref MaxLengthAttributeData maxLength,
+		ref GeneratorResult<LengthAttributeData> length,
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
+	)
+	{
+		var isCollectionType = CustomRuleResolver.IsCountableCollectionType(propertyType);
+
+		if (
+			MinCountAttributeData.TryFromAttributeData(
+				validationAttributes,
+				out var minCount,
+				out var minCountAttribute
+			)
+		)
+		{
+			if (!ReportUncountable(minCountAttribute, "MinCountRule") && !minLength.Exists)
+				minLength = new(true, minCount.MinCount, WithMessage(minCount.ValidationAttribute, minCount.Message));
+		}
+
+		if (
+			MaxCountAttributeData.TryFromAttributeData(
+				validationAttributes,
+				out var maxCount,
+				out var maxCountAttribute
+			)
+		)
+		{
+			if (!ReportUncountable(maxCountAttribute, "MaxCountRule") && !maxLength.Exists)
+				maxLength = new(true, maxCount.MaxCount, WithMessage(maxCount.ValidationAttribute, maxCount.Message));
+		}
+
+		if (
+			CountRangeAttributeData.TryFromAttributeData(
+				validationAttributes,
+				out var countRange,
+				out var rangeAttribute
+			)
+		)
+		{
+			if (ReportUncountable(rangeAttribute, "CountRangeRule") || (length.ShouldProcess && length.Value.Exists))
+				return;
+
+			LengthAttributeData data = new(
+				true,
+				countRange.Minimum,
+				countRange.Maximum,
+				WithMessage(countRange.ValidationAttribute, countRange.Message)
+			);
+
+			length =
+				data.MinimumLength > data.MaximumLength
+					? GeneratorResult<LengthAttributeData>.Create(
+						data,
+						ReportableDiagnostic.Create(
+							DiagnosticLibrary.InvalidLengthAttribute,
+							true,
+							GetAttributeLocation(rangeAttribute),
+							propertyName
+						)
+					)
+					: GeneratorResult<LengthAttributeData>.Create(data);
+		}
+
+		// A count attribute on a member that is not a collection: when the member is not collection-shaped at all,
+		// CustomRuleResolver resolves the attribute as a rule and reports ZODSGEN030 itself (the rule validates
+		// IEnumerable). Only the collection-shaped member the size emitter cannot count is reported here.
+		bool ReportUncountable(AttributeData? attribute, string ruleName)
+		{
+			if (isCountableCollection)
+				return false;
+
+			if (isCollectionType && attribute is not null)
+			{
+				diagnostics.Add(
+					ReportableDiagnostic.Create(
+						DiagnosticLibrary.UnsupportedCustomRuleTarget,
+						true,
+						GetAttributeLocation(attribute),
+						ruleName,
+						attribute.AttributeClass?.Name ?? ruleName,
+						propertyType.ToDisplayString()
+					)
+				);
+			}
+
+			return true;
+		}
+
+		static ValidationAttributeData WithMessage(ValidationAttributeData validationAttribute, string? message) =>
+			string.IsNullOrEmpty(validationAttribute.ErrorMessage) && !string.IsNullOrEmpty(message)
+				? validationAttribute with
+				{
+					ErrorMessage = message,
+				}
+				: validationAttribute;
 	}
 
 	static GeneratorResult<LengthAttributeData> BuildLengthAttributeResult(
