@@ -26,6 +26,7 @@
 		<Project Path="tests/SystemTextJson.UnitTests/SystemTextJson.UnitTests.csproj" />
 		<Project Path="tests/ZodSharp.UnitTests/ZodSharp.UnitTests.csproj" />
 		<Project Path="tests/Repository.UnitTests/Repository.UnitTests.csproj" />
+		<Project Path="tests/TrimSafety.Verification/TrimSafety.Verification.csproj" />
 	</Folder>
 	<Folder Name="/src/">
 		<Project Path="src/AspNetCore/AspNetCore.csproj" />

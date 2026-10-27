@@ -1,0 +1,119 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!--
+		The trim and Native AOT verification harness. It is published with PublishAot=true, every Purview.ZodSharp
+		assembly except Purview.ZodSharp.NewtonsoftJson is rooted whole (TrimmerRootAssembly), and every IL warning is
+		an error, so ILC analyses all of their code - not only what this program happens to call - and any trim or AOT
+		hazard that the per-assembly analyzers miss fails the publish. The program then exercises the trim-safe surface
+		and exits non-zero on any mismatch, which proves the code still behaves once trimmed and compiled ahead of time.
+
+		Publish and run it with `just verify-trim` (CI: the `verify-trim` job in .github/workflows/pr.yml).
+		Purview.ZodSharp.NewtonsoftJson is excluded: Newtonsoft.Json is not trim- or AOT-compatible, and the package
+		annotates every API that reaches it with [RequiresUnreferencedCode]/[RequiresDynamicCode].
+	-->
+	<PropertyGroup>
+		<!-- net11.0 only: Purview.ZodSharp.Extensions.Validation, .Blazor and .AspNetCore.OpenApi are net11.0 only. -->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<OutputType>Exe</OutputType>
+		<IsTestProject>false</IsTestProject>
+		<IsPackable>false</IsPackable>
+		<!-- Purview.BuildSdk defaults every project to IsPublishable=false; this one is published. -->
+		<IsPublishable>true</IsPublishable>
+		<RootNamespace>ZodSharp.TrimSafety</RootNamespace>
+		<AssemblyName>ZodSharp.TrimSafety.Verification</AssemblyName>
+		<!-- Generated so IDE0005 runs on build; the harness has no public API to document. -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<!--
+			CS1591: no public API to document.			CA1506: the program deliberately touches every package. CA1849: the synchronous Validate is what is checked.
+		-->
+		<NoWarn>$(NoWarn);CS1591;CA1506;CA1849</NoWarn>
+		<!--
+			IL2104/IL3053: the single summary warning of the collapsed framework assembly; see the target below. IL2101:
+			that same assembly's embedded ILLink XML names another assembly (an ASP.NET Core packaging issue). No ZodSharp
+			assembly embeds ILLink XML, so IL2101 cannot hide a ZodSharp problem.
+		-->
+		<NoWarn>$(NoWarn);IL2101;IL2104;IL3053</NoWarn>
+		<PublishDocumentationFile>false</PublishDocumentationFile>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+
+		<PublishAot>true</PublishAot>
+		<!-- Report every trim/AOT warning individually rather than one summary warning per assembly. -->
+		<TrimmerSingleWarn>false</TrimmerSingleWarn>
+		<!-- Every warning - including each IL2xxx (trim) and IL3xxx (AOT/single-file) warning the analyzers, ILLink and ILC
+		     report - fails the build and the publish. -->
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+		<IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<!--
+			Directory.Packages.props picks the Microsoft.Extensions line by $(TargetFramework), which a single-targeted
+			project has not set yet when that file is evaluated; Purview.ZodSharp.Blazor's component packages need the 11.x line.
+		-->
+		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<MicrosoftExtensionsDIVersion>$(MicrosoftExtensionsVersion)</MicrosoftExtensionsDIVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
+		<ProjectReference Include="..\..\src\SystemTextJson\SystemTextJson.csproj" />
+		<ProjectReference Include="..\..\src\AspNetCore\AspNetCore.csproj" />
+		<ProjectReference Include="..\..\src\AspNetCore.OpenApi\AspNetCore.OpenApi.csproj" />
+		<ProjectReference Include="..\..\src\Extensions.Validation\Extensions.Validation.csproj" />
+		<ProjectReference Include="..\..\src\Blazor\Blazor.csproj" />
+		<!-- Direct reference required when we're using a local project ref -->
+		<ProjectReference
+			Include="..\..\src\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
+	</ItemGroup>
+
+	<!-- The package ships this through buildTransitive; a ProjectReference does not import it. -->
+	<Import Project="..\..\src\ZodSharp\Sdk\buildTransitive\Purview.ZodSharp.targets" />
+
+	<!--
+		Two modes, both run by just verify-trim and CI:
+
+		- Rooted (the default): every Purview.ZodSharp assembly except NewtonsoftJson is rooted whole, so ILC analyses all of
+		  their code, not only what this program calls. Rooting also makes ILC expand ZodType<T>.Or<TOther>() over its own
+		  output (Union<Union<...>>) until it gives up, which it reports as IL3054 generic recursion. That expansion only
+		  exists because the generic method is rooted; consumer mode below proves an application that calls Or() and
+		  NativeUnion() compiles without it, so IL3054 alone is tolerated here.
+		- Consumer (-p:TrimVerificationMode=Consumer): nothing is rooted and nothing is tolerated, exactly as an application
+		  that references the packages is compiled; the published binary must still pass every check.
+	-->
+	<PropertyGroup>
+		<TrimVerificationMode Condition="'$(TrimVerificationMode)' == ''">Rooted</TrimVerificationMode>
+		<NoWarn Condition="'$(TrimVerificationMode)' == 'Rooted'">$(NoWarn);IL3054</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup
+		Label="Rooted for whole-assembly trim and AOT analysis"
+		Condition="'$(TrimVerificationMode)' == 'Rooted'"
+	>
+		<TrimmerRootAssembly Include="Purview.ZodSharp" />
+		<TrimmerRootAssembly Include="Purview.ZodSharp.SystemTextJson" />
+		<TrimmerRootAssembly Include="Purview.ZodSharp.AspNetCore" />
+		<TrimmerRootAssembly Include="Purview.ZodSharp.AspNetCore.OpenApi" />
+		<TrimmerRootAssembly Include="Purview.ZodSharp.Extensions.Validation" />
+		<TrimmerRootAssembly Include="Purview.ZodSharp.Blazor" />
+	</ItemGroup>
+	<!--
+		Razor component endpoints (Microsoft.AspNetCore.Components.Endpoints) are not trim- or AOT-compatible: ASP.NET Core
+		annotates AddRazorComponents [RequiresUnreferencedCode]/[RequiresDynamicCode], and the assembly's own code reports
+		trim and AOT warnings whenever ILC compiles it. ZodSharp reaches it only through AddZodSharpClientValidation, which
+		carries the same requirements, but rooting Purview.ZodSharp.AspNetCore compiles that method anyway. Those warnings
+		are ASP.NET Core's, not ZodSharp's, so that one framework assembly is collapsed to a single summary warning
+		(IL2104/IL3053), which is tolerated below. Every ZodSharp assembly still reports each warning individually.
+	-->
+	<Target Name="CollapseRazorComponentEndpointWarnings" AfterTargets="_PrepareTrimConfiguration">
+		<ItemGroup>
+			<ResolvedFileToPublish
+				Update="@(ResolvedFileToPublish)"
+				Condition="'%(Filename)' == 'Microsoft.AspNetCore.Components.Endpoints'"
+				TrimmerSingleWarn="true"
+			/>
+		</ItemGroup>
+	</Target>
+</Project>
