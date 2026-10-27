@@ -112,3 +112,5 @@ See [JSON Schema Import](JsonSchema-Import.md) for the supported keywords, `$ref
 ## Comparing with Newtonsoft
 
 See the API comparison table on the [Newtonsoft.Json Integration](NewtonsoftJson-Integration.md) page for the differences between the two JSON packages.
+
+Both packages can be referenced from one project. Their extensions share the `ZodSharp` namespace and names, so this package also has option-less overloads (`DeserializeAndValidate(json)`, `DeserializeAndValidateAsync(stream)` and `(stream, cancellationToken)`, `ValidateAndSerialize(value)`, `ValidateAndSerializeAsync(value, output)` and `(value, output, cancellationToken)`): a call without options resolves to System.Text.Json instead of failing with CS0121. `CreateValidatingConverter(schema)` is the one call that stays ambiguous; call `SystemTextJsonExtensions.CreateValidatingConverter(schema)` directly.

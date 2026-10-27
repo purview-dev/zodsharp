@@ -314,6 +314,80 @@ public static class SystemTextJsonExtensions
 		return ValidationResult<string>.Success(string.Empty);
 	}
 
+	// The overloads below take no options at all. They exist so a project that references both JSON packages can
+	// call the argument-light forms: Purview.ZodSharp.NewtonsoftJson declares same-named extensions in the same
+	// namespace whose settings parameter is optional too, so without these the calls are ambiguous (CS0121).
+	// An overload that needs no default argument beats one that does, so these win and resolve to
+	// System.Text.Json; a call that passes Newtonsoft settings still resolves to Newtonsoft.
+
+	/// <summary>
+	/// Deserializes JSON with the default <see cref="JsonSerializerOptions"/> and validates it using a Zod schema.
+	/// </summary>
+	/// <inheritdoc cref="DeserializeAndValidate{T}(IZodSchema{T, T}, string, JsonSerializerOptions?)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValidationResult<T> DeserializeAndValidate<T>(this IZodSchema<T, T> schema, string json) =>
+		DeserializeAndValidate(schema, json, options: null);
+
+	/// <summary>
+	/// Deserializes JSON from a stream with the default <see cref="JsonSerializerOptions"/> and validates it using
+	/// a Zod schema (async).
+	/// </summary>
+	/// <inheritdoc cref="DeserializeAndValidateAsync{T}(IZodSchema{T, T}, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<T>> DeserializeAndValidateAsync<T>(
+		this IZodSchema<T, T> schema,
+		Stream jsonStream
+	) => DeserializeAndValidateAsync(schema, jsonStream, options: null, CancellationToken.None);
+
+	/// <summary>
+	/// Deserializes JSON from a stream with the default <see cref="JsonSerializerOptions"/> and validates it using
+	/// a Zod schema (async).
+	/// </summary>
+	/// <inheritdoc cref="DeserializeAndValidateAsync{T}(IZodSchema{T, T}, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<T>> DeserializeAndValidateAsync<T>(
+		this IZodSchema<T, T> schema,
+		Stream jsonStream,
+		CancellationToken cancellationToken
+	) => DeserializeAndValidateAsync(schema, jsonStream, options: null, cancellationToken);
+
+	/// <summary>
+	/// Validates a value and serializes it to a JSON string with the default <see cref="JsonSerializerOptions"/>.
+	/// </summary>
+	/// <inheritdoc cref="ValidateAndSerialize{T}(IZodSchema{T, T}, T, JsonSerializerOptions?)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValidationResult<string> ValidateAndSerialize<T>(this IZodSchema<T, T> schema, T value) =>
+		ValidateAndSerialize(schema, value, options: null);
+
+	/// <summary>
+	/// Validates a value and serializes it to a stream with the default <see cref="JsonSerializerOptions"/> (async).
+	/// </summary>
+	/// <inheritdoc cref="ValidateAndSerializeAsync{T}(IZodSchema{T, T}, T, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(
+		this IZodSchema<T, T> schema,
+		T value,
+		Stream output
+	) => ValidateAndSerializeAsync(schema, value, output, options: null, CancellationToken.None);
+
+	/// <summary>
+	/// Validates a value and serializes it to a stream with the default <see cref="JsonSerializerOptions"/> (async).
+	/// </summary>
+	/// <inheritdoc cref="ValidateAndSerializeAsync{T}(IZodSchema{T, T}, T, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(
+		this IZodSchema<T, T> schema,
+		T value,
+		Stream output,
+		CancellationToken cancellationToken
+	) => ValidateAndSerializeAsync(schema, value, output, options: null, cancellationToken);
+
 	/// <summary>
 	/// Creates a custom JsonConverter that validates using a Zod schema.
 	/// </summary>

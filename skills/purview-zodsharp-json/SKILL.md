@@ -27,9 +27,11 @@ Each adds deserialize-and-validate, a validating converter, and JSON Schema **im
 Both can be referenced from one project without `extern alias` — the JSON Schema types live in
 `ZodSharp.JsonSchema.SystemTextJson` / `ZodSharp.JsonSchema.NewtonsoftJson` — but the
 deserialize/serialize extensions (`SystemTextJsonExtensions`, `NewtonsoftJsonExtensions`) are both in the
-`ZodSharp` namespace with the same names, so with both packages referenced a call that omits the options
-argument is ambiguous (CS0121). Pass the options/settings argument, or call the extension class directly
-(`SystemTextJsonExtensions.DeserializeAndValidate(schema, json)`).
+`ZodSharp` namespace with the same names. With both referenced, a call that omits the options argument
+(`schema.DeserializeAndValidate(json)`, `DeserializeAndValidateAsync(stream[, ct])`, `ValidateAndSerialize(value)`,
+`ValidateAndSerializeAsync(value, output[, ct])`) resolves to System.Text.Json; pass a `JsonSerializerSettings`
+for Newtonsoft. `CreateValidatingConverter(schema)` stays ambiguous (CS0121): call the class directly,
+`NewtonsoftJsonExtensions.CreateValidatingConverter(schema)`.
 
 ## Deserialize and validate
 

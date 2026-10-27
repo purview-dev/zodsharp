@@ -337,6 +337,14 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **Referencing both JSON packages no longer makes option-less calls ambiguous.** Both packages declare
+  `DeserializeAndValidate`, `DeserializeAndValidateAsync`, `ValidateAndSerialize` and `ValidateAndSerializeAsync` in
+  namespace `ZodSharp` with an optional options/settings parameter, so `schema.DeserializeAndValidate(json)` failed
+  with CS0121. `Purview.ZodSharp.SystemTextJson` adds option-less overloads (and `CancellationToken`-only stream
+  overloads), which win, so those calls resolve to System.Text.Json; a call that passes Newtonsoft settings still
+  resolves to Newtonsoft. No existing member changed. `CreateValidatingConverter(schema)` has one signature in both
+  and stays ambiguous: call `NewtonsoftJsonExtensions.CreateValidatingConverter(schema)` or
+  `SystemTextJsonExtensions.CreateValidatingConverter(schema)`.
 - **Generated collection size failures report the Zod origin.** `[MinLength]`/`[MaxLength]`/`[Length]` (and
   `[MinCount]`/`[MaxCount]`/`[CountRange]`) on a `List<T>` or other collection reported `Origin = "collection"`,
   which no other producer uses; they now report `array` (`record` for a dictionary), like `ZodArray`, `ZodRecord`,
