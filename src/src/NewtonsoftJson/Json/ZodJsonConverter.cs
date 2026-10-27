@@ -39,6 +39,28 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 			// under this value's path too.
 			throw new ZodNewtonsoftJsonValidationException(nested.Errors, path, line, position);
 		}
+		catch (JsonSerializationException unreadable)
+		{
+			// The value was read from the buffered token, so the serializer's path is relative to it ("Age");
+			// report it under this value's path ("Members[1].Age").
+			throw new JsonSerializationException(
+				unreadable.Message,
+				CombinePath(path, unreadable.Path),
+				line,
+				position,
+				unreadable
+			);
+		}
+		catch (JsonReaderException unreadable)
+		{
+			throw new JsonSerializationException(
+				unreadable.Message,
+				CombinePath(path, unreadable.Path),
+				line,
+				position,
+				unreadable
+			);
+		}
 
 		var result = schema.Validate(deserialized);
 
@@ -62,6 +84,13 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 		var token = JToken.FromObject(value, CreateSerializerWithoutThisConverter(serializer));
 		token.WriteTo(writer);
 	}
+
+	/// <summary>Joins this value's JSON path with a path relative to it.</summary>
+	static string CombinePath(string outer, string? relative) =>
+		string.IsNullOrEmpty(relative) ? outer
+		: string.IsNullOrEmpty(outer) ? relative
+		: relative[0] == '[' ? outer + relative
+		: outer + "." + relative;
 
 	static (int Line, int Position) LineInfo(IJsonLineInfo? info) =>
 		info is { } lineInfo && lineInfo.HasLineInfo() ? (lineInfo.LineNumber, lineInfo.LinePosition) : (0, 0);

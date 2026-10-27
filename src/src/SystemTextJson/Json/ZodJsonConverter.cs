@@ -47,6 +47,12 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 			// already carry that relative path; a fresh exception lets the outer serializer add this value's.
 			throw new ZodJsonValidationException(nested.Errors);
 		}
+		catch (JsonException unreadable)
+		{
+			// The inner serializer's path is relative to this element; the serializer would keep it as it is
+			// and drop this value's own path. Record it, and let the serializer add this value's path.
+			throw new ZodJsonReadException(ZodJsonReadException.RelativePathOf(unreadable), unreadable);
+		}
 		var result = schema.Validate(deserialized);
 
 		// The serializer adds the converted value's path to the exception as it leaves the converter, so the

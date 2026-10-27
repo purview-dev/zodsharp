@@ -48,6 +48,12 @@ static class JsonDeserializationErrors
 				errors = validation.Errors;
 				return true;
 
+			// A validating converter could not read its value: the location joins the converted value's path
+			// with the position inside it.
+			case ZodJsonReadException read:
+				errors = [Create(read.FullPath, typeInfo, read.LineNumber, read.BytePositionInLine)];
+				return true;
+
 			case JsonException json:
 				errors = [FromJsonException(json, typeInfo)];
 				return true;
@@ -155,15 +161,45 @@ static class JsonDeserializationErrors
 			return null;
 		}
 
-#if NET9_0_OR_GREATER
-		if (
-			current.Kind is JsonTypeInfoKind.Enumerable or JsonTypeInfoKind.Dictionary
-			&& current.ElementType is { } element
-		)
-			return current.Options.GetTypeInfo(element);
-#endif
+		if (current.Kind is JsonTypeInfoKind.Enumerable or JsonTypeInfoKind.Dictionary)
+		{
+			var expectedSegment =
+				current.Kind == JsonTypeInfoKind.Enumerable ? ZodPathSegmentKind.Index : ZodPathSegmentKind.Key;
+			if (segment.Kind != expectedSegment && segment.Kind != ZodPathSegmentKind.Member)
+				return null;
 
-		// A scalar has no members, and before .NET 9 a collection contract does not expose its element type.
+			return ElementTypeOf(current) is { } element ? current.Options.GetTypeInfo(element) : null;
+		}
+
+		// A scalar has no members.
 		return null;
+	}
+
+	/// <summary>
+	/// The element (or dictionary value) type of a collection contract. .NET 9 exposes it on the contract; before
+	/// that, and for a contract that does not set it, it is read from an array's element type or the collection's
+	/// generic arguments (the last one, so a dictionary yields its value type). Neither needs unreferenced metadata.
+	/// </summary>
+	static Type? ElementTypeOf(JsonTypeInfo collection)
+	{
+#if NET9_0_OR_GREATER
+		if (collection.ElementType is { } element)
+			return element;
+#endif
+		var type = collection.Type;
+		if (type.IsArray)
+			return type.GetElementType();
+
+		if (!type.IsGenericType)
+			return null;
+
+		var arguments = type.GetGenericArguments();
+		return collection.Kind == JsonTypeInfoKind.Dictionary
+			? arguments.Length == 2
+				? arguments[1]
+				: null
+			: arguments.Length == 1
+				? arguments[0]
+				: null;
 	}
 }

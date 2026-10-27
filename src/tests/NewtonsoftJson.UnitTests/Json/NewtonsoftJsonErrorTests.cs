@@ -58,6 +58,43 @@ public class NewtonsoftJsonErrorTests
 	}
 
 	[Test]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""", "Members[1].Age")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":}]}""", "Members[1].Age")]
+	public async Task DeserializeAndValidate_GivenUnreadableValueUnderAValidatingConverter_ReportsTheFullPath(
+		string json,
+		string expectedPath
+	)
+	{
+		// Arrange
+		PassThroughSchema<Team> schema = new();
+		JsonSerializerSettings settings = new() { Converters = { new PersonSchema().CreateValidatingConverter() } };
+
+		// Act
+		var error = schema.DeserializeAndValidate(json, settings).Errors.Single();
+
+		// Assert
+		await Assert.That(error.FullPath.ToDottedString()).IsEqualTo(expectedPath);
+	}
+
+	[Test]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":}]}""", "Members[1].Age")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":12x}]}""", "Members[1].Age")]
+	public async Task DeserializeAndValidate_GivenMalformedJsonInsideAnElement_ReportsTheReadersPath(
+		string json,
+		string expectedPath
+	)
+	{
+		// Arrange
+		PassThroughSchema<Team> schema = new();
+
+		// Act
+		var error = schema.DeserializeAndValidate(json).Errors.Single();
+
+		// Assert
+		await Assert.That(error.FullPath.ToDottedString()).IsEqualTo(expectedPath);
+	}
+
+	[Test]
 	public async Task DeserializeAndValidate_GivenMalformedOrNullJson_ReportsSingleInvalidJsonCode()
 	{
 		// Defect J2

@@ -75,6 +75,18 @@ catch (ZodJsonValidationException ex)
 
 A failure to read the JSON (malformed JSON, a value that cannot be converted, a `null` document, or a type the serializer cannot handle — `JsonException`, `NotSupportedException`, `InvalidOperationException`) produces one `ValidationError` with code `invalid_json` (`SystemTextJsonExtensions.InvalidJsonCode`) and category `invalid_type`. Its `FullPath` is the location the serializer reported (`$.items[1].age` becomes `items[1].age`), its `line` and `position` parameters hold the serializer's zero-based line number and byte position in the line, and its message is the fixed `"The JSON value could not be converted to {expected}."`, where `expected` is a Zod type name (`string`, `number`, `object`, `array`, …) found by walking the failing path through the serializer contract, or the generic `"the expected type"` when it cannot be described (for example malformed JSON read into a `Dictionary<string, object?>`). The serializer's own message, which names CLR types and can quote the input, is never surfaced. A failure raised by a validating converter is returned as the schema's own errors, located under the converter's path.
 
+How precise the location is depends on what failed, and is exactly what System.Text.Json reports:
+
+| Failure | `FullPath` for `{"items":[{"age":1},{"age":…}]}` |
+|---|---|
+| A value that cannot be converted (`"age":"x"`, `"age":true`) | `items[1].age` |
+| A syntax error while reading a value (`"age":}`, `"age":12x`) | `items[1].age` |
+| A syntax error between members (`"age":1,}`, a missing `:`) | `items[1]` - the element being read |
+| Truncated JSON | the next element (`items[2]`) |
+| Any failure inside a value read by a validating converter (`CreateValidatingConverter`) | a conversion failure keeps its full path (`items[1].age`); a syntax error is reported at the converted value (`items[1]`), because the converter - and, for a stream, the serializer's read-ahead - buffers the whole value first |
+
+`expected` is found for members, array and list elements and dictionary values on every target framework, and binary members (`byte[]`, `Memory<byte>`, base64 in JSON) are `string`.
+
 ```csharp
 var result = userSchema.DeserializeAndValidate("""{ "name": "John", "age": }""");
 var error = result.Errors[0];

@@ -59,7 +59,9 @@ System.Text.Json a `NotSupportedException`/`InvalidOperationException` - is one 
 (`SystemTextJsonExtensions.InvalidJsonCode` / `NewtonsoftJsonExtensions.InvalidJsonCode`), category
 `invalid_type` and the fixed message `"The JSON value could not be converted to {expected}."` (`expected` is a
 Zod type name). The serializer's path becomes the error's `FullPath` (`$.items[1].age` and Newtonsoft's
-`items[1].age` both become `items[1].age`); line and position become the `line` and `position` parameters. The
+`items[1].age` both become `items[1].age`); line and position become the `line` and `position` parameters. A
+System.Text.Json syntax error between members is located at the element (`items[1]`), and one inside a value read
+by a validating converter at that value, because it is buffered first. The
 serializer's own message is never surfaced, because it names CLR types and can quote the input. Schema failures
 keep the schema's own codes, and the Newtonsoft `DeserializeAndValidateAsync` awaits the schema's
 `ValidateAsync`.

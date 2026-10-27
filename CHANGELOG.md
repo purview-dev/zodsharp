@@ -385,7 +385,16 @@ Released versions correspond to `v<version>` GitHub releases.
 
 - **JSON read failures keep their location.** The serializer's path becomes the error's `FullPath`
   (`$.items[1].age` and Newtonsoft's `items[1].age` both become `items[1].age`), and its line and position
-  become the `line` and `position` parameters.
+  become the `line` and `position` parameters. The path is the serializer's: a value that cannot be converted, or
+  a syntax error while reading a value (`"age":}`), is located at the value (`items[1].age`); a System.Text.Json
+  syntax error between members (`"age":1,}`) is located at the element being read (`items[1]`), and one inside a
+  value read by a validating converter at the converted value, because that value is buffered first.
+- **JSON read failures under a validating converter keep the full path.** A value that could not be converted
+  inside a value read by `CreateValidatingConverter` (both JSON packages) was reported at its path within that
+  value (`Age`); it is now reported under the converted value's path too (`items[1].age`).
+- **`invalid_json` names the expected type in more places.** `expected` is found through list, array and
+  dictionary element contracts on every target framework (it fell back to `"the expected type"` before .NET 9), and
+  binary members (`byte[]`, `Memory<byte>`) are `string`.
 - **System.Text.Json `NotSupportedException` and `InvalidOperationException`** thrown while deserializing are
   reported as `invalid_json` instead of escaping `DeserializeAndValidate`.
 - **Validating-converter errors keep every field and their path**, located under the converter's JSON path

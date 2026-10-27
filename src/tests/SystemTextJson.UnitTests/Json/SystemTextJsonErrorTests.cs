@@ -61,6 +61,81 @@ public class SystemTextJsonErrorTests
 	}
 
 	[Test]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":}]}""", "Members[1].Age")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":12x}]}""", "Members[1].Age")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":1,}]}""", "Members[1]")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age" 1}]}""", "Members[1]")]
+	public async Task DeserializeAndValidate_GivenMalformedJsonInsideAnElement_ReportsTheSerializersPath(
+		string json,
+		string expectedPath,
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — the path is the serializer's: the value being read when a syntax error is a value error,
+		// and the containing element when the reader fails between members.
+		PassThroughSchema<Team> schema = new();
+		using MemoryStream stream = new(System.Text.Encoding.UTF8.GetBytes(json));
+
+		// Act
+		var fromString = schema.DeserializeAndValidate(json).Errors.Single();
+		var fromStream = (
+			await schema.DeserializeAndValidateAsync(stream, cancellationToken: cancellationToken)
+		).Errors.Single();
+
+		// Assert
+		await Assert.That(fromString.FullPath.ToDottedString()).IsEqualTo(expectedPath);
+		await Assert.That(fromStream.FullPath.ToDottedString()).IsEqualTo(expectedPath);
+		await Assert.That(fromString.Code).IsEqualTo(SystemTextJsonExtensions.InvalidJsonCode);
+	}
+
+	[Test]
+	// A value that cannot be converted is located inside the converted element. A syntax error is located at the
+	// element itself: the converter (and, for a stream, the serializer's read-ahead) buffers the whole value, so
+	// the position inside it is not known.
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""", "Members[1].Age")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":true}]}""", "Members[1].Age")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":}]}""", "Members[1]")]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":1,}]}""", "Members[1]")]
+	public async Task DeserializeAndValidate_GivenMalformedJsonUnderAValidatingConverter_ReportsTheConvertedValuePath(
+		string json,
+		string expectedPath
+	)
+	{
+		// Arrange
+		PassThroughSchema<Team> schema = new();
+		JsonSerializerOptions options = new() { Converters = { new PersonSchema().CreateValidatingConverter() } };
+
+		// Act
+		var error = schema.DeserializeAndValidate(json, options).Errors.Single();
+
+		// Assert
+		await Assert.That(error.FullPath.ToDottedString()).IsEqualTo(expectedPath);
+	}
+
+	[Test]
+	[Arguments("""{"Members":[{"Name":"Ada","Age":true}]}""", "number")]
+	[Arguments("""{"Members":[{"Name":true,"Age":1}]}""", "string")]
+	[Arguments("""{"Scores":{"a":"x"}}""", "number")]
+	[Arguments("""{"Grid":[["x"]]}""", "number")]
+	[Arguments("""{"Payload":5}""", "string")]
+	[Arguments("""{"Members":5}""", "array")]
+	public async Task DeserializeAndValidate_GivenUnconvertibleNestedValue_NamesTheExpectedJsonType(
+		string json,
+		string expected
+	)
+	{
+		// Arrange
+		PassThroughSchema<Roster> schema = new();
+
+		// Act
+		var error = schema.DeserializeAndValidate(json).Errors.Single();
+
+		// Assert
+		await Assert.That(error.Parameters!.Get<string>(ZodIssueParameters.Expected)).IsEqualTo(expected);
+		await Assert.That(error.Message).IsEqualTo($"The JSON value could not be converted to {expected}.");
+	}
+
+	[Test]
 	public async Task DeserializeAndValidate_GivenMalformedOrNullJson_ReportsSingleInvalidJsonCode()
 	{
 		// Defect J2
@@ -164,6 +239,22 @@ public class SystemTextJsonErrorTests
 	public sealed class Team
 	{
 		public List<Person>? Members { get; set; }
+	}
+
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Performance",
+		"CA1819:Properties should not return arrays",
+		Justification = "The fixture exercises how the serializer reads arrays."
+	)]
+	public sealed class Roster
+	{
+		public List<Person>? Members { get; set; }
+
+		public Dictionary<string, int>? Scores { get; set; }
+
+		public int[][]? Grid { get; set; }
+
+		public byte[]? Payload { get; set; }
 	}
 
 	public sealed class Household

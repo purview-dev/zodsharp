@@ -106,5 +106,9 @@ static class JsonKinds
 		[typeof(TimeSpan)] = "string",
 		[typeof(Uri)] = "string",
 		[typeof(Version)] = "string",
+		// Binary data is written as a base64 string.
+		[typeof(byte[])] = "string",
+		[typeof(Memory<byte>)] = "string",
+		[typeof(ReadOnlyMemory<byte>)] = "string",
 	};
 }
