@@ -58,6 +58,7 @@ public static class ServiceCollectionExtensions
 		{
 			services.AddSingleton<IValidateOptions<T>>(sp => new ZodSchemaOptionsValidator<T>(
 				sp.GetRequiredService<IZodSchemaFactory>(),
+				sp,
 				missingValidatorBehavior
 			));
 
