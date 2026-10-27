@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<PropertyGroup>
+		<!-- net11.0 only: it demonstrates the .NET 11 validation pipeline and the net11.0-only OpenAPI package. -->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<!--
+			Native AOT. CI publishes this sample for linux-x64 and fails on any IL2xxx/IL3xxx warning, which is the
+			proof that the minimal-API integration (generated registration, the validation bridge, ProblemDetails and
+			the OpenAPI transformers) is trim- and AOT-safe end to end.
+		-->
+		<PublishAot>true</PublishAot>
+		<!-- Purview.BuildSdk defaults every project to IsPublishable=false; this one is published. Never packed. -->
+		<IsPublishable>true</IsPublishable>
+		<IsPackable>false</IsPackable>
+		<!-- Kept off: the sample localizes validation messages into French, which needs culture data. -->
+		<InvariantGlobalization>false</InvariantGlobalization>
+		<!-- Report every trim/AOT warning individually rather than one summary warning per assembly. -->
+		<TrimmerSingleWarn>false</TrimmerSingleWarn>
+		<!--
+			The XML documentation file is generated (the SDK default, and the OpenAPI generator reads the comments at
+			compile time) but not published: a native image has no use for it, and on a clean Native AOT publish the
+			SDK looks for it in bin/, where the native build never copies it (MSB3030).
+		-->
+		<PublishDocumentationFile>false</PublishDocumentationFile>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AspNetCore\AspNetCore.csproj" />
+		<ProjectReference Include="..\AspNetCore.OpenApi\AspNetCore.OpenApi.csproj" />
+		<ProjectReference Include="..\Examples.Shared\Examples.Shared.csproj" />
+		<ProjectReference Include="..\Extensions.Validation\Extensions.Validation.csproj" />
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+		<!-- Direct reference required when we're using a local project ref -->
+		<ProjectReference
+			Include="..\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
+	</ItemGroup>
+</Project>

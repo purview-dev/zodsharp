@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!--
+			The [ZodSchema] request models the samples share: Examples.MinimalApi binds them, and the Blazor samples
+			validate the same types in both render modes. net11.0 only, like the samples that use it.
+		-->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<!-- The Native AOT sample compiles this library in, so trim and AOT regressions surface here first. -->
+		<IsAotCompatible>true</IsAotCompatible>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+		<!-- Direct reference required when we're using a local project ref -->
+		<ProjectReference
+			Include="..\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
+	</ItemGroup>
+</Project>

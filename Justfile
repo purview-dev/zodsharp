@@ -3,6 +3,9 @@ set quiet
 root_folder := "src"
 solution := root_folder / "ZodSharp.slnx"
 perf_tests_project := root_folder / "src" / "Benchmarks" / "Benchmarks.csproj"
+aot_sample_project := root_folder / "src" / "Examples.MinimalApi" / "Examples.MinimalApi.csproj"
+# Native AOT cannot cross-compile between operating systems, so the sample publishes for this machine by default.
+default_rid := (if os_family() == "windows" { "win" } else if os() == "macos" { "osx" } else { "linux" }) + "-" + (if arch() == "aarch64" { "arm64" } else { "x64" })
 build_configuration := "Debug"
 artifacts_folder := "./artifacts"
 default_test_filter := "/*/*/*/*"
@@ -109,6 +112,13 @@ restore *args:
 pack publish_folder=artifacts_folder *args:
     echo "Packing {{ BLUE }}{{ solution }}{{ NORMAL }} with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }} to {{ GREEN }}{{ publish_folder }}{{ NORMAL }}"
     dotnet pack {{ solution }} -c {{ build_configuration }} -o {{ publish_folder }} {{ args }}
+
+# The CI `aot-sample` job runs the same publish for linux-x64. Windows needs the MSVC C++ build tools, Linux clang.
+# Publish the Examples.MinimalApi sample with Native AOT, failing on any trim (IL2xxx) or AOT (IL3xxx) warning
+[group('Build and Test')]
+publish-aot-sample rid=default_rid *args:
+    echo "Publishing {{ BLUE }}{{ aot_sample_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }}"
+    dotnet publish {{ aot_sample_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/aot-sample/{{ rid }} -warnaserror {{ args }}
 
 # Displays the current version of the project.
 # Requires Bun.

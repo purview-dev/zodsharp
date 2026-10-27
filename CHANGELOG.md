@@ -163,6 +163,14 @@ Released versions correspond to `v<version>` GitHub releases.
   registers through `Validate<TValidator>()`. New `AddZodSchemaValidator(missingValidatorBehavior, validateOnStart,
   configurationSection)` overload, `BindAndValidateWithZod(section)` (AspNetCore package) and
   `ZodValidateOptionsResult` (the failure with its full `Errors`). `Microsoft.Extensions.Options` 11 on net11.0.
+- **Examples.MinimalApi sample** (`src/src/Examples.MinimalApi`, `net11.0`, not packed), with its `[ZodSchema]`
+  request models in `src/src/Examples.Shared` for reuse by later samples. It shows generated trim-safe registration
+  (`AddZodSharp{Assembly}Schemas()`), route groups validated by the .NET 11 pipeline (`AddZodSharpValidation()`), the
+  `WithZodSharpValidation()` filter, a manual `ZodTypedResults.ValidationProblem`, a service-aware async uniqueness
+  rule, async options validation on start, French messages, the OpenAPI transformers and an `.http` file. It
+  publishes with `PublishAot=true` and zero IL2xxx/IL3xxx warnings: a new `aot-sample` PR job publishes it for
+  `linux-x64` with `-warnaserror` and smoke-tests the native binary, `just publish-aot-sample` runs the same publish
+  locally, and `Examples.MinimalApi.IntegrationTests` starts it in memory.
 ### Breaking behaviour changes
 
 - **`[Required]` on a string now matches `RequiredAttribute`** (source generator, defect G1). The generated
