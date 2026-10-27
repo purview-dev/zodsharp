@@ -91,7 +91,7 @@ partial class ZodSchemaGeneratorTests
 
 		var generatedSource = driverResult.GetSource("UserSchema");
 
-		await Assert.That(generatedSource).ContainsGeneratedCode("value.Name == null");
+		await Assert.That(generatedSource).ContainsGeneratedCode("string.IsNullOrWhiteSpace(value.Name)");
 		await Assert.That(generatedSource).ContainsGeneratedCode("var nameValue = value.Name;");
 		await Assert.That(generatedSource).ContainsGeneratedCode("var nameLength = nameValue.Length;");
 		await Assert.That(generatedSource).ContainsGeneratedCode("nameLength < 3");

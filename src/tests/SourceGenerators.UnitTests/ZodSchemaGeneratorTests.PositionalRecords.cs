@@ -206,7 +206,9 @@ partial class ZodSchemaGeneratorTests
 
 		// Assert - the display name, the length bounds and the parsed DateTimeOffset bounds all come from the
 		// parameters, so the emitted validation is the one a declared property would get.
-		await Assert.That(generated).ContainsGeneratedCode("Required field 'Account name' is null");
+		await Assert
+			.That(generated)
+			.ContainsGeneratedCode("Field 'Account name' is required and cannot be null, empty or whitespace");
 		await Assert.That(generated).ContainsGeneratedCode("if (handleLength < 3)");
 		await Assert.That(generated).ContainsGeneratedCode("if (handleLength > 10)");
 		await Assert

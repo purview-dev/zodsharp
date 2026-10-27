@@ -711,18 +711,21 @@ partial class ZodSchemaGenerator
 		if (property.CanBeNull && attributes.Required.ShouldProcess && attributes.Required.Value.Exists)
 		{
 			var required = attributes.Required.Value;
-			var isStringAndAllowEmptyStrings =
-				property.PropertyType.SpecialType == SpecialType.System_String && required.AllowEmptyStrings;
-			var localErrorMessage = isStringAndAllowEmptyStrings
-				? "Field '{0}' is required and cannot be null or empty"
+
+			// RequiredAttribute semantics: a string is missing when it is null, empty or whitespace-only,
+			// unless AllowEmptyStrings is set, in which case only null is missing.
+			var rejectsBlankStrings =
+				property.PropertyType.SpecialType == SpecialType.System_String && !required.AllowEmptyStrings;
+			var localErrorMessage = rejectsBlankStrings
+				? "Field '{0}' is required and cannot be null, empty or whitespace"
 				: "Required field '{0}' is null";
 			var errorMessage = string.Format(
 				CultureInfo.InvariantCulture,
 				required.ValidationAttribute.ErrorMessage ?? localErrorMessage,
 				displayName
 			);
-			var comparison = isStringAndAllowEmptyStrings
-				? $"string.IsNullOrEmpty(value.{propertyName})"
+			var comparison = rejectsBlankStrings
+				? $"string.IsNullOrWhiteSpace(value.{propertyName})"
 				: $"value.{propertyName} == null";
 
 			writer.Rule(propertyName, comparison, "missing_field", errorMessage);

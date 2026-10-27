@@ -8,6 +8,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## [Unreleased]
+
+### Breaking behaviour changes
+
+- **`[Required]` on a string now matches `RequiredAttribute`.** The generated check was inverted: the
+  default (`AllowEmptyStrings = false`) only rejected `null`, so `""` passed, while
+  `AllowEmptyStrings = true` rejected `""`. The default now rejects `null`, `""` and whitespace-only text
+  (message `Field '{displayName}' is required and cannot be null, empty or whitespace`), and
+  `AllowEmptyStrings = true` rejects only `null`. *Migration:* a model that relied on `""` passing a bare
+  `[Required]` must either supply a value or set `AllowEmptyStrings = true`.
+
+### Fixed
+
+- `[Required]` string semantics (defect G1, see above).
+
 ## 2.4.1
 
 ### Fixed
