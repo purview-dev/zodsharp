@@ -12,8 +12,8 @@ public readonly record struct DurationRule : Core.IValidationRule<string>, Core.
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Invalid duration: {0}";
+	/// <summary>Gets the default message format. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Invalid duration";
 
 	/// <summary>
 	/// Regular expression for ISO 8601-1 durations. Does not accept the 8601-2 extensions (negative
@@ -25,7 +25,7 @@ public readonly record struct DurationRule : Core.IValidationRule<string>, Core.
 		RegexRule.DefaultMatchTimeout
 	);
 
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DurationRule"/> struct.
@@ -34,7 +34,7 @@ public readonly record struct DurationRule : Core.IValidationRule<string>, Core.
 	/// <param name="code">Optional error code override. If one is not specified then the <see cref="ErrorCode"/> is used.</param>
 	public DurationRule(string? message = null, string? code = null)
 	{
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -97,5 +97,9 @@ public readonly record struct DurationRule : Core.IValidationRule<string>, Core.
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format("duration");
 }

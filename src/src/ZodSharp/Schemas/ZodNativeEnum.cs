@@ -17,7 +17,8 @@ namespace ZodSharp.Schemas;
 public class ZodNativeEnum<TEnum>() : ZodType<TEnum>, JsonSchema.IJsonSchemaEnumInfo
 	where TEnum : struct, Enum
 {
-	static readonly string[] EmptyPath = [];
+	// The schema's own membership check reports exactly what the [Enum] rule reports.
+	static readonly Rules.EnumRule<TEnum> MembershipRule = new(message: null);
 
 	// Resolving the defined members once per closed generic type avoids the per-validation
 	// Enum.IsDefined reflection path.
@@ -49,13 +50,7 @@ public class ZodNativeEnum<TEnum>() : ZodType<TEnum>, JsonSchema.IJsonSchemaEnum
 	protected override ValidationResult<TEnum> ParseInternal(TEnum value) =>
 		DefinedValues.Contains(value)
 			? ValidationResult<TEnum>.Success(value)
-			: ValidationResult<TEnum>.Failure(
-				new ValidationError(
-					"invalid_enum_value",
-					$"'{value}' is not a defined member of {typeof(TEnum).Name}",
-					EmptyPath
-				)
-			);
+			: ValidationResult<TEnum>.Failure(ZodRuleErrors.Create(MembershipRule, value, ZodPath.Root));
 
 	/// <summary>
 	/// Adds an <see cref="Rules.EnumRule{TEnum}"/> that validates the value is a defined member of

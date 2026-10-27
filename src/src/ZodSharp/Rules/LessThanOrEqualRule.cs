@@ -20,7 +20,7 @@ public readonly record struct LessThanOrEqualRule<T>
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal T MaxValue { get; }
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the LessThanOrEqualRule struct.
@@ -31,7 +31,7 @@ public readonly record struct LessThanOrEqualRule<T>
 	public LessThanOrEqualRule(T maxValue, string? message = null, string? code = null)
 	{
 		MaxValue = maxValue;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -65,5 +65,9 @@ public readonly record struct LessThanOrEqualRule<T>
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooBig;
+
+	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(MaxValue);
 }

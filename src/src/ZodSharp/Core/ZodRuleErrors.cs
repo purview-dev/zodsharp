@@ -5,6 +5,12 @@ namespace ZodSharp.Core;
 /// (<see cref="IZodRule"/>) so runtime schemas and generated validators report exactly the same error for the
 /// same rule.
 /// </summary>
+/// <remarks>
+/// When the rule implements <see cref="IZodFailureDescriber{T}"/> (or <see cref="IZodStringFailureDescriber"/>
+/// for spans) its value-dependent category and parameters are applied too. The raw input is added as the
+/// <see cref="ZodIssueParameters.Received"/> parameter only when <see cref="ZodErrorOptions.IncludeReceivedValues"/>
+/// is enabled.
+/// </remarks>
 public static class ZodRuleErrors
 {
 	/// <summary>
@@ -29,12 +35,17 @@ public static class ZodRuleErrors
 	{
 		ArgumentNullException.ThrowIfNull(rule);
 		var zodRule = rule as IZodRule;
-		return Build(
+		var failure = rule is IZodFailureDescriber<T> describer ? describer.DescribeFailure(value) : default;
+		var includeReceived = ZodErrorOptions.IncludeReceivedValues;
+		return BuildCore(
 			code ?? (zodRule?.Code is { } ruleCode ? ruleCode : rule.Code),
 			message ?? rule.GetErrorMessage(value),
 			path,
 			zodRule,
-			fallbackOrigin
+			fallbackOrigin,
+			failure,
+			includeReceived,
+			includeReceived ? value : null
 		);
 	}
 
@@ -59,12 +70,17 @@ public static class ZodRuleErrors
 	{
 		ArgumentNullException.ThrowIfNull(rule);
 		var zodRule = rule as IZodRule;
-		return Build(
+		var failure = rule is IZodStringFailureDescriber describer ? describer.DescribeFailure(value) : default;
+		var includeReceived = ZodErrorOptions.IncludeReceivedValues;
+		return BuildCore(
 			code ?? (zodRule?.Code is { } ruleCode ? ruleCode : rule.Code),
 			message ?? rule.GetErrorMessage(value),
 			path,
 			zodRule,
-			fallbackOrigin
+			fallbackOrigin,
+			failure,
+			includeReceived,
+			includeReceived ? value.ToString() : null
 		);
 	}
 
@@ -83,6 +99,37 @@ public static class ZodRuleErrors
 		ZodPath path,
 		IZodRule? rule,
 		string? fallbackOrigin = null
+	) => BuildCore(code, message, path, rule, fallbackOrigin, default, false, null);
+
+	/// <summary>
+	/// Creates an error from a rule's structured identity with an explicit code and message, applying a
+	/// value-dependent <paramref name="failure"/> description.
+	/// </summary>
+	/// <param name="code">The error code.</param>
+	/// <param name="message">The error message.</param>
+	/// <param name="path">The error path.</param>
+	/// <param name="rule">The rule supplying the structured identity, if any.</param>
+	/// <param name="failure">The value-dependent category and parameters.</param>
+	/// <param name="fallbackOrigin">The origin used when the rule does not report one.</param>
+	/// <returns>The error.</returns>
+	public static ValidationError Build(
+		string code,
+		string message,
+		ZodPath path,
+		IZodRule? rule,
+		ZodRuleFailure failure,
+		string? fallbackOrigin = null
+	) => BuildCore(code, message, path, rule, fallbackOrigin, failure, false, null);
+
+	static ValidationError BuildCore(
+		string code,
+		string message,
+		ZodPath path,
+		IZodRule? rule,
+		string? fallbackOrigin,
+		ZodRuleFailure failure,
+		bool includeReceived,
+		object? received
 	)
 	{
 		var lower = rule?.Lower;
@@ -95,17 +142,49 @@ public static class ZodRuleErrors
 			code,
 			message,
 			path,
-			rule?.Parameters,
+			MergeParameters(rule?.Parameters, failure.Parameters, includeReceived, received),
 			rule?.Origin ?? fallbackOrigin,
 			minimum,
 			maximum,
 			inclusive,
-			rule?.Category
+			failure.Category ?? rule?.Category
 		) with
 		{
 			Lower = lower,
 			Upper = upper,
 			MessageFormat = rule?.MessageFormat,
 		};
+	}
+
+	static IReadOnlyDictionary<string, object?>? MergeParameters(
+		IReadOnlyDictionary<string, object?>? ruleParameters,
+		IReadOnlyDictionary<string, object?>? failureParameters,
+		bool includeReceived,
+		object? received
+	)
+	{
+		if (failureParameters is null && !includeReceived)
+			return ruleParameters;
+
+		if (ruleParameters is null && !includeReceived)
+			return failureParameters;
+
+		Dictionary<string, object?> merged = [with(StringComparer.Ordinal)];
+		if (ruleParameters is not null)
+		{
+			foreach (var pair in ruleParameters)
+				merged[pair.Key] = pair.Value;
+		}
+
+		if (failureParameters is not null)
+		{
+			foreach (var pair in failureParameters)
+				merged[pair.Key] = pair.Value;
+		}
+
+		if (includeReceived)
+			merged[ZodIssueParameters.Received] = received;
+
+		return merged;
 	}
 }

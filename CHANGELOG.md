@@ -10,7 +10,58 @@ Released versions correspond to `v<version>` GitHub releases.
 
 ## [Unreleased]
 
+### Added
+
+- **Shared error identities.** `ZodIssueCodes` (codes), `ZodMessages` (named-placeholder templates),
+  `ZodIssues` (factories for null/invalid-type/missing-field/refinement/union/collection-size errors and the
+  `GetUnionErrors()` extension) and `ZodTypeNames` (`Of(Type)`/`OfValue(object)`: Zod type names such as
+  `string`, `number`, `array`) in `ZodSharp.Core`, so every producer reports the same failure identically.
+- **`ZodErrorOptions.IncludeReceivedValues`** (default `false`). When enabled, rule failures carry the raw input
+  as the `received` parameter. Development only; built-in messages never contain the input either way.
+- **`IZodFailureDescriber<T>` / `IZodStringFailureDescriber` / `ZodRuleFailure`.** A rule can describe the
+  value-dependent part of its failure (category by direction, `count`); `ZodRuleErrors` applies it.
+- **Structured rule identity.** Every built-in rule reports `Origin` (`string`, `number`, `date`, `enum`, …),
+  `Category` (the Zod v4 issue code), `Lower`/`Upper` bounds with the correct inclusivity, and parameters such as
+  `format`, `divisor`, `pattern`, `prefix`, `options`, `version` and `count`.
+- **`RefineCtx<T>.AddIssue(ValidationError)`** and **`AddIssue(code, message, ZodPath, parameters, category)`**,
+  plus `RefineCtx<T>.FullPath` and a `RefineCtx(T, ZodPath)` constructor.
+- `ZodIssueParameters.Format`, `Divisor`, `Pattern`, `Prefix`, `Suffix`, `Includes`, `Version` and `Key`.
+- `ZodMessageFormat` renders a sequence parameter (an options or keys list) as its elements joined by `, `.
+
 ### Breaking behaviour changes
+
+- **Index paths.** `ZodArray` and `ZodTuple` element errors are located with typed index segments; the legacy
+  `ValidationError.Path` renders them as `"0"` (was `"[0]"`), matching Zod. `FullPath.ToDottedString()` renders
+  `Items[0].Name`.
+- **Tuple element errors are prefixed with their index** (they were reported at the tuple root).
+- **Null messages** are `"Expected {type}, received null"` for strings, arrays, records, objects, enums, tuples and
+  discriminated unions (were `"Expected array, but got null"` and similar).
+- **Invalid-type messages use Zod type names** (`"Expected number, received string"`), never CLR names such as
+  `Int32`, `Double` or `JsonElement`; `expected`/`received` parameters carry the same names.
+- **Missing fields:** `ZodObject` reports `"{key} is required"` (was `"Required field '{key}' is missing"`), category
+  `invalid_type`. `RequiredRule` reports `"Value is required"` (was `"Field is required"`) with the shared
+  `"{displayName} is required"` template as `MessageFormat`; its `{0}` placeholder is now the display name.
+- **Unrecognized keys:** a strict object reports one `unrecognized_keys` issue at the object's path with a `keys`
+  parameter (was one `unrecognized_key` issue per key, at the key's path).
+- **Unions** report per-option issues under `unionErrors` (`ImmutableArray<ImmutableArray<ValidationError>>`) instead
+  of a flattened mutable list under `errors`; typed and native unions now keep them (they were discarded) and name
+  the options with Zod type names. Category `invalid_union`.
+- **Discriminated unions** report `missing_discriminator`/`invalid_discriminator` at the discriminator's path with
+  `discriminator` and `options` parameters, list options in declaration order, and no longer echo the received
+  discriminator value.
+- **Enums and literals** no longer echo the received value (`"Expected one of: a, b"`, `"Expected literal 1.5"`);
+  `ZodEnum` lists its options in ordinal order; `ZodNativeEnum` reports exactly what `EnumRule` reports.
+- **Array size messages:** `Min`, `Max` and `Length` keep separate custom messages (a shared one reported the wrong
+  message), and the defaults report the count (`"Array must have at least 2 elements, but got 1"`).
+- **Default rule messages no longer contain the input** (email, credit card, JWT, phone, compare, starts/ends
+  with, includes, regex, UUID/GUID and every other string format, allowed/denied values, null-or-non-whitespace).
+  A custom message can still use the positional placeholders. `UUIDRule` custom and default messages now receive
+  the same arguments (`{0}` value, `{1}` version as an integer); `RegexRule`'s `{0}` is the pattern, as documented.
+- Rules no longer store their default message as the custom message (`message.Or(MessageFormat)`), so a rule built
+  without a message and `default(TRule)` behave the same.
+- `ZodIntersection` reports an issue raised identically by both sides once.
+- Refinement and `SuperRefine` issues carry category `custom`; `ZodTransform` failures carry category `custom`.
+
 
 - **JSON read failures use one code, `invalid_json`.** `DeserializeAndValidate`/`DeserializeAndValidateAsync`
   in both JSON packages used to report `json_error` (with the serializer's exception text in the message) or
@@ -31,6 +82,17 @@ Released versions correspond to `v<version>` GitHub releases.
 
 ### Fixed
 
+- Re-pathing an element, field, catchall, record value or tuple element error no longer drops its origin,
+  bounds, inclusivity, category or message format (`WithPathPrefix` everywhere).
+- `ZodArray.Min(2).Max(5)` reported a too-small failure with the maximum's message.
+- A null tuple element is handed to the element schema when the element type can hold `null`.
+- `GreaterThanRule`/`LessThanRule` report exclusive bounds; `SafeIntegerRule` reports `invalid_type` for a
+  fraction and `too_small`/`too_big` by direction (was always `too_big`).
+- `ZodString` span validation reports the rule's full structured identity.
+- `default(IPAddressRule)` no longer formats a `null` message.
+
+
+
 - **JSON read failures keep their location.** The serializer's path becomes the error's `FullPath`
   (`$.items[1].age` and Newtonsoft's `items[1].age` both become `items[1].age`), and its line and position
   become the `line` and `position` parameters.
@@ -44,6 +106,7 @@ Released versions correspond to `v<version>` GitHub releases.
   index and key segments and keep every field (origin, bounds, category, parameters); `minItems`/`maxItems`
   failures carry origin `array`, both bounds, inclusivity and the `too_small`/`too_big` category, like
   `ZodArray`. A Newtonsoft `JValue` is no longer treated as an empty array.
+
 ## 2.4.1
 
 ### Fixed
