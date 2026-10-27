@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using ZodSharp.Core;
 #endif
 
-
 namespace ZodSharp.SourceGenerators;
 
 /// <summary>
