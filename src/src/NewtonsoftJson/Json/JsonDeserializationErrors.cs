@@ -21,6 +21,8 @@ namespace ZodSharp.Json;
 /// is never passed to a client; the expected type is described with Zod's type names instead.
 /// </para>
 /// </remarks>
+[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 static class JsonDeserializationErrors
 {
 	/// <summary>The message format of every deserialization failure.</summary>

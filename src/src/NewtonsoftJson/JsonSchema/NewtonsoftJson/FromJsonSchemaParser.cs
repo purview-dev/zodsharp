@@ -18,6 +18,8 @@ public static class FromJsonSchemaParser
 	/// </summary>
 	/// <param name="schema">The JSON Schema definition</param>
 	/// <returns>A ZodSharp schema that validates according to the JSON Schema</returns>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static IZodSchema<object, object> Parse(JsonSchemaDefinition schema)
 	{
 		if (schema is null)
@@ -35,6 +37,8 @@ public static class FromJsonSchemaParser
 	/// </summary>
 	/// <param name="jsonSchema">The JSON Schema as a string</param>
 	/// <returns>A ZodSharp schema that validates according to the JSON Schema</returns>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static IZodSchema<object, object> Parse(string jsonSchema)
 	{
 		var schema = JsonConvert.DeserializeObject<JsonSchemaDefinition>(
@@ -58,6 +62,8 @@ public static class FromJsonSchemaParser
 		public HashSet<string> Processing { get; } = [];
 	}
 
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	static IZodSchema<object, object> ConvertSchema(JsonSchemaDefinition schema, ConversionContext ctx)
 	{
 		if (schema is null)
@@ -102,6 +108,8 @@ public static class FromJsonSchemaParser
 		return baseSchema;
 	}
 
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	static IZodSchema<object, object> ConvertBaseSchema(JsonSchemaDefinition schema, ConversionContext ctx)
 	{
 		// Handle $ref
@@ -228,6 +236,8 @@ public static class FromJsonSchemaParser
 		"Performance",
 		"CA1859:Use concrete types when possible for improved performance"
 	)]
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	static IZodSchema<object, object> ConvertObjectSchema(JsonSchemaDefinition schema, ConversionContext ctx)
 	{
 		// An object with no declared properties whose additionalProperties is a schema is a record: every
@@ -274,6 +284,8 @@ public static class FromJsonSchemaParser
 	/// <param name="ctx">The conversion context.</param>
 	/// <param name="valueSchema">The converted value schema, when the object is a record.</param>
 	/// <returns><see langword="true"/> when the object is a record.</returns>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	static bool TryConvertAdditionalProperties(
 		object? additionalProperties,
 		ConversionContext ctx,
@@ -329,6 +341,8 @@ public static class FromJsonSchemaParser
 		"Performance",
 		"CA1859:Use concrete types when possible for improved performance"
 	)]
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	static IZodSchema<object, object> ConvertArraySchema(JsonSchemaDefinition schema, ConversionContext ctx)
 	{
 		var elementSchema = schema.Items != null ? ConvertSchema(schema.Items, ctx) : new AnySchema();
@@ -336,6 +350,8 @@ public static class FromJsonSchemaParser
 		return new ArraySchemaWrapper(elementSchema, schema.MinItems, schema.MaxItems);
 	}
 
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	static IZodSchema<object, object> ResolveRef(string refPath, ConversionContext ctx)
 	{
 		if (!refPath.StartsWith('#'))

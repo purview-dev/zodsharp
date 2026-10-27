@@ -27,6 +27,8 @@ public static class NewtonsoftJsonExtensions
 	/// <summary>
 	/// Deserializes JSON and validates it using a Zod schema.
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static ValidationResult<T> DeserializeAndValidate<T>(
 		this IZodSchema<T, T> schema,
 		string json,
@@ -44,6 +46,8 @@ public static class NewtonsoftJsonExtensions
 	/// <summary>
 	/// Deserializes JSON and validates it using a Zod schema (async).
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static async Task<ValidationResult<T>> DeserializeAndValidateAsync<T>(
 		this IZodSchema<T, T> schema,
 		Stream jsonStream,
@@ -73,6 +77,8 @@ public static class NewtonsoftJsonExtensions
 	/// <summary>
 	/// Deserializes JSON from a JToken and validates it using a Zod schema.
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static ValidationResult<T> DeserializeAndValidate<T>(
 		this IZodSchema<T, T> schema,
 		JToken token,
@@ -102,6 +108,8 @@ public static class NewtonsoftJsonExtensions
 			: schema.Validate(deserialized);
 	}
 
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	static bool TryDeserialize<T>(
 		string json,
 		JsonSerializerSettings? settings,
@@ -135,12 +143,16 @@ public static class NewtonsoftJsonExtensions
 	/// <summary>
 	/// Creates a custom JsonConverter that validates using a Zod schema.
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static JsonConverter CreateValidatingConverter<T>(this IZodSchema<T, T> schema) =>
 		schema == null ? throw new ArgumentNullException(nameof(schema)) : new ZodJsonConverter<T>(schema);
 
 	/// <summary>
 	/// Validates a value and serializes it to a JSON string.
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static ValidationResult<string> ValidateAndSerialize<T>(
 		this IZodSchema<T, T> schema,
 		T value,
@@ -162,6 +174,8 @@ public static class NewtonsoftJsonExtensions
 	/// <summary>
 	/// Validates a value and serializes it to a stream (async).
 	/// </summary>
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 	public static async Task<ValidationResult<string>> ValidateAndSerializeAsync<T>(
 		this IZodSchema<T, T> schema,
 		T value,

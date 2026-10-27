@@ -13,6 +13,18 @@
 		<PackageTags>zod;validation;schema;json</PackageTags>
 	</PropertyGroup>
 
+	<!--
+		Trimming and Native AOT. Newtonsoft.Json is reflection-based throughout and carries no trimming annotations,
+		so the analyzers cannot see its hazards. Every public API here that reaches Newtonsoft serialization declares
+		[RequiresUnreferencedCode]/[RequiresDynamicCode] itself (NewtonsoftJsonTrimming.Message), which makes the
+		package analyzer-clean and honest: a trimmed or AOT consumer is warned at the call site and pointed at
+		Purview.ZodSharp.SystemTextJson.
+	-->
+	<PropertyGroup Label="Trimming and Native AOT">
+		<IsAotCompatible>true</IsAotCompatible>
+		<IsTrimmable>true</IsTrimmable>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Newtonsoft.Json" />
 	</ItemGroup>

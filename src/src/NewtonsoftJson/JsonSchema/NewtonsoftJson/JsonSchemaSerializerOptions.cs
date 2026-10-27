@@ -27,6 +27,8 @@ sealed class JsonSchemaNamingStrategy : CamelCaseNamingStrategy
 /// <summary>
 /// Options for JSON serialization/deserialization of JSON Schema.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 public static class JsonSchemaSerializerOptions
 {
 	/// <summary>

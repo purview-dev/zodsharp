@@ -7,6 +7,8 @@ namespace ZodSharp.Json;
 /// <summary>
 /// JsonConverter that validates using a Zod schema.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 {
 	public override T ReadJson(

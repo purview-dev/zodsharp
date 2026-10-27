@@ -90,6 +90,17 @@ var result = schema.Validate(data);
 
 This lets you share schemas defined in TypeScript/Zod with your .NET backend. (Export via `Z.ToJsonSchema` lives in the core package.)
 
+## Trimming and Native AOT
+
+Newtonsoft.Json is not trim- or Native AOT-compatible: it discovers members and constructors by reflection and
+generates code at runtime. Every API in this package that reaches Newtonsoft serialization (`DeserializeAndValidate`,
+`DeserializeAndValidateAsync`, `ValidateAndSerialize`, `ValidateAndSerializeAsync`, `CreateValidatingConverter`,
+`Z.FromJsonSchema` and `FromJsonSchemaParser.Parse`) is annotated `[RequiresUnreferencedCode]` and
+`[RequiresDynamicCode]`, so a trimmed or AOT application gets an IL2026/IL3050 warning at the call site instead of a
+runtime failure. Use [Purview.ZodSharp.SystemTextJson](https://www.nuget.org/packages/Purview.ZodSharp.SystemTextJson)
+with a source-generated `JsonSerializerContext` in those applications. See
+[Trimming and Native AOT](https://purview.dev/docs/zodsharp/trimming-and-aot/).
+
 ## Documentation
 
 - [Homepage](https://purview.dev/projects/zodsharp/)
