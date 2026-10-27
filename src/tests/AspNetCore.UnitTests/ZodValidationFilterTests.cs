@@ -13,9 +13,8 @@ public class ZodValidationFilterTests
 	{
 		var context = CreateContext(CreateProvider(), new ValidatedRequest { Name = "abc" });
 
-		var result = await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(
-			context,
-			static _ => ValueTask.FromResult<object?>(NextResult)
+		var result = await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(context, static _ =>
+			ValueTask.FromResult<object?>(NextResult)
 		);
 
 		await Assert.That(result).IsEqualTo(NextResult);
@@ -26,9 +25,8 @@ public class ZodValidationFilterTests
 	{
 		var context = CreateContext(CreateProvider(), new ValidatedRequest { Name = "a" });
 
-		var result = await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(
-			context,
-			static _ => ValueTask.FromResult<object?>(NextResult)
+		var result = await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(context, static _ =>
+			ValueTask.FromResult<object?>(NextResult)
 		);
 
 		await Assert.That(result is IResult).IsTrue();
@@ -43,9 +41,8 @@ public class ZodValidationFilterTests
 		InvalidOperationException? exception = null;
 		try
 		{
-			await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(
-				context,
-				static _ => ValueTask.FromResult<object?>(NextResult)
+			await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(context, static _ =>
+				ValueTask.FromResult<object?>(NextResult)
 			);
 		}
 		catch (InvalidOperationException ex)
@@ -66,9 +63,8 @@ public class ZodValidationFilterTests
 		InvalidOperationException? exception = null;
 		try
 		{
-			await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(
-				context,
-				static _ => ValueTask.FromResult<object?>(NextResult)
+			await new ZodValidationFilter<ValidatedRequest>().InvokeAsync(context, static _ =>
+				ValueTask.FromResult<object?>(NextResult)
 			);
 		}
 		catch (InvalidOperationException ex)

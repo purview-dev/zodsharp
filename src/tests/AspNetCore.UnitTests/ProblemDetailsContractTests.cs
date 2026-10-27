@@ -85,9 +85,8 @@ public class ProblemDetailsContractTests
 
 				ModeBOnly(app.MapPost("/filter", (OrderRequest order) => TypedResults.Ok()).WithZodSharpValidation());
 				ModeBOnly(
-					app.MapPost(
-						"/exception",
-						IResult (OrderRequest order) => throw new ZodException(OrderRequestValidator.Check(order))
+					app.MapPost("/exception", IResult (OrderRequest order) =>
+						throw new ZodException(OrderRequestValidator.Check(order))
 					)
 				);
 				ModeBOnly(

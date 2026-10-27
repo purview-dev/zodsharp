@@ -96,25 +96,19 @@ static class SampleApp
 	static void MapPipelineValidatedEndpoints(WebApplication app)
 	{
 		var orders = app.MapGroup("/orders").WithTags("Orders");
-		orders.MapPost(
-			"/",
-			static (CreateOrderRequest order) =>
-			{
-				var accepted = OrderAccepted.For(order);
-				return TypedResults.Created($"/orders/{accepted.Id}", accepted);
-			}
-		);
+		orders.MapPost("/", static (CreateOrderRequest order) =>
+		{
+			var accepted = OrderAccepted.For(order);
+			return TypedResults.Created($"/orders/{accepted.Id}", accepted);
+		});
 
 		var customers = app.MapGroup("/customers").WithTags("Customers");
-		customers.MapPost(
-			"/",
-			static (RegisterCustomerRequest customer, ICustomerEmailRegistry registry) =>
-			{
-				// The async uniqueness rule has already run against the same registry.
-				registry.TryRegister(customer.Email!);
-				return TypedResults.Created($"/customers/{customer.Email}", new CustomerRegistered(customer.Email!));
-			}
-		);
+		customers.MapPost("/", static (RegisterCustomerRequest customer, ICustomerEmailRegistry registry) =>
+		{
+			// The async uniqueness rule has already run against the same registry.
+			registry.TryRegister(customer.Email!);
+			return TypedResults.Created($"/customers/{customer.Email}", new CustomerRegistered(customer.Email!));
+		});
 	}
 
 	/// <summary>
@@ -122,14 +116,11 @@ static class SampleApp
 	/// takes the endpoint out of the built-in pipeline, so the filter is the one validating it.
 	/// </summary>
 	static void MapFilterValidatedEndpoints(WebApplication app) =>
-		app.MapPost(
-				"/filtered/orders",
-				static (CreateOrderRequest order) =>
-				{
-					var accepted = OrderAccepted.For(order);
-					return TypedResults.Created($"/orders/{accepted.Id}", accepted);
-				}
-			)
+		app.MapPost("/filtered/orders", static (CreateOrderRequest order) =>
+			{
+				var accepted = OrderAccepted.For(order);
+				return TypedResults.Created($"/orders/{accepted.Id}", accepted);
+			})
 			.WithTags("Orders")
 			.DisableValidation()
 			.WithZodSharpValidation();

@@ -98,12 +98,10 @@ public class ZodEndpointValidationTests
 		// Arrange
 		await using var app = await TestApp.StartAsync(
 			services =>
-				AddServices(
-					services,
-					configure: options =>
-						options.MapErrorType(
-							new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
-						)
+				AddServices(services, configure: options =>
+					options.MapErrorType(
+						new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
+					)
 				),
 			app => app.MapPost("/orders", (OrderRequest order) => TypedResults.Ok()).WithZodSharpValidation(),
 			cancellationToken
