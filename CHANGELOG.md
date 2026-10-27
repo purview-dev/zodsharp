@@ -334,6 +334,10 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **Source generator: `[ZodSchema]` types with the same simple name no longer fail with `ZODSGEN001`.** Two types
+  named `Widget` in different namespaces (or two nested `Item` types in different containing types) produced the
+  same hint name, so generation failed for the compilation. Each schema's outputs are now named by its namespace,
+  containing types and name (`Alpha.WidgetSchema.g.cs`, `Alpha.Outer.ItemSchema.g.cs`), deterministically.
 - **`Z.String().Required()` reports a resolvable template.** Its `"{displayName} is required"` `MessageFormat` had
   nothing to resolve `displayName` from at the root, so a host re-formatting it got the placeholder back.
   `ZodMessageFormat`'s built-in `displayName` now falls back to `"Value"` (matching the message) when the path has

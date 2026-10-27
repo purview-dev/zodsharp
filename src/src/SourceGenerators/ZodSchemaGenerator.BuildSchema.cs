@@ -22,7 +22,7 @@ partial class ZodSchemaGenerator
 		var writer = outputContext.Context.CreateCodeWriter();
 
 		GenerateSchemaClass(outputContext, writer, isPrimary, context);
-		context.AddSource($"{outputContext.ZodSchema.SchemaType.Name}.g.cs", writer);
+		context.AddSource($"{GetHintNameStem(outputContext.ZodSchema)}.g.cs", writer);
 
 		GenerateRefinementHookDeclaration(outputContext, context);
 
@@ -43,7 +43,7 @@ partial class ZodSchemaGenerator
 				+ $"typeof(global::{GetValidatorTypeName(outputContext.ZodSchema)}))]"
 		);
 
-		context.AddSource($"{outputContext.ZodSchema.SchemaType.Name}Registration.g.cs", registrationWriter);
+		context.AddSource($"{GetHintNameStem(outputContext.ZodSchema)}Registration.g.cs", registrationWriter);
 	}
 
 	/// <summary>
@@ -52,6 +52,24 @@ partial class ZodSchemaGenerator
 	/// </summary>
 	static bool IsRegistrable(ZodSchemaDescriptor schema) =>
 		schema.IsPrimary && schema.ContainingTypes.Count == 0 && schema.GenerateValidateMethod;
+
+	/// <summary>
+	/// The hint-name stem of a schema's per-type outputs: the schema's namespace, containing types and name
+	/// (<c>Alpha.Outer.ItemSchema</c>), so two schemas with the same simple name in different namespaces or
+	/// containing types never produce the same hint name. Derived from the declaration only, so it is stable
+	/// across runs.
+	/// </summary>
+	internal static string GetHintNameStem(ZodSchemaDescriptor schema)
+	{
+		System.Text.StringBuilder builder = new();
+		if (!string.IsNullOrEmpty(schema.SchemaType.Namespace))
+			builder.Append(schema.SchemaType.Namespace).Append('.');
+
+		foreach (var containingType in schema.ContainingTypes)
+			builder.Append(containingType.Name).Append('.');
+
+		return builder.Append(schema.SchemaType.Name).ToString();
+	}
 
 	static string GetValidatorTypeName(ZodSchemaDescriptor schema) =>
 		string.IsNullOrEmpty(schema.SchemaType.Namespace)
@@ -95,7 +113,7 @@ partial class ZodSchemaGenerator
 				block.Dispose();
 		}
 
-		context.AddSource($"{outputContext.ZodSchema.SchemaType.Name}.Hooks.g.cs", writer);
+		context.AddSource($"{GetHintNameStem(outputContext.ZodSchema)}.Hooks.g.cs", writer);
 	}
 
 	/// <summary>
