@@ -101,6 +101,7 @@ public partial class AnalyzerReleaseTrackingTests
 		"ZODSGEN050",
 		"ZODSGEN051",
 		"ZODSGEN052",
+		"ZODSGEN053",
 	];
 
 	[Test]
