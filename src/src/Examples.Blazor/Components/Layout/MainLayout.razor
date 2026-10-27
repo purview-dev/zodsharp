@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+@using System.Globalization
+@inject NavigationManager Navigation
+
+<header>
+	<nav>
+		<a href="">ZodSharp Blazor sample</a>
+		<a href="orders">Interactive Server</a>
+		<a href="register">Interactive WebAssembly</a>
+		<a href="returns">Static SSR</a>
+	</nav>
+	<nav class="culture" aria-label="Language">
+		@foreach (var culture in SampleLocalization.SupportedCultures)
+		{
+			@* A full page load: the culture is read once per request on the server and at startup in WebAssembly. *@
+			<a href="@CultureLink(culture)" data-enhance-nav="false" aria-current="@(IsCurrent(culture) ? "true" : null)">
+				@(culture == "fr" ? "Français" : "English")
+			</a>
+		}
+	</nav>
+</header>
+
+<main>
+	@Body
+</main>
+
+@code {
+	string CultureLink(string culture) =>
+		$"{SampleApp.CulturePath.TrimStart('/')}?culture={culture}&redirectUri={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}";
+
+	static bool IsCurrent(string culture) => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == culture;
+}

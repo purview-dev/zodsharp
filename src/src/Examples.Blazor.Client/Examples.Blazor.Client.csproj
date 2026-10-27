@@ -1,0 +1,92 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+	<PropertyGroup>
+		<!--
+			The WebAssembly half of the Blazor sample: the interactive WebAssembly form, compiled for the browser. net11.0
+			only, like Purview.ZodSharp.Blazor.
+		-->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<!--
+			Purview.BuildSdk defaults every project to IsPublishable=false. CI publishes this one trimmed (wasm-trimmed)
+			and with RunAOTCompilation (wasm-aot), failing on any IL2xxx/IL3xxx warning, which is the proof that the
+			Blazor integration is trim-safe in the browser. Never packed.
+		-->
+		<IsPublishable>true</IsPublishable>
+		<IsPackable>false</IsPackable>
+		<NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+		<StaticWebAssetProjectMode>Default</StaticWebAssetProjectMode>
+		<!-- Trimming is the WebAssembly default for Release publishes; stated so the intent is explicit. -->
+		<PublishTrimmed>true</PublishTrimmed>
+		<EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+		<!-- Report every trim warning individually rather than one summary warning per assembly. -->
+		<TrimmerSingleWarn>false</TrimmerSingleWarn>
+		<!-- The sample switches between English and French, so it needs culture data and satellite assemblies. -->
+		<InvariantGlobalization>false</InvariantGlobalization>
+		<BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+		<!-- A browser has no use for the XML documentation file. -->
+		<PublishDocumentationFile>false</PublishDocumentationFile>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<!--
+			Directory.Packages.props picks the Microsoft.Extensions line by $(TargetFramework), which a single-targeted
+			project has not set yet when that file is evaluated; the WebAssembly packages need the 11.x line.
+		-->
+		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<!-- NU5104: the .NET 11 WebAssembly packages are prerelease until .NET 11 GA. -->
+		<NoWarn>$(NoWarn);NU5104</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!--
+			No direct Microsoft.Extensions.Validation reference and no [ValidatableType]: the [ZodSchema] models in
+			Examples.Shared still validate nested members, collections and dictionaries in the browser, because the
+			ZodSharp resolver supplies their type info.
+		-->
+		<ProjectReference Include="..\Blazor\Blazor.csproj" />
+		<ProjectReference Include="..\Examples.Shared\Examples.Shared.csproj" />
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!--
+			The contracts, the resources marker and the localization setup are internal; the server project uses them too,
+			as a Blazor Web App's server always references its client.
+		-->
+		<InternalsVisibleTo Include="ZodSharp.Examples.Blazor" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+		<PackageReference Include="Microsoft.Extensions.Localization" />
+	</ItemGroup>
+
+	<!--
+		Like Purview.ZodSharp.Blazor, the client must not run the Microsoft.Extensions.Validation generator (it flows in
+		transitively through the bridge): the sample demonstrates that [ZodSchema] models need none of it.
+	-->
+	<Target Name="RemoveValidationsGenerator" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+		<ItemGroup>
+			<Analyzer
+				Remove="@(Analyzer)"
+				Condition="'%(Filename)' == 'Microsoft.Extensions.Validation.ValidationsGenerator'"
+			/>
+		</ItemGroup>
+	</Target>
+	<!--
+		Purview.SourceGeneratorFramework (the generator's build-time framework) declares its assembly as copy-to-output
+		content so the in-repo, unmerged ZodSharp generator can load it, and that content flows through every
+		ProjectReference to ZodSharp. It is a compiler-host dependency, never an application one: the WebAssembly AOT
+		compiler would try to compile it and fail on its Microsoft.CodeAnalysis references. Package consumers never see
+		it (the package ships the merged generator under analyzers/ only), so this is a project-reference-only concern.
+	-->
+	<Target Name="RemoveSourceGeneratorFrameworkFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+		<ItemGroup>
+			<ResolvedFileToPublish
+				Remove="@(ResolvedFileToPublish)"
+				Condition="'%(Filename)' == 'Purview.SourceGeneratorFramework'"
+			/>
+		</ItemGroup>
+	</Target>
+
+	<!-- The Purview.ZodSharp package ships this through buildTransitive; a ProjectReference does not import it. -->
+	<Import Project="..\ZodSharp\Sdk\buildTransitive\Purview.ZodSharp.targets" />
+</Project>

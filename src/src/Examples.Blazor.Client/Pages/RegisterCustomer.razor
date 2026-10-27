@@ -1,0 +1,90 @@
+@page "/register"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@implements IDisposable
+@inject HttpClient Http
+
+<PageTitle>Interactive WebAssembly - ZodValidator</PageTitle>
+
+<h1>Register a customer</h1>
+<p>
+	<strong>Interactive WebAssembly, route 2:</strong> <code>&lt;ZodValidator&gt;</code> validates in the browser as you
+	type (debounced by 300 ms) and keeps every error's code, shown after each message. The email is checked for
+	uniqueness by a service-aware async rule - try <code>@InMemoryCustomerEmailRegistry.SeededEmail</code>. The
+	second button posts without validating, so the server's ProblemDetails are mapped back onto the fields.
+</p>
+
+<EditForm EditContext="_editContext" OnValidSubmit="PostAsync">
+	<ZodValidator ValidateOn="@(ZodValidationTrigger.Change | ZodValidationTrigger.Input)" DebounceMilliseconds="300" />
+
+	<div class="field">
+		<label for="name">Name</label>
+		<LiveInputText id="name" @bind-Value="_model.Name" />
+		<ZodValidationMessage For="() => _model.Name" ShowCode="true" />
+	</div>
+
+	<div class="field">
+		<label for="email">Email</label>
+		<LiveInputText id="email" @bind-Value="_model.Email" />
+		@if (_editContext.IsValidationPending(() => _model.Email))
+		{
+			<span id="email-pending" class="pending-indicator">Checking...</span>
+		}
+		<ZodValidationMessage For="() => _model.Email" ShowCode="true" />
+	</div>
+
+	<div class="field">
+		<label for="age">Age</label>
+		<InputNumber id="age" @bind-Value="_model.Age" />
+		<ZodValidationMessage For="() => _model.Age" ShowCode="true" />
+	</div>
+
+	<ZodValidationSummary />
+
+	<button type="submit">Register</button>
+	<button type="button" id="post-unvalidated" @onclick="PostAsync">Send to the server without validating</button>
+</EditForm>
+
+@if (_status is not null)
+{
+	<p id="status" role="status">@_status</p>
+}
+
+@code {
+	RegisterCustomerRequest _model = new();
+	EditContext _editContext = default!;
+	string? _status;
+
+	protected override void OnInitialized()
+	{
+		_editContext = new(_model);
+		_editContext.OnValidationStateChanged += OnValidationStateChanged;
+	}
+
+	void OnValidationStateChanged(object? sender, ValidationStateChangedEventArgs e) => StateHasChanged();
+
+	async Task PostAsync()
+	{
+		_status = null;
+		using var response = await Http.PostAsJsonAsync(
+			"api/customers",
+			_model,
+			ClientJsonContext.Default.RegisterCustomerRequest
+		);
+
+		// The server always validates: its errors use the same contract, so they land on the same fields. They replace
+		// whatever the browser reported, so a field never shows the same message twice.
+		if (await response.TryReadZodValidationProblemAsync() is { } problem)
+		{
+			_editContext.ClearZodErrors();
+			_editContext.AddZodProblemDetails(problem);
+			_status = $"The server rejected the registration ({problem.Status}).";
+			return;
+		}
+
+		response.EnsureSuccessStatusCode();
+		var registered = await response.Content.ReadFromJsonAsync(ClientJsonContext.Default.CustomerRegistered);
+		_status = $"Registered {registered?.Email}.";
+	}
+
+	public void Dispose() => _editContext.OnValidationStateChanged -= OnValidationStateChanged;
+}

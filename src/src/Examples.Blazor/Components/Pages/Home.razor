@@ -1,0 +1,24 @@
+@page "/"
+
+<PageTitle>ZodSharp Blazor sample</PageTitle>
+
+<h1>ZodSharp Blazor sample</h1>
+<p>
+	The same <code>[ZodSchema]</code> models from <code>Examples.Shared</code> validate in every render mode. Each page
+	shows one way to use them.
+</p>
+<ul>
+	<li>
+		<a href="orders">Interactive Server</a>: the standard <code>&lt;DataAnnotationsValidator /&gt;</code> (route 1)
+		over a nested address, a collection of lines and a dictionary of addresses, with field-level validation.
+	</li>
+	<li>
+		<a href="register">Interactive WebAssembly</a>: <code>&lt;ZodValidator&gt;</code> (route 2) with debounced
+		validation, error codes, an async uniqueness check and server errors mapped back onto the form.
+	</li>
+	<li>
+		<a href="returns">Static SSR</a>: a posted form with client-side validation of ZodSharp rules
+		(<code>[StartsWith]</code>, <code>[UUID]</code>) before it is submitted.
+	</li>
+</ul>
+<p>Switch the language above to see the validation messages in French; codes and paths never change.</p>

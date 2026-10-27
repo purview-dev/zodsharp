@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<PropertyGroup>
+		<!--
+			The server half of the Blazor Web App sample (Auto render mode: interactive server and interactive
+			WebAssembly, plus static SSR). It hosts Examples.Blazor.Client and exposes the minimal API the WebAssembly form
+			posts to. net11.0 only, like Purview.ZodSharp.Blazor.
+		-->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<!-- Purview.BuildSdk defaults every project to IsPublishable=false; the sample can be published. Never packed. -->
+		<IsPublishable>true</IsPublishable>
+		<IsPackable>false</IsPackable>
+		<!-- Kept off: the sample localizes validation messages into French, which needs culture data. -->
+		<InvariantGlobalization>false</InvariantGlobalization>
+		<PublishDocumentationFile>false</PublishDocumentationFile>
+		<!-- NU5104: the .NET 11 WebAssembly server package is prerelease until .NET 11 GA. -->
+		<NoWarn>$(NoWarn);NU5104</NoWarn>
+		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AspNetCore\AspNetCore.csproj" />
+		<ProjectReference Include="..\Blazor\Blazor.csproj" />
+		<ProjectReference Include="..\Examples.Blazor.Client\Examples.Blazor.Client.csproj" />
+		<ProjectReference Include="..\Examples.Shared\Examples.Shared.csproj" />
+		<ProjectReference Include="..\Extensions.Validation\Extensions.Validation.csproj" />
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+	</ItemGroup>
+</Project>

@@ -1,0 +1,76 @@
+@page "/returns"
+
+<PageTitle>Static SSR - client-side validation</PageTitle>
+
+<h1>Return items</h1>
+<p>
+	<strong>Static server-side rendering:</strong> no interactivity. The form posts to the server, which binds and
+	validates <code>ReturnRequest</code> with its generated ZodSharp validator and re-renders the messages next to the
+	inputs. Before posting, the browser already checks the DataAnnotations rules and the ZodSharp ones -
+	<code>[StartsWith("@ReturnRequest.ReferencePrefix")]</code> and <code>[UUID]</code> - because
+	<code>AddZodSharpClientValidation()</code> adds them to the form's client rules. Client rules only improve the
+	experience; the server always validates.
+</p>
+
+<EditForm Model="Model" FormName="return" method="post" OnValidSubmit="Submit" Enhance>
+	<DataAnnotationsValidator />
+	<ValidationSummary />
+
+	<fieldset>
+		<legend>Return</legend>
+		<label for="reference">Reference</label>
+		<InputText id="reference" @bind-Value="Model!.Reference" placeholder="RMA-1001" />
+		<ValidationMessage For="() => Model!.Reference" />
+		<label for="order-id">Order id</label>
+		<InputText id="order-id" @bind-Value="Model!.OrderId" placeholder="UUID" />
+		<ValidationMessage For="() => Model!.OrderId" />
+	</fieldset>
+
+	<fieldset>
+		<legend>Return address</legend>
+		<label for="street">Street</label>
+		<InputText id="street" @bind-Value="Model!.ReturnAddress!.Street" />
+		<ValidationMessage For="() => Model!.ReturnAddress!.Street" />
+		<label for="city">City</label>
+		<InputText id="city" @bind-Value="Model!.ReturnAddress!.City" />
+		<ValidationMessage For="() => Model!.ReturnAddress!.City" />
+		<label for="postcode">Post code</label>
+		<InputText id="postcode" @bind-Value="Model!.ReturnAddress!.PostCode" />
+		<ValidationMessage For="() => Model!.ReturnAddress!.PostCode" />
+	</fieldset>
+
+	<fieldset>
+		<legend>Items</legend>
+		@for (var i = 0; i < Model!.Items.Count; i++)
+		{
+			var index = i;
+			<div class="line">
+				<label for="sku-@index">SKU</label>
+				<InputText id="@($"sku-{index}")" @bind-Value="Model!.Items[index].Sku" placeholder="ABC-1234" />
+				<ValidationMessage For="() => Model!.Items[index].Sku" />
+				<label for="quantity-@index">Quantity</label>
+				<InputNumber id="@($"quantity-{index}")" @bind-Value="Model!.Items[index].Quantity" />
+				<ValidationMessage For="() => Model!.Items[index].Quantity" />
+			</div>
+		}
+	</fieldset>
+
+	<button type="submit">Request the return</button>
+</EditForm>
+
+@if (_submitted)
+{
+	<p id="submitted" role="status">Return @Model!.Reference requested for @Model.Items.Count item(s).</p>
+}
+
+@code {
+	bool _submitted;
+
+	[SupplyParameterFromForm(FormName = "return")]
+	ReturnRequest? Model { get; set; }
+
+	protected override void OnInitialized() =>
+		Model ??= new() { ReturnAddress = new(), Items = [new(), new()] };
+
+	void Submit() => _submitted = true;
+}

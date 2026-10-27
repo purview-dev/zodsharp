@@ -1,0 +1,84 @@
+@page "/orders"
+@rendermode InteractiveServer
+
+<PageTitle>Interactive Server - DataAnnotationsValidator</PageTitle>
+
+<h1>Place an order</h1>
+<p>
+	<strong>Interactive Server, route 1:</strong> the standard <code>&lt;DataAnnotationsValidator /&gt;</code> validates
+	<code>CreateOrderRequest</code> with its generated ZodSharp validator - no <code>[ValidatableType]</code> needed.
+	Each message lands next to its input: the nested shipping address, every order line and every extra address.
+	Changing a field re-validates only that field.
+</p>
+
+<EditForm Model="_order" OnValidSubmit="Save">
+	<DataAnnotationsValidator />
+
+	<fieldset>
+		<legend>Customer</legend>
+		<label for="email">Email</label>
+		<InputText id="email" @bind-Value="_order.CustomerEmail" />
+		<ValidationMessage For="() => _order.CustomerEmail" />
+	</fieldset>
+
+	<fieldset>
+		<legend>Shipping address</legend>
+		<AddressFields Address="_order.ShippingAddress!" IdPrefix="shipping" />
+	</fieldset>
+
+	<fieldset>
+		<legend>Lines</legend>
+		@for (var i = 0; i < _order.Lines.Count; i++)
+		{
+			var line = _order.Lines[i];
+			var index = i;
+			<div class="line">
+				<label for="sku-@index">SKU</label>
+				<InputText id="@($"sku-{index}")" @bind-Value="line.Sku" placeholder="ABC-1234" />
+				<ValidationMessage For="() => line.Sku" />
+				<label for="quantity-@index">Quantity</label>
+				<InputNumber id="@($"quantity-{index}")" @bind-Value="line.Quantity" />
+				<ValidationMessage For="() => line.Quantity" />
+				<button type="button" @onclick="() => _order.Lines.Remove(line)">Remove</button>
+			</div>
+		}
+		<button type="button" @onclick="() => _order.Lines.Add(new())">Add a line</button>
+		<ValidationMessage For="() => _order.Lines" />
+	</fieldset>
+
+	<fieldset>
+		<legend>Additional addresses</legend>
+		@foreach (var (purpose, address) in _order.AdditionalAddresses)
+		{
+			<h3>@purpose</h3>
+			<AddressFields Address="address" IdPrefix="@purpose" />
+			<button type="button" @onclick="() => _order.AdditionalAddresses.Remove(purpose)">Remove</button>
+		}
+		@foreach (var purpose in Purposes.Where(p => !_order.AdditionalAddresses.ContainsKey(p)))
+		{
+			<button type="button" @onclick="() => _order.AdditionalAddresses[purpose] = new()">Add a @purpose address</button>
+		}
+	</fieldset>
+
+	<ValidationSummary />
+	<button type="submit">Place order</button>
+</EditForm>
+
+@if (_saved)
+{
+	<p id="saved" role="status">Order accepted with @_order.Lines.Count line(s).</p>
+}
+
+@code {
+	static readonly string[] Purposes = ["billing", "gift"];
+
+	readonly CreateOrderRequest _order = new()
+	{
+		ShippingAddress = new(),
+		Lines = [new()],
+	};
+
+	bool _saved;
+
+	void Save() => _saved = true;
+}

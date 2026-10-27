@@ -1,0 +1,70 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0 auto;
+  max-width: 60rem;
+  padding: 1rem;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 1rem;
+}
+
+nav a {
+  margin-right: 1rem;
+}
+
+nav a[aria-current="true"] {
+  font-weight: bold;
+}
+
+fieldset {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin-bottom: 1rem;
+}
+
+fieldset legend,
+fieldset h3,
+fieldset .line,
+fieldset > button,
+fieldset > .validation-message {
+  grid-column: 1 / -1;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+}
+
+.field {
+  margin-bottom: 0.5rem;
+}
+
+.validation-message {
+  color: #b00020;
+  grid-column: 2;
+}
+
+.validation-code {
+  margin-left: 0.5rem;
+  font-family: monospace;
+  opacity: 0.7;
+}
+
+.valid.modified:not([type="checkbox"]) {
+  outline: 1px solid #26b050;
+}
+
+.invalid {
+  outline: 1px solid #b00020;
+}
+
+.pending,
+.pending-indicator {
+  color: #996f00;
+}

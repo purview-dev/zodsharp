@@ -10,6 +10,8 @@
 		<File Path="Directory.Build.targets" />
 	</Folder>
 	<Folder Name="/src/examples/">
+		<Project Path="src/Examples.Blazor/Examples.Blazor.csproj" />
+		<Project Path="src/Examples.Blazor.Client/Examples.Blazor.Client.csproj" />
 		<Project Path="src/Examples.CLI/Examples.CLI.csproj" />
 		<Project Path="src/Examples.MinimalApi/Examples.MinimalApi.csproj" />
 		<Project Path="src/Examples.Shared/Examples.Shared.csproj" />
