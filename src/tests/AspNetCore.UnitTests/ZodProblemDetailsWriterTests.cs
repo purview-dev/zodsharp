@@ -406,6 +406,35 @@ public class ZodProblemDetailsWriterTests
 	}
 
 	[Test]
+	public async Task Create_GivenGeneratedRangeFailures_SerializesTheBoundParametersAsNumbers(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		var result = await Fixtures.RangedRequestSchema.ValidateAsync(
+			new Fixtures.RangedRequest { Quantity = 0, Ratio = 3 },
+			services: null,
+			cancellationToken
+		);
+		var errors = result.Errors;
+
+		// Act
+		var issues = Serialize(CreateWriter().Create(errors)).GetProperty("issues");
+		var quantity = issues[0].GetProperty("parameters");
+		var ratio = issues[1].GetProperty("parameters");
+
+		// Assert
+		await Assert.That(errors[0].Parameters!["minimum"]).IsTypeOf<int>();
+		await Assert.That(quantity.GetProperty("minimum").ValueKind).IsEqualTo(JsonValueKind.Number);
+		await Assert.That(quantity.GetProperty("maximum").GetInt32()).IsEqualTo(10);
+		await Assert.That(ratio.GetProperty("minimum").GetDouble()).IsEqualTo(0.5);
+		await Assert.That(ratio.GetProperty("maximum").GetDouble()).IsEqualTo(2.5);
+		await Assert
+			.That(errors[1].Message)
+			.IsEqualTo("Field 'Ratio' must be greater than or equal to 0.5 and less than or equal to 2.5.");
+	}
+
+	[Test]
 	public async Task Apply_GivenEverySequenceShape_RewritesTheSameWayWithoutAmbiguity()
 	{
 		// Arrange

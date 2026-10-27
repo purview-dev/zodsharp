@@ -165,7 +165,9 @@ work too.
 Messages are formatted at runtime by `ZodMessageFormat`, which never throws: an unknown placeholder or a stray
 brace is written out literally, and `{{`/`}}` are literal braces. The template is kept in
 `ValidationError.MessageFormat` and the values in `Parameters`, so a host can re-format the message in the
-request culture. A placeholder the attribute does not supply, or an unbalanced brace, is reported at build time
+request culture. A number `[Range]` reports its `minimum`/`maximum` parameters as numbers of the member's type, so
+ProblemDetails writes `"minimum": 1` rather than `"minimum": "1"`; a converted non-number range (dates, times) keeps
+the attribute's text for them, and its typed bounds are the error's `Lower`/`Upper`. A placeholder the attribute does not supply, or an unbalanced brace, is reported at build time
 as `ZODSGEN052`. Providing only one of the resource name/type pair is reported as ZODSGEN005.
 
 ```csharp

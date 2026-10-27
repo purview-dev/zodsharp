@@ -337,6 +337,9 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **Generated `[Range]` parameters are typed.** A number range's `minimum`/`maximum` parameters were strings
+  (`"1"`), so `issues[].parameters` in ProblemDetails carried JSON strings. They are now numbers of the member's type
+  (`1`, `0.5`); messages are unchanged. A converted non-number range (dates, times) keeps the declared text.
 - **OpenAPI: enums follow the application's System.Text.Json settings.** An enum's `enum` values were always
   numbers (the generator cannot see a global `JsonStringEnumConverter`), so a document for an API that writes
   member names described values it never sends. They are now written as System.Text.Json writes them: numbers by

@@ -31,20 +31,29 @@ partial class ZodSchemaGenerator
 		var minimumDescription = range.MinimumIsExclusive ? "greater than" : "greater than or equal to";
 		var maximumDescription = range.MaximumIsExclusive ? "less than" : "less than or equal to";
 
-		// The bounds are reported as typed values (Lower/Upper); the message keeps the attribute's literal
-		// rendering, so a converted range ("1.5", a date string) reads exactly as declared.
-		var minimumDisplay = Convert.ToString(range.Minimum, CultureInfo.InvariantCulture) ?? string.Empty;
-		var maximumDisplay = Convert.ToString(range.Maximum, CultureInfo.InvariantCulture) ?? string.Empty;
+		// The bounds are reported as typed values (Lower/Upper). A number range also reports its minimum/maximum
+		// parameters as numbers (so ProblemDetails writes JSON numbers), which render in the message exactly as
+		// declared. A converted non-number range (a date or time string) keeps the attribute's literal text, so its
+		// message reads as declared rather than in the type's invariant rendering.
 		var message = BuildMessageTemplate(
 			range.ValidationAttribute,
 			$"Field '{{displayName}}' must be {minimumDescription} {{minimum}} and {maximumDescription} {{maximum}}.",
 			"minimum",
 			"maximum"
 		);
-		var values = ValuesExpression(
-			("minimum", minimumDisplay.StringLiteral()),
-			("maximum", maximumDisplay.StringLiteral())
-		);
+		var values =
+			property.ValidationKind == PropertyValidationKind.Numeric
+				? ValuesExpression(("minimum", minimumField), ("maximum", maximumField))
+				: ValuesExpression(
+					(
+						"minimum",
+						(Convert.ToString(range.Minimum, CultureInfo.InvariantCulture) ?? string.Empty).StringLiteral()
+					),
+					(
+						"maximum",
+						(Convert.ToString(range.Maximum, CultureInfo.InvariantCulture) ?? string.Empty).StringLiteral()
+					)
+				);
 		var lower = Bound(minimumField, !range.MinimumIsExclusive);
 		var upper = Bound(maximumField, !range.MaximumIsExclusive);
 		var origin = $"global::ZodSharp.Core.ZodTypeNames.Of(typeof({property.PropertyType.AsTypeReference()}))";
