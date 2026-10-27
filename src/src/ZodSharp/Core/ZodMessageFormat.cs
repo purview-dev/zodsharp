@@ -13,7 +13,9 @@ namespace ZodSharp.Core;
 /// Placeholders are <c>{name}</c>, <c>{name:format}</c> or positional <c>{0}</c>. Named placeholders resolve
 /// from the supplied parameters first and then, when formatting an error, from its built-in fields:
 /// <c>displayName</c>, <c>member</c>, <c>path</c>, <c>code</c>, <c>category</c>, <c>origin</c>, <c>minimum</c>,
-/// <c>maximum</c> and <c>inclusive</c>. <c>{{</c> and <c>}}</c> are literal braces.
+/// <c>maximum</c> and <c>inclusive</c>. <c>displayName</c> falls back to the last member of the path, then to
+/// <c>"Value"</c>, so a template such as <see cref="ZodMessages.Required"/> resolves for an error at the root.
+/// <c>{{</c> and <c>}}</c> are literal braces.
 /// </para>
 /// <para>
 /// A placeholder that cannot be resolved, and any unbalanced brace, is written out literally.
@@ -102,9 +104,12 @@ public static class ZodMessageFormat
 			"maximum" => (error.Upper is not null, error.Upper?.Value),
 			"inclusive" => (error.Inclusive is not null, error.Inclusive),
 			"member" => LastMember(error.FullPath),
-			"displayName" => LastMember(error.FullPath),
+			"displayName" => LastMember(error.FullPath) is (true, _) found ? found : (true, DefaultDisplayName),
 			_ => (false, null),
 		};
+
+	// The display name of a value the error cannot name (no member segment), as in DataAnnotations' "Value".
+	const string DefaultDisplayName = "Value";
 
 	static (bool Found, object? Value) LastMember(ZodPath path)
 	{

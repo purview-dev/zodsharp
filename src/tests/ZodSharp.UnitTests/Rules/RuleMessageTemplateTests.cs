@@ -184,6 +184,40 @@ public class RuleMessageTemplateTests
 	}
 
 	[Test]
+	public async Task StringRequired_GivenFailureAtTheRoot_ReportsAResolvableTemplate()
+	{
+		// Arrange
+		var error = Z.String().Required().Validate("").Errors.Single();
+
+		// Act
+		var complete = ZodMessageFormat.TryFormatComplete(
+			error.MessageFormat ?? string.Empty,
+			error,
+			out var reformatted,
+			CultureInfo.InvariantCulture
+		);
+
+		// Assert
+		await Assert.That(error.MessageFormat).IsEqualTo(ZodMessages.Required);
+		await Assert.That(complete).IsTrue();
+		await Assert.That(reformatted).IsEqualTo("Value is required");
+		await Assert.That(reformatted).IsEqualTo(error.Message);
+	}
+
+	[Test]
+	public async Task StringRequired_GivenFailureUnderAMember_NamesTheMember()
+	{
+		// Arrange
+		var error = Z.String().Required().Validate("").Errors.Single().WithPathPrefix(ZodPathSegment.Member("Email"));
+
+		// Act
+		var reformatted = DefaultZodMessageFormatter.Instance.Format(error, CultureInfo.InvariantCulture);
+
+		// Assert
+		await Assert.That(reformatted).IsEqualTo("Email is required");
+	}
+
+	[Test]
 	public async Task RuntimeRule_GivenCustomMessage_ReportsItAsANamedTemplate()
 	{
 		// Arrange

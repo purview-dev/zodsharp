@@ -334,6 +334,10 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **`Z.String().Required()` reports a resolvable template.** Its `"{displayName} is required"` `MessageFormat` had
+  nothing to resolve `displayName` from at the root, so a host re-formatting it got the placeholder back.
+  `ZodMessageFormat`'s built-in `displayName` now falls back to `"Value"` (matching the message) when the path has
+  no member segment; under a member it still names the member.
 - **The `ZodSharp*` MSBuild switches now reach the generator and analyzers.** They were read with the key
   `build_property:Name`, but the compiler exposes a `CompilerVisibleProperty` as `build_property.Name`, so
   `ZodSharpAutoGenerateOptionsValidators`, `ZodSharpAutoGenerateOptionsValidatorSuffixes`,

@@ -161,7 +161,7 @@ Validation is culture-independent; only the host that shows a message to a user 
 re-formats `MessageFormat` when every placeholder resolves and otherwise returns `Message`. The
 `ZodMessageFormat` engine behind it never throws: unknown placeholders and unbalanced braces are written
 literally, `{{`/`}}` escape braces, and named placeholders resolve from the parameters and then the built-in
-fields (`displayName`, `member`, `path`, `code`, `category`, `origin`, `minimum`, `maximum`, `inclusive`). A
+fields (`displayName`, `member`, `path`, `code`, `category`, `origin`, `minimum`, `maximum`, `inclusive`; `displayName` is the last member of the path, or `Value` at the root). A
 sequence parameter (an options or keys list) renders as its elements joined by `, `. See
 [Localization](Localization.md).
 
