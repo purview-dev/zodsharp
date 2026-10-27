@@ -19,7 +19,7 @@ jobs:
       # install`. Before global.json pinned a version the same gap failed later instead, with
       # NETSDK1045 on the net11.0 target, because the 10.0.x SDK cannot build it.
       # Keep in sync with `sdk.version` in global.json.
-      dotnet-version: "11.0.100-rc.2.26504.105"
+      dotnet-version: "11.0.100-rc.3.26522.148"
       run-pack: true
       validate-pack: true
     secrets: inherit

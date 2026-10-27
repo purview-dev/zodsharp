@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using ZodSharp.Core;
@@ -39,7 +38,7 @@ static class ProblemDetailsMapper
 				highest = errorType;
 			}
 
-			var key = ToProblemDetailsKey(error.Path);
+			var key = error.FullPath.ToDottedString();
 			if (!groupedMessages.TryGetValue(key, out var messages))
 			{
 				messages = [];
@@ -96,24 +95,6 @@ static class ProblemDetailsMapper
 		lookup is not null ? lookup(code)
 		: registry is not null && registry.TryGet(code, out var errorType) ? errorType
 		: null;
-
-	static string ToProblemDetailsKey(ImmutableArray<string> path)
-	{
-		if (path.IsDefaultOrEmpty)
-			return string.Empty;
-
-		StringBuilder builder = new();
-		for (var i = 0; i < path.Length; i++)
-		{
-			var segment = path[i];
-			if (i > 0 && !segment.StartsWith('['))
-				builder = builder.Append('.');
-
-			builder = builder.Append(segment);
-		}
-
-		return builder.ToString();
-	}
 
 	/// <remarks>
 	/// Every declared error parameter is copied into the response. That is deliberate — the parameters exist

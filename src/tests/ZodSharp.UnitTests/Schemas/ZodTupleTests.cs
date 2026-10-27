@@ -1,3 +1,4 @@
+using ZodSharp.Core;
 namespace ZodSharp.Schemas;
 
 public class ZodTupleTests
@@ -42,7 +43,7 @@ public class ZodTupleTests
 
 		// Assert
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors[0].Path).Contains("[0]");
+		await Assert.That(result.Errors[0].FullPath[0]).IsEqualTo(ZodPathSegment.At(0));
 	}
 
 	[Test]

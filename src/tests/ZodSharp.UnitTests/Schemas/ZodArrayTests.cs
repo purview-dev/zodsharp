@@ -1,3 +1,4 @@
+using ZodSharp.Core;
 namespace ZodSharp.Schemas;
 
 public class ZodArrayTests
@@ -40,7 +41,8 @@ public class ZodArrayTests
 		var result = Z.Array(Z.String().Min(2)).Validate(["ok", "x"]);
 
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors[0].Path).Contains("[1]");
+		await Assert.That(result.Errors[0].Path).Contains("1");
+		await Assert.That(result.Errors[0].FullPath[0]).IsEqualTo(ZodPathSegment.At(1));
 	}
 
 	[Test]
@@ -123,9 +125,10 @@ public class ZodArrayTests
 		var result = schema.Validate(["ok", "x"]);
 
 		// Assert — the whole path, not just a containment check. A containment assertion cannot
-		// distinguish ["[1]"] from [null, "[1]"].
+		// distinguish ["1"] from [null, "1"].
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors[0].Path.SequenceEqual(["[1]"])).IsTrue();
+		await Assert.That(result.Errors[0].Path.SequenceEqual(["1"])).IsTrue();
+		await Assert.That(result.Errors[0].FullPath.ToDottedString()).IsEqualTo("[1]");
 	}
 
 	[Test]
@@ -144,7 +147,8 @@ public class ZodArrayTests
 
 		// Assert
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors[0].Path.SequenceEqual(["[1]", "email"])).IsTrue();
+		await Assert.That(result.Errors[0].Path.SequenceEqual(["1", "email"])).IsTrue();
+		await Assert.That(result.Errors[0].FullPath.ToDottedString()).IsEqualTo("[1].email");
 		await Assert.That(result.Errors[0].Path.All(static segment => segment is not null)).IsTrue();
 	}
 

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 
 namespace ZodSharp.Core;
 
@@ -17,9 +18,44 @@ public class ZodException : Exception
 	/// </summary>
 	/// <param name="errors">The validation errors</param>
 	public ZodException(ImmutableArray<ValidationError> errors)
-		: base($"Validation failed with {(errors.IsDefault ? 0 : errors.Length)} error(s)")
+		: base(BuildMessage(errors))
 	{
 		Errors = errors.IsDefault ? [] : errors;
+	}
+
+	const int MaxIssuesInMessage = 5;
+
+	static string BuildMessage(ImmutableArray<ValidationError> errors)
+	{
+		var count = errors.IsDefault ? 0 : errors.Length;
+		if (count == 0)
+			return "Validation failed with 0 error(s)";
+
+		StringBuilder builder = new();
+		builder.Append("Validation failed with ").Append(count).Append(" error(s): ");
+		for (var i = 0; i < Math.Min(count, MaxIssuesInMessage); i++)
+		{
+			if (i > 0)
+				builder.Append("; ");
+			AppendIssue(builder, errors[i]);
+		}
+
+		if (count > MaxIssuesInMessage)
+			builder.Append("; and ").Append(count - MaxIssuesInMessage).Append(" more");
+
+		return builder.ToString();
+	}
+
+	static void AppendIssue(StringBuilder builder, in ValidationError error)
+	{
+		var path = error.FullPath.ToDottedString();
+		builder
+			.Append(path.Length == 0 ? "(root)" : path)
+			.Append(": ")
+			.Append(error.Message)
+			.Append(" (")
+			.Append(error.Code)
+			.Append(')');
 	}
 
 	/// <summary>
@@ -38,9 +74,14 @@ public class ZodException : Exception
 		if (Errors.IsDefaultOrEmpty)
 			return base.ToString();
 
-		var errorMessages = Errors.Select(static e => $"{string.Join(".", e.Path)}: {e.Message} ({e.Code})");
+		StringBuilder builder = new(Message);
+		foreach (var error in Errors)
+		{
+			builder.Append('\n');
+			AppendIssue(builder, error);
+		}
 
-		return $"{Message}\n{string.Join("\n", errorMessages)}";
+		return builder.ToString();
 	}
 
 	/// <inheritdoc/>
