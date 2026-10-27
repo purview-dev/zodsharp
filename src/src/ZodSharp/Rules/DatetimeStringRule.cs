@@ -11,7 +11,8 @@ namespace ZodSharp.Rules;
 public readonly record struct DatetimeStringRule
 	: Core.IValidationRule<string>,
 		Core.IStringValidationRule,
-		Core.IZodRule
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -131,4 +132,20 @@ public readonly record struct DatetimeStringRule
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
 
 	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format("datetime");
+
+	/// <summary>The JSON Schema <c>pattern</c> for the UTC (<c>Z</c>-suffixed) date-time this rule accepts.</summary>
+	public const string JsonSchemaPattern =
+		"^\\d{4}-\\d{2}-\\d{2}[Tt](?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?[Zz]$";
+
+	/// <summary>
+	/// Applies <c>format: date-time</c>. The rule only accepts UTC values, which the format alone does not
+	/// express, so <see cref="JsonSchemaPattern"/> is applied as well.
+	/// </summary>
+	/// <param name="schema">The schema being built for the validated string.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.Format = "date-time";
+		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, JsonSchemaPattern);
+	}
 }

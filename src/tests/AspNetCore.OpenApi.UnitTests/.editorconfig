@@ -1,0 +1,6 @@
+# Layered over the Purview.BuildSdk-managed root .editorconfig (which must not be edited).
+
+[*.{cs,csx,cake}]
+# "OpenApi" is the spelling ASP.NET Core and Microsoft.OpenApi use (OpenApiOptions, IOpenApiSchemaTransformer),
+# so ZodSharp's OpenAPI integration follows it rather than PDS0004's "OpenAPI". Scoped to this project.
+dotnet_analyzer_configuration.pds0004.allowed_words = Api

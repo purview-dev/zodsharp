@@ -70,6 +70,7 @@ public readonly record struct IncludesRule
 	{
 		ArgumentNullException.ThrowIfNull(schema);
 		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, Regex.Escape(_substring));
+		schema.SetVendorExtension("x-zod-includes", _substring);
 	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>

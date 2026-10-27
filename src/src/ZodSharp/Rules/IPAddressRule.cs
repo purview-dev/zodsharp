@@ -29,7 +29,11 @@ public enum IPAddressRuleType
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct IPAddressRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct IPAddressRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -151,4 +155,28 @@ public readonly record struct IPAddressRule : Core.IValidationRule<string>, Core
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
 
 	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format(FormatName);
+
+	/// <summary>
+	/// Applies <c>format: ipv4</c>/<c>ipv6</c>. An address of either family has no single JSON Schema format, so it
+	/// is recorded as unsupported and described by the <c>x-zod-ipVersion</c> vendor extension instead.
+	/// </summary>
+	/// <param name="schema">The schema being built for the validated string.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		switch (_ruleType)
+		{
+			case IPAddressRuleType.IPv4:
+				schema.Format = "ipv4";
+				break;
+			case IPAddressRuleType.IPv6:
+				schema.Format = "ipv6";
+				break;
+			case IPAddressRuleType.Any:
+			default:
+				schema.SetVendorExtension("x-zod-ipVersion", "any");
+				JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(IPAddressRule));
+				break;
+		}
+	}
 }

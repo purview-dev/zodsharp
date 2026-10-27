@@ -7,7 +7,11 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct DurationRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct DurationRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -102,4 +106,12 @@ public readonly record struct DurationRule : Core.IValidationRule<string>, Core.
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
 
 	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format("duration");
+
+	/// <summary>Applies <c>format: duration</c> (an ISO 8601 duration).</summary>
+	/// <param name="schema">The schema being built for the validated string.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.Format = "duration";
+	}
 }

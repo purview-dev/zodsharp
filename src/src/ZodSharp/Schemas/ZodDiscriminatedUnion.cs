@@ -55,6 +55,13 @@ public class ZodDiscriminatedUnion(
 		_optionKeys = optionOrder;
 	}
 
+	// Exposed to the JSON Schema exporter, which exports the union as oneOf with the discriminator recorded.
+	internal string Discriminator => discriminator;
+
+	internal ImmutableDictionary<string, IZodSchema<object, object>> Options => options;
+
+	internal ImmutableArray<string> OptionKeys => _optionKeys;
+
 	/// <summary>
 	/// Parses and validates the value using the discriminated union.
 	/// </summary>

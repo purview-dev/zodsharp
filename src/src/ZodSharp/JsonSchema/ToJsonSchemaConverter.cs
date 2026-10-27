@@ -18,7 +18,28 @@ public static class ToJsonSchemaConverter
 	/// <param name="schema">The ZodSharp schema to convert</param>
 	/// <param name="options">Conversion options</param>
 	/// <returns>A JSON Schema definition</returns>
-	public static JsonSchemaDefinition Convert<T>(IZodSchema<T, T> schema, ToJsonSchemaOptions? options = null)
+	public static JsonSchemaDefinition Convert<T>(IZodSchema<T, T> schema, ToJsonSchemaOptions? options = null) =>
+		ConvertCore(schema, options);
+
+	/// <summary>
+	/// Converts a schema, validator or validator view whose type is only known at runtime to JSON Schema.
+	/// </summary>
+	/// <param name="schema">
+	/// A ZodSharp schema, a generated validator (<see cref="IJsonSchemaProvider"/>), or an adapter that wraps one
+	/// (<see cref="Core.ZodSchemaValidator{T}"/>, <see cref="Core.ZodUntypedValidator{T}"/>), as returned by
+	/// <see cref="Core.IZodSchemaFactory.TryGetUntypedValidator(Type, out Core.IZodUntypedValidator?)"/>.
+	/// </param>
+	/// <param name="options">Conversion options</param>
+	/// <returns>
+	/// A JSON Schema definition. A schema the exporter cannot describe produces the empty (<c>any</c>) schema.
+	/// </returns>
+	public static JsonSchemaDefinition ConvertUntyped(object schema, ToJsonSchemaOptions? options = null)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		return ConvertCore(schema, options);
+	}
+
+	static JsonSchemaDefinition ConvertCore(object schema, ToJsonSchemaOptions? options)
 	{
 		options ??= new ToJsonSchemaOptions();
 		ConversionContext context = new() { DateTimeOffsetSerialization = options.DateTimeOffsetSerialization };
@@ -92,6 +113,7 @@ public static class ToJsonSchemaConverter
 			// ZodOptional is handled by the unwrap loop above: in JSON Schema optionality lives in the
 			// parent's "required" list, not in the property's own type.
 			ZodUnion zodUnion => ConvertUnion(zodUnion, ctx),
+			ZodDiscriminatedUnion discriminatedUnion => ConvertDiscriminatedUnion(discriminatedUnion, ctx),
 			_ => ConvertGeneric(schema, ctx),
 		};
 
@@ -281,6 +303,29 @@ public static class ToJsonSchemaConverter
 			{
 				result.AnyOf.Add(ConvertSchema(option, ctx));
 			}
+		}
+
+		return result;
+	}
+
+	/// <summary>
+	/// A discriminated union matches exactly one option (the one its discriminator selects), so it exports as
+	/// <c>oneOf</c>. The discriminator property is recorded in the <c>x-zod-discriminator</c> vendor extension,
+	/// and each option records its discriminator value in <c>x-zod-discriminatorValue</c>.
+	/// </summary>
+	static JsonSchemaDefinition ConvertDiscriminatedUnion(ZodDiscriminatedUnion schema, ConversionContext ctx)
+	{
+		JsonSchemaDefinition result = new() { OneOf = [] };
+		result.SetVendorExtension("x-zod-discriminator", schema.Discriminator);
+
+		foreach (var value in schema.OptionKeys)
+		{
+			if (!schema.Options.TryGetValue(value, out var option))
+				continue;
+
+			var converted = ConvertSchema(option, ctx);
+			converted.SetVendorExtension("x-zod-discriminatorValue", value);
+			result.OneOf.Add(converted);
 		}
 
 		return result;

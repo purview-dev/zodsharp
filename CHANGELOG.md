@@ -26,6 +26,27 @@ Released versions correspond to `v<version>` GitHub releases.
   WebAssembly clients.
 - **`IZodMessageFormatter`** in `ZodSharp.Core`: formats an error's user-facing message for a culture at a host
   boundary.
+- **`Purview.ZodSharp.AspNetCore.OpenApi`** (new package, `net11.0`). `options.AddZodSharp()` on
+  `OpenApiOptions` registers schema, operation and document transformers so the ASP.NET Core 11 OpenAPI
+  document (3.1 and 3.2) describes what ZodSharp enforces: lengths, bounds (exclusive bounds in the 3.1+ form),
+  `multipleOf`, integer narrowing, patterns (several promote to `allOf`), formats (including `[EmailAddress]`,
+  which the platform does not map), `enum`/`not`, `contentEncoding`, required members and `type: [x, "null"]`
+  nullability, with ZodSharp winning when a DataAnnotation disagrees. Polymorphic types are described with
+  `oneOf` + `discriminator`; C# unions keep the platform's `anyOf` and get their cases constrained. Rules with
+  no JSON Schema keyword are described with `x-zod-*` vendor extensions. Operations that bind a ZodSharp-validated
+  parameter list `400` (and `422` when a registered `ErrorType` uses it) as `application/problem+json` with the
+  shared `ZodValidationProblemDetails`/`ZodValidationIssue` components, merging into a declared
+  `ProducesValidationProblem()` response. Types ZodSharp does not know are left exactly as the platform produced
+  them.
+- **JSON Schema export.** `ToJsonSchemaConverter.ConvertUntyped(object)` converts a schema or validator known only
+  at runtime (including the `ZodSchemaValidator<T>`/`ZodUntypedValidator<T>` adapters, which now unwrap);
+  `JsonSchemaDefinition.GetVendorExtensions()`/`SetVendorExtension()` record `x-zod-*` information for hosts that
+  carry it, without changing the serialized JSON Schema. `ZodDiscriminatedUnion` exports as `oneOf` (it exported
+  the empty schema). `IPAddressRule` exports `format: ipv4`/`ipv6`, `DurationRule` `format: duration`,
+  `DateStringRule` `format: date`, `DatetimeStringRule` `format: date-time` plus its UTC pattern,
+  `TimeStringRule` its local-time pattern, and `Base64StringRule` `contentEncoding: base64`; `CidrRule`,
+  `JWTRule` and an any-family `IPAddressRule` stay listed as unsupported and record `x-zod-cidr`, `x-zod-jwt`
+  and `x-zod-ipVersion`.
 - **Shared error identities.** `ZodIssueCodes` (codes), `ZodMessages` (named-placeholder templates),
   `ZodIssues` (factories for null/invalid-type/missing-field/refinement/union/collection-size errors and the
   `GetUnionErrors()` extension) and `ZodTypeNames` (`Of(Type)`/`OfValue(object)`: Zod type names such as

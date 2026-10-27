@@ -30,7 +30,11 @@ public enum CidrRuleType
 /// <c>z.string().cidr()</c>. Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct CidrRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct CidrRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
@@ -153,4 +157,25 @@ public readonly record struct CidrRule : Core.IValidationRule<string>, Core.IStr
 	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
 
 	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format(FormatName);
+
+	/// <summary>
+	/// CIDR notation has no JSON Schema format, so the rule is recorded as unsupported and described by the
+	/// <c>x-zod-cidr</c> vendor extension (<c>v4</c>, <c>v6</c> or <c>any</c>).
+	/// </summary>
+	/// <param name="schema">The schema being built for the validated string.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.SetVendorExtension(
+			"x-zod-cidr",
+			_ruleType switch
+			{
+				CidrRuleType.IPv4 => "v4",
+				CidrRuleType.IPv6 => "v6",
+				CidrRuleType.Any => "any",
+				_ => "any",
+			}
+		);
+		JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(CidrRule));
+	}
 }

@@ -36,6 +36,12 @@
 				"purview-logo-light.png",
 				"README.md"
 			],
+			"purview.zodsharp.aspnetcore.openapi": [
+				"lib/$(TFM)/Purview.ZodSharp.AspNetCore.OpenApi.dll",
+				"lib/$(TFM)/Purview.ZodSharp.AspNetCore.OpenApi.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
 			"purview.zodsharp.newtonsoftjson": [
 				"lib/$(TFM)/Purview.ZodSharp.NewtonsoftJson.dll",
 				"lib/$(TFM)/Purview.ZodSharp.NewtonsoftJson.xml",

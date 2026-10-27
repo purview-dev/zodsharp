@@ -2,3 +2,4 @@
 # union declarations are excluded from formatting. Revisit once CSharpier supports C# 15 unions.
 src/src/ZodSharp/Unions/NativeUnion.cs
 src/tests/Extensions.Validation.UnitTests/Fixtures/Unions.cs
+src/tests/AspNetCore.OpenApi.UnitTests/Fixtures/PetUnion.cs
