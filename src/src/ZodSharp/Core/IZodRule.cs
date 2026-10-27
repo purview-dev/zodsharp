@@ -18,6 +18,12 @@ namespace ZodSharp.Core;
 /// because the value would be supplied by the generated validation and then never read. See
 /// <see cref="IZodRuleAttribute"/> for the attribute-side counterpart.
 /// </para>
+/// <para>
+/// The structured members (<see cref="Category"/>, <see cref="Lower"/>, <see cref="Upper"/>,
+/// <see cref="MessageFormat"/>, <see cref="Parameters"/>) are copied onto the reported
+/// <see cref="ValidationError"/> by <see cref="ZodRuleErrors"/>, so runtime schemas and generated validators
+/// report the same structure for the same rule.
+/// </para>
 /// </remarks>
 public interface IZodRule
 {
@@ -34,4 +40,32 @@ public interface IZodRule
 	/// <see langword="null"/> to fall back to the attribute-mapped origin.
 	/// </summary>
 	string? Origin { get; }
+
+	/// <summary>
+	/// Gets the Zod issue code reported as <see cref="ValidationError.Category"/> (see
+	/// <see cref="ZodIssueCategories"/>), or <see langword="null"/> when the rule has no Zod equivalent.
+	/// </summary>
+	string? Category => null;
+
+	/// <summary>
+	/// Gets the lower bound the rule enforces, if any.
+	/// </summary>
+	ErrorBound? Lower => null;
+
+	/// <summary>
+	/// Gets the upper bound the rule enforces, if any.
+	/// </summary>
+	ErrorBound? Upper => null;
+
+	/// <summary>
+	/// Gets the unformatted message template, with named placeholders, that a host may re-format (for example
+	/// to localize it); <see langword="null"/> when the message is not template-based.
+	/// </summary>
+	string? MessageFormat => null;
+
+	/// <summary>
+	/// Gets the named values reported in <see cref="ValidationError.Parameters"/>, used to format
+	/// <see cref="MessageFormat"/>.
+	/// </summary>
+	IReadOnlyDictionary<string, object?>? Parameters => null;
 }

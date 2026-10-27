@@ -12,8 +12,6 @@ namespace ZodSharp.Core;
 /// <typeparam name="TInput">The input type before validation</typeparam>
 public abstract class ZodType<TOutput, TInput> : IZodSchema<TOutput, TInput>, IOptionalSchema
 {
-	static readonly string[] EmptyPath = [];
-
 	// Read by the JSON Schema exporter, which previously reached this by walking BaseType.BaseType and
 	// reflecting on the field name — fragile, and invisible to the trimmer.
 	internal ImmutableArray<IValidationRule<TOutput>> AppliedRules { get; private set; } = [];
@@ -54,7 +52,7 @@ public abstract class ZodType<TOutput, TInput> : IZodSchema<TOutput, TInput>, IO
 			if (!rule.IsValid(validatedValue))
 			{
 				errors ??= [with(rulesCount)];
-				errors.Add(new ValidationError(ResolveCode(rule), rule.GetErrorMessage(validatedValue), EmptyPath));
+				errors.Add(ZodRuleErrors.Create(rule, validatedValue, ZodPath.Root));
 			}
 		}
 
@@ -88,8 +86,9 @@ public abstract class ZodType<TOutput, TInput> : IZodSchema<TOutput, TInput>, IO
 
 	/// <summary>
 	/// Adds a validation rule to this schema. Rules are evaluated after the schema's
-	/// <see cref="ParseInternal"/> hook succeeds; a failing rule produces a
-	/// <see cref="ValidationError"/> with code <c>"validation_failed"</c> and an empty path.
+	/// <see cref="ParseInternal"/> hook succeeds; a failing rule produces a <see cref="ValidationError"/> at the
+	/// schema's own (empty) path, carrying the rule's code and, when the rule implements <see cref="IZodRule"/>,
+	/// its category, origin, bounds and parameters (see <see cref="ZodRuleErrors"/>).
 	/// </summary>
 	/// <param name="rule">The rule to add. Implementations are expected to be structs to avoid allocations.</param>
 	/// <returns>This schema for method chaining.</returns>
@@ -167,16 +166,6 @@ public abstract class ZodType<TOutput, TInput> : IZodSchema<TOutput, TInput>, IO
 		AddRule(new DeniedValuesRule<TOutput>(values, message, code));
 		return this;
 	}
-
-	/// <summary>
-	/// Resolves the error code to report for a failed rule: a rule that implements <see cref="IZodRule"/>
-	/// and supplies a code (typically from its constructor) wins over the rule's intrinsic
-	/// <see cref="IValidationRule{T}.Code"/>.
-	/// </summary>
-	/// <param name="rule">The rule that failed.</param>
-	/// <returns>The code to report.</returns>
-	static string ResolveCode(IValidationRule<TOutput> rule) =>
-		rule is IZodRule zodRule && zodRule.Code is { } code ? code : rule.Code;
 
 	/// <summary>
 	/// Gets the number of rules accumulated on this schema.

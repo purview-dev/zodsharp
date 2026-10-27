@@ -25,4 +25,18 @@ public interface IZodSchemaFactory
 
 	/// <summary>True if a validator is registered for <typeparamref name="T"/>.</summary>
 	bool IsRegistered<T>();
+
+	/// <summary>
+	/// Resolves a type-erased view of the validator registered for <paramref name="type"/>, for hosts that only
+	/// know the type at runtime. Registrations made through <see cref="Register{T}"/>, or with a validator that
+	/// implements <see cref="IZodUntypedValidator"/> itself (generated validators do), are resolvable.
+	/// </summary>
+	/// <param name="type">The validated type.</param>
+	/// <param name="validator">The validator, when one is registered.</param>
+	/// <returns><see langword="true"/> when a validator is registered.</returns>
+	bool TryGetUntypedValidator(Type type, out IZodUntypedValidator? validator)
+	{
+		validator = null;
+		return false;
+	}
 }
