@@ -58,7 +58,10 @@ sealed class ZodJsonSchemaSource
 		JsonSchemaDefinition definition;
 		try
 		{
-			definition = ToJsonSchemaConverter.ConvertUntyped(source, new ToJsonSchemaOptions { IncludeSchema = false });
+			definition = ToJsonSchemaConverter.ConvertUntyped(
+				source,
+				new ToJsonSchemaOptions { IncludeSchema = false }
+			);
 		}
 		catch (NotSupportedException)
 		{
@@ -75,7 +78,9 @@ sealed class ZodJsonSchemaSource
 	object? CreateGeneratedValidator(Type type)
 	{
 		var generated = _generated.GetOrAdd(type.Assembly, ReadGeneratedValidators);
-		return generated.TryGetValue(type, out var attribute) ? Activator.CreateInstance(attribute.ValidatorType) : null;
+		return generated.TryGetValue(type, out var attribute)
+			? Activator.CreateInstance(attribute.ValidatorType)
+			: null;
 	}
 
 	// Activator.CreateInstance over ValidatorType is trim- and AOT-safe: the property is annotated

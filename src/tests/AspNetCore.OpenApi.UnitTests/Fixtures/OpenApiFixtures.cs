@@ -125,6 +125,10 @@ public partial class ShapesRequest
 
 	public string? Nickname { get; set; }
 
+	/// <summary>Nullable in C#, but ZodSharp rejects null: the platform's null type is removed.</summary>
+	[RequiredZod]
+	public string? Reference { get; set; }
+
 	public string Title { get; set; } = string.Empty;
 
 	public int Quantity { get; set; }
@@ -187,10 +191,11 @@ public class PlainRequest
 	public string? Comment { get; set; }
 }
 
+[ZodSchema]
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(CircleShape), "circle")]
 [JsonDerivedType(typeof(SquareShape), "square")]
-public abstract class ShapeBase
+public abstract partial class ShapeBase
 {
 	public string? Label { get; set; }
 }
@@ -203,4 +208,62 @@ public sealed class CircleShape : ShapeBase
 public sealed class SquareShape : ShapeBase
 {
 	public double Side { get; set; }
+}
+
+/// <summary>
+/// A value object ZodSharp knows only through a runtime schema registered in <c>IZodSchemaFactory</c>.
+/// </summary>
+[JsonConverter(typeof(PercentageConverter))]
+public readonly record struct Percentage(double Value);
+
+public sealed class PercentageConverter : JsonConverter<Percentage>
+{
+	public override Percentage Read(
+		ref System.Text.Json.Utf8JsonReader reader,
+		Type typeToConvert,
+		System.Text.Json.JsonSerializerOptions options
+	) => new(reader.GetDouble());
+
+	public override void Write(
+		System.Text.Json.Utf8JsonWriter writer,
+		Percentage value,
+		System.Text.Json.JsonSerializerOptions options
+	)
+	{
+		ArgumentNullException.ThrowIfNull(writer);
+		writer.WriteNumberValue(value.Value);
+	}
+}
+
+/// <summary>A hand-written runtime schema that describes its own JSON Schema.</summary>
+public sealed class PercentageSchema : ZodSharp.Core.ZodType<Percentage>, ZodSharp.JsonSchema.IJsonSchemaProvider
+{
+	public ZodSharp.JsonSchema.JsonSchemaDefinition BuildJsonSchema() =>
+		new()
+		{
+			Type = "number",
+			Minimum = 0,
+			Maximum = 100,
+		};
+
+	protected override ZodSharp.Core.ValidationResult<Percentage> ParseInternal(Percentage value) =>
+		value.Value is >= 0 and <= 100
+			? ZodSharp.Core.ValidationResult<Percentage>.Success(value)
+			: ZodSharp.Core.ValidationResult<Percentage>.Failure(
+				new ZodSharp.Core.ValidationError("too_big", "Out of range", [])
+			);
+}
+
+[ZodSchema]
+public partial class CatCase
+{
+	[MinLengthZod(2)]
+	public string Name { get; set; } = string.Empty;
+}
+
+[ZodSchema]
+public partial class DogCase
+{
+	[MinValue(0)]
+	public int Barks { get; set; }
 }

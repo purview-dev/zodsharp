@@ -134,7 +134,8 @@ public readonly record struct DatetimeStringRule
 	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format("datetime");
 
 	/// <summary>The JSON Schema <c>pattern</c> for the UTC (<c>Z</c>-suffixed) date-time this rule accepts.</summary>
-	public const string JsonSchemaPattern = "^\\d{4}-\\d{2}-\\d{2}[Tt](?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?[Zz]$";
+	public const string JsonSchemaPattern =
+		"^\\d{4}-\\d{2}-\\d{2}[Tt](?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?[Zz]$";
 
 	/// <summary>
 	/// Applies <c>format: date-time</c>. The rule only accepts UTC values, which the format alone does not

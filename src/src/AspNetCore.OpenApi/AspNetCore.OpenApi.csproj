@@ -12,6 +12,9 @@
 		<IsPackable>true</IsPackable>
 		<!-- A new package has no previous release to validate against. -->
 		<DisablePackageBaselineValidation>true</DisablePackageBaselineValidation>
+		<!-- NU5104: ASP.NET Core 11 has only shipped release candidates, so the Microsoft.AspNetCore.OpenApi
+		     dependency is a prerelease. Remove once 11.0.0 is released and Directory.Packages.props is updated. -->
+		<NoWarn>$(NoWarn);NU5104</NoWarn>
 		<RootNamespace>ZodSharp.AspNetCore.OpenApi</RootNamespace>
 		<PackageId>Purview.ZodSharp.AspNetCore.OpenApi</PackageId>
 		<AssemblyName>Purview.ZodSharp.AspNetCore.OpenApi</AssemblyName>

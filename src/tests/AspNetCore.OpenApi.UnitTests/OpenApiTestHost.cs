@@ -26,8 +26,9 @@ static class OpenApiTestHost
 		var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = environment });
 		builder.WebHost.UseTestServer();
 
-		builder.Services.AddZodSharp(options => options.ScanAssemblies.Add(typeof(OpenApiTestHost).Assembly));
+		// The first AddZodSharp wins, so a test's own registration (a runtime schema, say) runs first.
 		services?.Invoke(builder.Services);
+		builder.Services.AddZodSharp(options => options.ScanAssemblies.Add(typeof(OpenApiTestHost).Assembly));
 		builder.Services.AddOpenApi(options =>
 		{
 			options.OpenApiVersion = version;
@@ -55,8 +56,8 @@ static class OpenApiTestHost
 	public static JsonObject Component(this JsonObject document, string name) =>
 		document["components"]!["schemas"]![name]!.AsObject();
 
-	public static JsonObject Property(this JsonObject schema, string name) =>
-		schema["properties"]![name]!.AsObject();
+	public static JsonObject Property(this JsonObject schema, string name) => schema["properties"]![name]!.AsObject();
 
-	public static IEnumerable<OpenApiSpecVersion> Versions() => [OpenApiSpecVersion.OpenApi3_1, OpenApiSpecVersion.OpenApi3_2];
+	public static IEnumerable<OpenApiSpecVersion> Versions() =>
+		[OpenApiSpecVersion.OpenApi3_1, OpenApiSpecVersion.OpenApi3_2];
 }

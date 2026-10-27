@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
@@ -102,7 +104,8 @@ public sealed class ZodOpenApiOperationTransformer(ZodOpenApiOptions options) : 
 
 		// Which error types an endpoint's rules can raise is not known statically, so 422 is listed only when
 		// the registry the ProblemDetails mapping uses contains an error type that maps to it.
-		var registry = services.GetService<IOptions<ZodProblemDetailsOptions>>()?.Value.Registry ?? ErrorTypeRegistry.Default;
+		var registry =
+			services.GetService<IOptions<ZodProblemDetailsOptions>>()?.Value.Registry ?? ErrorTypeRegistry.Default;
 		if (registry.All.Any(static errorType => errorType.HttpStatus == StatusCodes.Status422UnprocessableEntity))
 			yield return StatusCodes.Status422UnprocessableEntity;
 	}
@@ -127,10 +130,32 @@ public sealed class ZodOpenApiOperationTransformer(ZodOpenApiOptions options) : 
 				continue;
 
 			type = Nullable.GetUnderlyingType(type) ?? type;
-			if (_source.IsKnown(type, services))
+			if (_source.IsKnown(type, services) || IsUnionOfKnownCases(type, services))
 				return true;
 		}
 
 		return false;
+	}
+
+	/// <summary>
+	/// A C# union is validated through its cases, so a union body whose cases ZodSharp knows is validated.
+	/// </summary>
+	bool IsUnionOfKnownCases(Type type, IServiceProvider services)
+	{
+		if (services.GetService<IOptions<JsonOptions>>()?.Value.SerializerOptions is not { } serializerOptions)
+			return false;
+
+		JsonTypeInfo typeInfo;
+		try
+		{
+			typeInfo = serializerOptions.GetTypeInfo(type);
+		}
+		catch (NotSupportedException)
+		{
+			return false;
+		}
+
+		return typeInfo.Kind == JsonTypeInfoKind.Union
+			&& typeInfo.UnionCases.Any(unionCase => _source.IsKnown(unionCase.CaseType, services));
 	}
 }

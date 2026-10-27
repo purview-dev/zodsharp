@@ -1,4 +1,3 @@
-using DisplayAttribute = System.ComponentModel.DataAnnotations.DisplayAttribute;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.OpenApi;
@@ -7,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
 using ZodSharp.JsonSchema;
+using DisplayAttribute = System.ComponentModel.DataAnnotations.DisplayAttribute;
 
 namespace ZodSharp.AspNetCore.OpenApi;
 
@@ -31,8 +31,6 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 {
 	readonly ZodOpenApiOptions _options = options ?? throw new ArgumentNullException(nameof(options));
 	readonly ZodJsonSchemaSource _source = new();
-
-	internal ZodJsonSchemaSource Source => _source;
 
 	/// <inheritdoc/>
 	public Task TransformAsync(
@@ -59,6 +57,10 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 		{
 			TransformType(schema, context.JsonTypeInfo, definition, CreateContext(services, context.JsonTypeInfo.Type));
 		}
+		else if (context.JsonTypeInfo.Kind == JsonTypeInfoKind.Union)
+		{
+			TransformUnionCases(schema, context.JsonTypeInfo, services);
+		}
 
 		return Task.CompletedTask;
 	}
@@ -79,6 +81,23 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 		if (propertyType.Kind == JsonTypeInfoKind.Object || ZodOpenApiSchemaMapper.IsObject(definition))
 			return;
 
+		var clrType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+
+		// An enum member's schema becomes the enum's shared component, so anything written here would constrain
+		// every member of that enum type. Only the enum's own value set — a fact about the type — is written.
+		if (clrType.IsEnum)
+		{
+			if (Enum.GetValuesAsUnderlyingType(clrType).Length == ZodOpenApiSchemaMapper.EnumValueCount(definition))
+				ZodOpenApiSchemaMapper.ApplyEnum(schema, definition, context);
+
+			return;
+		}
+
+		// System.Text.Json writes a TimeSpan in its constant ("c") format, which the platform already describes
+		// with a pattern; it is not an ISO 8601 duration, so ZodSharp's base format for the type is not applied.
+		if (clrType == typeof(TimeSpan))
+			context.IgnoredFormat = "duration";
+
 		ZodOpenApiSchemaMapper.ApplyValue(schema, definition, context);
 
 		// [Display(Description)] is the one description attribute the platform does not map.
@@ -92,7 +111,53 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 		}
 	}
 
-	void TransformType(OpenApiSchema schema, JsonTypeInfo typeInfo, JsonSchemaDefinition definition, MapperContext context)
+	/// <summary>
+	/// A C# union keeps the platform's <c>anyOf</c> over its case schemas; ZodSharp only constrains each case
+	/// it knows, and never restructures the union. The platform builds the case schemas inline with the union,
+	/// so they are constrained here rather than through their own transformer invocations.
+	/// </summary>
+	void TransformUnionCases(OpenApiSchema schema, JsonTypeInfo union, IServiceProvider services)
+	{
+		if (schema.AnyOf is not { } cases || cases.Count != union.UnionCases.Count)
+			return;
+
+		for (var i = 0; i < cases.Count; i++)
+		{
+			var caseType = union.UnionCases[i].CaseType;
+			if (cases[i] is not OpenApiSchema caseSchema || !_source.TryGet(caseType, services, out var definition))
+				continue;
+
+			var caseInfo = union.Options.GetTypeInfo(caseType);
+			TransformType(caseSchema, caseInfo, definition, CreateContext(services, caseType));
+
+			if (caseSchema.Properties is null)
+				continue;
+
+			foreach (var property in caseInfo.Properties)
+			{
+				if (
+					caseSchema.Properties.TryGetValue(property.Name, out var member)
+					&& member is OpenApiSchema memberSchema
+				)
+				{
+					TransformProperty(
+						memberSchema,
+						property,
+						union.Options.GetTypeInfo(property.PropertyType),
+						definition,
+						CreateContext(services, property)
+					);
+				}
+			}
+		}
+	}
+
+	void TransformType(
+		OpenApiSchema schema,
+		JsonTypeInfo typeInfo,
+		JsonSchemaDefinition definition,
+		MapperContext context
+	)
 	{
 		var inner = ZodOpenApiSchemaMapper.UnwrapNullable(definition, out _);
 
@@ -112,24 +177,20 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 
 		// System.Text.Json polymorphism ([JsonPolymorphic]/[JsonDerivedType], or a closed hierarchy) already
 		// dispatches on a discriminator, so exactly one case matches.
-		if (_options.DiscriminatedUnionsAsOneOf && schema.AnyOf is { Count: > 0 } && schema.Discriminator is not null)
-		{
-			schema.OneOf = schema.AnyOf;
-			schema.AnyOf = null;
-		}
+		if (schema.AnyOf is { Count: > 0 } && schema.Discriminator is not null)
+			MarkOneOf(schema);
 	}
 
 	void ApplyDiscriminatedUnion(OpenApiSchema schema, JsonSchemaDefinition definition)
 	{
-		if (!_options.DiscriminatedUnionsAsOneOf)
-			return;
-
-		schema.OneOf = schema.AnyOf;
-		schema.AnyOf = null;
+		MarkOneOf(schema);
 
 		if (
-			schema.Discriminator is null
-			&& definition.GetVendorExtensions().TryGetValue(ZodOpenApiSchemaMapper.DiscriminatorExtensionName, out var name)
+			_options.DiscriminatedUnionsAsOneOf
+			&& schema.Discriminator is null
+			&& definition
+				.GetVendorExtensions()
+				.TryGetValue(ZodOpenApiSchemaMapper.DiscriminatorExtensionName, out var name)
 			&& name is string propertyName
 		)
 		{
@@ -138,23 +199,48 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 	}
 
 	/// <summary>
-	/// Adds the members ZodSharp rejects when absent. A non-nullable value-type member is excluded: an absent
-	/// value deserializes to its default, which ZodSharp sees and may accept, so listing it would claim more
-	/// than is enforced. Members the platform already lists (C# <c>required</c>, <c>[JsonRequired]</c>) are
-	/// kept, because System.Text.Json enforces them.
+	/// Marks a union for <c>oneOf</c>. The swap itself happens in <see cref="ZodOpenApiDocumentTransformer"/>:
+	/// the platform resolves the case references of a polymorphic <c>anyOf</c> after the schema transformers
+	/// run, and a case moved out of <c>anyOf</c> here would lose its polymorphic component name.
 	/// </summary>
+	void MarkOneOf(OpenApiSchema schema)
+	{
+		if (!_options.DiscriminatedUnionsAsOneOf)
+			return;
+
+		schema.Metadata ??= new Dictionary<string, object>(StringComparer.Ordinal);
+		schema.Metadata[ZodOpenApiSchemaMapper.OneOfMetadataKey] = true;
+	}
+
+	/// <summary>
+	/// Adds the members ZodSharp rejects when absent: an absent member deserializes to <see langword="null"/>,
+	/// so a reference (or <see cref="Nullable{T}"/>) member ZodSharp does not allow to be null — a non-nullable
+	/// reference, <c>[Required]</c>, or a required rule such as <c>[RequiredZod]</c> — is required.
+	/// </summary>
+	/// <remarks>
+	/// A non-nullable value-type member is excluded: an absent value deserializes to its default, which ZodSharp
+	/// sees and may accept, so listing it would claim more than is enforced. Members the platform already lists
+	/// (C# <c>required</c>, <c>[JsonRequired]</c>) are kept, because System.Text.Json enforces them.
+	/// </remarks>
 	static void ApplyRequired(OpenApiSchema schema, JsonTypeInfo typeInfo, JsonSchemaDefinition definition)
 	{
-		if (definition.Required is not { Count: > 0 } required || schema.Properties is null)
+		if (schema.Properties is null)
 			return;
 
 		foreach (var property in typeInfo.Properties)
 		{
-			if (!schema.Properties.ContainsKey(property.Name) || !ContainsMember(required, property.Name))
+			if (
+				!schema.Properties.ContainsKey(property.Name)
+				|| !TryGetMember(definition, property.Name, out var member)
+			)
 				continue;
 
 			var type = property.PropertyType;
 			if (type.IsValueType && Nullable.GetUnderlyingType(type) is null)
+				continue;
+
+			ZodOpenApiSchemaMapper.UnwrapNullable(member, out var allowsNull);
+			if (allowsNull)
 				continue;
 
 			schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
@@ -177,9 +263,6 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 			);
 	}
 
-	static bool ContainsMember(List<string> names, string name) =>
-		names.Contains(name, StringComparer.Ordinal)
-		|| names.Contains(JsonNamingPolicy.CamelCase.ConvertName(name), StringComparer.Ordinal);
 	/// <summary>
 	/// Resolves the ZodSharp schema for an <c>[AsParameters]</c> member bound from the route, query or a header:
 	/// the member's container is the ZodSharp-known type.
@@ -217,8 +300,7 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 	MapperContext CreateContext(IServiceProvider services, JsonPropertyInfo property) =>
 		CreateContext(services, $"property '{property.DeclaringType.Name}.{property.Name}'");
 
-	MapperContext CreateContext(IServiceProvider services, Type type) =>
-		CreateContext(services, $"type '{type.Name}'");
+	MapperContext CreateContext(IServiceProvider services, Type type) => CreateContext(services, $"type '{type.Name}'");
 
 	MapperContext CreateContext(IServiceProvider services, string location)
 	{

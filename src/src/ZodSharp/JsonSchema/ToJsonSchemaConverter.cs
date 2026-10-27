@@ -330,6 +330,7 @@ public static class ToJsonSchemaConverter
 
 		return result;
 	}
+
 	static JsonSchemaDefinition ConvertGeneric(object schema, ConversionContext ctx)
 	{
 		var schemaType = schema.GetType();

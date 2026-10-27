@@ -13,6 +13,7 @@
 		<Project Path="src/Examples.CLI/Examples.CLI.csproj" />
 	</Folder>
 	<Folder Name="/tests/">
+		<Project Path="tests/AspNetCore.OpenApi.UnitTests/AspNetCore.OpenApi.UnitTests.csproj" />
 		<Project Path="tests/AspNetCore.UnitTests/AspNetCore.UnitTests.csproj" />
 		<Project Path="tests/JsonInterop.UnitTests/JsonInterop.UnitTests.csproj" />
 		<Project Path="tests/NewtonsoftJson.UnitTests/NewtonsoftJson.UnitTests.csproj" />
@@ -23,6 +24,7 @@
 	</Folder>
 	<Folder Name="/src/">
 		<Project Path="src/AspNetCore/AspNetCore.csproj" />
+		<Project Path="src/AspNetCore.OpenApi/AspNetCore.OpenApi.csproj" />
 		<Project Path="src/CodeFixes/CodeFixes.csproj" />
 		<Project Path="src/NewtonsoftJson/NewtonsoftJson.csproj" />
 		<Project Path="src/SourceGenerators/SourceGenerators.csproj" />

@@ -7,7 +7,11 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct DateStringRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule, JsonSchema.IJsonSchemaRule
+public readonly record struct DateStringRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";

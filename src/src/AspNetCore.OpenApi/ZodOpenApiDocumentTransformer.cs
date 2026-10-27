@@ -29,7 +29,32 @@ public sealed class ZodOpenApiDocumentTransformer(ZodOpenApiOptions options) : I
 		if (_options.DescribeValidationProblems && ReferencesValidationProblem(document))
 			ZodValidationProblemSchemas.Register(document);
 
+		if (_options.DiscriminatedUnionsAsOneOf)
+			ApplyOneOf(document);
+
 		return Task.CompletedTask;
+	}
+
+	/// <summary>
+	/// Rewrites the unions the schema transformer marked from <c>anyOf</c> to <c>oneOf</c>, once the platform has
+	/// resolved their case references.
+	/// </summary>
+	static void ApplyOneOf(OpenApiDocument document)
+	{
+		if (document.Components?.Schemas is not { } schemas)
+			return;
+
+		foreach (var schema in schemas.Values)
+		{
+			if (
+				schema is OpenApiSchema { AnyOf: { Count: > 0 } cases, Metadata: { } metadata } union
+				&& metadata.ContainsKey(ZodOpenApiSchemaMapper.OneOfMetadataKey)
+			)
+			{
+				union.OneOf = cases;
+				union.AnyOf = null;
+			}
+		}
 	}
 
 	static bool ReferencesValidationProblem(OpenApiDocument document)
@@ -56,7 +81,11 @@ public sealed class ZodOpenApiDocumentTransformer(ZodOpenApiOptions options) : I
 					{
 						if (
 							mediaType.Schema is OpenApiSchemaReference { Reference.Id: { } id }
-							&& string.Equals(id, ZodOpenApiOptions.ValidationProblemDetailsSchemaId, StringComparison.Ordinal)
+							&& string.Equals(
+								id,
+								ZodOpenApiOptions.ValidationProblemDetailsSchemaId,
+								StringComparison.Ordinal
+							)
 						)
 						{
 							return true;

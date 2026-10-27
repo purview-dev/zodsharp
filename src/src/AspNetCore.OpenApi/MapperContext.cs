@@ -13,6 +13,12 @@ sealed class MapperContext(ZodOpenApiOptions options, ILogger? logger, string lo
 	public ZodOpenApiOptions Options { get; } = options;
 
 	/// <summary>
+	/// Gets or sets a <c>format</c> ZodSharp's export assigns to the member's CLR type that does not describe its
+	/// System.Text.Json wire form, and so is not written.
+	/// </summary>
+	public string? IgnoredFormat { get; set; }
+
+	/// <summary>
 	/// Reports that ZodSharp replaced a keyword value the platform had already set (for example from a
 	/// DataAnnotation). Only a replaced value is reported: a keyword the platform left unset is not a conflict.
 	/// </summary>

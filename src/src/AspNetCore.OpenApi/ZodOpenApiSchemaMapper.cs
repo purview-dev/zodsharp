@@ -26,6 +26,7 @@ static class ZodOpenApiSchemaMapper
 	public const string UnsupportedExtensionName = "x-zodsharp-unsupported";
 	public const string DiscriminatorExtensionName = "x-zod-discriminator";
 	public const string DiscriminatorValueExtensionName = "x-zod-discriminatorValue";
+	public const string OneOfMetadataKey = "zodsharp:oneOf";
 
 	/// <summary>
 	/// Applies a value schema (a property, parameter, item or scalar type), including its nullability.
@@ -102,7 +103,7 @@ static class ZodOpenApiSchemaMapper
 
 	static void ApplyFormat(OpenApiSchema target, JsonSchemaDefinition source, MapperContext context)
 	{
-		if (source.Format is { } format)
+		if (source.Format is { } format && !string.Equals(format, context.IgnoredFormat, StringComparison.Ordinal))
 			target.Format = Set("format", target.Format, format, context);
 	}
 
@@ -135,7 +136,8 @@ static class ZodOpenApiSchemaMapper
 		if (source.Minimum is not null || source.ExclusiveMinimum is not null)
 		{
 			target.Minimum = SetNumber("minimum", target.Minimum, source.Minimum, context);
-			target.ExclusiveMinimum = SetNumber("exclusiveMinimum",
+			target.ExclusiveMinimum = SetNumber(
+				"exclusiveMinimum",
 				target.ExclusiveMinimum,
 				source.ExclusiveMinimum,
 				context
@@ -145,7 +147,8 @@ static class ZodOpenApiSchemaMapper
 		if (source.Maximum is not null || source.ExclusiveMaximum is not null)
 		{
 			target.Maximum = SetNumber("maximum", target.Maximum, source.Maximum, context);
-			target.ExclusiveMaximum = SetNumber("exclusiveMaximum",
+			target.ExclusiveMaximum = SetNumber(
+				"exclusiveMaximum",
 				target.ExclusiveMaximum,
 				source.ExclusiveMaximum,
 				context
@@ -197,7 +200,8 @@ static class ZodOpenApiSchemaMapper
 		{
 			if (
 				target.AllOf.Any(schema =>
-					schema is OpenApiSchema { } current && string.Equals(current.Pattern, branch, StringComparison.Ordinal)
+					schema is OpenApiSchema { } current
+					&& string.Equals(current.Pattern, branch, StringComparison.Ordinal)
 				)
 			)
 			{
@@ -208,17 +212,26 @@ static class ZodOpenApiSchemaMapper
 		}
 	}
 
+	/// <summary>The number of values in the (unwrapped) source's <c>enum</c>, or 0 when it has none.</summary>
+	public static int EnumValueCount(JsonSchemaDefinition source) => UnwrapNullable(source, out _).Enum?.Count ?? 0;
+
+	/// <summary>Applies only the <c>enum</c> keyword of the (unwrapped) source.</summary>
+	public static void ApplyEnum(OpenApiSchema target, JsonSchemaDefinition source, MapperContext context)
+	{
+		if (UnwrapNullable(source, out _).Enum is not { Count: > 0 } values)
+			return;
+
+		var nodes = ToNodes(values);
+		if (!SameNodes(target.Enum, nodes))
+		{
+			context.Conflict("enum", Render(target.Enum), Render(nodes));
+			target.Enum = nodes;
+		}
+	}
+
 	static void ApplyValues(OpenApiSchema target, JsonSchemaDefinition source, MapperContext context)
 	{
-		if (source.Enum is { Count: > 0 } values)
-		{
-			var nodes = ToNodes(values);
-			if (!SameNodes(target.Enum, nodes))
-			{
-				context.Conflict("enum", Render(target.Enum), Render(nodes));
-				target.Enum = nodes;
-			}
-		}
+		ApplyEnum(target, source, context);
 
 		if (source.Not is { Enum: { Count: > 0 } denied })
 		{
