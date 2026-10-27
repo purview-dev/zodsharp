@@ -205,9 +205,8 @@ against the C# verdicts on the same inputs.
 - Every field change is a SignalR round trip anyway; debounce expensive async checks with `Input` +
   `DebounceMilliseconds`.
 - `AddZodSharpBlazor` registers no `IZodValidationReportSink`. If the same app calls `AddZodSharpProblemDetails`
-  (minimal APIs), its scoped sink is only read by the HTTP ProblemDetails callback. `ZodValidator` never writes to
-  it; Route 1 (`DataAnnotationsValidator`, through the bridge) does append to the circuit's instance, which nothing
-  reads, so in long-lived circuits of such an app prefer `ZodValidator`.
+  (minimal APIs), that sink stores errors on the current HTTP request only and discards writes made from an
+  interactive circuit, so neither route accumulates anything for the life of a circuit.
 - Prerendering: don't validate in `OnInitialized`; it runs once per render phase. Use `PersistentComponentState`
   for server-only error state if needed.
 

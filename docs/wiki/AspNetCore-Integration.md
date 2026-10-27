@@ -181,9 +181,9 @@ The contract:
   `JsonOptions` naming policy.
 - **`code` and `category`.** `code` is ZodSharp's specific identity (`invalid_range`). `category` is the Zod issue
   code (`too_small`), so a client can treat ZodSharp and Zod issues alike.
-- **Top-level parameters.** With `MergeParametersIntoExtensions` (default `true`, for compatibility), every issue's
-  parameters are also merged into the top-level extensions, and the last issue wins. Read `issues[].parameters`
-  instead. A parameter whose camel-cased name is reserved (`type`, `title`, `status`, `detail`, `instance`,
+- **Top-level parameters.** Parameters are written per issue only. With `MergeParametersIntoExtensions = true` (the 2.4
+  behaviour, off by default) every issue's parameters are also merged into the top-level extensions, and the last
+  issue wins. A parameter whose camel-cased name is reserved (`type`, `title`, `status`, `detail`, `instance`,
   `errors`, `issues`, `traceId`) is written as `param_{name}`.
 - **`traceId`.** It is present on every path: `Activity.Current?.Id`, else `HttpContext.TraceIdentifier`.
 - **No input values.** Messages and parameters never contain the input unless `ZodErrorOptions.IncludeReceivedValues`
@@ -269,8 +269,10 @@ orders.MapPost("/import", (ImportRequest request) => TypedResults.Ok()).DisableV
 
 How it works:
 
-- `AddZodSharpProblemDetails()` registers a scoped `ZodRequestValidationReport`, which is the bridge's
-  `IZodValidationReportSink`. The bridge appends every full-fidelity ZodSharp error of the request to it.
+- `AddZodSharpProblemDetails()` registers the bridge's `IZodValidationReportSink`. It appends every
+  full-fidelity ZodSharp error to a `ZodRequestValidationReport` stored on the current request
+  (`HttpContext.Features`), so the report lives and dies with the request. Writes made outside an HTTP request that
+  is still being handled (an interactive Blazor circuit, WebAssembly, a background service) are discarded.
 - It composes `ProblemDetailsOptions.CustomizeProblemDetails` with a post-configure step. The ZodSharp callback
   runs **first**, then whatever callback the application configured, whether before or after the call or
   through its `problemDetails` argument. The application can therefore still change the result. A later
@@ -359,7 +361,7 @@ does the following:
 | `FormatMessages` | `true` | Format messages from the matched `ErrorType.MessageFormat`, only when every placeholder resolves. |
 | `PathNaming` | `ZodPathNaming.MemberName` | `Json` renders keys with the minimal-API `JsonOptions` naming policy. |
 | `IncludeIssues` | `true` | Include the `issues` extension. |
-| `MergeParametersIntoExtensions` | `true` | Also merge every issue's parameters into the top-level extensions (last wins). |
+| `MergeParametersIntoExtensions` | `false` | Also merge every issue's parameters into the top-level extensions (last wins). |
 | `ProjectDataAnnotationsIssues` | `true` | Give non-ZodSharp `errors` entries an `issues` entry with code `dataannotations` (`ZodProblemDetailsWriter.DataAnnotationsCode`). |
 | `DefaultStatusCode` | `400` | The status when no matched `ErrorType` supplies one. |
 | `StatusCodeSelector` | `null` | `Func<ImmutableArray<ValidationError>, int>`: takes complete control of the status. It runs after the highest `ErrorType.HttpStatus` is computed, and its result wins. |

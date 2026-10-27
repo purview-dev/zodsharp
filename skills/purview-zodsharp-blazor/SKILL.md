@@ -32,8 +32,8 @@ builder.Services.AddZodSharpBlazor();
   the ZodSharp generator runs there. Models declared in `.razor` files are invisible to generators.
 - Prefer the generated registration. Assembly scanning (`AddZodSharpAssembly*`, `RegisterFromAssembly`) is not
   trim-safe and warns in a WebAssembly publish.
-- `AddZodSharpBlazor` does **not** register an `IZodValidationReportSink`; never register one with a circuit
-  lifetime.
+- `AddZodSharpBlazor` does **not** register an `IZodValidationReportSink`; never register a scoped one yourself (a
+  Blazor Server scope is the whole circuit). The ASP.NET Core sink is request-bound and safe alongside Blazor.
 
 ## Choosing a route
 

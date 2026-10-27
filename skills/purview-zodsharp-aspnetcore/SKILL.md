@@ -119,8 +119,9 @@ orders.MapPost("/", (Order order, [Range(1, 100)] int page) => …);
 orders.MapPost("/import", (Import i) => …).DisableValidation();   // the standard opt-out
 ```
 
-On `net11.0`, `AddZodSharpProblemDetails()` also registers a scoped `ZodRequestValidationReport` (the
-bridge's `IZodValidationReportSink`) and composes `ProblemDetailsOptions.CustomizeProblemDetails`:
+On `net11.0`, `AddZodSharpProblemDetails()` also registers the bridge's `IZodValidationReportSink`, which
+keeps errors in a per-request `ZodRequestValidationReport` (`HttpContext.Features`) and ignores writes outside a
+request, and composes `ProblemDetailsOptions.CustomizeProblemDetails`:
 
 - **ZodSharp errors reported** - the pipeline's `HttpValidationProblemDetails` is rewritten with
   `ZodProblemDetailsWriter.Apply`: ZodSharp keys replaced, DataAnnotations entries kept (with
