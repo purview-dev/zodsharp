@@ -470,6 +470,26 @@ public class ZodValidationPipelineTests
 	}
 
 	[Test]
+	public async Task Pipeline_GivenUnionBodyWithoutApplicationAddValidation_StillValidatesActiveCase(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - only the ZodSharp registrations: the bridge must claim the union parameter itself.
+		await using var app = await TestApp.StartAsync(
+			services => AddServices(services),
+			app => app.MapPost("/shipments", (OrderOrReference body) => TypedResults.Ok()),
+			cancellationToken
+		);
+
+		// Act
+		var (status, _, root) = await PostAsync(app, "/shipments", InvalidOrder, cancellationToken);
+
+		// Assert
+		await Assert.That(status).IsEqualTo(HttpStatusCode.BadRequest);
+		await Assert.That(root.GetProperty("errors").TryGetProperty("Value.Email", out _)).IsTrue();
+	}
+
+	[Test]
 	[Arguments("fr", "L'adresse e-mail doit être valide", "La quantité doit être au moins 1")]
 	[Arguments("en", "Email must be a valid email address", "Quantity must be at least 1")]
 	public async Task Pipeline_GivenAcceptLanguage_LocalizesMessagesButNotCodesOrPaths(

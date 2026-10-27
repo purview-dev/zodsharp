@@ -164,6 +164,11 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 		)
 			return new ZodValidatableParameterInfo(parameter.Name, declared, allowsNull, isCollection, Unwrap(info));
 
+		// A C# union with no validator of its own: claim it here so the active case is validated even when the
+		// application never calls AddValidation() (which is what adds the runtime parameter resolver).
+		if (info is ZodUnionValidatableTypeInfo union)
+			return new ZodValidatableParameterInfo(parameter.Name, declared, allowsNull, false, null, union);
+
 		if (isCollection && GetElementType(type) is { } elementType && TryGetValidator(elementType, out _))
 			return new ZodValidatableParameterInfo(parameter.Name, declared, allowsNull, true, null);
 
