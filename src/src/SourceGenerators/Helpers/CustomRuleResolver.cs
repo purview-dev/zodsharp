@@ -1487,7 +1487,7 @@ static class CustomRuleResolver
 		|| type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
 		|| (type.IsReferenceType && type.NullableAnnotation == NullableAnnotation.None);
 
-	static bool TryConvertConstant(TypedConstant constant, ITypeSymbol targetType, out string expression)
+	internal static bool TryConvertConstant(TypedConstant constant, ITypeSymbol targetType, out string expression)
 	{
 		if (constant.IsNull)
 		{

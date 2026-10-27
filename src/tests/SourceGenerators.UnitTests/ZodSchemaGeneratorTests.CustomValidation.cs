@@ -21,7 +21,7 @@ namespace Testing
 		// No async state machine
 		await Assert
 			.That(generated)
-			.ContainsGeneratedCode("ValueTask.FromResult")
+			.ContainsGeneratedCode("=> new(ValidateCore(value, depth));")
 			.Because("Should use FromResult, not async");
 		await Assert
 			.That(generated)
@@ -60,7 +60,7 @@ namespace Testing
 			.Because("Should generate async when custom method exists");
 		await Assert.That(generated).ContainsGeneratedCode("await global::Testing.WithDefault.CustomValidationAsync");
 		await Assert.That(generated).ContainsGeneratedCode(".ConfigureAwait(false)");
-		await Assert.That(generated).ContainsGeneratedCode(".Merge(syncResult, customResult)");
+		await Assert.That(generated).ContainsGeneratedCode("ZodGeneratedValidation.WithResult(errors, customResult)");
 	}
 
 	[Test]

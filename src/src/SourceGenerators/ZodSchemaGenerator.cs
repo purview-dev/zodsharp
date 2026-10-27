@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using ZodSharp.SourceGenerators.Helpers;
+using ZodSharp.SourceGenerators.Models;
 
 namespace ZodSharp.SourceGenerators;
 
@@ -37,6 +38,17 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 				if (!model.Context.Capabilities.HasRequiredAttribute)
 					return;
 
+				List<ZodSchemaDescriptor> processed = [];
+				foreach (var schema in model.ZodSchemas)
+				{
+					if (schema.ShouldProcess)
+						processed.Add(schema.Value);
+				}
+
+				// Which schemas need asynchronous validation is a property of the whole graph (a nested schema
+				// can make its parent asynchronous), so it is decided once per output from the collected schemas.
+				AsyncSchemaIndex asyncIndex = new(processed);
+
 				foreach (var schema in model.ZodSchemas)
 				{
 					if (!schema.ShouldProcess)
@@ -44,7 +56,7 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 
 					try
 					{
-						SchemaGenerationOutputContext outputContext = new(model.Context, schema.Value);
+						SchemaGenerationOutputContext outputContext = new(model.Context, schema.Value, asyncIndex);
 						BuildSchema(outputContext, spc, schema.Value.IsPrimary);
 					}
 					// CodeWriterScopeValidationException was caught here and rethrown, to fail loudly on a
@@ -64,6 +76,19 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 
 						spc.ReportDiagnostic(diagnostic.ToDiagnostic());
 					}
+				}
+
+				try
+				{
+					GenerateAssemblyRegistration(spc, model, processed);
+				}
+				catch (Exception ex)
+				{
+					spc.ReportDiagnostic(
+						ReportableDiagnostic
+							.Create(DiagnosticLibrary.UnhandledException, true, "assembly registration", ex.Message)
+							.ToDiagnostic()
+					);
 				}
 			}
 		);

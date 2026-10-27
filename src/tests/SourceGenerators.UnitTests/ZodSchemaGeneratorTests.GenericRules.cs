@@ -73,7 +73,9 @@ partial class ZodSchemaGeneratorTests
 		await Assert
 			.That(generated)
 			.ContainsGeneratedCode("((global::ZodSharp.Core.IZodRule)valueCustomRule0).Code ?? \"invalid_asset_id\"");
-		await Assert.That(generated).ContainsGeneratedCode("((global::ZodSharp.Core.IZodRule)valueCustomRule0).Origin");
+		await Assert
+			.That(generated)
+			.ContainsGeneratedCode("ZodRuleErrors.Create(valueCustomRule0, valueCustomRuleValue0");
 	}
 
 	[Test]

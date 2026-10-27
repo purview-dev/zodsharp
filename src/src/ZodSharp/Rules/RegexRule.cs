@@ -39,7 +39,13 @@ public readonly record struct RegexRule
 	/// Supply a <see cref="Regex"/> yourself if you need a different budget.
 	/// </para>
 	/// </remarks>
-	public static readonly TimeSpan DefaultMatchTimeout = TimeSpan.FromSeconds(2);
+	public static readonly TimeSpan DefaultMatchTimeout = TimeSpan.FromMilliseconds(DefaultMatchTimeoutMilliseconds);
+
+	/// <summary>
+	/// <see cref="DefaultMatchTimeout"/> in milliseconds, as a constant so it can be used in attribute
+	/// arguments (for example <c>[GeneratedRegex(pattern, options, RegexRule.DefaultMatchTimeoutMilliseconds)]</c>).
+	/// </summary>
+	public const int DefaultMatchTimeoutMilliseconds = 2000;
 
 	readonly string? _message;
 

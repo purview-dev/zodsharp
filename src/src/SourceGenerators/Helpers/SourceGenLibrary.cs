@@ -36,6 +36,14 @@ static partial class SourceGenLibrary
 						TypeLibrary.System.ComponentModel.DataAnnotations.RequiredAttribute
 					),
 					HasIValidateOptions = HasIValidateOptionsType(compilation),
+					HasIAsyncValidateOptions =
+						compilation.GetTypeByMetadataName("Microsoft.Extensions.Options.IAsyncValidateOptions`1")
+							is not null,
+					HasServiceCollection =
+						compilation.GetTypeByMetadataName("Microsoft.Extensions.DependencyInjection.IServiceCollection")
+							is not null
+						&& compilation.GetTypeByMetadataName("ZodSharp.Core.ZodSchemaRegistration") is not null,
+					AssemblyName = compilation.AssemblyName ?? string.Empty,
 				},
 			PropertyLibrary.DisableZodSharpSourceGeneratorProperty
 		);
@@ -137,6 +145,8 @@ static partial class SourceGenLibrary
 			if (customValidation.Value.HasCustomValidation && refinementHook.Value.IsImplemented)
 				customValidation = CustomValidationMethodData.None;
 			var isValueType = symbol.TypeKind == TypeKind.Struct;
+			var (implementsValidatableObject, implementsAsyncValidatableObject) =
+				ValidationInputsResolver.GetValidatableObjectKinds(symbol);
 
 			// A Purview.ValueObjects scalar serialises as its underlying value, so its JSON Schema is the
 			// underlying type's schema (for example a Guid scalar is a canonical Guid string, not Zod's
@@ -186,6 +196,11 @@ static partial class SourceGenLibrary
 					default,
 					typeDateTimeOffsetSerialization
 				)
+				{
+					ImplementsValidatableObject = implementsValidatableObject,
+					ImplementsAsyncValidatableObject = implementsAsyncValidatableObject,
+					HasOptionsValidatorConflict = ValidationInputsResolver.HasOptionsValidatorConflict(symbol),
+				}
 			);
 
 			foreach (
@@ -206,9 +221,46 @@ static partial class SourceGenLibrary
 				if (TryGetNestedSchemaType(property, externalSchemas, out var nested))
 					queue.Enqueue((nested, false));
 			}
+
+			EnqueueUnionCaseTypes(symbol, externalSchemas, queue);
 		}
 
 		return GeneratorResult<SchemaSet>.Create(new SchemaSet(schemas.ToImmutable()));
+	}
+
+	/// <summary>
+	/// Queues the case types of a type's C# 15 union members, so they get schemas like nested types do and
+	/// the member can dispatch to them (Change 7). A closed hierarchy's derived types need their own
+	/// <c>[ZodSchema]</c>.
+	/// </summary>
+	static void EnqueueUnionCaseTypes(
+		INamedTypeSymbol symbol,
+		ExternalSchemaResolver externalSchemas,
+		Queue<(INamedTypeSymbol Symbol, bool IsPrimary)> queue
+	)
+	{
+		foreach (var member in symbol.GetMembers())
+		{
+			if (
+				member
+					is not IPropertySymbol
+					{
+						DeclaredAccessibility: Accessibility.Public,
+						IsStatic: false
+					} unionProperty
+				|| TypeHelpers.UnwrapNullableType(unionProperty.Type) is not INamedTypeSymbol unionType
+				|| !ValidationInputsResolver.RoslynFeatures.IsUnion(unionType)
+			)
+			{
+				continue;
+			}
+
+			foreach (var caseType in ValidationInputsResolver.GetUnionCaseTypes(unionType))
+			{
+				if (externalSchemas.IsSchemaOwnedByThisCompilation(caseType))
+					queue.Enqueue((caseType, false));
+			}
+		}
 	}
 
 	static bool IsPropertyWithNestedSchema(IPropertySymbol property, ExternalSchemaResolver externalSchemas)
@@ -589,6 +641,7 @@ static partial class SourceGenLibrary
 		ValidateCompareProperty(property, validationAttributes, compareAttribute, diagnostics);
 
 		ValidateErrorMessageResourceConfiguration(validationAttributes, property.Name, diagnostics);
+		ValidateErrorMessagePlaceholders(validationAttributes, property.Name, diagnostics);
 
 		diagnostics.AddRange(regularExpressionAttribute.Diagnostics);
 		diagnostics.AddRange(lengthAttribute.Diagnostics);
@@ -609,6 +662,11 @@ static partial class SourceGenLibrary
 			compilation,
 			diagnostics
 		);
+
+		var (dispatchKind, dispatchCases) = nestedSchemaType is null
+			? ValidationInputsResolver.ResolveDispatch(originalPropertyType, externalSchemas)
+			: (DispatchKind.None, new EquatableArray<DispatchCase>([]));
+		var (nestedIsModern, nestedRequiresAsync) = GetNestedSchemaFeatures(property, validationKind, externalSchemas);
 
 		var compareViaCompareTo =
 			validationKind == PropertyValidationKind.Comparable
@@ -659,9 +717,48 @@ static partial class SourceGenLibrary
 				enumSerializedAsString,
 				enumJsonNames,
 				dateTimeOffsetSerialization
-			),
+			)
+			{
+				DisplayNameResourceExpression = ValidationInputsResolver.GetDisplayNameResourceExpression(
+					validationAttributes
+				),
+				NestedSchemaIsModern = nestedIsModern,
+				ExternalNestedSchemaRequiresAsync = nestedRequiresAsync,
+				AsyncValidationAttributes = ValidationInputsResolver.GetAsyncValidationAttributes(validationAttributes),
+				DispatchKind = dispatchKind,
+				DispatchCases = dispatchCases,
+			},
 			diagnostics.ToImmutable()
 		);
+	}
+
+	/// <summary>
+	/// Reports whether a member's nested schema exposes the depth-aware, async and member-resolution entry
+	/// points, and whether an external one requires asynchronous validation. A schema generated into this
+	/// compilation always has the entry points; one generated by an older ZodSharp may not.
+	/// </summary>
+	static (bool IsModern, bool RequiresAsync) GetNestedSchemaFeatures(
+		IPropertySymbol property,
+		PropertyValidationKind validationKind,
+		ExternalSchemaResolver? externalSchemas
+	)
+	{
+		if (
+			externalSchemas is null
+			|| validationKind is not (PropertyValidationKind.Complex or PropertyValidationKind.Collection)
+		)
+			return (true, false);
+
+		var targetType =
+			validationKind == PropertyValidationKind.Collection
+				? GetCollectionItemTypeSymbol(property.Type)
+				: property.Type;
+		targetType = targetType is null ? null : TypeHelpers.UnwrapNullableType(targetType);
+
+		if (targetType is not INamedTypeSymbol namedType || externalSchemas.IsSchemaOwnedByThisCompilation(namedType))
+			return (true, false);
+
+		return externalSchemas.GetExistingSchemaFeatures(namedType);
 	}
 
 	/// <summary>
@@ -1386,13 +1483,134 @@ static partial class SourceGenLibrary
 		}
 	}
 
+	/// <summary>
+	/// Reports (ZODSGEN052) an attribute <c>ErrorMessage</c> that uses a positional placeholder the attribute
+	/// does not supply, or an unbalanced brace. The message is formatted at runtime by a never-throw engine
+	/// (defect G2), so this only catches the typo at build time.
+	/// </summary>
+	static void ValidateErrorMessagePlaceholders(
+		ImmutableArray<AttributeData> attributes,
+		string propertyName,
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
+	)
+	{
+		foreach (var attribute in attributes)
+		{
+			if (
+				attribute.AttributeClass is not { } attributeClass
+				|| !TypeHelpers.InheritsFrom(
+					attributeClass,
+					TypeLibrary.System.ComponentModel.DataAnnotations.ValidationAttribute
+				)
+			)
+			{
+				continue;
+			}
+
+			string? message = null;
+			foreach (var namedArgument in attribute.NamedArguments)
+			{
+				if (namedArgument.Key == "ErrorMessage" && namedArgument.Value.Value is string text)
+					message = text;
+			}
+
+			if (
+				message is null
+				|| FindUnresolvablePlaceholder(message, GetMaxMessageOrdinal(attributeClass.Name)) is not { } token
+			)
+				continue;
+
+			diagnostics.Add(
+				ReportableDiagnostic.Create(
+					DiagnosticLibrary.UnresolvableMessagePlaceholder,
+					false,
+					GetAttributeLocation(attribute),
+					attributeClass.Name.EndsWith("Attribute", StringComparison.Ordinal)
+						? attributeClass.Name.Substring(0, attributeClass.Name.Length - "Attribute".Length)
+						: attributeClass.Name,
+					propertyName,
+					token
+				)
+			);
+		}
+	}
+
+	/// <summary>
+	/// The highest positional placeholder an attribute's <c>FormatErrorMessage</c> supplies (<c>{0}</c> is the
+	/// display name).
+	/// </summary>
+	static int GetMaxMessageOrdinal(string attributeName) =>
+		attributeName switch
+		{
+			"StringLengthAttribute" or "LengthAttribute" or "RangeAttribute" => 2,
+			"MinLengthAttribute"
+			or "MaxLengthAttribute"
+			or "RegularExpressionAttribute"
+			or "CompareAttribute"
+			or "AllowedValuesAttribute"
+			or "DeniedValuesAttribute" => 1,
+			_ => 0,
+		};
+
+	/// <summary>
+	/// Returns the first positional placeholder beyond <paramref name="maxOrdinal"/> or unbalanced brace, or
+	/// <see langword="null"/> when the message is well formed. Named placeholders are always accepted.
+	/// </summary>
+	internal static string? FindUnresolvablePlaceholder(string message, int maxOrdinal)
+	{
+		for (var i = 0; i < message.Length; i++)
+		{
+			var c = message[i];
+			if (c == '}')
+			{
+				if (i + 1 < message.Length && message[i + 1] == '}')
+				{
+					i++;
+					continue;
+				}
+
+				return "}";
+			}
+
+			if (c != '{')
+				continue;
+
+			if (i + 1 < message.Length && message[i + 1] == '{')
+			{
+				i++;
+				continue;
+			}
+
+			var close = message.IndexOf('}', i + 1);
+			var nextOpen = message.IndexOf('{', i + 1);
+			if (close < 0 || (nextOpen >= 0 && nextOpen < close))
+				return "{";
+
+			var token = message.Substring(i + 1, close - i - 1);
+			var nameEnd = token.IndexOfAny([',', ':']);
+			var name = (nameEnd < 0 ? token : token.Substring(0, nameEnd)).Trim();
+			if (
+				name.Length > 0
+				&& char.IsDigit(name[0])
+				&& (
+					!int.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out var ordinal)
+					|| ordinal > maxOrdinal
+				)
+			)
+			{
+				return message.Substring(i, close - i + 1);
+			}
+
+			i = close;
+		}
+
+		return null;
+	}
+
 	// Fallback used when no resolver is available (the analyzer call path): a type declared in source is
 	// the type this compilation owns.
 	static bool IsSchemaDefinedInSource(INamedTypeSymbol type) =>
-		type.Locations.Any(static location => location.IsInSource)
-		&& type.TypeKind is TypeKind.Class or TypeKind.Struct
-		&& !type.IsAbstract
-		&& !type.IsStatic;
+		type.Locations.Any(static location => location.IsInSource) && ExternalSchemaResolver.HasSchemaShape(type);
 
 	internal static bool TryGetNestedSchemaType(
 		IPropertySymbol property,

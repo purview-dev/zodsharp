@@ -133,7 +133,9 @@ partial class ZodSchemaGeneratorTests
 		// Assert
 		var generated = driverResult.GetSource("AppOptionsSchema");
 		await Assert.That(generated).IsNotNull();
-		await Assert.That(generated!).ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.Validate(");
+		await Assert
+			.That(generated!)
+			.ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.ValidateCore(");
 	}
 
 	[Test]
@@ -174,7 +176,9 @@ partial class ZodSchemaGeneratorTests
 
 		var generated = driverResult.GetSource("AppOptionsSchema");
 		await Assert.That(generated).IsNotNull();
-		await Assert.That(generated!).ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.Validate(");
+		await Assert
+			.That(generated!)
+			.ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.ValidateCore(");
 	}
 
 	[Test]
@@ -241,7 +245,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(generated).IsNotNull();
 		await Assert
 			.That(generated!)
-			.ContainsGeneratedCode("global::Testing.Local.LocalServiceOptionsSchema.Validate(");
+			.ContainsGeneratedCode("global::Testing.Local.LocalServiceOptionsSchema.ValidateCore(");
 	}
 
 	const string NestedAppOptionsSource = """
@@ -282,7 +286,9 @@ partial class ZodSchemaGeneratorTests
 
 		var generated = driverResult.GetSource("ChangeOpsAppOptionsSchema");
 		await Assert.That(generated).IsNotNull();
-		await Assert.That(generated!).ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.Validate(");
+		await Assert
+			.That(generated!)
+			.ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.ValidateCore(");
 
 		var diagnostics = driverResult.CompilationResult.Compilation.GetDiagnostics(cancellationToken);
 		await Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == "CS0436")).IsFalse();
