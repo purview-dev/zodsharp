@@ -216,12 +216,24 @@ static class ZodOpenApiSchemaMapper
 	public static int EnumValueCount(JsonSchemaDefinition source) => UnwrapNullable(source, out _).Enum?.Count ?? 0;
 
 	/// <summary>Applies only the <c>enum</c> keyword of the (unwrapped) source.</summary>
-	public static void ApplyEnum(OpenApiSchema target, JsonSchemaDefinition source, MapperContext context)
+	/// <param name="target">The platform's schema.</param>
+	/// <param name="source">ZodSharp's schema.</param>
+	/// <param name="context">The mapping context.</param>
+	/// <param name="toNode">
+	/// Converts each value to the form written on the wire (for example an enum member's name when System.Text.Json
+	/// writes enums as strings); <see langword="null"/> converts the value as it is.
+	/// </param>
+	public static void ApplyEnum(
+		OpenApiSchema target,
+		JsonSchemaDefinition source,
+		MapperContext context,
+		Func<object?, JsonNode?>? toNode = null
+	)
 	{
 		if (UnwrapNullable(source, out _).Enum is not { Count: > 0 } values)
 			return;
 
-		var nodes = ToNodes(values);
+		var nodes = toNode is null ? ToNodes(values) : [.. values.Select(toNode).OfType<JsonNode>()];
 		if (!SameNodes(target.Enum, nodes))
 		{
 			context.Conflict("enum", Render(target.Enum), Render(nodes));

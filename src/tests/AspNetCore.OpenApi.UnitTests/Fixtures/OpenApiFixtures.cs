@@ -267,3 +267,21 @@ public partial class DogCase
 	[MinValue(0)]
 	public int Barks { get; set; }
 }
+
+/// <summary>An enum that asks System.Text.Json for member names itself, through its own converter.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<Tone>))]
+public enum Tone
+{
+	Warm,
+	Cool,
+}
+
+/// <summary>Enum members: one serialized by the options (numbers unless a global converter says otherwise), one by
+/// its type's own converter.</summary>
+[ZodSchema]
+public partial class EnumsRequest
+{
+	public Shade Shade { get; set; }
+
+	public Tone Tone { get; set; }
+}

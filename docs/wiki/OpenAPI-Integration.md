@@ -110,7 +110,7 @@ attribute and not `[EmailAddress]`. With the transformers, the document says:
 A `TimeSpan` member keeps the platform's description. System.Text.Json writes a `TimeSpan` in its constant (`c`)
 format, which is not an ISO 8601 duration, so `format: duration` is not applied.
 
-An enum member's schema becomes the enum's shared component, so only the enum's own value set is written there.
+An enum member's schema becomes the enum's shared component, so only the enum's own value set is written there. The values are written as System.Text.Json writes them with the application's options: numbers by default, and member names (after the converter's naming policy and any `[JsonStringEnumMemberName]`) when a `JsonStringEnumConverter` applies globally (`ConfigureHttpJsonOptions`) or to the enum type.
 
 Nested types, collection elements and map values are constrained through their own component schemas. Constraints
 on `[AsParameters]`, query and route parameters of ZodSharp-known types come from the containing type's schema.

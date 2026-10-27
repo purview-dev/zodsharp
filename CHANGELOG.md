@@ -337,6 +337,11 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **OpenAPI: enums follow the application's System.Text.Json settings.** An enum's `enum` values were always
+  numbers (the generator cannot see a global `JsonStringEnumConverter`), so a document for an API that writes
+  member names described values it never sends. They are now written as System.Text.Json writes them: numbers by
+  default, and member names (with the converter's naming policy) when a `JsonStringEnumConverter` applies globally or
+  to the enum type.
 - **OpenAPI: the `ZodValidationIssue` `code` and `category` descriptions were swapped.** `code` was described as the
   Zod issue code; it is the ZodSharp error code, and `category` (now described) carries the Zod issue code.
 - **`ZODSGEN011` says `CancellationToken` must be the *last* parameter** (it said "second", which is wrong for the

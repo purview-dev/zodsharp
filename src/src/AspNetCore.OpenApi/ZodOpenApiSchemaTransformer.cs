@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
@@ -88,7 +89,15 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 		if (clrType.IsEnum)
 		{
 			if (Enum.GetValuesAsUnderlyingType(clrType).Length == ZodOpenApiSchemaMapper.EnumValueCount(definition))
-				ZodOpenApiSchemaMapper.ApplyEnum(schema, definition, context);
+			{
+				var wire = TryGetTypeInfo(propertyType.Options, clrType);
+				ZodOpenApiSchemaMapper.ApplyEnum(
+					schema,
+					definition,
+					context,
+					wire is null ? null : value => ToWireValue(value, clrType, wire)
+				);
+			}
 
 			return;
 		}
@@ -108,6 +117,52 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 		)
 		{
 			schema.Description = description;
+		}
+	}
+
+	static JsonTypeInfo? TryGetTypeInfo(JsonSerializerOptions options, Type type)
+	{
+		try
+		{
+			return options.GetTypeInfo(type);
+		}
+		catch (NotSupportedException)
+		{
+			return null;
+		}
+		catch (InvalidOperationException)
+		{
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// Converts one of ZodSharp's enum values (the member's number, or its name when the generator was told enums
+	/// are strings) to what System.Text.Json writes for that member with the application's options: a number by
+	/// default, or the member name — after the converter's naming policy and any <c>[JsonStringEnumMemberName]</c>
+	/// — when a <c>JsonStringEnumConverter</c> applies globally or to the type. The generator cannot see the
+	/// application's options, so the document is corrected here. A value that is not a member is left as it is.
+	/// </summary>
+	static JsonNode? ToWireValue(object? value, Type enumType, JsonTypeInfo typeInfo)
+	{
+		var member = value switch
+		{
+			string name when Enum.TryParse(enumType, name, ignoreCase: true, out var parsed) => parsed,
+			byte or sbyte or short or ushort or int or uint or long or ulong => Enum.ToObject(enumType, value),
+			double number when number == Math.Floor(number) => Enum.ToObject(enumType, (long)number),
+			_ => null,
+		};
+
+		if (member is null)
+			return ZodOpenApiSchemaMapper.ToNode(value);
+
+		try
+		{
+			return JsonSerializer.SerializeToNode(member, typeInfo) ?? ZodOpenApiSchemaMapper.ToNode(value);
+		}
+		catch (Exception exception) when (exception is JsonException or NotSupportedException)
+		{
+			return ZodOpenApiSchemaMapper.ToNode(value);
 		}
 	}
 
