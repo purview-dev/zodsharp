@@ -238,6 +238,83 @@ public class ZodSchemaOptionsValidatorPathTests
 	}
 
 	[Test]
+	public async Task AddZodSchemaOptionsValidator_GivenAsyncRuleAndValidateOnStart_FailsStartupValidation(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		SmtpValidator schema = new(asyncOnlyError: true);
+		var services = CreateServices(schema);
+		services.AddZodSchemaOptionsValidator<SmtpOptions>();
+		services.AddOptions<SmtpOptions>().ValidateOnStart();
+		await using var provider = services.BuildServiceProvider();
+		var startup = provider.GetRequiredService<IAsyncStartupValidator>();
+
+		// Act
+		OptionsValidationException? exception = null;
+		try
+		{
+			await startup.ValidateAsync(cancellationToken);
+		}
+		catch (OptionsValidationException ex)
+		{
+			exception = ex;
+		}
+
+		// Assert
+		await Assert.That(exception).IsNotNull();
+		await Assert.That(exception!.Failures).Contains("Port: Port is already in use (in_use)");
+		await Assert.That(schema.AsyncCalls).IsGreaterThan(0);
+	}
+
+	[Test]
+	public async Task AddZodSchemaOptionsValidator_GivenNamedOptionsAndValidateOnStart_RunsTheAsyncRules(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		SmtpValidator schema = new(asyncOnlyError: true);
+		var services = CreateServices(schema);
+		services.AddZodSchemaOptionsValidator<SmtpOptions>();
+		services.AddOptions<SmtpOptions>("Backup").ValidateOnStart();
+		await using var provider = services.BuildServiceProvider();
+		var startup = provider.GetRequiredService<IAsyncStartupValidator>();
+
+		// Act
+		OptionsValidationException? exception = null;
+		try
+		{
+			await startup.ValidateAsync(cancellationToken);
+		}
+		catch (OptionsValidationException ex)
+		{
+			exception = ex;
+		}
+
+		// Assert
+		await Assert.That(exception).IsNotNull();
+		await Assert.That(exception!.Failures).Contains("Backup: Port: Port is already in use (in_use)");
+	}
+
+	[Test]
+	public async Task AddZodSchemaOptionsValidator_GivenAsyncRule_SynchronousAccessRunsSynchronousRulesOnly()
+	{
+		// Arrange
+		SmtpValidator schema = new(asyncOnlyError: true);
+		var services = CreateServices(schema);
+		services.AddZodSchemaOptionsValidator<SmtpOptions>();
+		services.AddOptions<SmtpOptions>();
+		await using var provider = services.BuildServiceProvider();
+
+		// Act
+		var exception = Catch(() => provider.GetRequiredService<IOptions<SmtpOptions>>().Value);
+
+		// Assert
+		await Assert.That(exception).IsNull();
+		await Assert.That(schema.AsyncCalls).IsEqualTo(0);
+	}
+
+	[Test]
 	public async Task OptionsAccess_GivenAsyncOnlyRule_ValidatesSynchronousRulesOnly()
 	{
 		// Arrange: the platform contract - synchronous access runs Validate, never ValidateAsync.

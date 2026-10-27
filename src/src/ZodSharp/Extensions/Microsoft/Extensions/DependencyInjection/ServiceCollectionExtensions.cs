@@ -70,7 +70,10 @@ public static class ServiceCollectionExtensions
 		/// <remarks>
 		/// Requires an <see cref="IZodSchemaFactory"/> to already be registered, for example via
 		/// <see cref="AddZodSharpFactory(IServiceCollection, Action{IZodSchemaFactory}?)"/>
-		/// or <c>AddZodSharp</c> from the <c>Purview.ZodSharp.AspNetCore</c> package.
+		/// or <c>AddZodSharp</c> from the <c>Purview.ZodSharp.AspNetCore</c> package. The validator checks every
+		/// options name. On .NET 11 it also implements <c>IAsyncValidateOptions&lt;T&gt;</c>, which the platform runs
+		/// for an <see cref="IValidateOptions{T}"/> registration, so <c>ValidateOnStart()</c> checks the asynchronous
+		/// and service-aware rules too.
 		/// </remarks>
 		public IServiceCollection AddZodSchemaOptionsValidator<T>(
 			MissingValidatorBehavior missingValidatorBehavior = MissingValidatorBehavior.Throw

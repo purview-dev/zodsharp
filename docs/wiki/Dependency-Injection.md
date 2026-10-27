@@ -104,7 +104,7 @@ builder.Services.AddZodSharpFactory(factory => factory.RegisterFromAssembly(type
 builder.Services.AddZodSchemaOptionsValidator<UserOptions>();
 ```
 
-`AddZodSchemaOptionsValidator<T>(MissingValidatorBehavior behavior = MissingValidatorBehavior.Throw)` registers a singleton `IValidateOptions<T>` (`ZodSchemaOptionsValidator<T>`) that resolves `IZodSchemaFactory` from DI and validates `T` when options are instantiated. The factory must already be registered — `AddZodSchemaOptionsValidator<T>` only wires up the validator, and can be called once per options type without affecting factory state.
+`AddZodSchemaOptionsValidator<T>(MissingValidatorBehavior behavior = MissingValidatorBehavior.Throw)` registers a singleton `IValidateOptions<T>` (`ZodSchemaOptionsValidator<T>`) that resolves `IZodSchemaFactory` from DI and validates `T` when options are instantiated. The factory must already be registered — `AddZodSchemaOptionsValidator<T>` only wires up the validator, and can be called once per options type without affecting factory state. It validates every options name. On .NET 11 the validator also implements `IAsyncValidateOptions<T>`, and the platform runs that for an `IValidateOptions<T>` registration, so `ValidateOnStart()` checks asynchronous and service-aware rules (in a scope) just as `OptionsBuilder<T>.AddZodSchemaValidator()` does; synchronous options access checks the synchronous rules only.
 
 `MissingValidatorBehavior` controls what happens when no validator is registered for `T`:
 

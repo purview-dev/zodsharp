@@ -285,7 +285,9 @@ builder.Services.AddOptions<SmtpOptions>()
   `OptionsBuilder<T>.Validate<TValidator>()`. `ValidateOnStart()` runs async and service-aware rules (in a
   scope); synchronous access (`IOptions<T>.Value`, reloads) checks only the synchronous rules.
 - `OptionsBuilder<T>.AddZodSchemaValidator()` validates only that builder's options name;
-  `services.AddZodSchemaOptionsValidator<T>()` validates every name.
+  `services.AddZodSchemaOptionsValidator<T>()` validates every name. Both run the async rules under
+  `ValidateOnStart()` on .NET 11 (the platform honours an `IAsyncValidateOptions<T>` registered as
+  `IValidateOptions<T>`).
 - `MissingValidatorBehavior`: `Throw` (default) or `Ignore`.
 
 ## Related skills
