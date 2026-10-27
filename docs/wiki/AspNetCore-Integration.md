@@ -308,7 +308,7 @@ Notes:
 
 | | `WithZodSharpValidation()` filter | Built-in pipeline |
 |---|---|---|
-| Frameworks | net8.0 to net11.0 | net11.0 |
+| Frameworks | net10.0 and net11.0 | net11.0 |
 | Scope | endpoints and groups you mark | every endpoint; opt out with `DisableValidation()` |
 | DataAnnotations parameters | not validated | validated and merged into one body |
 | Binding failures | `OnBindingFailure` | ASP.NET Core's own response |

@@ -13,7 +13,7 @@
 - **Messages never throw.** Messages are formatted by `ZodMessageFormat`, which writes unknown placeholders and stray braces literally, so a `{` in a custom message can no longer turn a validation failure into a `FormatException` (at build time in the generator, or at validation time).
 - **No string input in messages by default.** Built-in messages never quote string input (numeric rules state the failing number, size rules the count), and the `received` parameter holds only the input's type name unless `ZodErrorOptions.IncludeReceivedValues` is enabled (development only). See [Core Concepts: PII](Core-Concepts.md#pii).
 - **No stack overflow on cyclic graphs.** Generated validators stop at `ZodValidationDepth.MaxDepth` (default 32, as Microsoft.Extensions.Validation) with an `InvalidOperationException`.
-- **Multi-targeting.** Packages target `net8.0`, `net9.0`, `net10.0`, and `net11.0` (the .NET 11 integrations - `Purview.ZodSharp.Extensions.Validation` and `Purview.ZodSharp.AspNetCore.OpenApi` - target `net11.0` only); the source generator targets `netstandard2.0` so it runs in any compiler host.
+- **Multi-targeting.** Packages target `net10.0` and `net11.0` (the .NET 11 integrations - `Purview.ZodSharp.Extensions.Validation`, `Purview.ZodSharp.AspNetCore.OpenApi` and `Purview.ZodSharp.Blazor` - target `net11.0` only); the source generator targets `netstandard2.0` so it runs in any compiler host.
 - **A fully built schema is safe to cache and share across threads.** Validation only reads the rule set and `Description`, so once construction is finished a schema can be reused concurrently. Building is *not* immutable — see the next section.
 
 ## Limitations

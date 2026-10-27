@@ -33,7 +33,7 @@ with the direction in `Category` (`too_small`/`too_big`) and both bounds, the sa
 `LengthRule`/`StringLengthRule`.
 
 > [!WARNING]
-> **Behaviour change in 2.5.0.** The generated `[Required]` check on a string was inverted: the default
+> **Behaviour change in 3.0.0.** The generated `[Required]` check on a string was inverted: the default
 > (`AllowEmptyStrings = false`) only rejected `null`, and `AllowEmptyStrings = true` rejected `""`. It now matches
 > `RequiredAttribute`. A model that relied on `""` passing a bare `[Required]` must supply a value or set
 > `AllowEmptyStrings = true`.
@@ -182,7 +182,7 @@ public class Profile
 ```
 
 > [!NOTE]
-> In 2.5.0, `[Length]`'s custom message binds `{1}` to the minimum and `{2}` to the maximum, matching
+> In 3.0.0, `[Length]`'s custom message binds `{1}` to the minimum and `{2}` to the maximum, matching
 > `LengthAttribute` (they were swapped), and a custom message containing `{1}` or a stray brace no longer fails
 > the build or throws during validation.
 

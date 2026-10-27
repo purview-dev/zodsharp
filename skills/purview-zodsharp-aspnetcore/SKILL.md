@@ -143,7 +143,7 @@ request, and composes `ProblemDetailsOptions.CustomizeProblemDetails`:
 
 | | Filter (`WithZodSharpValidation`) | Pipeline (`AddZodSharpValidation`) |
 | --- | --- | --- |
-| Frameworks | net8.0-net11.0 | net11.0 |
+| Frameworks | net10.0-net11.0 | net11.0 |
 | Scope | endpoints/groups you mark | every endpoint; opt out with `DisableValidation()` |
 | DataAnnotations parameters | not validated | validated and merged into one body |
 | Binding-failure handling | `OnBindingFailure` | ASP.NET Core's own |

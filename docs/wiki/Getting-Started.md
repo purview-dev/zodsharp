@@ -2,6 +2,9 @@
 
 ## Install
 
+The packages target `net10.0` and `net11.0` (the .NET 11 integrations target `net11.0` only). Applications on
+`net8.0` or `net9.0` stay on the 2.4.x line.
+
 ```bash
 dotnet add package Purview.ZodSharp
 ```

@@ -14,7 +14,7 @@ The library is developed and maintained at [github.com/purview-dev/zodsharp](htt
 - **Fluent API** - Fluent and extensible API similar to original Zod
 - **Type-safe** - Strong typing with advanced C# generics
 - **High performance** - Sub-microsecond validation times; see [the measurements](#performance)
-- **Cross-platform** - Works on .NET 8.0, .NET 9.0, .NET 10.0 and .NET 11.0
+- **Cross-platform** - Works on .NET 10.0 and .NET 11.0
 - **Source Generators** - Compile-time validator generation with `[ZodSchema]` attribute
 - **DataAnnotations Support** - Automatic validation from `[Required]`, `[StringLength]`, `[Length]`, `[MinLength]`, `[MaxLength]`, `[Range]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, etc.  
 
@@ -70,7 +70,7 @@ The fixture generator script is intentionally run via Bun rather than `npx tsx` 
 ## What's new in v2
 
 - **Packages are published under the `Purview.*` IDs.** The core `Purview.ZodSharp` package ships the validator and the source generator, with optional `Purview.ZodSharp.SystemTextJson`, `Purview.ZodSharp.NewtonsoftJson`, and `Purview.ZodSharp.AspNetCore` integration packages.
-- **Targets `net8.0`, `net9.0`, `net10.0`, and `net11.0`.** The source generator remains on `netstandard2.0` so it can run in any compiler host.
+- **Targets `net10.0` and `net11.0`** (3.0.0 dropped `net8.0` and `net9.0`; stay on 2.4.x for those). The source generator remains on `netstandard2.0` so it can run in any compiler host.
 - **System.Text.Json integration.** JSON deserialize-and-validate is available for both major JSON libraries, including validating `JsonConverter<T>` instances.
 - **JSON Schema interoperability.** Schemas can be exported via `Z.ToJsonSchema` and imported via `Z.FromJsonSchema`, enabling cross-language reuse with TypeScript/Zod. The import API lives in the JSON integration package's namespace (`ZodSharp.JsonSchema.SystemTextJson` or `ZodSharp.JsonSchema.NewtonsoftJson`); export stays in the core package.
 - **ASP.NET Core ProblemDetails integration.** Failed validation results convert directly to `HttpValidationProblemDetails` via `result.ToHttpValidationProblemDetails()`.
@@ -339,7 +339,7 @@ src/
 └── tests/                     # TUnit test projects
 ```
 
-The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net8.0`, `net9.0`, `net10.0` and `net11.0`.
+The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net10.0` and `net11.0`.
 
 ## Advanced Features
 

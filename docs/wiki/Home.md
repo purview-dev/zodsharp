@@ -69,4 +69,4 @@ This wiki is the project documentation hub for the core API, source generator, J
 - **Value object scalars** — a `Purview.ValueObjects` `[Scalar]` can be validated as a unit with `[ZodSchema]`; a rule written against the scalar's underlying value is adapted automatically. See [Value Objects Integration](Value-Objects-Integration.md).
 - **Integration packages** — `Purview.ZodSharp.SystemTextJson`, `Purview.ZodSharp.NewtonsoftJson`, and `Purview.ZodSharp.AspNetCore` (ProblemDetails); on .NET 11, `Purview.ZodSharp.Extensions.Validation` (minimal APIs and Blazor through Microsoft.Extensions.Validation), `Purview.ZodSharp.AspNetCore.OpenApi` (OpenAPI transformers) and `Purview.ZodSharp.Blazor`.
 - **Cross-platform tests** — a shared TypeScript/Zod fixture set is generated into the repo and asserted against from both the C# test suite and a vitest suite.
-- **Multi-target** — packages target `net8.0`, `net9.0`, `net10.0`, and `net11.0`; the source generator targets `netstandard2.0` so it runs in any compiler host.
+- **Multi-target** — packages target `net10.0` and `net11.0`; the source generator targets `netstandard2.0` so it runs in any compiler host.
