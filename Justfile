@@ -7,6 +7,11 @@ build_configuration := "Debug"
 artifacts_folder := "./artifacts"
 default_test_filter := "/*/*/*/*"
 
+# CSharpier is vendored in .assets/ rather than taken from the tool manifest: the released 1.3.0
+# cannot parse C# 15 `union` declarations and fails with CS1001, which would fail linting on the
+# four files that declare one. Build:CSharpierPath points the pipeline at the same binary.
+csharpier := "dotnet .assets/csharpier/CSharpier.dll"
+
 pipeline_tool := "dotnet purview-build"
 
 [private]
@@ -20,29 +25,25 @@ ensure-pipeline-tool:
 
 # Run the PR pipeline (restore, build, lint, tests)
 [group('Pipeline')]
-pipeline-pr *args:
-    just ensure-pipeline-tool
+pipeline-pr *args: ensure-pipeline-tool
     echo "Running PR pipeline..."
     {{ pipeline_tool }} {{ args }}
 
 # Run the build pipeline (restore, build, lint)
 [group('Pipeline')]
-pipeline-build *args:
-    just ensure-pipeline-tool
+pipeline-build *args: ensure-pipeline-tool
     echo "Running build pipeline..."
     {{ pipeline_tool }} --Build:RunTests=false --Release:Mode=None {{ args }}
 
 # Run the release pipeline (restore, build, lint, tests, pack, publish, GitHub release)
 [group('Pipeline')]
-pipeline-release *args:
-    just ensure-pipeline-tool
+pipeline-release *args: ensure-pipeline-tool
     echo "Running release pipeline..."
     {{ pipeline_tool }} --Release:Mode=NuGet {{ args }}
 
 # Run the pipeline through pack + validate (restore, build, lint, tests, pack, validate pack contents) without publishing/releasing
 [group('Pipeline')]
-pipeline-pack-validate *args:
-    just ensure-pipeline-tool
+pipeline-pack-validate *args: ensure-pipeline-tool
     echo "Running pack + validate pipeline..."
     {{ pipeline_tool }} --Build:RunPack=true --Build:ValidatePack=true --Release:Mode=None {{ args }}
 
@@ -61,9 +62,7 @@ smoke-packed-generator *args:
 # Use the LOCAL_NUGET_FEED_PATH environment variable or forward slashes, e.g.
 # just pipeline-local-release --PublishLocalNuGet:LocalFeedPath=p:/_sync-projects/.local-nuget/
 [group('Pipeline')]
-pipeline-local-release *args:
-    just ensure-pipeline-tool
-    just lint-fix
+pipeline-local-release *args: ensure-pipeline-tool lint-fix
     echo "Running local release pipeline..."
     {{ pipeline_tool }} --Release:Mode=LocalNuGet {{ args }}
 
@@ -120,14 +119,12 @@ version:
 # Check code formatting using CSharpier
 [group('Utilities')]
 lint-check:
-    dotnet csharpier check .
-    # dotnet format --verify-no-changes {{ solution }}
+    {{ csharpier }} check .
 
 # Fix code formatting issues using CSharpier
 [group('Utilities')]
 lint-fix:
-    dotnet csharpier format .
-    # dotnet format {{ solution }}
+    {{ csharpier }} format .
 
 # Open the solution in Visual Studio/ Registered application
 [group('Utilities')]

@@ -53,6 +53,8 @@
 		<PackageVersion Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsVersion)" />
 		<!-- In-memory ASP.NET Core host for the AspNetCore integration tests; tracks the test TFM's runtime. -->
 		<PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreTestHostVersion)" />
+		<!-- net11.0 only (Purview.ZodSharp.Extensions.Validation). Bump to GA when .NET 11 ships. -->
+		<PackageVersion Include="Microsoft.Extensions.Validation" Version="11.0.0-rc.3.26522.148" />
 		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.402" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynCompilerVersion)" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(RoslynCompilerVersion)" />

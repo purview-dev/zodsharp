@@ -30,6 +30,12 @@
 				"purview-logo-light.png",
 				"README.md"
 			],
+			"purview.zodsharp.extensions.validation": [
+				"lib/$(TFM)/Purview.ZodSharp.Extensions.Validation.dll",
+				"lib/$(TFM)/Purview.ZodSharp.Extensions.Validation.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
 			"purview.zodsharp.newtonsoftjson": [
 				"lib/$(TFM)/Purview.ZodSharp.NewtonsoftJson.dll",
 				"lib/$(TFM)/Purview.ZodSharp.NewtonsoftJson.xml",

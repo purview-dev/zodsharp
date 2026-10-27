@@ -1,3 +1,4 @@
 # CSharpier 1.3.0 (latest) cannot parse the C# 15 `union` keyword, so files containing native
 # union declarations are excluded from formatting. Revisit once CSharpier supports C# 15 unions.
 src/src/ZodSharp/Unions/NativeUnion.cs
+src/tests/Extensions.Validation.UnitTests/Fixtures/Unions.cs
