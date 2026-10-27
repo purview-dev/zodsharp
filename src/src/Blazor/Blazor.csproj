@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+	<PropertyGroup>
+		<!--
+			net11.0 only: built on .NET 11's Microsoft.Extensions.Validation and Blazor's async validation APIs
+			(AddAsyncValidator, RegisterAsyncFieldValidator, IsValidationPending/IsValidationFaulted).
+		-->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<RootNamespace>ZodSharp.Blazor</RootNamespace>
+		<!-- Explicit: NamespacePrefix is ZodSharp, so the SDK would otherwise derive ZodSharp.* identities. -->
+		<PackageId>Purview.ZodSharp.Blazor</PackageId>
+		<AssemblyName>Purview.ZodSharp.Blazor</AssemblyName>
+		<IsPackable>true</IsPackable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<IsAotCompatible>true</IsAotCompatible>
+		<IsTrimmable>true</IsTrimmable>
+		<Description>
+			Blazor integration for ZodSharp: validates EditForm models with ZodSharp on Blazor Server, Blazor
+			WebAssembly and Auto render mode, through the standard DataAnnotationsValidator or the full-fidelity
+			ZodValidator, and maps API validation problems back onto form fields.
+		</Description>
+		<PackageTags>zod;validation;schema;blazor;webassembly;forms</PackageTags>
+		<!-- First release: there is no previous version to validate the public API against. -->
+		<ZodSharpNoPackageValidationBaseline>true</ZodSharpNoPackageValidationBaseline>
+		<!-- NU5104: the .NET 11 component packages are prerelease until .NET 11 GA. Remove with the GA bump. -->
+		<NoWarn>$(NoWarn);NU5104</NoWarn>
+		<!--
+			Directory.Packages.props picks the Microsoft.Extensions line by $(TargetFramework), which a single-targeted
+			project has not set yet when that file is evaluated; the component packages need the 11.x line.
+		-->
+		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<MicrosoftExtensionsDIVersion>$(MicrosoftExtensionsVersion)</MicrosoftExtensionsDIVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<SupportedPlatform Include="browser" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Extensions.Validation\Extensions.Validation.csproj" />
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!--
+			PackageReferences, never FrameworkReference Microsoft.AspNetCore.App: a Blazor WebAssembly client cannot
+			take the ASP.NET Core shared framework. On a server app the shared framework supplies the same
+			assemblies and the packages are pruned.
+		-->
+		<PackageReference Include="Microsoft.AspNetCore.Components.Forms" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+	</ItemGroup>
+
+	<!--
+		The Microsoft.Extensions.Validation generator flows here transitively (Purview.ZodSharp.Extensions.Validation
+		references the package with its analyzers). It must not run on this package: it would intercept the
+		AddValidation() call inside AddZodSharpValidation and compile a generated DataAnnotations resolver into
+		this assembly. ExcludeAssets does not stop it (ResolvePackageAssets still yields the package's analyzers),
+		so it is removed before compiling.
+	-->
+	<Target Name="RemoveValidationsGenerator" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+		<ItemGroup>
+			<Analyzer
+				Remove="@(Analyzer)"
+				Condition="'%(Filename)' == 'Microsoft.Extensions.Validation.ValidationsGenerator'"
+			/>
+		</ItemGroup>
+	</Target>
+</Project>

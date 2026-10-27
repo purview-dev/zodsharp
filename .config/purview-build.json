@@ -30,6 +30,13 @@
 				"purview-logo-light.png",
 				"README.md"
 			],
+			"purview.zodsharp.blazor": [
+				"lib/$(TFM)/Purview.ZodSharp.Blazor.dll",
+				"lib/$(TFM)/Purview.ZodSharp.Blazor.xml",
+				"staticwebassets/zodsharp-validation.js",
+				"purview-logo-light.png",
+				"README.md"
+			],
 			"purview.zodsharp.extensions.validation": [
 				"lib/$(TFM)/Purview.ZodSharp.Extensions.Validation.dll",
 				"lib/$(TFM)/Purview.ZodSharp.Extensions.Validation.xml",

@@ -44,6 +44,8 @@
 		<!-- Drives the vitest cross-platform suites from the .NET test run (Repository.UnitTests), so
 		     `just test` covers both sides of the parity guarantee rather than only the C# side. -->
 		<PackageVersion Include="CliWrap" Version="3.10.5" />
+		<!-- Test-only: renders the Purview.ZodSharp.Blazor components in Blazor.UnitTests. -->
+		<PackageVersion Include="bunit" Version="2.13.3" />
 		<PackageVersion Include="FastGuid" Version="1.4.3" />
 		<!-- Test-only: validates fixture payloads against the OpenAPI document Purview.ZodSharp.AspNetCore.OpenApi
 		     emits, proving the document agrees with what ZodSharp enforces. -->
@@ -51,6 +53,12 @@
 		<!-- net11.0 only: Purview.ZodSharp.AspNetCore.OpenApi targets the Microsoft.OpenApi 3.x object model that
 		     ASP.NET Core 11 ships. -->
 		<PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0-rc.3.26522.148" />
+		<!--
+			net11.0 only: Purview.ZodSharp.Blazor references the component packages rather than the ASP.NET Core
+			shared framework, so it runs in Blazor WebAssembly. Bump to GA when .NET 11 ships.
+		-->
+		<PackageVersion Include="Microsoft.AspNetCore.Components.Forms" Version="11.0.0-rc.3.26522.148" />
+		<PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="11.0.0-rc.3.26522.148" />
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDIVersion)" />
 		<PackageVersion
 			Include="Microsoft.Extensions.DependencyInjection.Abstractions"
