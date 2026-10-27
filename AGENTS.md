@@ -178,6 +178,7 @@ npx skills add purview-dev/zodsharp
 | `skills/purview-zodsharp-custom-rules/` | writing a rule, `ErrorCode`/`MessageFormat`, `IZodRule`, `[ZodRule]` attributes, scalar value objects |
 | `skills/purview-zodsharp-json/` | System.Text.Json and Newtonsoft integrations, JSON Schema export and import, TypeScript Zod interop |
 | `skills/purview-zodsharp-aspnetcore/` | ProblemDetails, minimal-API validation, `IZodSchemaFactory` registration, options validation, `ErrorType` |
+| `skills/purview-zodsharp-blazor/` | Blazor forms: `DataAnnotationsValidator` vs `ZodValidator`, `GetZodErrors`, server errors onto fields, static-SSR client rules |
 | `skills/purview-zodsharp-diagnostics/` | what a `ZODSGEN` or `ZODSASP` diagnostic means and how to fix it |
 
 Every skill carries the `purview-zodsharp` prefix. Skills install into one flat directory per agent,

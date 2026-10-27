@@ -17,6 +17,7 @@
 - [System.Text.Json Integration](SystemTextJson-Integration.md)
 - [Newtonsoft.Json Integration](NewtonsoftJson-Integration.md)
 - [ASP.NET Core Integration](AspNetCore-Integration.md)
+- [Blazor Integration](Blazor-Integration.md)
 - [Dependency Injection](Dependency-Injection.md)
 - [Source Generator](Source-Generator.md)
 - [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md)

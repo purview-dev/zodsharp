@@ -24,6 +24,25 @@ Released versions correspond to `v<version>` GitHub releases.
   `ValidationOptions.ValidateAsync<T>` validates outside HTTP and Blazor. References the
   `Microsoft.Extensions.Validation` package only - never the ASP.NET Core shared framework - so it works in
   WebAssembly clients.
+- **`Purview.ZodSharp.Blazor`** (new package, `net11.0`): Blazor forms validated by ZodSharp on Blazor Server,
+  Blazor WebAssembly and Auto render mode. `AddZodSharpBlazor()` makes the standard `<DataAnnotationsValidator />`
+  validate `[ZodSchema]` models - nested objects, collections and dictionaries included - with no
+  `[ValidatableType]` and no Microsoft.Extensions.Validation generator, which is what nested validation in
+  WebAssembly needs. `<ZodValidator />` keeps the full error behind every message (`EditContext.GetZodErrors`),
+  validates on `Submit`, `Change` or debounced `Input` through the platform's async validation APIs (pending,
+  faulted, supersession), accepts a runtime `Schema` (`ZodModelSchema.For<TModel>`), can re-validate a field's
+  owning object (`ValidateNestedOnFieldChange`) and coexists with `DataAnnotationsValidator` without duplicating
+  messages. `<ZodValidationMessage>` and `<ZodValidationSummary>` match the built-in markup and add
+  `data-code`/`data-category`, path grouping and union details. `HttpResponseMessage.TryReadZodValidationProblemAsync()`
+  (source-generated JSON, trim-safe) and `EditContext.AddZodProblemDetails` map API validation problems onto fields,
+  cleared per field on change. Ships `zodsharp-validation.js`, browser validators that mirror the C# rules
+  (verified by a C#-to-JavaScript parity suite), registered through a Blazor JavaScript initializer.
+- **Static-SSR client-side validation for ZodSharp rules.** On `net11.0`, `Purview.ZodSharp.AspNetCore` adds
+  `AddZodSharpClientValidation()`: statically rendered forms carry client rules for ZodSharp rule attributes
+  (`[StartsWith]`, `[UUID]`, `[IPAddress]`, `[MinValue]`, …), derived from each rule's `IZodRule` metadata, and for
+  registered runtime schemas, merged into ASP.NET Core's `data-rules` payload. It works before or after
+  `AddRazorComponents` and warns at startup in Development when a later registration replaces it.
+  `ZodClientValidationRules` exposes the mapping for custom `IClientValidationRuleProvider` attributes.
 - **Minimal APIs on .NET 11: full-fidelity ProblemDetails from the built-in validation pipeline.** On
   `net11.0`, `Purview.ZodSharp.AspNetCore` now depends on `Purview.ZodSharp.Extensions.Validation` (that target
   framework only). `AddZodSharpProblemDetails()` registers a scoped `ZodRequestValidationReport` (the bridge's
