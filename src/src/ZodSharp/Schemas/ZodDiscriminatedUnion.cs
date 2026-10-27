@@ -188,23 +188,10 @@ public class ZodDiscriminatedUnion(
 	/// The fallback for a POCO whose type was not supplied through <c>Option&lt;T&gt;</c>: reads the discriminator from
 	/// the runtime type by name, which a trimmer cannot follow.
 	/// </summary>
-#if NET9_0_OR_GREATER
 	[RequiresUnreferencedCode(
 		"Reads the discriminator from a type that was not supplied through Option<T>. Add each option with Option<T> "
 			+ "so its properties are preserved, or validate dictionaries/JSON."
 	)]
-#else
-	// .NET 8's trimming tools ignore feature guards, so on net8.0 this cannot be expressed as a guarded requirement
-	// without surfacing a warning for every use of the type. The fallback is reached only for a POCO whose type was
-	// not supplied through Option<T>; under trimming its property may be gone, in which case the value is reported as
-	// missing its discriminator (the union fails closed). Add options with Option<T> in a trimmed net8.0 application.
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2070:UnrecognizedReflectionPattern",
-		Justification = "net8.0 only: reached for a POCO of a type not supplied through Option<T>; a trimmed property "
-			+ "makes the union report a missing discriminator rather than accept the value. Option<T> is the trim-safe path."
-	)]
-#endif
 	static Func<object, string?>? BuildReflectiveAccessor(Type type, string discriminator) =>
 		CreateAccessor(
 			type,

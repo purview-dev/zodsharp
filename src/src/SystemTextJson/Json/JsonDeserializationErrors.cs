@@ -176,16 +176,15 @@ static class JsonDeserializationErrors
 	}
 
 	/// <summary>
-	/// The element (or dictionary value) type of a collection contract. .NET 9 exposes it on the contract; before
-	/// that, and for a contract that does not set it, it is read from an array's element type or the collection's
-	/// generic arguments (the last one, so a dictionary yields its value type). Neither needs unreferenced metadata.
+	/// The element (or dictionary value) type of a collection contract, as the contract exposes it; for a contract
+	/// that does not set it, it is read from an array's element type or the collection's generic arguments (the last
+	/// one, so a dictionary yields its value type). Neither needs unreferenced metadata.
 	/// </summary>
 	static Type? ElementTypeOf(JsonTypeInfo collection)
 	{
-#if NET9_0_OR_GREATER
 		if (collection.ElementType is { } element)
 			return element;
-#endif
+
 		var type = collection.Type;
 		if (type.IsArray)
 			return type.GetElementType();

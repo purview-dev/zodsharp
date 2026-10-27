@@ -382,29 +382,12 @@ public static class ZodGeneratedValidation
 		string? memberName = null
 	)
 	{
-#if NET10_0_OR_GREATER
 		System.ComponentModel.DataAnnotations.ValidationContext context = new(instance, displayName, services, null);
-#else
-		var context = CreateLegacyValidationContext(instance, services);
-		context.DisplayName = displayName;
-#endif
 		if (memberName is not null)
 			context.MemberName = memberName;
 
 		return context;
 	}
-
-#if !NET10_0_OR_GREATER
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "The constructor only reflects to find a display name, which CreateValidationContext sets explicitly."
-	)]
-	static System.ComponentModel.DataAnnotations.ValidationContext CreateLegacyValidationContext(
-		object instance,
-		IServiceProvider? services
-	) => new(instance, services, null);
-#endif
 
 	/// <summary>
 	/// Merges a custom validation result into the error list.

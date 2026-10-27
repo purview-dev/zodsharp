@@ -8,34 +8,21 @@
 		<!--
 			Microsoft.Extensions.Options and ...DependencyInjection.Abstractions are real dependencies of
 			the shipped Purview.ZodSharp package, so their version has to track the consumer's target
-			framework: referencing this package must not drag a net8.0 (LTS) application onto .NET 10
-			assemblies. Keep one entry per supported TFM and leave the default as the newest.
+			framework: referencing this package must not drag a net10.0 application onto .NET 11
+			assemblies. Keep one entry per supported TFM and leave the default as the oldest.
 
 			On net10.0 and later the SDK prunes these from the package graph entirely because the
-			targeted framework already supplies them — which is why the net11.0 dependency group in the
-			produced .nuspec is empty. That is expected, not a missing dependency.
-
-			The 8.x line needs two properties, because the packages did not ship in lockstep:
-			Options and DependencyInjection.Abstractions published 8.0.2, DependencyInjection stopped at
-			8.0.1, and DependencyInjection 8.0.1 itself depends on Abstractions >= 8.0.2. So the only
-			self-consistent 8.x set is DependencyInjection 8.0.1 with Options/Abstractions 8.0.2. Pinning
-			all three to one value fails NU1109 in one direction or the other. From 9.x onward the lines
-			are aligned again and both properties collapse to the same value.
+			targeted framework already supplies them — which is why the dependency groups in the
+			produced .nuspec are empty. That is expected, not a missing dependency.
 		-->
 		<MicrosoftExtensionsVersion>$(DotnetRuntimeVersion)</MicrosoftExtensionsVersion>
-		<MicrosoftExtensionsVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.2</MicrosoftExtensionsVersion>
-		<MicrosoftExtensionsVersion Condition="'$(TargetFramework)' == 'net9.0'">9.0.20</MicrosoftExtensionsVersion>
 		<!--
 			net11.0 needs the 11.x line for IAsyncValidateOptions<T> and OptionsBuilder<T>.Validate<TValidator>(),
 			which ZodSchemaOptionsValidator<T> implements and registers through on .NET 11.
 		-->
 		<MicrosoftExtensionsVersion Condition="'$(TargetFramework)' == 'net11.0'"
 			>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
-		<MicrosoftExtensionsDIVersion>$(MicrosoftExtensionsVersion)</MicrosoftExtensionsDIVersion>
-		<MicrosoftExtensionsDIVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.1</MicrosoftExtensionsDIVersion>
 		<AspNetCoreTestHostVersion>$(DotnetRuntimeVersion)</AspNetCoreTestHostVersion>
-		<AspNetCoreTestHostVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.33</AspNetCoreTestHostVersion>
-		<AspNetCoreTestHostVersion Condition="'$(TargetFramework)' == 'net9.0'">9.0.22</AspNetCoreTestHostVersion>
 		<AspNetCoreTestHostVersion Condition="'$(TargetFramework)' == 'net11.0'"
 			>11.0.0-rc.3.26522.148</AspNetCoreTestHostVersion>
 	</PropertyGroup>
@@ -59,7 +46,7 @@
 		-->
 		<PackageVersion Include="Microsoft.AspNetCore.Components.Forms" Version="11.0.0-rc.3.26522.148" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="11.0.0-rc.3.26522.148" />
-		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDIVersion)" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsVersion)" />
 		<PackageVersion
 			Include="Microsoft.Extensions.DependencyInjection.Abstractions"
 			Version="$(MicrosoftExtensionsVersion)"

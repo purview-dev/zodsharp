@@ -1,7 +1,7 @@
 # Trimming and Native AOT
 
-Every shipping ZodSharp package is marked `IsTrimmable` and `IsAotCompatible` on every target where the analyzers exist
-(`net8.0` and later), and builds with no trim (IL2xxx), AOT (IL3xxx) or single-file warnings. An API that cannot work
+Every shipping ZodSharp package is marked `IsTrimmable` and `IsAotCompatible` on every target (`net10.0` and
+`net11.0`), and builds with no trim (IL2xxx), AOT (IL3xxx) or single-file warnings. An API that cannot work
 when trimmed is not hidden behind a suppression: it is annotated `[RequiresUnreferencedCode]` (and
 `[RequiresDynamicCode]` where it needs runtime code generation), so a trimmed or AOT application is warned at the call
 site, and the message names the trim-safe alternative.
@@ -51,15 +51,11 @@ A few fallbacks read members of a type the library was never told about:
 - assembly reference-graph scanning.
 
 They are guarded by the `ZodSharp.Reflection.IsSupported` feature switch (`[FeatureSwitchDefinition]` and
-`[FeatureGuard]` on .NET 9 and later). `Purview.ZodSharp`'s `buildTransitive/Purview.ZodSharp.targets` sets it to
+`[FeatureGuard]`). `Purview.ZodSharp`'s `buildTransitive/Purview.ZodSharp.targets` sets it to
 `false` with `Trim="true"` whenever `PublishTrimmed` or `PublishAot` is `true`, so ILLink and ILC remove the branches.
 In a trimmed application the effect is deterministic: an unregistered POCO is reported as missing its discriminator
 (the union fails closed), an error from a non-generated validator stays on the nearest object the validator resolved,
 and graph scanning registers nothing. Use `Option<T>`, generated validators and generated registration instead.
-
-.NET 8's trimming tools do not understand feature guards, so on `net8.0` the guarded calls carry narrow suppressions
-whose justification is the same: they are reached only through the annotated opt-in APIs, or for a type the
-application did not supply.
 
 ## Collection counts: `[MinCount]`, `[MaxCount]` and `[CountRange]`
 

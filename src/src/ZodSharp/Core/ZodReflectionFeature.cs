@@ -8,16 +8,10 @@ namespace ZodSharp.Core;
 /// <c>ZodDiscriminatedUnionBuilder.Option&lt;T&gt;</c>).
 /// </summary>
 /// <remarks>
-/// <para>
-/// On .NET 9 and later the property is a feature guard for <see cref="RequiresUnreferencedCodeAttribute"/>: the trim
-/// analyzer accepts the reflection it guards, and ILLink and ILC treat it as <see langword="false"/> when trimming or
-/// compiling ahead of time, so the fallback is removed instead of failing unpredictably on trimmed metadata. An
-/// untrimmed application keeps it unless it sets the switch to <see langword="false"/>.
-/// </para>
-/// <para>
-/// .NET 8's trimming tools do not support feature guards, so on <c>net8.0</c> the switch is an ordinary
-/// <see cref="AppContext"/> switch and the guarded fallbacks carry a narrow suppression instead; see the call sites.
-/// </para>
+/// The property is a feature guard for <see cref="RequiresUnreferencedCodeAttribute"/>: the trim analyzer accepts the
+/// reflection it guards, and ILLink and ILC treat it as <see langword="false"/> when trimming or compiling ahead of
+/// time, so the fallback is removed instead of failing unpredictably on trimmed metadata. An untrimmed application
+/// keeps it unless it sets the switch to <see langword="false"/>.
 /// </remarks>
 static class ZodReflectionFeature
 {
@@ -25,7 +19,6 @@ static class ZodReflectionFeature
 	public const string SwitchName = "ZodSharp.Reflection.IsSupported";
 
 	/// <summary>Gets whether the reflection fallbacks may run.</summary>
-#if NET9_0_OR_GREATER
 	[FeatureSwitchDefinition(SwitchName)]
 	[FeatureGuard(typeof(RequiresUnreferencedCodeAttribute))]
 	[UnconditionalSuppressMessage(
@@ -35,6 +28,5 @@ static class ZodReflectionFeature
 			+ "treat this guard as false when trimming, which the trim verification harness proves (no IL2026 from the "
 			+ "guarded calls, and the fallback is observed disabled in the published binary)."
 	)]
-#endif
 	public static bool IsSupported => !AppContext.TryGetSwitch(SwitchName, out var enabled) || enabled;
 }

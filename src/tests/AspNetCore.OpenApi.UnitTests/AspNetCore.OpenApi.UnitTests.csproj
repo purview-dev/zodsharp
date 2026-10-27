@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<!-- Single-targeted on purpose, against the repository's 'All' set: the package under test is net11.0
+		<!-- Single-targeted on purpose, against the repository's 'Supported' set: the package under test is net11.0
 		     only, because it targets the Microsoft.OpenApi 3.x object model ASP.NET Core 11 ships. -->
 		<TargetFramework>net11.0</TargetFramework>
 		<TargetFrameworks></TargetFrameworks>

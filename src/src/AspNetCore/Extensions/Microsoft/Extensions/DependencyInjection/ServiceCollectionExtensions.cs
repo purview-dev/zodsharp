@@ -261,27 +261,10 @@ public static class ServiceCollectionExtensions
 
 	// Graph scanning needs Assembly.GetReferencedAssemblies, which trimming can invalidate. It is opted into only through
 	// [RequiresUnreferencedCode] APIs (AddZodSharpAssemblyGraph, ScanAssemblyGraphs), so the requirement is stated where
-	// the application opts in. On .NET 9+ the walk is also removed when trimming (ZodReflectionFeature is a feature guard);
-	// .NET 8's trimming tools ignore feature guards, so there the internal reads carry a suppression instead.
-#if !NET9_0_OR_GREATER
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "net8.0 only: graph roots exist only when the application called a [RequiresUnreferencedCode] "
-			+ "opt-in (AddZodSharpAssemblyGraph or ScanAssemblyGraphs), which already warned it."
-	)]
-#endif
+	// the application opts in. The walk is also removed when trimming, because ZodReflectionFeature is a feature guard.
 	static IReadOnlyList<Assembly> ReadGraphRoots(ZodSchemaFactoryOptions options) =>
 		ZodReflectionFeature.IsSupported ? [.. options.ScanAssemblyGraphs] : [];
 
-#if !NET9_0_OR_GREATER
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "net8.0 only: graph roots exist only when the application called a [RequiresUnreferencedCode] "
-			+ "opt-in (AddZodSharpAssemblyGraph or ScanAssemblyGraphs), which already warned it."
-	)]
-#endif
 	static IEnumerable<Assembly> GetGraphAssemblies(
 		IServiceProvider serviceProvider,
 		ZodSchemaFactoryConfiguration? configuration,

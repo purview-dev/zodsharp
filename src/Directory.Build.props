@@ -1,8 +1,9 @@
 <Project>
 	<PropertyGroup>
-		<!-- Every shipped release plus the newest major, resolved by Purview.BuildSdk rather than listed
-		     here, so a runtime lifecycle change is an SDK bump instead of an edit in this file. -->
-		<PurviewTargetFrameworkSet>All</PurviewTargetFrameworkSet>
+		<!-- Every .NET release still in support (net10.0;net11.0), resolved by Purview.BuildSdk rather than
+		     listed here, so a runtime lifecycle change is an SDK bump instead of an edit in this file.
+		     net8.0 and net9.0 were dropped in 3.0.0. -->
+		<PurviewTargetFrameworkSet>Supported</PurviewTargetFrameworkSet>
 		<LangVersion>preview</LangVersion>
 		<NamespacePrefix>ZodSharp</NamespacePrefix>
 		<!-- Set project-by-project -->
@@ -18,7 +19,7 @@
 	     targets already; this re-asserts it for projects where another default got in first. -->
 	<PropertyGroup Condition="'$(IsTestProject)' == 'true' OR '$(OutputType)' == 'Exe'">
 		<TargetFramework></TargetFramework>
-		<TargetFrameworks>$(PurviewTargetFrameworksAll)</TargetFrameworks>
+		<TargetFrameworks>$(PurviewTargetFrameworksSupported)</TargetFrameworks>
 	</PropertyGroup>
 
 	<PropertyGroup Label="Purview site URL metadata">

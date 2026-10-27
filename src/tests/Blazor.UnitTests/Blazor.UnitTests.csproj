@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 	<PropertyGroup>
-		<!-- net11.0 only, like the package under test. Directory.Build.props forces the 'All' set onto test projects,
+		<!-- net11.0 only, like the package under test. Directory.Build.props forces the 'Supported' set onto test projects,
 		     so both properties are reset here. -->
 		<TargetFramework>net11.0</TargetFramework>
 		<TargetFrameworks></TargetFrameworks>
@@ -13,7 +13,6 @@
 			set yet when that file is evaluated; the .NET 11 component and host packages need the 11.x lines.
 		-->
 		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
-		<MicrosoftExtensionsDIVersion>$(MicrosoftExtensionsVersion)</MicrosoftExtensionsDIVersion>
 		<AspNetCoreTestHostVersion>11.0.0-rc.3.26522.148</AspNetCoreTestHostVersion>
 		<!-- CA1506: a component test couples bUnit, the form types, the validators and TUnit's generic assertion
 		     builders in a single method by design. -->

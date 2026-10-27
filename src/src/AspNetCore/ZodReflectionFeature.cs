@@ -1,4 +1,3 @@
-#if NET9_0_OR_GREATER
 using System.Diagnostics.CodeAnalysis;
 
 namespace ZodSharp.AspNetCore;
@@ -30,14 +29,3 @@ static class ZodReflectionFeature
 	)]
 	public static bool IsSupported => !AppContext.TryGetSwitch(SwitchName, out var enabled) || enabled;
 }
-#else
-namespace ZodSharp.AspNetCore;
-
-/// <summary>The <c>ZodSharp.Reflection.IsSupported</c> switch; see the .NET 9+ declaration.</summary>
-static class ZodReflectionFeature
-{
-	public const string SwitchName = "ZodSharp.Reflection.IsSupported";
-
-	public static bool IsSupported => !AppContext.TryGetSwitch(SwitchName, out var enabled) || enabled;
-}
-#endif

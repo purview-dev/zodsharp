@@ -50,7 +50,6 @@
 			project has not set yet when that file is evaluated; Purview.ZodSharp.Blazor's component packages need the 11.x line.
 		-->
 		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
-		<MicrosoftExtensionsDIVersion>$(MicrosoftExtensionsVersion)</MicrosoftExtensionsDIVersion>
 	</PropertyGroup>
 
 	<ItemGroup>

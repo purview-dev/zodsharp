@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<!-- net11.0 only, like the package under test: .NET 11's Microsoft.Extensions.Validation surface does not
-		     exist on earlier frameworks. Directory.Build.props forces the 'All' set onto test projects, so both
+		     exist on earlier frameworks. Directory.Build.props forces the 'Supported' set onto test projects, so both
 		     properties are reset here. -->
 		<TargetFramework>net11.0</TargetFramework>
 		<TargetFrameworks></TargetFrameworks>

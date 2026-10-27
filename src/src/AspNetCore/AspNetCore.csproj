@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFrameworks>$(PurviewTargetFrameworksAll)</TargetFrameworks>
+		<TargetFrameworks>$(PurviewTargetFrameworksSupported)</TargetFrameworks>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<!--
 			Trimming and Native AOT. Verified clean under both analyzers. Graph-based assembly scanning

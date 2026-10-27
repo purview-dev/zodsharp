@@ -269,14 +269,6 @@ static class ZodEndpointValidationFilterFactory
 		"IL2060:MakeGenericMethod",
 		Justification = "Adapt<T> has no DynamicallyAccessedMembers requirements on T."
 	)]
-#if !NET9_0_OR_GREATER
-	[UnconditionalSuppressMessage(
-		"AOT",
-		"IL3050:RequiresDynamicCode",
-		Justification = "Guarded by RuntimeFeature.IsDynamicCodeSupported, which Native AOT compiles to false. net8.0's "
-			+ "reference assembly does not mark it [FeatureGuard], so only that target needs the suppression."
-	)]
-#endif
 	static IZodUntypedValidator? AdaptRegisteredValidator(IZodSchemaFactory factory, Type validatedType)
 	{
 		if (!RuntimeFeature.IsDynamicCodeSupported || validatedType.ContainsGenericParameters)
