@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Validation;
+using ZodSharp.Core;
 
 namespace ZodSharp.Extensions.Validation;
 
@@ -30,6 +31,10 @@ sealed class ZodValidationOptionsSetup(ZodValidatableInfoResolver resolver) : IP
 		}
 
 		resolver.AttachTo(options);
+
+		// Generated validators recurse internally with their own depth guard; keep it in step with the
+		// pipeline's so a cyclic graph fails at the same depth however it is validated.
+		ZodValidationDepth.MaxDepth = options.MaxDepth;
 	}
 
 	static int FindAfterGeneratedIndex(IList<IValidatableInfoResolver> resolvers)

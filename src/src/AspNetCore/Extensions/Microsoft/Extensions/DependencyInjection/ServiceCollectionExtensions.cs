@@ -214,6 +214,10 @@ public static class ServiceCollectionExtensions
 		ZodSchemaFactory factory = new();
 		var configuration = serviceProvider.GetService<ZodSchemaFactoryConfiguration>();
 
+		// Trim-safe registrations added by the generated AddZodSharp{Assembly}Schemas() extensions.
+		foreach (var registration in serviceProvider.GetServices<ZodSchemaRegistration>())
+			registration.Register(factory);
+
 		configuration?.ConfigureFactory?.Invoke(factory);
 
 		foreach (var assembly in GetAssembliesToScan(serviceProvider, configuration))
