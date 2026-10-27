@@ -16,6 +16,11 @@ namespace ZodSharp.Blazor;
 /// </summary>
 static class ZodFieldLocator
 {
+	const string WalkRequirement =
+		"Walks public properties of the form model's runtime types, which a trimmer cannot follow. Guarded by "
+		+ ZodReflectionFeature.SwitchName
+		+ "; generated validators resolve members without it.";
+
 	static readonly ConcurrentDictionary<(Type Type, string Name, bool IgnoreCase), PropertyInfo?> Properties = new();
 
 	/// <summary>
@@ -56,7 +61,12 @@ static class ZodFieldLocator
 			}
 		}
 
-		if (Walk(root, path, ignoreCase, out var container, out var member))
+		var container = (object?)root;
+		var member = string.Empty;
+
+		// The reflection walk is the fallback for a validator that does not resolve members itself; it is removed when
+		// trimming, where the message stays on the nearest object the validator reached (or the model).
+		if (ZodReflectionFeature.IsSupported && Walk(root, path, ignoreCase, out container, out member))
 			return new(container ?? root, member);
 
 		// The validator followed part of the path itself: its nearest ancestor is better informed than ours.
@@ -75,13 +85,7 @@ static class ZodFieldLocator
 	/// ends in an index or a key resolves to the owner of the collection member; a path that cannot be followed stops
 	/// at the nearest object reached.
 	/// </summary>
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2075:DynamicallyAccessedMembers",
-		Justification = "Failure-path fallback for validators that do not resolve members themselves. When the "
-			+ "trimmer removed a property, the walk stops at the nearest object reached, which only degrades field "
-			+ "placement; it never throws. Form models are application types, preserved because they are rendered."
-	)]
+	[RequiresUnreferencedCode(WalkRequirement)]
 	static bool Walk(object root, ZodPath path, bool ignoreCase, out object? container, out string memberName)
 	{
 		container = root;
@@ -123,6 +127,7 @@ static class ZodFieldLocator
 		return true;
 	}
 
+	[RequiresUnreferencedCode(WalkRequirement)]
 	static PropertyInfo? FindCachedProperty(Type type, string name, bool ignoreCase)
 	{
 		var exact = Properties.GetOrAdd((type, name, false), static key => FindProperty(key.Type, key.Name, false));
@@ -131,11 +136,7 @@ static class ZodFieldLocator
 			: Properties.GetOrAdd((type, name, true), static key => FindProperty(key.Type, key.Name, true));
 	}
 
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2070:DynamicallyAccessedMembers",
-		Justification = "See Walk: a trimmed property only stops the walk early."
-	)]
+	[RequiresUnreferencedCode(WalkRequirement)]
 	static PropertyInfo? FindProperty(Type type, string name, bool ignoreCase)
 	{
 		var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;

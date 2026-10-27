@@ -10,6 +10,10 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
+	const string GraphScanRequirement =
+		"Walks the assembly reference graph, which a trimmer can remove (Assembly.GetReferencedAssemblies). Register "
+		+ "validators with the generated AddZodSharp{AssemblyId}Schemas() extension (or AddZodSharpAssembly) instead.";
+
 	extension(IServiceCollection services)
 	{
 		/// <summary>
@@ -30,7 +34,7 @@ public static class ServiceCollectionExtensions
 				{
 					ConfigureFactory = options.ConfigureFactory,
 					ScanAssemblies = [.. options.ScanAssemblies],
-					ScanAssemblyGraphs = [.. options.ScanAssemblyGraphs],
+					ScanAssemblyGraphs = ReadGraphRoots(options),
 					ScanLoadedAssemblies = options.ScanLoadedAssemblies,
 				}
 			);
@@ -80,6 +84,7 @@ public static class ServiceCollectionExtensions
 		/// validators.</remarks>
 		/// <typeparam name="T">The type whose assembly graph is scanned for generated validators.</typeparam>
 		/// <returns>The <see cref="IServiceCollection"/> instance for chaining.</returns>
+		[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 		public IServiceCollection AddZodSharpAssemblyGraph<T>() =>
 			AddZodSharpAssemblyGraph(services, typeof(T).Assembly);
 
@@ -88,6 +93,7 @@ public static class ServiceCollectionExtensions
 		/// </summary>
 		/// <param name="type">The type whose assembly contains the ZodSharp definitions to register.</param>
 		/// <returns>The service collection for chaining additional registrations.</returns>
+		[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 		public IServiceCollection AddZodSharpAssemblyGraph(Type type)
 		{
 			ArgumentNullException.ThrowIfNull(type);
@@ -98,6 +104,7 @@ public static class ServiceCollectionExtensions
 		/// <summary>
 		/// Registers a root assembly whose referenced assembly graph should be scanned for generated validators.
 		/// </summary>
+		[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 		public IServiceCollection AddZodSharpAssemblyGraph(Assembly rootAssembly)
 		{
 			ArgumentNullException.ThrowIfNull(rootAssembly);
@@ -205,13 +212,6 @@ public static class ServiceCollectionExtensions
 		}
 	}
 
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "Assembly scanning for generated validators cannot be followed by a trimmer. The "
-			+ "requirement is surfaced on the public AddZodSharp* registration methods, which is where a "
-			+ "host opts into scanning; a trimmed or Native AOT host registers validators explicitly."
-	)]
 	static ZodSchemaFactory CreateFactory(IServiceProvider serviceProvider)
 	{
 		ZodSchemaFactory factory = new();
@@ -247,18 +247,7 @@ public static class ServiceCollectionExtensions
 			)
 				yield return registration.Assembly;
 
-		foreach (var assembly in GetAssembliesFromGraphs(configuration?.ScanAssemblyGraphs ?? [], seenAssemblyNames))
-			yield return assembly;
-
-		foreach (
-			var assembly in GetAssembliesFromGraphs(
-				serviceProvider
-					.GetServices<ZodSchemaAssemblyRegistration>()
-					.Where(static registration => registration.Kind == ZodSchemaAssemblyRegistrationKind.Graph)
-					.Select(static registration => registration.Assembly),
-				seenAssemblyNames
-			)
-		)
+		foreach (var assembly in GetGraphAssemblies(serviceProvider, configuration, seenAssemblyNames))
 			yield return assembly;
 
 		if (
@@ -270,19 +259,54 @@ public static class ServiceCollectionExtensions
 					yield return assembly;
 	}
 
+	// Graph scanning needs Assembly.GetReferencedAssemblies, which trimming can invalidate. It is opted into only through
+	// [RequiresUnreferencedCode] APIs (AddZodSharpAssemblyGraph, ScanAssemblyGraphs), so the requirement is stated where
+	// the application opts in. On .NET 9+ the walk is also removed when trimming (ZodReflectionFeature is a feature guard);
+	// .NET 8's trimming tools ignore feature guards, so there the internal reads carry a suppression instead.
+#if !NET9_0_OR_GREATER
+	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+		"Trimming",
+		"IL2026:RequiresUnreferencedCode",
+		Justification = "net8.0 only: graph roots exist only when the application called a [RequiresUnreferencedCode] "
+			+ "opt-in (AddZodSharpAssemblyGraph or ScanAssemblyGraphs), which already warned it."
+	)]
+#endif
+	static IReadOnlyList<Assembly> ReadGraphRoots(ZodSchemaFactoryOptions options) =>
+		ZodReflectionFeature.IsSupported ? [.. options.ScanAssemblyGraphs] : [];
+
+#if !NET9_0_OR_GREATER
+	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+		"Trimming",
+		"IL2026:RequiresUnreferencedCode",
+		Justification = "net8.0 only: graph roots exist only when the application called a [RequiresUnreferencedCode] "
+			+ "opt-in (AddZodSharpAssemblyGraph or ScanAssemblyGraphs), which already warned it."
+	)]
+#endif
+	static IEnumerable<Assembly> GetGraphAssemblies(
+		IServiceProvider serviceProvider,
+		ZodSchemaFactoryConfiguration? configuration,
+		HashSet<string> seenAssemblyNames
+	) =>
+		ZodReflectionFeature.IsSupported
+			? GetAssembliesFromGraphs(
+				[
+					.. configuration?.ScanAssemblyGraphs ?? [],
+					.. serviceProvider
+						.GetServices<ZodSchemaAssemblyRegistration>()
+						.Where(static registration => registration.Kind == ZodSchemaAssemblyRegistrationKind.Graph)
+						.Select(static registration => registration.Assembly),
+				],
+				seenAssemblyNames
+			)
+			: [];
+
 	/// <remarks>
 	/// Walking an assembly's reference graph cannot be followed by a trimmer, which may also have removed
 	/// the references entirely. Prefer <c>ScanAssemblies</c> with an explicit assembly, or register
 	/// validators directly, in a trimmed or Native AOT host — the graph walk also loads the whole
 	/// transitive closure at container-build time, which is a measurable startup cost in a large solution.
 	/// </remarks>
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "Only reached when a host opts into graph scanning via ScanAssemblyGraphs. The "
-			+ "alternative — naming assemblies explicitly, or registering validators directly — is "
-			+ "documented on the option and is what a trimmed or Native AOT host should use."
-	)]
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 	static IEnumerable<Assembly> GetAssembliesFromGraphs(
 		IEnumerable<Assembly> rootAssemblies,
 		HashSet<string> seenAssemblyNames

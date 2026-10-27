@@ -15,6 +15,11 @@ namespace ZodSharp.Extensions.Validation;
 /// </summary>
 static class ZodMemberLocator
 {
+	const string WalkRequirement =
+		"Walks public properties of the validated value's runtime types, which a trimmer cannot follow. Guarded by "
+		+ ZodReflectionFeature.SwitchName
+		+ "; generated validators resolve members without it.";
+
 	static readonly ConcurrentDictionary<(Type Type, string Name), PropertyInfo?> Properties = new();
 
 	/// <summary>
@@ -49,7 +54,12 @@ static class ZodMemberLocator
 			resolvedMember = string.Empty;
 		}
 
-		if (Walk(value, path, out container, out memberName))
+		container = value;
+		memberName = string.Empty;
+
+		// The reflection walk is the fallback for a validator that does not resolve members itself (a runtime schema over
+		// a CLR type); it is removed when trimming, where the error stays on the nearest object the validator reached.
+		if (ZodReflectionFeature.IsSupported && Walk(value, path, out container, out memberName))
 			return;
 
 		// The validator followed part of the path itself: its nearest ancestor is better informed than ours.
@@ -66,13 +76,7 @@ static class ZodMemberLocator
 	/// key resolves to the owner of the collection member. A path that cannot be followed stops at the nearest
 	/// object reached.
 	/// </summary>
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2075:DynamicallyAccessedMembers",
-		Justification = "Failure-path fallback for runtime schemas over CLR types. When the trimmer removed a "
-			+ "property, the walk stops at the nearest object reached, which only degrades field placement; it "
-			+ "never throws. Generated validators resolve members without reflection and never reach this."
-	)]
+	[RequiresUnreferencedCode(WalkRequirement)]
 	public static bool Walk(object root, ZodPath path, out object? container, out string memberName)
 	{
 		container = root;
@@ -116,11 +120,7 @@ static class ZodMemberLocator
 		return true;
 	}
 
-	[UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2070:DynamicallyAccessedMembers",
-		Justification = "See Walk: a trimmed property only stops the walk early."
-	)]
+	[RequiresUnreferencedCode(WalkRequirement)]
 	static PropertyInfo? FindProperty(Type type, string name)
 	{
 		try

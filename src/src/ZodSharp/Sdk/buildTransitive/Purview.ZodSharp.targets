@@ -1,0 +1,17 @@
+<Project>
+	<!--
+		Trimming and Native AOT. ZodSharp.Reflection.IsSupported guards the reflection fallbacks that read members of a type
+		the library was not told about: a discriminated-union discriminator on a POCO whose type was not supplied through
+		Option<T>, the field walker that places a Blazor or Microsoft.Extensions.Validation error when the validator does not
+		resolve members itself, and assembly reference-graph scanning. The switch is a [FeatureSwitchDefinition], so setting
+		it false with Trim="true" lets ILLink and ILC remove those branches; the APIs that opt into them are annotated
+		[RequiresUnreferencedCode]. This is a .targets file because PublishTrimmed and PublishAot are set in the project
+		body, after a package's .props are imported.
+	-->
+	<ItemGroup
+		Condition="'$(PublishTrimmed)' == 'true' Or '$(PublishAot)' == 'true'"
+		Label="ZodSharp trimming feature switches"
+	>
+		<RuntimeHostConfigurationOption Include="ZodSharp.Reflection.IsSupported" Value="false" Trim="true" />
+	</ItemGroup>
+</Project>

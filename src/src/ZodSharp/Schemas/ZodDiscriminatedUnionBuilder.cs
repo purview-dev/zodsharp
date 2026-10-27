@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
@@ -14,6 +15,7 @@ public class ZodDiscriminatedUnionBuilder(string discriminator)
 {
 	readonly Dictionary<string, IZodSchema<object, object>> _options = [];
 	readonly List<string> _order = [];
+	readonly List<ZodDiscriminatedUnion.DiscriminatorReader> _readers = [];
 
 	/// <summary>
 	/// Adds an object-typed option to the discriminated union.
@@ -37,13 +39,29 @@ public class ZodDiscriminatedUnionBuilder(string discriminator)
 	/// <param name="value">The discriminator value</param>
 	/// <param name="schema">The schema for this option</param>
 	/// <returns>This builder for method chaining</returns>
-	public ZodDiscriminatedUnionBuilder Option<T>(string value, IZodSchema<T, T> schema)
+	/// <remarks>
+	/// A CLR value of type <typeparamref name="T"/> (or a type derived from it) has its discriminator read through an
+	/// accessor built from <typeparamref name="T"/>'s public properties, which the
+	/// <see cref="DynamicallyAccessedMembersAttribute"/> preserves - so a POCO union is trim- and Native AOT-safe.
+	/// </remarks>
+	public ZodDiscriminatedUnionBuilder Option<
+		[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T
+	>(string value, IZodSchema<T, T> schema)
 	{
 		if (schema is null)
 			throw new ArgumentNullException(nameof(schema));
 
 		AddOption(value, new SchemaWrapper<T>(schema));
+		AddReader(typeof(T));
 		return this;
+	}
+
+	void AddReader([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] Type type)
+	{
+		if (type == typeof(object) || _readers.Exists(reader => reader.Type == type))
+			return;
+
+		_readers.Add(new(type, ZodDiscriminatedUnion.BuildAccessor(type, discriminator)));
 	}
 
 	void AddOption(string value, IZodSchema<object, object> schema)
@@ -57,7 +75,8 @@ public class ZodDiscriminatedUnionBuilder(string discriminator)
 	/// <summary>
 	/// Builds the discriminated union schema.
 	/// </summary>
-	public ZodDiscriminatedUnion Build() => new(discriminator, _options.ToImmutableDictionary(), [.. _order]);
+	public ZodDiscriminatedUnion Build() =>
+		new(discriminator, _options.ToImmutableDictionary(), [.. _order], [.. _readers]);
 
 	sealed class SchemaWrapper<T>(IZodSchema<T, T> inner) : IZodSchema<object, object>, IOptionalSchema
 	{

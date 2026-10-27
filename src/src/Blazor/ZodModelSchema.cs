@@ -13,6 +13,10 @@ namespace ZodSharp.Blazor;
 /// </summary>
 public static class ZodModelSchema
 {
+	const string ObjectModelRequirement =
+		"Reads the form model and its nested models by reflection, which a trimmer cannot follow. Validate with a "
+		+ "[ZodSchema] generated validator, or ZodModelSchema.For<TModel>(IZodSchema<TModel, TModel>), instead.";
+
 	/// <summary>
 	/// Validates a CLR form model with a schema of the model's own type.
 	/// </summary>
@@ -35,9 +39,17 @@ public static class ZodModelSchema
 	/// <param name="schema">The object schema.</param>
 	/// <returns>The validator to pass as <see cref="ZodValidator.Schema"/>.</returns>
 	/// <remarks>
+	/// <para>
 	/// Collections are passed to the schema as they are (their elements are not converted), and there is no member
 	/// validation, so a field change validates the whole model and keeps the changed field's errors.
+	/// </para>
+	/// <para>
+	/// The model is read by reflection, including nested model types a trimmer cannot see, so this is annotated
+	/// <see cref="RequiresUnreferencedCodeAttribute"/>. In a trimmed or WebAssembly-AOT application validate with a
+	/// <c>[ZodSchema]</c> generated validator (or <see cref="For{TModel}(IZodSchema{TModel, TModel})"/>) instead.
+	/// </para>
 	/// </remarks>
+	[RequiresUnreferencedCode(ObjectModelRequirement)]
 	public static IZodUntypedValidator For<
 		[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] TModel
 	>(ZodObject schema)
@@ -47,6 +59,7 @@ public static class ZodModelSchema
 		return new ObjectModelValidator(typeof(TModel), schema);
 	}
 
+	[RequiresUnreferencedCode(ObjectModelRequirement)]
 	sealed class ObjectModelValidator(Type modelType, ZodObject schema) : IZodUntypedValidator
 	{
 		static readonly ConcurrentDictionary<Type, PropertyInfo[]> PropertiesByType = new();
@@ -126,12 +139,6 @@ public static class ZodModelSchema
 			&& type != typeof(Uri)
 			&& !typeof(IEnumerable).IsAssignableFrom(type);
 
-		[UnconditionalSuppressMessage(
-			"Trimming",
-			"IL2070:DynamicallyAccessedMembers",
-			Justification = "The root model type is annotated on For<TModel>; nested model types are reached through "
-				+ "the root's properties and are application types. A trimmed property is simply not validated."
-		)]
 		static PropertyInfo[] GetReadableProperties(Type type) =>
 			[
 				.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance)

@@ -19,6 +19,7 @@
 				"analyzers/dotnet/cs/Purview.ZodSharp.CodeFixes.dll",
 				"analyzers/dotnet/cs/Purview.ZodSharp.SourceGenerators.dll",
 				"buildTransitive/Purview.ZodSharp.props",
+				"buildTransitive/Purview.ZodSharp.targets",
 				"lib/$(TFM)/Purview.ZodSharp.dll",
 				"lib/$(TFM)/Purview.ZodSharp.xml",
 				"purview-logo-light.png",

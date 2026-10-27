@@ -23,13 +23,10 @@ public class ZodDiscriminatedUnion(
 	ImmutableDictionary<string, IZodSchema<object, object>> options
 ) : ZodType<object, object>
 {
-	// Reflection on the discriminator is unavoidable for POCO inputs, but it only has to happen once per
-	// (type, discriminator) pair: the accessor is compiled and cached, so validation hot paths run direct
-	// property access with no reflection and no boxing for string discriminators.
-	static readonly ConditionalWeakTable<
-		Type,
-		ConcurrentDictionary<string, Func<object, string?>>
-	> DiscriminatorAccessors = [];
+	// A POCO's discriminator is read through an accessor built once per runtime type and cached on this union (the
+	// readers depend on the options this union was built with): a compiled property read where dynamic code is
+	// available, so validation hot paths do no reflection and no boxing for string discriminators.
+	readonly ConcurrentDictionary<Type, Func<object, string?>> _accessors = new();
 
 	static readonly Func<object, string?> MissingDiscriminatorAccessor = static _ => null;
 
@@ -38,6 +35,8 @@ public class ZodDiscriminatedUnion(
 	// hash-based, so it could differ between processes.
 	readonly ImmutableArray<string> _optionKeys = [.. options.Keys.Order(StringComparer.Ordinal)];
 
+	readonly ImmutableArray<DiscriminatorReader> _readers = [];
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ZodDiscriminatedUnion"/> class, listing the options in
 	/// <paramref name="optionOrder"/> in messages and parameters.
@@ -45,15 +44,26 @@ public class ZodDiscriminatedUnion(
 	/// <param name="discriminator">The discriminator field name.</param>
 	/// <param name="options">The union options.</param>
 	/// <param name="optionOrder">The option keys in declaration order.</param>
+	/// <param name="readers">The discriminator readers built for the options' CLR types.</param>
 	internal ZodDiscriminatedUnion(
 		string discriminator,
 		ImmutableDictionary<string, IZodSchema<object, object>> options,
-		ImmutableArray<string> optionOrder
+		ImmutableArray<string> optionOrder,
+		ImmutableArray<DiscriminatorReader> readers
 	)
 		: this(discriminator, options)
 	{
 		_optionKeys = optionOrder;
+		_readers = readers;
 	}
+
+	/// <summary>
+	/// A discriminator reader for one option's CLR type, built from the type the builder was given through
+	/// <c>Option&lt;T&gt;</c>, so it needs no reflection over an unknown type.
+	/// </summary>
+	/// <param name="Type">The option type.</param>
+	/// <param name="Read">The accessor, or <see langword="null"/> when the type has no discriminator property.</param>
+	internal readonly record struct DiscriminatorReader(Type Type, Func<object, string?>? Read);
 
 	// Exposed to the JSON Schema exporter, which exports the union as oneOf with the discriminator recorded.
 	internal string Discriminator => discriminator;
@@ -122,49 +132,109 @@ public class ZodDiscriminatedUnion(
 			return TryGetDictionaryDiscriminatorValue(dictionary);
 		}
 
-		var type = value.GetType();
-		var accessors = DiscriminatorAccessors.GetValue(type, static _ => new ConcurrentDictionary<
-			string,
-			Func<object, string?>
-		>(StringComparer.OrdinalIgnoreCase));
-		var accessor = accessors.GetOrAdd(
-			discriminator,
-			static (name, candidateType) =>
-				BuildDiscriminatorAccessor(candidateType, name) ?? MissingDiscriminatorAccessor,
-			type
+		var accessor = _accessors.GetOrAdd(
+			value.GetType(),
+			static (type, state) =>
+				ResolveAccessor(type, state.Discriminator, state.Readers) ?? MissingDiscriminatorAccessor,
+			(Discriminator: discriminator, Readers: _readers)
 		);
 
 		return accessor(value);
 	}
 
 	/// <summary>
-	/// Compiles a <see cref="Func{T, TResult}"/> that reads the discriminator property from an instance,
-	/// so subsequent validations avoid reflection and, for <see cref="string"/> discriminators, boxing.
+	/// Resolves the discriminator accessor for a POCO: the reader built for the option type it is (or derives from),
+	/// otherwise the reflection fallback when <see cref="ZodReflectionFeature.IsSupported"/>.
 	/// </summary>
-	/// <param name="type">The runtime type of the value being validated.</param>
+	static Func<object, string?>? ResolveAccessor(
+		Type type,
+		string discriminator,
+		ImmutableArray<DiscriminatorReader> readers
+	)
+	{
+		foreach (var reader in readers)
+		{
+			if (reader.Type == type && reader.Read is not null)
+				return reader.Read;
+		}
+
+		foreach (var reader in readers)
+		{
+			if (reader.Type.IsAssignableFrom(type) && reader.Read is not null)
+				return reader.Read;
+		}
+
+		return ZodReflectionFeature.IsSupported ? BuildReflectiveAccessor(type, discriminator) : null;
+	}
+
+	/// <summary>
+	/// Builds the accessor for a type the builder was given through <c>Option&lt;T&gt;</c>. The type's public
+	/// properties are preserved by the <see cref="DynamicallyAccessedMembersAttribute"/> on <c>T</c>, so this is
+	/// safe under trimming and Native AOT.
+	/// </summary>
+	/// <param name="type">The option type.</param>
 	/// <param name="discriminator">The discriminator property name.</param>
-	/// <returns>The compiled accessor, or <see langword="null"/> when no readable property exists.</returns>
-	/// <remarks>
-	/// The expression-compiled fast path needs runtime code generation, which Native AOT does not provide.
-	/// When it is unavailable this falls back to plain reflection: slower per call, but correct, and still
-	/// built once per type because the result is cached by the caller. The discriminator property belongs to
-	/// the consumer's own type, so a trimmed application has to preserve it — which it already does if that
-	/// type is serialized.
-	/// </remarks>
+	/// <returns>The accessor, or <see langword="null"/> when the type has no readable discriminator property.</returns>
+	internal static Func<object, string?>? BuildAccessor(
+		[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] Type type,
+		string discriminator
+	) =>
+		CreateAccessor(
+			type,
+			FindProperty(type.GetProperties(BindingFlags.Public | BindingFlags.Instance), discriminator)
+		);
+
+	/// <summary>
+	/// The fallback for a POCO whose type was not supplied through <c>Option&lt;T&gt;</c>: reads the discriminator from
+	/// the runtime type by name, which a trimmer cannot follow.
+	/// </summary>
+#if NET9_0_OR_GREATER
+	[RequiresUnreferencedCode(
+		"Reads the discriminator from a type that was not supplied through Option<T>. Add each option with Option<T> "
+			+ "so its properties are preserved, or validate dictionaries/JSON."
+	)]
+#else
+	// .NET 8's trimming tools ignore feature guards, so on net8.0 this cannot be expressed as a guarded requirement
+	// without surfacing a warning for every use of the type. The fallback is reached only for a POCO whose type was
+	// not supplied through Option<T>; under trimming its property may be gone, in which case the value is reported as
+	// missing its discriminator (the union fails closed). Add options with Option<T> in a trimmed net8.0 application.
 	[UnconditionalSuppressMessage(
 		"Trimming",
 		"IL2070:UnrecognizedReflectionPattern",
-		Justification = "The discriminator is a property of the consumer's own validated type, resolved from "
-			+ "its runtime type. A trimmed application must preserve that type's properties; it is the "
-			+ "consumer's model, not library-internal state."
+		Justification = "net8.0 only: reached for a POCO of a type not supplied through Option<T>; a trimmed property "
+			+ "makes the union report a missing discriminator rather than accept the value. Option<T> is the trim-safe path."
 	)]
-	static Func<object, string?>? BuildDiscriminatorAccessor(Type type, string discriminator)
-	{
-		var property = type.GetProperty(
-			discriminator,
-			BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase
+#endif
+	static Func<object, string?>? BuildReflectiveAccessor(Type type, string discriminator) =>
+		CreateAccessor(
+			type,
+			FindProperty(type.GetProperties(BindingFlags.Public | BindingFlags.Instance), discriminator)
 		);
 
+	// The discriminator matches case-insensitively, as Type.GetProperty with BindingFlags.IgnoreCase did; the first
+	// declared match wins.
+	static PropertyInfo? FindProperty(PropertyInfo[] properties, string discriminator)
+	{
+		foreach (var property in properties)
+		{
+			if (string.Equals(property.Name, discriminator, StringComparison.OrdinalIgnoreCase))
+				return property;
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Compiles a <see cref="Func{T, TResult}"/> that reads the discriminator property from an instance, so
+	/// subsequent validations avoid reflection and, for <see cref="string"/> discriminators, boxing.
+	/// </summary>
+	/// <remarks>
+	/// The expression-compiled fast path needs runtime code generation, which Native AOT does not provide; there the
+	/// accessor reads the property through <see cref="PropertyInfo.GetValue(object)"/> instead. Either way it is built
+	/// once per type, because the result is cached by the caller.
+	/// </remarks>
+	static Func<object, string?>? CreateAccessor(Type type, PropertyInfo? property)
+	{
 		if (property is null || !property.CanRead || property.GetMethod is not { IsStatic: false })
 			return null;
 

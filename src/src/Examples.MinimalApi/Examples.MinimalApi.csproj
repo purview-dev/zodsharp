@@ -39,4 +39,7 @@
 			PrivateAssets="all"
 		/>
 	</ItemGroup>
+
+	<!-- The Purview.ZodSharp package ships this through buildTransitive; a ProjectReference does not import it. -->
+	<Import Project="..\ZodSharp\Sdk\buildTransitive\Purview.ZodSharp.targets" />
 </Project>
