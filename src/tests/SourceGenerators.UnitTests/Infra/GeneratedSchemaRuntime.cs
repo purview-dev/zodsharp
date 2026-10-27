@@ -52,6 +52,62 @@ static class GeneratedSchemaRuntime
 		return GetErrors(result);
 	}
 
+	public static async Task<ImmutableArray<ValidationError>> RunMemberValidationAsync(
+		Assembly assembly,
+		string schemaTypeName,
+		object value,
+		string memberName,
+		IServiceProvider? services = null,
+		CancellationToken cancellationToken = default
+	)
+	{
+		var pending = GetStaticMethod(assembly, schemaTypeName, "ValidateMemberAsync", 4)
+			.Invoke(null, [value, memberName, services, cancellationToken])!;
+		var task = (Task)pending.GetType().GetMethod("AsTask")!.Invoke(pending, null)!;
+		await task.ConfigureAwait(false);
+		var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
+		return GetErrors(result);
+	}
+
+	public static bool RunTryResolveMember(
+		Assembly assembly,
+		string schemaTypeName,
+		object value,
+		ZodPath path,
+		out object? container,
+		out string memberName
+	)
+	{
+		object?[] arguments = [value, path, null, null];
+		var resolved = (bool)GetStaticMethod(assembly, schemaTypeName, "TryResolveMember", 4).Invoke(null, arguments)!;
+		container = arguments[2];
+		memberName = (string)arguments[3]!;
+		return resolved;
+	}
+
+	public static T InvokeStatic<T>(Assembly assembly, string typeName, string name, params object?[] arguments) =>
+		(T)GetStaticMethod(assembly, typeName, name, arguments.Length).Invoke(null, arguments)!;
+
+	public static object? GetStaticField(Assembly assembly, string typeName, string name) =>
+		assembly
+			.GetType(typeName, throwOnError: true)!
+			.GetField(name, BindingFlags.Public | BindingFlags.Static)!
+			.GetValue(null);
+
+	/// <summary>Unwraps the exception a reflected call threw.</summary>
+	public static Exception? Unwrap(Action action)
+	{
+		try
+		{
+			action();
+			return null;
+		}
+		catch (TargetInvocationException ex)
+		{
+			return ex.InnerException;
+		}
+	}
+
 	public static ImmutableArray<ValidationError> GetErrors(object result)
 	{
 		var errors = (ImmutableArray<ValidationError>)result.GetType().GetProperty("Errors")!.GetValue(result)!;

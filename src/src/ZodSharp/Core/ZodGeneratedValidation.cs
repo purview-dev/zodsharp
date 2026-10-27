@@ -366,6 +366,47 @@ public static class ZodGeneratedValidation
 	}
 
 	/// <summary>
+	/// Creates the DataAnnotations <c>ValidationContext</c> handed to <c>IValidatableObject</c>,
+	/// <c>IAsyncValidatableObject</c> and <c>AsyncValidationAttribute</c> inputs. The display name is set
+	/// explicitly, so the context never reflects over the instance to find one (trim-safe).
+	/// </summary>
+	/// <param name="instance">The object being validated.</param>
+	/// <param name="displayName">The display name of the object or member.</param>
+	/// <param name="services">The caller's services, if any.</param>
+	/// <param name="memberName">The member being validated, or <see langword="null"/> for the object itself.</param>
+	/// <returns>The context.</returns>
+	public static System.ComponentModel.DataAnnotations.ValidationContext CreateValidationContext(
+		object instance,
+		string displayName,
+		IServiceProvider? services,
+		string? memberName = null
+	)
+	{
+#if NET10_0_OR_GREATER
+		System.ComponentModel.DataAnnotations.ValidationContext context = new(instance, displayName, services, null);
+#else
+		var context = CreateLegacyValidationContext(instance, services);
+		context.DisplayName = displayName;
+#endif
+		if (memberName is not null)
+			context.MemberName = memberName;
+
+		return context;
+	}
+
+#if !NET10_0_OR_GREATER
+	[UnconditionalSuppressMessage(
+		"Trimming",
+		"IL2026:RequiresUnreferencedCode",
+		Justification = "The constructor only reflects to find a display name, which CreateValidationContext sets explicitly."
+	)]
+	static System.ComponentModel.DataAnnotations.ValidationContext CreateLegacyValidationContext(
+		object instance,
+		IServiceProvider? services
+	) => new(instance, services, null);
+#endif
+
+	/// <summary>
 	/// Merges a custom validation result into the error list.
 	/// </summary>
 	/// <typeparam name="T">The validated type.</typeparam>

@@ -641,6 +641,7 @@ static partial class SourceGenLibrary
 		ValidateCompareProperty(property, validationAttributes, compareAttribute, diagnostics);
 
 		ValidateErrorMessageResourceConfiguration(validationAttributes, property.Name, diagnostics);
+		ValidateErrorMessagePlaceholders(validationAttributes, property.Name, diagnostics);
 
 		diagnostics.AddRange(regularExpressionAttribute.Diagnostics);
 		diagnostics.AddRange(lengthAttribute.Diagnostics);
@@ -1480,6 +1481,130 @@ static partial class SourceGenLibrary
 				)
 			);
 		}
+	}
+
+	/// <summary>
+	/// Reports (ZODSGEN052) an attribute <c>ErrorMessage</c> that uses a positional placeholder the attribute
+	/// does not supply, or an unbalanced brace. The message is formatted at runtime by a never-throw engine
+	/// (defect G2), so this only catches the typo at build time.
+	/// </summary>
+	static void ValidateErrorMessagePlaceholders(
+		ImmutableArray<AttributeData> attributes,
+		string propertyName,
+		ImmutableArray<ReportableDiagnostic>.Builder diagnostics
+	)
+	{
+		foreach (var attribute in attributes)
+		{
+			if (
+				attribute.AttributeClass is not { } attributeClass
+				|| !TypeHelpers.InheritsFrom(
+					attributeClass,
+					TypeLibrary.System.ComponentModel.DataAnnotations.ValidationAttribute
+				)
+			)
+			{
+				continue;
+			}
+
+			string? message = null;
+			foreach (var namedArgument in attribute.NamedArguments)
+			{
+				if (namedArgument.Key == "ErrorMessage" && namedArgument.Value.Value is string text)
+					message = text;
+			}
+
+			if (
+				message is null
+				|| FindUnresolvablePlaceholder(message, GetMaxMessageOrdinal(attributeClass.Name)) is not { } token
+			)
+				continue;
+
+			diagnostics.Add(
+				ReportableDiagnostic.Create(
+					DiagnosticLibrary.UnresolvableMessagePlaceholder,
+					false,
+					GetAttributeLocation(attribute),
+					attributeClass.Name.EndsWith("Attribute", StringComparison.Ordinal)
+						? attributeClass.Name.Substring(0, attributeClass.Name.Length - "Attribute".Length)
+						: attributeClass.Name,
+					propertyName,
+					token
+				)
+			);
+		}
+	}
+
+	/// <summary>
+	/// The highest positional placeholder an attribute's <c>FormatErrorMessage</c> supplies (<c>{0}</c> is the
+	/// display name).
+	/// </summary>
+	static int GetMaxMessageOrdinal(string attributeName) =>
+		attributeName switch
+		{
+			"StringLengthAttribute" or "LengthAttribute" or "RangeAttribute" => 2,
+			"MinLengthAttribute"
+			or "MaxLengthAttribute"
+			or "RegularExpressionAttribute"
+			or "CompareAttribute"
+			or "AllowedValuesAttribute"
+			or "DeniedValuesAttribute" => 1,
+			_ => 0,
+		};
+
+	/// <summary>
+	/// Returns the first positional placeholder beyond <paramref name="maxOrdinal"/> or unbalanced brace, or
+	/// <see langword="null"/> when the message is well formed. Named placeholders are always accepted.
+	/// </summary>
+	internal static string? FindUnresolvablePlaceholder(string message, int maxOrdinal)
+	{
+		for (var i = 0; i < message.Length; i++)
+		{
+			var c = message[i];
+			if (c == '}')
+			{
+				if (i + 1 < message.Length && message[i + 1] == '}')
+				{
+					i++;
+					continue;
+				}
+
+				return "}";
+			}
+
+			if (c != '{')
+				continue;
+
+			if (i + 1 < message.Length && message[i + 1] == '{')
+			{
+				i++;
+				continue;
+			}
+
+			var close = message.IndexOf('}', i + 1);
+			var nextOpen = message.IndexOf('{', i + 1);
+			if (close < 0 || (nextOpen >= 0 && nextOpen < close))
+				return "{";
+
+			var token = message.Substring(i + 1, close - i - 1);
+			var nameEnd = token.IndexOfAny([',', ':']);
+			var name = (nameEnd < 0 ? token : token.Substring(0, nameEnd)).Trim();
+			if (
+				name.Length > 0
+				&& char.IsDigit(name[0])
+				&& (
+					!int.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out var ordinal)
+					|| ordinal > maxOrdinal
+				)
+			)
+			{
+				return message.Substring(i, close - i + 1);
+			}
+
+			i = close;
+		}
+
+		return null;
 	}
 
 	// Fallback used when no resolver is available (the analyzer call path): a type declared in source is

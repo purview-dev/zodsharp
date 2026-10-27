@@ -19,7 +19,7 @@ namespace ZodSharp.SourceGenerators;
 /// <see cref="RuleIdRegex"/> accepts a rule row with or without a leading pipe, because the two files are
 /// written in different table styles — <c>AnalyzerReleases.Shipped.md</c> delimits rows with pipes and
 /// <c>AnalyzerReleases.Unshipped.md</c> does not. Matching only the pipe-delimited form made
-/// <see cref="UnshippedRelease_GivenEveryRuleHasShipped_DeclaresNoRules"/> vacuous: a rule parked in the
+/// <see cref="UnshippedRelease_GivenUnreleasedRules_DeclaresExactlyThoseRules"/> vacuous: a rule parked in the
 /// unshipped file parsed as no rules at all, so the guard passed while the catalogue was wrong.
 /// </para>
 /// </remarks>
@@ -90,10 +90,18 @@ public partial class AnalyzerReleaseTrackingTests
 	];
 
 	/// <summary>
-	/// Rules added since the last release. Empty: every rule is recorded as shipped. A new or changed
-	/// diagnostic is added here and moves into <c>AnalyzerReleases.Shipped.md</c> when it ships.
+	/// Rules added since the last release. A new or changed diagnostic is added here and moves into
+	/// <c>AnalyzerReleases.Shipped.md</c> when it ships.
 	/// </summary>
-	static readonly string[] ExpectedUnshippedRuleIds = [];
+	static readonly string[] ExpectedUnshippedRuleIds =
+	[
+		"ZODSGEN047",
+		"ZODSGEN048",
+		"ZODSGEN049",
+		"ZODSGEN050",
+		"ZODSGEN051",
+		"ZODSGEN052",
+	];
 
 	[Test]
 	public async Task ShippedReleases_GivenEveryRelease_DeclareEveryDiagnosticId(CancellationToken cancellationToken)
@@ -112,7 +120,9 @@ public partial class AnalyzerReleaseTrackingTests
 	}
 
 	[Test]
-	public async Task UnshippedRelease_GivenEveryRuleHasShipped_DeclaresNoRules(CancellationToken cancellationToken)
+	public async Task UnshippedRelease_GivenUnreleasedRules_DeclaresExactlyThoseRules(
+		CancellationToken cancellationToken
+	)
 	{
 		// Arrange
 		var markdown = await ReadReleaseFileAsync("AnalyzerReleases.Unshipped.md", cancellationToken);
@@ -120,7 +130,7 @@ public partial class AnalyzerReleaseTrackingTests
 		// Act
 		var ruleIds = ReadRuleIds(markdown);
 
-		// Assert — the header stays so the file keeps its purpose; it just declares nothing right now.
+		// Assert — the header stays so the file keeps its purpose, and it declares exactly the unreleased rules.
 		await Assert.That(markdown).Contains("; Unshipped analyzer release");
 		await Assert.That(SortedRuleIds(ruleIds)).IsEqualTo(SortedRuleIds(ExpectedUnshippedRuleIds));
 	}

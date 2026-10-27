@@ -8,8 +8,6 @@ partial class ZodSchemaGenerator
 {
 	const string TypeMemberFieldName = "TypeMember";
 
-	const string ValidationContextType = "global::System.ComponentModel.DataAnnotations.ValidationContext";
-
 	const string ServiceProviderType = "global::System.IServiceProvider";
 
 	const string CancellationTokenType = "global::System.Threading.CancellationToken";

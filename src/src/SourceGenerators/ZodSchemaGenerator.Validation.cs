@@ -438,11 +438,11 @@ partial class ZodSchemaGenerator
 			writer.Assignment(
 				"var",
 				"validationContext",
-				$"new {ValidationContextType}(value, {schema.TargetType.Name.StringLiteral()}, services, null)"
+				$"{GeneratedValidation}.CreateValidationContext(value, {schema.TargetType.Name.StringLiteral()}, services)"
 			);
 			using (
 				writer.OpenBlockScope(
-					$"await foreach (var validationResult in ((global::System.ComponentModel.DataAnnotations.IAsyncValidatableObject)value).ValidateAsync(validationContext, cancellationToken).ConfigureAwait(false))"
+					$"await foreach (var validationResult in global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(((global::System.ComponentModel.DataAnnotations.IAsyncValidatableObject)value).ValidateAsync(validationContext, cancellationToken), false))"
 				)
 			)
 			{
@@ -476,7 +476,7 @@ partial class ZodSchemaGenerator
 					writer.Assignment(
 						"var",
 						"validationContext",
-						$"new {ValidationContextType}(value, {schema.TargetType.Name.StringLiteral()}, services, null)"
+						$"{GeneratedValidation}.CreateValidationContext(value, {schema.TargetType.Name.StringLiteral()}, services)"
 					);
 					writer.Foreach(
 						"var validationResult in ((global::System.ComponentModel.DataAnnotations.IValidatableObject)value).Validate(validationContext)",
@@ -1079,7 +1079,7 @@ partial class ZodSchemaGenerator
 				writer.Assignment(
 					"var",
 					"validationContext",
-					$"new {ValidationContextType}(value, {MemberOf(property)}.DisplayName, services, null) {{ MemberName = {property.Name.StringLiteral()} }}"
+					$"{GeneratedValidation}.CreateValidationContext(value, {MemberOf(property)}.DisplayName, services, {property.Name.StringLiteral()})"
 				);
 
 				for (var i = 0; i < property.AsyncValidationAttributes.Count; i++)

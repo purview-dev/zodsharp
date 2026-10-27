@@ -479,4 +479,85 @@ static class DiagnosticLibrary
 		defaultSeverity: DiagnosticSeverity.Warning,
 		isEnabledByDefault: true
 	);
+
+	/// <summary>
+	/// ZODSGEN047: <c>[ValidatableType]</c> (Microsoft.Extensions.Validation) on a <c>[ZodSchema]</c> type is
+	/// redundant: the ZodSharp bridge resolves the generated validator first, and the attribute makes the M.E.V
+	/// generator emit a second, DataAnnotations-only validator for the same type.
+	/// </summary>
+	public static readonly DiagnosticDescriptor ValidatableTypeRedundant = new(
+		id: "ZODSGEN047",
+		title: "[ValidatableType] is redundant on a [ZodSchema] type",
+		messageFormat: "[ValidatableType] on '{0}' is redundant: the type is validated by its generated ZodSharp schema",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Info,
+		isEnabledByDefault: true
+	);
+
+	/// <summary>
+	/// ZODSGEN048: a type has rules that only run asynchronously (an <c>AsyncValidationAttribute</c> or
+	/// <c>IAsyncValidatableObject</c>) but a synchronous <c>Validate</c> is generated; it throws rather than
+	/// skip those rules.
+	/// </summary>
+	public static readonly DiagnosticDescriptor AsyncOnlyRulesWithSyncValidate = new(
+		id: "ZODSGEN048",
+		title: "Type has asynchronous-only rules but a synchronous Validate is generated",
+		messageFormat: "'{0}' has rules that only run asynchronously ({1}); the generated synchronous Validate throws InvalidOperationException, so call ValidateAsync",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
+	/// <summary>
+	/// ZODSGEN049: a member is typed as a closed class whose derived type has no <c>[ZodSchema]</c>, so a value
+	/// of that derived type is not validated.
+	/// </summary>
+	public static readonly DiagnosticDescriptor ClosedHierarchyDerivedTypeWithoutSchema = new(
+		id: "ZODSGEN049",
+		title: "Closed-hierarchy member has a derived type without [ZodSchema]",
+		messageFormat: "Property '{0}' is typed as the closed type '{1}', but the derived type '{2}' has no [ZodSchema], so a value of that type is not validated",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
+	/// <summary>
+	/// ZODSGEN050: a generated <c>IValidateOptions</c> validator would conflict with a hand-authored
+	/// <c>[OptionsValidator]</c> class (SYSLIB1205); the ZodSharp validator is not generated.
+	/// </summary>
+	public static readonly DiagnosticDescriptor OptionsValidatorConflict = new(
+		id: "ZODSGEN050",
+		title: "Generated options validator conflicts with [OptionsValidator]",
+		messageFormat: "'{0}' would get a generated IValidateOptions validator, but '{1}' is an [OptionsValidator] class (SYSLIB1205); keep one generator by removing [OptionsValidator] or setting [ZodSchema(SuppressIValidateOptions = true)]. The ZodSharp validator was not generated.",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true
+	);
+
+	/// <summary>
+	/// ZODSGEN051: a <c>[ZodSchema]</c> type is declared in a Razor component. Razor compiles components with its
+	/// own source generator, and generators cannot see each other's output, so no schema is generated.
+	/// </summary>
+	public static readonly DiagnosticDescriptor ZodSchemaInRazorFile = new(
+		id: "ZODSGEN051",
+		title: "[ZodSchema] type declared in a Razor file",
+		messageFormat: "The [ZodSchema] type '{0}' is declared in a Razor file, which the ZodSharp source generator cannot see; move it to a .cs file",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
+	/// <summary>
+	/// ZODSGEN052: an attribute's <c>ErrorMessage</c> uses a positional placeholder the attribute does not
+	/// supply, or an unbalanced brace. The message is formatted with a never-throw engine, so the text is shown
+	/// literally rather than failing; the diagnostic catches the typo at build time.
+	/// </summary>
+	public static readonly DiagnosticDescriptor UnresolvableMessagePlaceholder = new(
+		id: "ZODSGEN052",
+		title: "Error message placeholder cannot be resolved",
+		messageFormat: "The ErrorMessage of [{0}] on '{1}' contains '{2}', which the attribute does not supply; it is shown literally",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
 }

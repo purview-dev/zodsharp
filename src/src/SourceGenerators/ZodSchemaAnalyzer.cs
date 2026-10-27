@@ -45,6 +45,11 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		DiagnosticLibrary.AutomaticScalarSchemaUnavailable,
 		DiagnosticLibrary.NestedSchemaExportDisabled,
 		DiagnosticLibrary.CollectionBehaviorNotApplicable,
+		DiagnosticLibrary.ValidatableTypeRedundant,
+		DiagnosticLibrary.AsyncOnlyRulesWithSyncValidate,
+		DiagnosticLibrary.ClosedHierarchyDerivedTypeWithoutSchema,
+		DiagnosticLibrary.OptionsValidatorConflict,
+		DiagnosticLibrary.UnresolvableMessagePlaceholder,
 	];
 
 	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => SupportedDiagnosticsList;
@@ -130,6 +135,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			ReportNestedSchemaExportDisabled(context, type, externalSchemas, typeLocation);
 
 		ReportCollectionBehaviorDiagnostics(context, type, typeLocation);
+
+		ReportValidationInputDiagnostics(context, type, zodSchemaData, hasIValidateOptions, typeLocation);
 
 		if (!hasDataAnnotations)
 		{
@@ -303,6 +310,134 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				)
 			);
 		}
+	}
+
+	/// <summary>
+	/// Reports the diagnostics for the validation inputs the generator reads besides DataAnnotations values:
+	/// a redundant <c>[ValidatableType]</c> (ZODSGEN047), async-only rules behind a synchronous
+	/// <c>Validate</c> (ZODSGEN048), a closed-hierarchy member whose derived type has no schema (ZODSGEN049),
+	/// and a generated options validator that would conflict with <c>[OptionsValidator]</c> (ZODSGEN050).
+	/// </summary>
+	static void ReportValidationInputDiagnostics(
+		SymbolAnalysisContext context,
+		INamedTypeSymbol type,
+		ZodSchemaAttributeData zodSchemaData,
+		bool hasIValidateOptions,
+		Location typeLocation
+	)
+	{
+		foreach (var attribute in type.GetAttributes())
+		{
+			if (
+				attribute.AttributeClass is { Name: "ValidatableTypeAttribute" } attributeClass
+				&& attributeClass.ContainingNamespace?.ToDisplayString() == "Microsoft.Extensions.Validation"
+			)
+			{
+				var location =
+					attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
+					?? typeLocation;
+				context.ReportDiagnostic(
+					Diagnostic.Create(DiagnosticLibrary.ValidatableTypeRedundant, location, type.Name)
+				);
+			}
+		}
+
+		List<string> asyncOnlyRules = [];
+		if (ValidationInputsResolver.GetValidatableObjectKinds(type).Async)
+			asyncOnlyRules.Add("IAsyncValidatableObject");
+
+		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		{
+			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
+				continue;
+
+			foreach (var attribute in SourceGenLibrary.GetValidationAttributes(property, context.Compilation))
+			{
+				if (
+					attribute.AttributeClass is { } attributeClass
+					&& ValidationInputsResolver.InheritsAsyncValidationAttribute(attributeClass)
+				)
+				{
+					asyncOnlyRules.Add($"[{attributeClass.Name}] on {property.Name}");
+				}
+			}
+
+			if (
+				TypeHelpers.UnwrapNullableType(property.Type)
+					is INamedTypeSymbol { TypeKind: TypeKind.Class } memberType
+				&& ValidationInputsResolver.RoslynFeatures.IsClosed(memberType)
+			)
+			{
+				foreach (
+					var derived in ValidationInputsResolver.GetClosedDerivedTypesWithoutSchema(
+						memberType,
+						context.CancellationToken
+					)
+				)
+				{
+					context.ReportDiagnostic(
+						Diagnostic.Create(
+							DiagnosticLibrary.ClosedHierarchyDerivedTypeWithoutSchema,
+							GetMemberLocation(property),
+							property.Name,
+							memberType.Name,
+							derived.Name
+						)
+					);
+				}
+			}
+		}
+
+		if (zodSchemaData.GenerateValidateMethod && asyncOnlyRules.Count > 0)
+		{
+			context.ReportDiagnostic(
+				Diagnostic.Create(
+					DiagnosticLibrary.AsyncOnlyRulesWithSyncValidate,
+					typeLocation,
+					type.Name,
+					string.Join(", ", asyncOnlyRules)
+				)
+			);
+		}
+
+		if (
+			hasIValidateOptions
+			&& type.TypeKind != TypeKind.Struct
+			&& zodSchemaData.GenerateValidateMethod
+			&& WouldGenerateOptionsValidator(context.Options, type, zodSchemaData)
+			&& ValidationInputsResolver.HasOptionsValidatorConflict(type)
+		)
+		{
+			context.ReportDiagnostic(
+				Diagnostic.Create(
+					DiagnosticLibrary.OptionsValidatorConflict,
+					typeLocation,
+					type.Name,
+					$"{type.Name}Validator"
+				)
+			);
+		}
+	}
+
+	/// <summary>
+	/// Mirrors the generator's options-validator decision: requested on the attribute, or picked up by the
+	/// assembly-level suffix auto-detection unless suppressed.
+	/// </summary>
+	static bool WouldGenerateOptionsValidator(
+		AnalyzerOptions options,
+		INamedTypeSymbol type,
+		ZodSchemaAttributeData zodSchemaData
+	)
+	{
+		if (zodSchemaData.GenerateIValidateOptions)
+			return true;
+
+		if (zodSchemaData.SuppressIValidateOptions)
+			return false;
+
+		var settings = GenerationSettingsResolver.Read(options.AnalyzerConfigOptionsProvider);
+		return settings.AutoGenerate
+			&& settings.Suffixes.Any(suffix => type.Name.EndsWith(suffix, StringComparison.Ordinal));
 	}
 
 	static Location GetTypeLocation(INamedTypeSymbol type)

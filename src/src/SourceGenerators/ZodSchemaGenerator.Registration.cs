@@ -105,7 +105,7 @@ partial class ZodSchemaGenerator
 			}
 		}
 
-		context.AddSource("ZodSharpSchemaRegistration.g.cs", writer);
+		context.AddSource("ZodSharpAssemblyRegistration.g.cs", writer);
 	}
 
 	/// <summary>

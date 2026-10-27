@@ -35,6 +35,22 @@ public class GeneratedValidationPerformanceTests
 
 	[Benchmark]
 	public ValidationResult<BenchmarkCustomer> Validate_Invalid() => BenchmarkCustomerSchema.Validate(_invalid);
+
+	[Benchmark]
+	public ValidationResult<BenchmarkCustomer> ValidateMember_Valid() =>
+		BenchmarkCustomerSchema.ValidateMember(_valid, nameof(BenchmarkCustomer.Email));
+
+	[Benchmark]
+	public ValidationResult<BenchmarkCustomer> ValidateMember_Invalid() =>
+		BenchmarkCustomerSchema.ValidateMember(_invalid, nameof(BenchmarkCustomer.Email));
+
+	[Benchmark]
+	public bool TryResolveMember_NestedPath() =>
+		BenchmarkCustomerSchema.TryResolveMember(_invalid, NestedPath, out _, out _);
+
+	static readonly ZodPath NestedPath = BenchmarkCustomerSchema.Paths.Address.Append(
+		ZodPathSegment.Member(nameof(BenchmarkAddress.City))
+	);
 }
 
 /// <summary>A generated-schema benchmark model.</summary>
