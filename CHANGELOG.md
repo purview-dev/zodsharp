@@ -355,6 +355,12 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **`Purview.ZodSharp.AspNetCore.OpenApi` alone is enough to call `AddOpenApi`.** The package referenced
+  Microsoft.AspNetCore.OpenApi with the default private assets, so a consumer that installed only
+  `Purview.ZodSharp.AspNetCore.OpenApi` (as its README shows) got Microsoft.AspNetCore.OpenApi's source generator but
+  not its `build/` targets, which enable the generator's interceptors, and `AddOpenApi(...)` failed to compile with
+  CS9137. The dependency now flows every asset. Found by the new packed-consumer release gate
+  (`just smoke-packed-consumers`), which builds a Native AOT minimal API against the packed packages only.
 - **Referencing both JSON packages no longer makes option-less calls ambiguous.** Both packages declare
   `DeserializeAndValidate`, `DeserializeAndValidateAsync`, `ValidateAndSerialize` and `ValidateAndSerializeAsync` in
   namespace `ZodSharp` with an optional options/settings parameter, so `schema.DeserializeAndValidate(json)` failed

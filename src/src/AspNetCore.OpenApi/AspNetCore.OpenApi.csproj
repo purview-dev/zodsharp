@@ -24,7 +24,13 @@
 
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
-		<PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+		<!--
+			PrivateAssets="none": Microsoft.AspNetCore.OpenApi's source generator reaches a consumer that references only
+			this package, so its build/ targets must too - they enable the generator's interceptors
+			(InterceptorsNamespaces). With the default private assets the dependency excluded Build, and AddOpenApi(...)
+			failed to compile with CS9137. scripts/test-packed-consumers.ps1 builds such a consumer.
+		-->
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" PrivateAssets="none" />
 	</ItemGroup>
 
 	<ItemGroup>
