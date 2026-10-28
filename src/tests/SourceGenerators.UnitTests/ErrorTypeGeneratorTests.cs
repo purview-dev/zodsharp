@@ -28,6 +28,32 @@ public class ErrorTypeGeneratorTests : ErrorTypeGeneratorTestBase
 		""";
 
 	[Test]
+	public async Task GivenErrorTypeField_DoesNotDeclareTheErrorTypeAttribute(CancellationToken cancellationToken)
+	{
+		// Arrange
+		var source = Source;
+
+		// Act
+		using var result = await GenerateAsync(source, cancellationToken);
+
+		// Assert - [ErrorType] is defined once in Purview.ZodSharp; a copy per project duplicated its documentation ID.
+		await Assert.That(result).HasNoErrorDiagnostics();
+		var query = result.Generated();
+		await Assert.That(query.HasClass("ConcurrentErrorType")).IsTrue();
+		await Assert.That(query.HasClass("ErrorTypeAttribute")).IsFalse();
+		await Assert.That(query.HasClass("EmbeddedAttribute")).IsFalse();
+
+		var field = result
+			.CompilationResult.Compilation.GetTypeByMetadataName("Testing.ConcurrentErrorType")!
+			.GetMembers("SaveFailed")
+			.Single();
+		var attributeClass = field.GetAttributes().Single().AttributeClass!;
+		await Assert
+			.That(attributeClass.ContainingAssembly.Name)
+			.IsEqualTo(typeof(ErrorTypeAttribute).Assembly.GetName().Name);
+	}
+
+	[Test]
 	public async Task GivenErrorTypeFieldWithParameters_GeneratesCreateAndThrowMethods(
 		CancellationToken cancellationToken
 	)

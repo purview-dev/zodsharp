@@ -154,9 +154,8 @@ public sealed class MSBuildSwitchGlobalConfigTests
 			Environment.NewLine,
 			result
 				.GeneratedTrees
-				// The generated attribute sources document the switches, so only the schema outputs are inspected.
+				// Only the schema outputs are inspected; a generated rule attribute documents its own options.
 				.Where(tree => !tree.FilePath.EndsWith("Attribute.g.cs", StringComparison.Ordinal))
-				.Where(tree => !tree.FilePath.EndsWith("EmbeddedAttribute.cs", StringComparison.Ordinal))
 				.Select(tree => tree.GetText(cancellationToken).ToString())
 		);
 	}

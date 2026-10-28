@@ -1,6 +1,6 @@
 # Source Generator
 
-Mark a class, struct, or record with `[ZodSchema]` and the generator emits a static, zero-allocation validator at compile time. The `[ZodSchema]` attribute is generated into the `ZodSharp` namespace by the generator itself (assembly `Purview.ZodSharp.SourceGenerators`), so no extra package is needed beyond `Purview.ZodSharp`.
+Mark a class, struct, or record with `[ZodSchema]` and the generator emits a static, zero-allocation validator at compile time. The `[ZodSchema]` attribute is `ZodSharp.ZodSchemaAttribute`, defined in the `Purview.ZodSharp` assembly (as is `[ErrorType]`), so no extra package is needed beyond `Purview.ZodSharp`. The generator emits no marker types into your project, so every project in a solution binds to the same attribute.
 
 ```csharp
 using System.ComponentModel.DataAnnotations;

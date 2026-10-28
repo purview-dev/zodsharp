@@ -355,6 +355,26 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **A multi-project solution's OpenAPI document no longer crashes with "An item with the same key has already been
+  added. Key: T:ZodSharp.Core.ErrorTypeAttribute".** The generators emitted `ZodSharp.ZodSchemaAttribute` and
+  `ZodSharp.Core.ErrorTypeAttribute` - public, with XML documentation - into every compilation as
+  post-initialization output, which every other generator sees. So every project in a solution documented the same
+  type IDs. The ASP.NET Core OpenAPI XML-comment generator (`Microsoft.AspNetCore.OpenApi` 10 and later, referenced
+  directly) reads an app's own documented public *and internal* types plus the XML file of every referenced project,
+  emits one `cache.Add` per entry, and threw the first time `/openapi/v1.json` was requested. `[Embedded]` already
+  kept the copies from colliding at compile time (no CS0436), but not in documentation. Making the copies `internal`
+  would not have helped either, because the generator also reads internal types and the XML file still documents
+  them. Both attributes are now defined once, in `Purview.ZodSharp`. The generators emit no marker types (and no
+  `Microsoft.CodeAnalysis.EmbeddedAttribute`) into a consumer compilation. This is binary compatible: the package
+  already exposed both types, with the same members, as generated `[Embedded]` copies. **2.x is affected too**
+  (reproduced with 2.4.2 on `net10.0` and Microsoft.AspNetCore.OpenApi 10.0.13): any app whose OpenAPI XML-comment
+  generator reads a referenced ZodSharp project's XML documentation file. A per-assembly generated type
+  (`ZodSharp.Generated.{Assembly}ZodSharpSchemas`, `{Assembly}ZodSharpServiceCollectionExtensions`,
+  `{Type}Schema` with its `Paths`/`JsonNames`, `{Type}SchemaValidator`) is named for its assembly or type, so it
+  cannot collide. The built-in rule attributes are compiled into `Purview.ZodSharp`, and only a rule declared in the
+  compilation gets a generated attribute. The packed-consumer gate (`just smoke-packed-consumers`) adds a
+  multi-project consumer: a `[ZodSchema]`/`[ErrorType]` class library under a minimal API with XML documentation and
+  a direct Microsoft.AspNetCore.OpenApi reference. It failed with this error before the fix.
 - **`Purview.ZodSharp.AspNetCore.OpenApi` alone is enough to call `AddOpenApi`.** A consumer that installed only
   `Purview.ZodSharp.AspNetCore.OpenApi` (as its README shows) got Microsoft.AspNetCore.OpenApi's source generator,
   transitively, but not its `build/` targets, which enable the generator's interceptors, so `AddOpenApi(...)` failed
@@ -491,6 +511,11 @@ Each note names the old form, the new form, and the edit to make.
   register a validator per name if you relied on the old scope.
 - **Endpoint filter.** `WithZodSharpValidation<T>()` threw on every request when no validator was registered → it
   fails when the endpoint is built. Register the validator (or factory) before mapping the endpoint.
+- **`[ZodSchema]` and `[ErrorType]` come from `Purview.ZodSharp`.** They were generated into each project as
+  `[Embedded]` types, which the compiler hides from other assemblies; they are now ordinary public types in the
+  package (same names, namespaces and members), so no source edit is needed. A project that declared its own
+  `partial class ZodSchemaAttribute` or `ErrorTypeAttribute` to extend the generated one now gets CS0436 → remove
+  the declaration. A library compiled with 2.x still carries hidden `[Embedded]` copies, which do not conflict.
 
 ## 2.4.1
 

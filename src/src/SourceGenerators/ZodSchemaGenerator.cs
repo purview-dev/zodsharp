@@ -18,14 +18,9 @@ public sealed partial class ZodSchemaGenerator : IIncrementalGenerator
 {
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
-		context
-			.RegisterEmbeddedAttribute<ZodSchemaGenerator>()
-			.RegisterPostInitializationOutput(static ctx =>
-			{
-				foreach (var (hintName, sourceText) in AttributeGenHelper.GenerateMarkers())
-					ctx.AddSource($"{hintName}.g.cs", sourceText);
-			});
-
+		// No post-initialization output: [ZodSchema] is defined once in Purview.ZodSharp. A copy generated into every
+		// compilation gave each project in a solution an identical type and XML documentation ID, which crashed the
+		// ASP.NET Core OpenAPI XML-comment generator ("An item with the same key has already been added").
 		var generationValueProviders = SourceGenLibrary.GetGeneratorValueProviders(context);
 
 		context.RegisterSourceOutput(generationValueProviders, static (spc, model) =>

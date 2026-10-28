@@ -89,7 +89,7 @@ Formatting is enforced with CSharpier; `.editorconfig` at the repo root defines 
 
 ## Source generators
 
-The `[ZodSchema]` attribute (generated into the `ZodSharp` namespace) marks a class or struct for compile-time validator generation. The generator produces a `{TypeName}Schema` static class with `Validate`/`Parse`, optional value-first composition methods (`ApplyAnd`, `ApplyOr`, `ApplyRefine`, controlled by `EnableComposition`, default `true`), and optional `IValidateOptions<T>` support.
+The `[ZodSchema]` attribute (`ZodSharp.ZodSchemaAttribute`, defined in the core `Purview.ZodSharp` assembly, like `[ErrorType]`) marks a class or struct for compile-time validator generation. The generator produces a `{TypeName}Schema` static class with `Validate`/`Parse`, optional value-first composition methods (`ApplyAnd`, `ApplyOr`, `ApplyRefine`, controlled by `EnableComposition`, default `true`), and optional `IValidateOptions<T>` support.
 
 The generator and analyzer are built with `Purview.SourceGeneratorFramework`:
 

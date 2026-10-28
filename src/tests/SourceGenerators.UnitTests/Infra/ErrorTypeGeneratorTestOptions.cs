@@ -18,7 +18,6 @@ public sealed record ErrorTypeGeneratorTestOptions : SourceGeneratorTestOptions
 			typeof(ZodException),
 			typeof(ImmutableArray),
 		];
-		ExcludeGeneratedSourceHintNames = ["ErrorTypeAttribute", "EmbeddedAttribute"];
 		DisableSourceGeneratorPropertyName = PropertyLibrary.DisableErrorTypeGeneratorProperty;
 	}
 }

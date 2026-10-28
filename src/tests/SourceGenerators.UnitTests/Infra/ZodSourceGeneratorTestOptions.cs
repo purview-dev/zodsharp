@@ -20,7 +20,6 @@ public sealed record ZodSourceGeneratorTestOptions : SourceGeneratorTestOptions
 			typeof(Microsoft.Extensions.Options.ValidateOptionsResult),
 		];
 		AdditionalNamespaces = [TypeLibraryGenerator.ZodSharpNamespace];
-		ExcludeGeneratedSourceHintNames = ["EmbeddedAttribute", "ZodSchemaAttribute"];
 		DisableSourceGeneratorPropertyName = PropertyLibrary.DisableZodSharpSourceGeneratorProperty;
 	}
 
