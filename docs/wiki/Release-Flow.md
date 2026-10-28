@@ -67,8 +67,8 @@ just verify-trim <rid>                        # rooted and consumer Native AOT h
 just publish-aot-sample                       # Native AOT minimal API sample and leak scan
 ```
 
-`just verify-pack-rules` re-proves the forbidden-content rules against the packages in `artifacts/`; run it after
-changing `PackValidation`.
+`just verify-pack-rules` re-proves the forbidden-content rules against the packages in `artifacts/` (after `just pipeline-local-release`, which moves them to the local feed, pass `-PackagesFolder <feed>`); run it after changing
+`PackValidation`.
 
 ## Workflows
 

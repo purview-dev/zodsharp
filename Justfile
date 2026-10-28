@@ -75,8 +75,9 @@ smoke-packed-consumers *args:
     pwsh -NoProfile -File scripts/test-packed-consumers.ps1 {{ args }}
 
 # Prove every PackValidation ForbiddenContent rule in .config/purview-build.json rejects a package: injects a matching
-# file into scratch copies of the packed packages and runs the real purview-build validation on them. Pack first
-# (`just pipeline-pack-validate`, or `just pack ./artifacts -c Release`); pass -PackagesFolder <dir> to use other packages.
+# file into scratch copies of the packed packages and runs the real purview-build validation on them. Reads artifacts/,
+# so pack first (`just pipeline-pack-validate`, or `just pack ./artifacts -c Release`). `just pipeline-local-release`
+# moves its packages to the local feed, so pass -PackagesFolder p:/_sync-projects/.local-nuget after it.
 [group('Pipeline')]
 verify-pack-rules *args: ensure-pipeline-tool
     echo "Proving the pack-validation forbidden-content rules..."
@@ -146,7 +147,7 @@ pack publish_folder=artifacts_folder *args:
 publish-aot-sample rid=default_rid *args:
     echo "Publishing {{ BLUE }}{{ aot_sample_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }}"
     dotnet publish {{ aot_sample_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/aot-sample/{{ rid }} -warnaserror {{ args }}
-    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/aot-sample/{{ rid }}
+    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/aot-sample/{{ rid }} {{ root_folder }}/src/Examples.MinimalApi/bin/Release
 
 # The CI `verify-trim` job runs the same recipe for linux-x64. Windows needs the MSVC C++ build tools, Linux clang.
 # The harness publishes twice - every ZodSharp assembly rooted, then as a plain consumer - and each binary exits non-zero on any mismatch.
@@ -159,7 +160,7 @@ verify-trim rid=default_rid *args:
     echo "Publishing {{ BLUE }}{{ trim_verification_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }} (consumer)"
     dotnet publish {{ trim_verification_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer -p:TrimVerificationMode=Consumer -warnaserror {{ args }}
     {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer/ZodSharp.TrimSafety.Verification
-    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/trim-verification/{{ rid }}/rooted {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer
+    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/trim-verification/{{ rid }}/rooted {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer {{ root_folder }}/tests/TrimSafety.Verification/bin/Release
 
 # The CI `wasm-trimmed` job runs the same publish and check; the nightly `wasm-aot` job adds -p:RunAOTCompilation=true (needs `dotnet workload install wasm-tools`).
 # Publish the Blazor WebAssembly sample trimmed, failing on any IL2xxx/IL3xxx warning, then check the ZodSharp size budget
@@ -169,7 +170,7 @@ wasm-size *args:
     rm -rf {{ artifacts_folder }}/wasm-trimmed
     dotnet publish {{ wasm_client_project }} -c Release -o {{ artifacts_folder }}/wasm-trimmed -warnaserror {{ args }}
     pwsh -NoProfile -File scripts/check-wasm-size.ps1 -PublishDirectory {{ artifacts_folder }}/wasm-trimmed
-    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/wasm-trimmed
+    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/wasm-trimmed {{ root_folder }}/src/Examples.Blazor.Client/bin/Release
 
 # Displays the current version of the project.
 # Requires Bun.

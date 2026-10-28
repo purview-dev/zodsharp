@@ -22,7 +22,8 @@
 
 .PARAMETER PackagesFolder
 	Folder holding the packed .nupkg and .snupkg files of the current version. Defaults to artifacts/, where
-	`just pipeline-pack-validate` and `just pack` write them.
+	`just pipeline-pack-validate` and `just pack` write them. `just pipeline-local-release` moves them to the local feed,
+	so pass that folder after it.
 
 .PARAMETER KeepArtifacts
 	Leave the scratch repositories in place for inspection.
@@ -47,7 +48,10 @@ if ($rules.Count -eq 0) { throw "No ForbiddenContent rules for '*' in $configPat
 
 $packages = @(Get-ChildItem $PackagesFolder -Filter "*.$version.nupkg" -File | Sort-Object Name)
 if ($packages.Count -eq 0) {
-	throw "No $version packages in '$PackagesFolder'. Pack first: just pipeline-pack-validate (or just pack -c Release)."
+	throw (
+		"No $version packages in '$PackagesFolder'. Pack first (just pipeline-pack-validate), or pass -PackagesFolder: " +
+		'just pipeline-local-release moves its packages to the local feed.'
+	)
 }
 
 # A concrete entry each glob must match: "**" spans one made-up folder, "*" becomes an assembly extension.
