@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!--
+		Packed-consumer gate (scripts/test-packed-consumers.ps1), consumer (a): a Native AOT console that references the
+		Purview.ZodSharp packages, and nothing else from the repository. The script copies this folder outside the
+		repository, beside guard Directory.Build.props/.targets and Directory.Packages.props files that stop any
+		inheritance, and supplies the version of the packages it has just packed as $(ZodSharpPackageVersion).
+
+		Every warning fails the publish, including each IL2xxx (trim) and IL3xxx (AOT) warning ILC reports for the packed
+		assemblies; the published binary then exits non-zero on any mismatch.
+	-->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net11.0</TargetFramework>
+		<AssemblyName>PackedAot</AssemblyName>
+		<RootNamespace>PackedAot</RootNamespace>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<PublishAot>true</PublishAot>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<TrimmerSingleWarn>false</TrimmerSingleWarn>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+		<IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Purview.ZodSharp" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.SystemTextJson" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.Extensions.Validation" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.AspNetCore" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.AspNetCore.OpenApi" Version="$(ZodSharpPackageVersion)" />
+	</ItemGroup>
+
+	<Target Name="RequireZodSharpPackageVersion" BeforeTargets="CollectPackageReferences;Restore">
+		<Error
+			Condition="'$(ZodSharpPackageVersion)' == ''"
+			Text="ZodSharpPackageVersion is not set. Run this consumer through scripts/test-packed-consumers.ps1."
+		/>
+	</Target>
+</Project>

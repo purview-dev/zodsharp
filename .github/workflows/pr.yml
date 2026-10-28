@@ -126,6 +126,15 @@ jobs:
           fi
           test -x artifacts/aot-sample/ZodSharp.Examples.MinimalApi
 
+      # Compiler-host assemblies (the generator, the code fixes, Purview.SourceGeneratorFramework, Roslyn) must never
+      # reach build or publish output: Purview.SourceGeneratorFramework.dll once did, through analyzer-only references,
+      # and broke Blazor WebAssembly AOT. Scans file names and every deps/runtimeconfig/boot manifest.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/aot-sample, src/src/Examples.MinimalApi/bin/Release
+
       - name: Run the native binary and check a failing request returns ProblemDetails
         shell: bash
         working-directory: artifacts/aot-sample
@@ -188,6 +197,15 @@ jobs:
         shell: pwsh
         run: ./scripts/check-wasm-size.ps1 -PublishDirectory artifacts/wasm-trimmed
 
+      # Compiler-host assemblies (the generator, the code fixes, Purview.SourceGeneratorFramework, Roslyn) must never
+      # reach build or publish output: Purview.SourceGeneratorFramework.dll once did, through analyzer-only references,
+      # and broke Blazor WebAssembly AOT. Scans file names and every deps/runtimeconfig/boot manifest.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/wasm-trimmed, src/src/Examples.Blazor.Client/bin/Release
+
   # Proves the whole trim-safe surface, not just what one sample calls. The harness publishes with PublishAot=true twice:
   # once with every Purview.ZodSharp assembly except NewtonsoftJson rooted whole, so ILC analyses all of their code, and
   # once as a plain consumer. Any IL2xxx/IL3xxx warning fails the publish, and each native binary exercises runtime
@@ -234,6 +252,18 @@ jobs:
             exit 1
           fi
           ./artifacts/trim-verification/consumer/ZodSharp.TrimSafety.Verification
+
+      # Compiler-host assemblies (the generator, the code fixes, Purview.SourceGeneratorFramework, Roslyn) must never
+      # reach build or publish output: Purview.SourceGeneratorFramework.dll once did, through analyzer-only references,
+      # and broke Blazor WebAssembly AOT. Scans file names and every deps/runtimeconfig/boot manifest.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/trim-verification/rooted, artifacts/trim-verification/consumer,
+          src/tests/TrimSafety.Verification/bin/Release
+
+
   # Pack validation checks the IL-merged generator is present in the .nupkg; it cannot check that the
   # assembly loads and generates. That merge has regressed twice (#36, #38), both times breaking consumers
   # while the in-repo tests stayed green, because those run against the unmerged generator.
@@ -252,3 +282,53 @@ jobs:
       - name: Build and run a consumer against the packed generator
         shell: pwsh
         run: ./scripts/test-packed-generator.ps1 -Configuration Release
+
+  # Every other publish job builds against ProjectReferences; this one builds what ships. It packs every shipping
+  # package to an isolated feed and package cache, then publishes and runs throwaway consumers that reference the
+  # packages only - a Native AOT console, a Blazor WebAssembly app (trimmed and RunAOTCompilation) and a Native AOT
+  # minimal API - and leak-scans every bin and publish folder for compiler-host assemblies. It then proves every
+  # PackValidation ForbiddenContent rule rejects a package, against the packages the consumers used.
+  # `just smoke-packed-consumers` and `just verify-pack-rules` run the same locally. See docs/wiki/Release-Flow.md.
+  packed-consumers:
+    name: Packed consumers (Native AOT, Blazor WebAssembly, minimal API)
+    runs-on: ubuntu-latest
+    env:
+      # An extra feed for Purview.SourceGeneratorFramework only, for a version that is not on nuget.org yet. Unset, the
+      # gate restores it from nuget.org alone.
+      ZODSHARP_SGF_FEED: ${{ vars.ZODSHARP_SGF_FEED }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # First, before any toolchain is installed: the generator is built against the Purview.SourceGeneratorFramework
+      # version Directory.Packages.props pins, so nothing can be packed until that version restores. This fails with
+      # what to do (publish it to nuget.org, or set the ZODSHARP_SGF_FEED repository variable) rather than skipping.
+      - name: Check Purview.SourceGeneratorFramework restores
+        shell: pwsh
+        run: ./scripts/test-packed-consumers.ps1 -PreflightOnly
+
+      # Native AOT links with clang and needs the zlib headers; the hosted image may not carry both.
+      - name: Install the Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # RunAOTCompilation needs the Emscripten toolchain and the Mono AOT cross compiler. -WasmAot Require below makes a
+      # missing workload an error instead of a skipped step.
+      - name: Install the wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Pack, then publish, run and leak-scan consumers of the packages
+        shell: pwsh
+        run: >-
+          ./scripts/test-packed-consumers.ps1 -RuntimeIdentifier linux-x64 -WasmAot Require
+          -PackOutput artifacts/packed
+
+      - name: Prove every pack-validation forbidden-content rule rejects a package
+        shell: pwsh
+        run: |
+          dotnet tool restore
+          ./scripts/test-pack-validation-rules.ps1 -PackagesFolder artifacts/packed

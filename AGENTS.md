@@ -155,7 +155,10 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 - Relevant tests pass.
 - `just lint-check` (CSharpier) reports no formatting changes.
 - Generated code is deterministic and reviewable; no scope leaks in `CodeWriter` output.
-- Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`).
+- Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`, and no `ForbiddenContent`: compiler-host assemblies outside `analyzers/`, generator or code-fix assemblies under `lib/`). After changing `PackValidation`, `just verify-pack-rules` proves every forbidden-content rule still rejects a package.
+- No build or publish output carries a compiler-host assembly (`Purview.SourceGeneratorFramework*`, `Microsoft.CodeAnalysis*`, `Purview.ZodSharp.SourceGenerators*`, `Purview.ZodSharp.CodeFixes*`): every publish recipe and CI publish job runs `scripts/assert-no-compiler-host-assemblies.ps1`, and `ReleaseGateTests` fails a workflow job that publishes without it.
+- Changes that affect what ships (packaging, `buildTransitive/`, package dependencies, the generator, trimming or AOT) also pass the gates that consume the real `.nupkg`: `just smoke-packed-generator` and `just smoke-packed-consumers` (Native AOT console, Blazor WebAssembly trimmed and AOT, Native AOT minimal API), plus `just wasm-size`, `just verify-trim <rid>` and `just publish-aot-sample`.
+- Before a release, run the pre-release checklist in `docs/wiki/Release-Flow.md` ("Release gates"): `just scrub`, `just pipeline-local-release ...`, then every gate above.
 
 ## Agent skills
 

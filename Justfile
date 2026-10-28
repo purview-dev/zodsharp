@@ -62,6 +62,31 @@ smoke-packed-generator *args:
     echo "Running the packed generator smoke test..."
     pwsh -NoProfile -File scripts/test-packed-generator.ps1 {{ args }}
 
+# Pack every shipping package to an isolated feed and cache, then publish and run throwaway consumers that reference
+# the packages only: a Native AOT console, a Blazor WebAssembly app (trimmed, plus RunAOTCompilation when wasm-tools is
+# installed) and a Native AOT minimal API, each leak-scanned for compiler-host assemblies.
+#
+# Every other publish gate builds against ProjectReferences; this is the one that proves what ships. The CI
+# `packed-consumers` job runs it for linux-x64. Purview.SourceGeneratorFramework is restored from nuget.org, plus
+# ZODSHARP_SGF_FEED or LOCAL_NUGET_FEED_PATH when set (or pass -SourceGeneratorFrameworkFeed).
+[group('Pipeline')]
+smoke-packed-consumers *args:
+    echo "Running the packed consumer gate..."
+    pwsh -NoProfile -File scripts/test-packed-consumers.ps1 {{ args }}
+
+# Prove every PackValidation ForbiddenContent rule in .config/purview-build.json rejects a package: injects a matching
+# file into scratch copies of the packed packages and runs the real purview-build validation on them. Pack first
+# (`just pipeline-pack-validate`, or `just pack ./artifacts -c Release`); pass -PackagesFolder <dir> to use other packages.
+[group('Pipeline')]
+verify-pack-rules *args: ensure-pipeline-tool
+    echo "Proving the pack-validation forbidden-content rules..."
+    pwsh -NoProfile -File scripts/test-pack-validation-rules.ps1 {{ args }}
+
+# Scan build or publish output for compiler-host assemblies (generators, analyzers, Roslyn) that must never ship.
+[group('Build and Test')]
+scan-compiler-host-leaks +paths:
+    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ paths }}
+
 # Run the release pipeline (restore, build, lint, tests, pack, local nuget publish)
 # Note: `just` runs recipes through the shell, which strips backslashes from unquoted arguments.
 # Use the LOCAL_NUGET_FEED_PATH environment variable or forward slashes, e.g.
@@ -121,6 +146,7 @@ pack publish_folder=artifacts_folder *args:
 publish-aot-sample rid=default_rid *args:
     echo "Publishing {{ BLUE }}{{ aot_sample_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }}"
     dotnet publish {{ aot_sample_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/aot-sample/{{ rid }} -warnaserror {{ args }}
+    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/aot-sample/{{ rid }}
 
 # The CI `verify-trim` job runs the same recipe for linux-x64. Windows needs the MSVC C++ build tools, Linux clang.
 # The harness publishes twice - every ZodSharp assembly rooted, then as a plain consumer - and each binary exits non-zero on any mismatch.
@@ -133,6 +159,7 @@ verify-trim rid=default_rid *args:
     echo "Publishing {{ BLUE }}{{ trim_verification_project }}{{ NORMAL }} with Native AOT for {{ YELLOW }}{{ rid }}{{ NORMAL }} (consumer)"
     dotnet publish {{ trim_verification_project }} -c Release -r {{ rid }} -o {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer -p:TrimVerificationMode=Consumer -warnaserror {{ args }}
     {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer/ZodSharp.TrimSafety.Verification
+    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/trim-verification/{{ rid }}/rooted {{ artifacts_folder }}/trim-verification/{{ rid }}/consumer
 
 # The CI `wasm-trimmed` job runs the same publish and check; the nightly `wasm-aot` job adds -p:RunAOTCompilation=true (needs `dotnet workload install wasm-tools`).
 # Publish the Blazor WebAssembly sample trimmed, failing on any IL2xxx/IL3xxx warning, then check the ZodSharp size budget
@@ -142,6 +169,7 @@ wasm-size *args:
     rm -rf {{ artifacts_folder }}/wasm-trimmed
     dotnet publish {{ wasm_client_project }} -c Release -o {{ artifacts_folder }}/wasm-trimmed -warnaserror {{ args }}
     pwsh -NoProfile -File scripts/check-wasm-size.ps1 -PublishDirectory {{ artifacts_folder }}/wasm-trimmed
+    pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ artifacts_folder }}/wasm-trimmed
 
 # Displays the current version of the project.
 # Requires Bun.

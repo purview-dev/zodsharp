@@ -49,6 +49,15 @@ jobs:
         shell: pwsh
         run: ./scripts/check-wasm-size.ps1 -PublishDirectory artifacts/wasm-aot
 
+      # Compiler-host assemblies (the generator, the code fixes, Purview.SourceGeneratorFramework, Roslyn) must never
+      # reach build or publish output: Purview.SourceGeneratorFramework.dll once did, through analyzer-only references,
+      # and broke exactly this AOT compile. Scans file names and every deps/runtimeconfig/boot manifest.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/wasm-aot, src/src/Examples.Blazor.Client/bin/Release
+
   # One form per render mode in a real browser, against the published sample (so the WebAssembly form runs the
   # trimmed client): debounced validation with codes and the async pending state, server ProblemDetails mapped onto
   # fields, interactive-server nested placement, static-SSR client rules, and French satellite resources.
@@ -66,6 +75,16 @@ jobs:
         run: >-
           dotnet publish src/src/Examples.Blazor/Examples.Blazor.csproj
           --configuration Release --output artifacts/blazor-sample
+
+      # The server publish carries the WebAssembly client too, so it is scanned like every other publish output.
+      # BlazorDebugProxy/ is allowed: Microsoft.AspNetCore.Components.WebAssembly.Server publishes the browser debugging
+      # proxy there, and its expression evaluator ships Roslyn. The application never loads it.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/blazor-sample, src/src/Examples.Blazor/bin/Release
+          -Allow '*BlazorDebugProxy/*'
 
       # playwright-core is not a repository dependency; it is installed for this job only, with its Chromium.
       - name: Install Playwright and Chromium
