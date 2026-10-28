@@ -56,6 +56,7 @@
 				"README.md"
 			],
 			"purview.zodsharp.aspnetcore.openapi": [
+				"buildTransitive/Purview.ZodSharp.AspNetCore.OpenApi.targets",
 				"lib/$(TFM)/Purview.ZodSharp.AspNetCore.OpenApi.dll",
 				"lib/$(TFM)/Purview.ZodSharp.AspNetCore.OpenApi.xml",
 				"purview-logo-light.png",
