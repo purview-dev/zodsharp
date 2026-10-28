@@ -237,7 +237,7 @@ knows the primitive.
 Such a scalar works under every publish mode, including Blazor WebAssembly with `RunAOTCompilation=true`:
 the generated code passes the wrapped rule's identity with a direct `(IZodRule)` cast (or `null` when the
 rule has none), never a runtime type test on the boxed rule. 3.0.0-prerelease.1 builds before that fix
-crashed the Mono AOT compiler (exit code -1073741819); drop no rules to work around it, upgrade instead.
+crashed the Mono AOT compiler (exit code -1073741819); upgrading is the fix, so do not drop the rule to avoid it.
 
 ## Diagnostics you will meet
 
