@@ -236,9 +236,9 @@ public sealed class PercentageConverter : JsonConverter<Percentage>
 }
 
 /// <summary>A hand-written runtime schema that describes its own JSON Schema.</summary>
-public sealed class PercentageSchema : ZodSharp.Core.ZodType<Percentage>, ZodSharp.JsonSchema.IJsonSchemaProvider
+public sealed class PercentageSchema : Core.ZodType<Percentage>, JsonSchema.IJsonSchemaProvider
 {
-	public ZodSharp.JsonSchema.JsonSchemaDefinition BuildJsonSchema() =>
+	public JsonSchema.JsonSchemaDefinition BuildJsonSchema() =>
 		new()
 		{
 			Type = "number",
@@ -246,12 +246,10 @@ public sealed class PercentageSchema : ZodSharp.Core.ZodType<Percentage>, ZodSha
 			Maximum = 100,
 		};
 
-	protected override ZodSharp.Core.ValidationResult<Percentage> ParseInternal(Percentage value) =>
+	protected override Core.ValidationResult<Percentage> ParseInternal(Percentage value) =>
 		value.Value is >= 0 and <= 100
-			? ZodSharp.Core.ValidationResult<Percentage>.Success(value)
-			: ZodSharp.Core.ValidationResult<Percentage>.Failure(
-				new ZodSharp.Core.ValidationError("too_big", "Out of range", [])
-			);
+			? Core.ValidationResult<Percentage>.Success(value)
+			: Core.ValidationResult<Percentage>.Failure(new Core.ValidationError("too_big", "Out of range", []));
 }
 
 [ZodSchema]

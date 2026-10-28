@@ -277,11 +277,11 @@ partial class ZodSchemaGenerator
 		var schemaName = schema.SchemaType.Name;
 		var targetType = schema.TargetType.AsTypeReference();
 		var resultType = TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(schema.TargetType).AsTypeReference();
-		var resultTaskType = $"global::System.Threading.Tasks.ValueTask<{resultType}>";
 		var resultTaskReference = TypeLibraryGenerator
 			.ValueTask.MakeGeneric(TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(schema.TargetType))
 			.AsTypeReference();
 		var cancellationTokenReference = TypeLibraryGenerator.CancellationToken.AsTypeReference();
+		TypeReference zodPathReference = new(new TypeIdentity("ZodPath", TypeLibraryGenerator.ZodSharpCoreNamespace));
 		var errorsType = "global::System.Collections.Immutable.ImmutableArray<global::ZodSharp.Core.ValidationError>";
 		var baseType = TypeLibrary.ZodSharp.Core.IZodSchemaValidator.MakeGeneric(schema.TargetType).AsTypeReference();
 		var usesAdapterInstance =
@@ -392,14 +392,27 @@ partial class ZodSchemaGenerator
 					);
 
 				body.XmlSummary("Gets whether some rules only run asynchronously.")
-					.Line($"public bool RequiresAsyncValidation => {schemaName}.RequiresAsyncValidation;")
+					.PropertyExpression(
+						"RequiresAsyncValidation",
+						PurviewTypeLibrary.System.Boolean,
+						TypeDeclarationAccessibility.Public,
+						expression => expression.Write($"{schemaName}.RequiresAsyncValidation")
+					)
 					.NewLine();
 
 				body.XmlSummary("Gets whether the member has rules that ValidateMember runs.")
 					.XmlParam("memberName", "The C# member name.")
 					.XmlReturn("True when the member is individually validatable.")
-					.Line(
-						$"public bool IsValidatableMember(string memberName) => {schemaName}.IsValidatableMember(memberName);"
+					.MethodExpression(
+						"IsValidatableMember",
+						PurviewTypeLibrary.System.Boolean,
+						TypeDeclarationAccessibility.Public,
+						expression => expression.Write($"{schemaName}.IsValidatableMember(memberName)"),
+						declaration =>
+							declaration with
+							{
+								Parameters = [new("memberName", PurviewTypeLibrary.System.String)],
+							}
 					)
 					.NewLine();
 
@@ -407,8 +420,20 @@ partial class ZodSchemaGenerator
 					.XmlParam("value", "The containing object.")
 					.XmlParam("memberName", "The C# member name.")
 					.XmlReturn("The member's errors.")
-					.Line(
-						$"public {resultType} ValidateMember({targetType} value, string memberName) => {schemaName}.ValidateMember(value, memberName);"
+					.MethodExpression(
+						"ValidateMember",
+						resultType,
+						TypeDeclarationAccessibility.Public,
+						expression => expression.Write($"{schemaName}.ValidateMember(value, memberName)"),
+						declaration =>
+							declaration with
+							{
+								Parameters =
+								[
+									new("value", targetType),
+									new("memberName", PurviewTypeLibrary.System.String),
+								],
+							}
 					)
 					.NewLine();
 
@@ -418,8 +443,31 @@ partial class ZodSchemaGenerator
 					.XmlParam("services", "The caller's services, if any.")
 					.XmlParam("cancellationToken", "The cancellation token.")
 					.XmlReturn("The member's errors.")
-					.Line(
-						$"public {resultTaskType} ValidateMemberAsync({targetType} value, string memberName, {ServiceProviderType}? services = null, {CancellationTokenType} cancellationToken = default) => {schemaName}.ValidateMemberAsync(value, memberName, services, cancellationToken);"
+					.MethodExpression(
+						"ValidateMemberAsync",
+						resultTaskReference,
+						TypeDeclarationAccessibility.Public,
+						expression =>
+							expression.Write(
+								$"{schemaName}.ValidateMemberAsync(value, memberName, services, cancellationToken)"
+							),
+						declaration =>
+							declaration with
+							{
+								Parameters =
+								[
+									new("value", targetType),
+									new("memberName", PurviewTypeLibrary.System.String),
+									new(
+										"services",
+										new TypeIdentity(typeof(IServiceProvider)).AsTypeReference().Nullable(body)
+									)
+									{
+										DefaultValue = "null",
+									},
+									new("cancellationToken", cancellationTokenReference) { DefaultValue = "default" },
+								],
+							}
 					)
 					.NewLine();
 
@@ -429,8 +477,31 @@ partial class ZodSchemaGenerator
 					.XmlParam("container", "The owning object.")
 					.XmlParam("memberName", "The owning member name.")
 					.XmlReturn("True when the full path was followed.")
-					.Line(
-						$"public bool TryResolveMember({targetType} value, {ZodPathType} path, out object? container, out string memberName) => {schemaName}.TryResolveMember(value, path, out container, out memberName);"
+					.MethodExpression(
+						"TryResolveMember",
+						PurviewTypeLibrary.System.Boolean,
+						TypeDeclarationAccessibility.Public,
+						expression =>
+							expression.Write(
+								$"{schemaName}.TryResolveMember(value, path, out container, out memberName)"
+							),
+						declaration =>
+							declaration with
+							{
+								Parameters =
+								[
+									new("value", targetType),
+									new("path", zodPathReference),
+									new("container", new TypeIdentity(typeof(object)).AsTypeReference().Nullable(body))
+									{
+										Modifier = ParameterModifier.Out,
+									},
+									new("memberName", PurviewTypeLibrary.System.String.AsTypeReference())
+									{
+										Modifier = ParameterModifier.Out,
+									},
+								],
+							}
 					)
 					.NewLine();
 
@@ -438,8 +509,26 @@ partial class ZodSchemaGenerator
 					.XmlParam("path", "The error path.")
 					.XmlParam("namingPolicy", "The naming policy for members without an explicit JSON name.")
 					.XmlReturn("The renamed path.")
-					.Line(
-						$"public {ZodPathType} ToJsonNamedPath({ZodPathType} path, global::System.Func<string, string>? namingPolicy = null) => {schemaName}.ToJsonNamedPath(path, namingPolicy);"
+					.MethodExpression(
+						"ToJsonNamedPath",
+						zodPathReference,
+						TypeDeclarationAccessibility.Public,
+						expression => expression.Write($"{schemaName}.ToJsonNamedPath(path, namingPolicy)"),
+						declaration =>
+							declaration with
+							{
+								Parameters =
+								[
+									new("path", zodPathReference),
+									new(
+										"namingPolicy",
+										new TypeIdentity(typeof(Func<string, string>)).AsTypeReference().Nullable(body)
+									)
+									{
+										DefaultValue = "null",
+									},
+								],
+							}
 					)
 					.NewLine();
 
@@ -462,6 +551,9 @@ partial class ZodSchemaGenerator
 				}
 
 				body.NewLine();
+				// An explicit interface implementation cannot carry an accessibility modifier, and the
+				// structured member APIs always emit one, so these stay raw text.
+#pragma warning disable PSGFR19 // Prefer a structured CodeWriter statement API
 				body.Line(
 					$"global::System.Threading.Tasks.ValueTask<{errorsType}> global::ZodSharp.Core.IZodUntypedValidator.ValidateAsync(object? value, {ServiceProviderType}? services, {CancellationTokenType} cancellationToken) => {GeneratedValidation}.ToErrorsAsync({schemaName}.ValidateCoreAsync(Cast(value), services, 0, cancellationToken{instanceArgument}));"
 				);
@@ -474,18 +566,32 @@ partial class ZodSchemaGenerator
 				body.Line(
 					$"bool global::ZodSharp.Core.IZodUntypedValidator.TryResolveMember(object value, {ZodPathType} path, out object? container, out string memberName) => {schemaName}.TryResolveMember(Cast(value), path, out container, out memberName);"
 				);
+#pragma warning restore PSGFR19
 				body.NewLine();
 
 				if (usesAdapterInstance)
 				{
 					var custom = schema.CustomValidationMethod.Value;
-					var servicesParameter = custom.RequiresServices
-						? $", {ServiceProviderType} services"
-						: string.Empty;
 					var servicesArgument = custom.RequiresServices ? ", services" : string.Empty;
 					body.XmlSummary("Invokes the custom validation method for the generated schema.");
-					body.Line(
-						$"internal {resultTaskType} {CustomValidationBridgeName}({targetType} value{servicesParameter}, {CancellationTokenType} cancellationToken) => {custom.MethodName}(value{servicesArgument}, cancellationToken);"
+					body.MethodExpression(
+						CustomValidationBridgeName,
+						resultTaskReference,
+						TypeDeclarationAccessibility.Internal,
+						expression =>
+							expression.Write($"{custom.MethodName}(value{servicesArgument}, cancellationToken)"),
+						declaration =>
+							declaration with
+							{
+								Parameters = custom.RequiresServices
+									?
+									[
+										new("value", targetType),
+										new("services", new TypeIdentity(typeof(IServiceProvider)).AsTypeReference()),
+										new("cancellationToken", cancellationTokenReference),
+									]
+									: [new("value", targetType), new("cancellationToken", cancellationTokenReference)],
+							}
 					);
 					body.NewLine();
 				}
@@ -495,8 +601,8 @@ partial class ZodSchemaGenerator
 					body.IfBlock($"value is {targetType} typed", ifBody => ifBody.Return("typed"));
 					if (schema.TargetCanBeNull)
 						body.IfBlock("value is null", ifBody => ifBody.Return("default!"));
-					body.Line(
-						$"throw new global::System.ArgumentException($\"Value of type '{{value?.GetType().FullName}}' cannot be validated as '{schema.TargetType.Name}'.\", nameof(value));"
+					body.Throw(
+						$"new global::System.ArgumentException($\"Value of type '{{value?.GetType().FullName}}' cannot be validated as '{schema.TargetType.Name}'.\", nameof(value))"
 					);
 				}
 

@@ -97,7 +97,7 @@ public static class ZodModelSchema
 			string memberName,
 			IServiceProvider? services,
 			CancellationToken cancellationToken
-		) => new(ImmutableArray<ValidationError>.Empty);
+		) => new([]);
 
 		public bool TryResolveMember(object value, ZodPath path, out object? container, out string memberName)
 		{

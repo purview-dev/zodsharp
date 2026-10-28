@@ -165,7 +165,7 @@ public class StructMemberPlacementTests
 
 	static BunitContext CreateContext() =>
 		FormHost.CreateContext(static factory =>
-			ZodSharp.Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
+			Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
 		);
 
 	// The switch trimming sets: the reflection fallbacks are unavailable, as in a Blazor WebAssembly client. Tests that

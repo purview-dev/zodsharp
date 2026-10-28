@@ -42,7 +42,18 @@ partial class ZodSchemaGenerator
 
 			if (names.Count == 0)
 			{
-				writer.Line("public static string? Get(string memberName) => null;");
+				writer.MethodExpression(
+					"Get",
+					PurviewTypeLibrary.System.String.AsTypeReference().Nullable(writer),
+					TypeDeclarationAccessibility.Public,
+					static expression => expression.Write("null"),
+					declaration =>
+						declaration with
+						{
+							IsStatic = true,
+							Parameters = [new("memberName", PurviewTypeLibrary.System.String)],
+						}
+				);
 			}
 			else
 			{
@@ -76,6 +87,7 @@ partial class ZodSchemaGenerator
 
 		var schema = outputContext.ZodSchema;
 		var targetType = schema.TargetType.AsTypeReference();
+		TypeReference zodPathReference = new(new TypeIdentity("ZodPath", TypeLibraryGenerator.ZodSharpCoreNamespace));
 		List<ZodPropertyDescriptor> walked = [];
 		foreach (var property in schema.Properties)
 		{
@@ -93,8 +105,29 @@ partial class ZodSchemaGenerator
 		writer.XmlParam("container", "The owning object.");
 		writer.XmlParam("memberName", "The member name on the container; empty for a model-level error.");
 		writer.XmlReturn("True when the full path was followed.");
-		writer.Line(
-			$"public static bool TryResolveMember({targetType} value, {ZodPathType} path, out object? container, out string memberName) => TryResolveMember(value, path, 0, out container, out memberName);"
+		writer.MethodExpression(
+			"TryResolveMember",
+			PurviewTypeLibrary.System.Boolean,
+			TypeDeclarationAccessibility.Public,
+			static expression => expression.Write("TryResolveMember(value, path, 0, out container, out memberName)"),
+			declaration =>
+				declaration with
+				{
+					IsStatic = true,
+					Parameters =
+					[
+						new("value", targetType),
+						new("path", zodPathReference),
+						new("container", new TypeIdentity(typeof(object)).AsTypeReference().Nullable(writer))
+						{
+							Modifier = ParameterModifier.Out,
+						},
+						new("memberName", PurviewTypeLibrary.System.String.AsTypeReference())
+						{
+							Modifier = ParameterModifier.Out,
+						},
+					],
+				}
 		);
 		writer.NewLine();
 

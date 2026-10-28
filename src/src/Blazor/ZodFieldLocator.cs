@@ -70,8 +70,11 @@ static class ZodFieldLocator
 			return new(container ?? root, member);
 
 		// The validator followed part of the path itself: its nearest ancestor is better informed than ours.
+		// A conditional expression would hide which of the three fallbacks produced the result.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (IsFieldOwner(resolvedContainer) && !string.IsNullOrEmpty(resolvedMember))
 			return new(resolvedContainer, resolvedMember);
+#pragma warning restore IDE0046
 
 		return new(container ?? root, member);
 	}

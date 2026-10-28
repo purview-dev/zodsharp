@@ -37,7 +37,7 @@ static class FixtureApi
 		services.AddZodSharp(options =>
 		{
 			options.ScanAssemblies.Add(typeof(FixtureApi).Assembly);
-			options.ConfigureFactory = factory => factory.Register<Percentage>(new PercentageSchema());
+			options.ConfigureFactory = factory => factory.Register(new PercentageSchema());
 		});
 
 	public static void Map(WebApplication app)

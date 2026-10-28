@@ -27,9 +27,8 @@ namespace ZodSharp.Extensions.Validation;
 public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 {
 	readonly IZodSchemaFactory? _factory;
-	readonly ZodValidationOptions _options;
 	readonly ConcurrentDictionary<Type, IValidatableTypeInfo?> _types = new();
-	readonly ConditionalWeakTable<ParameterInfo, IValidatableParameterInfo?> _parameters = new();
+	readonly ConditionalWeakTable<ParameterInfo, IValidatableParameterInfo?> _parameters = [];
 	ValidationOptions? _attachedTo;
 
 	/// <summary>
@@ -47,14 +46,14 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 	)
 	{
 		_factory = factory;
-		_options = options ?? new();
-		ValidatesParameters = _options.ValidateParameters ?? parametersRequested;
+		Options = options ?? new();
+		ValidatesParameters = Options.ValidateParameters ?? parametersRequested;
 	}
 
 	/// <summary>
 	/// Gets the bridge options.
 	/// </summary>
-	public ZodValidationOptions Options => _options;
+	public ZodValidationOptions Options { get; }
 
 	/// <summary>
 	/// Gets whether this resolver claims parameters, so Microsoft.Extensions.Validation's endpoint filter validates
@@ -73,7 +72,7 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 	{
 		ArgumentNullException.ThrowIfNull(type);
 
-		foreach (var source in _options.Sources)
+		foreach (var source in Options.Sources)
 		{
 			if (source.TryGetValidator(type, out validator) && validator is not null)
 				return true;
@@ -150,8 +149,8 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 		var lookup = Nullable.GetUnderlyingType(type) ?? type;
 		if (TryGetValidator(lookup, out var validator) || (lookup != type && TryGetValidator(type, out validator)))
 		{
-			ZodValidatableTypeInfo zod = new(validator, _options);
-			return _options.AlsoRunDataAnnotations ? new ZodCompositeValidatableTypeInfo(zod, this) : zod;
+			ZodValidatableTypeInfo zod = new(validator, Options);
+			return Options.AlsoRunDataAnnotations ? new ZodCompositeValidatableTypeInfo(zod, this) : zod;
 		}
 
 		// A union with no validator of its own: follow the active case, unless a later resolver (the
@@ -190,8 +189,11 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 		if (info is ZodUnionValidatableTypeInfo union)
 			return new ZodValidatableParameterInfo(parameter.Name, declared, allowsNull, false, null, union);
 
+		// A conditional expression would nest the type, union, and collection lookups above.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (isCollection && GetElementType(type) is { } elementType && TryGetValidator(elementType, out _))
 			return new ZodValidatableParameterInfo(parameter.Name, declared, allowsNull, true, null);
+#pragma warning restore IDE0046
 
 		return null;
 	}

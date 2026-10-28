@@ -26,8 +26,8 @@ public static class ToJsonSchemaConverter
 	/// </summary>
 	/// <param name="schema">
 	/// A ZodSharp schema, a generated validator (<see cref="IJsonSchemaProvider"/>), or an adapter that wraps one
-	/// (<see cref="Core.ZodSchemaValidator{T}"/>, <see cref="Core.ZodUntypedValidator{T}"/>), as returned by
-	/// <see cref="Core.IZodSchemaFactory.TryGetUntypedValidator(Type, out Core.IZodUntypedValidator?)"/>.
+	/// (<see cref="ZodSchemaValidator{T}"/>, <see cref="ZodUntypedValidator{T}"/>), as returned by
+	/// <see cref="IZodSchemaFactory.TryGetUntypedValidator(Type, out Core.IZodUntypedValidator?)"/>.
 	/// </param>
 	/// <param name="options">Conversion options</param>
 	/// <returns>

@@ -18,7 +18,8 @@ public class SystemTextJsonErrorTests
 		// Defect J1
 		// Arrange
 		PassThroughSchema<Person> schema = new();
-		const string json = """{"Name":"Ada","Age":"forty-two"}""";
+		const string json = /*lang=json,strict*/
+			"""{"Name":"Ada","Age":"forty-two"}""";
 
 		// Act
 		var result = schema.DeserializeAndValidate(json);
@@ -44,7 +45,8 @@ public class SystemTextJsonErrorTests
 		PassThroughSchema<Team> schema = new();
 		JsonSerializerOptions options = new() { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 		var typeInfo = (JsonTypeInfo<Team>)options.TypeInfoResolver.GetTypeInfo(typeof(Team), options)!;
-		const string json = """{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":true}]}""";
+		const string json = /*lang=json,strict*/
+			"""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":true}]}""";
 
 		// Act
 		var result = schema.DeserializeAndValidate(json, typeInfo);
@@ -63,7 +65,10 @@ public class SystemTextJsonErrorTests
 	[Test]
 	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":}]}""", "Members[1].Age")]
 	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":12x}]}""", "Members[1].Age")]
-	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":1,}]}""", "Members[1]")]
+	[Arguments( /*lang=json*/
+		"""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":1,}]}""",
+		"Members[1]"
+	)]
 	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age" 1}]}""", "Members[1]")]
 	public async Task DeserializeAndValidate_GivenMalformedJsonInsideAnElement_ReportsTheSerializersPath(
 		string json,
@@ -74,7 +79,7 @@ public class SystemTextJsonErrorTests
 		// Arrange — the path is the serializer's: the value being read when a syntax error is a value error,
 		// and the containing element when the reader fails between members.
 		PassThroughSchema<Team> schema = new();
-		using MemoryStream stream = new(System.Text.Encoding.UTF8.GetBytes(json));
+		using MemoryStream stream = new(Encoding.UTF8.GetBytes(json));
 
 		// Act
 		var fromString = schema.DeserializeAndValidate(json).Errors.Single();
@@ -92,10 +97,19 @@ public class SystemTextJsonErrorTests
 	// A value that cannot be converted is located inside the converted element. A syntax error is located at the
 	// element itself: the converter (and, for a stream, the serializer's read-ahead) buffers the whole value, so
 	// the position inside it is not known.
-	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""", "Members[1].Age")]
-	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":true}]}""", "Members[1].Age")]
+	[Arguments( /*lang=json,strict*/
+		"""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""",
+		"Members[1].Age"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":true}]}""",
+		"Members[1].Age"
+	)]
 	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":}]}""", "Members[1]")]
-	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":1,}]}""", "Members[1]")]
+	[Arguments( /*lang=json*/
+		"""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":1,}]}""",
+		"Members[1]"
+	)]
 	public async Task DeserializeAndValidate_GivenMalformedJsonUnderAValidatingConverter_ReportsTheConvertedValuePath(
 		string json,
 		string expectedPath
@@ -113,12 +127,30 @@ public class SystemTextJsonErrorTests
 	}
 
 	[Test]
-	[Arguments("""{"Members":[{"Name":"Ada","Age":true}]}""", "number")]
-	[Arguments("""{"Members":[{"Name":true,"Age":1}]}""", "string")]
-	[Arguments("""{"Scores":{"a":"x"}}""", "number")]
-	[Arguments("""{"Grid":[["x"]]}""", "number")]
-	[Arguments("""{"Payload":5}""", "string")]
-	[Arguments("""{"Members":5}""", "array")]
+	[Arguments( /*lang=json,strict*/
+		"""{"Members":[{"Name":"Ada","Age":true}]}""",
+		"number"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"Members":[{"Name":true,"Age":1}]}""",
+		"string"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"Scores":{"a":"x"}}""",
+		"number"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"Grid":[["x"]]}""",
+		"number"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"Payload":5}""",
+		"string"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"Members":5}""",
+		"array"
+	)]
 	public async Task DeserializeAndValidate_GivenUnconvertibleNestedValue_NamesTheExpectedJsonType(
 		string json,
 		string expected
@@ -163,7 +195,9 @@ public class SystemTextJsonErrorTests
 		PassThroughSchema<IShape> schema = new();
 
 		// Act
-		var result = schema.DeserializeAndValidate("""{"Sides":3}""");
+		var result = schema.DeserializeAndValidate( /*lang=json,strict*/
+			"""{"Sides":3}"""
+		);
 
 		// Assert
 		await Assert.That(result.IsSuccess).IsFalse();
@@ -178,7 +212,8 @@ public class SystemTextJsonErrorTests
 		// Arrange
 		PassThroughSchema<Household> schema = new();
 		JsonSerializerOptions options = new() { Converters = { new PersonSchema().CreateValidatingConverter() } };
-		const string json = """{"Owner":{"Name":"","Age":30}}""";
+		const string json = /*lang=json,strict*/
+			"""{"Owner":{"Name":"","Age":30}}""";
 
 		// Act
 		var result = schema.DeserializeAndValidate(json, options);
@@ -200,7 +235,8 @@ public class SystemTextJsonErrorTests
 		// Defect J4
 		// Arrange
 		JsonSerializerOptions options = new() { Converters = { new PersonSchema().CreateValidatingConverter() } };
-		const string json = """{"Owner":{"Name":"","Age":30}}""";
+		const string json = /*lang=json,strict*/
+			"""{"Owner":{"Name":"","Age":30}}""";
 
 		// Act
 		var exception = Assert.Throws<ZodJsonValidationException>(() =>
@@ -218,7 +254,11 @@ public class SystemTextJsonErrorTests
 		// Defect J1
 		// Arrange
 		PassThroughSchema<Person> schema = new();
-		using MemoryStream stream = new(Encoding.UTF8.GetBytes("""{"Name":"Ada","Age":[1]}"""));
+		using MemoryStream stream = new(
+			Encoding.UTF8.GetBytes( /*lang=json,strict*/
+				"""{"Name":"Ada","Age":[1]}"""
+			)
+		);
 
 		// Act
 		var result = await schema.DeserializeAndValidateAsync(stream);

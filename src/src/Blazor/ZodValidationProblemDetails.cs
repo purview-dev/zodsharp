@@ -178,7 +178,7 @@ public sealed class ZodValidationProblemIssue
 		Dictionary<string, object?>? parameters = null;
 		if (Parameters is { Count: > 0 })
 		{
-			parameters = new(StringComparer.Ordinal);
+			parameters = [with(StringComparer.Ordinal)];
 			foreach (var (name, value) in Parameters)
 				parameters[name] = ToScalar(value);
 		}
@@ -189,7 +189,7 @@ public sealed class ZodValidationProblemIssue
 			foreach (var option in unionErrors)
 				options.Add([.. (option ?? []).Select(static issue => issue.ToValidationError())]);
 
-			parameters ??= new(StringComparer.Ordinal);
+			parameters ??= [with(StringComparer.Ordinal)];
 			parameters[ZodIssueParameters.UnionErrors] = options.MoveToImmutable();
 		}
 

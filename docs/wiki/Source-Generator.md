@@ -259,10 +259,13 @@ var handleOnly = await AccountSchema.ValidateMemberAsync(account, nameof(Account
 `RequiresAsyncValidation` is `true` for `Account`, and for every type that nests it. A type whose graph has no
 asynchronous rule completes `ValidateAsync` synchronously, so awaiting it costs nothing.
 
-Because `ValidateAsync` exists, CA1849 (when enabled) reports a `Validate` call in async code. For a type whose
-`RequiresAsyncValidation` is `false` the generated `Validate` remarks say the call never blocks, so the warning is
-noise there: prefer awaiting `ValidateAsync` (free for such a type, and correct if async rules are added later) over
-suppressing it. For a type that requires async validation it is a real finding.
+Because `ValidateAsync` exists, CA1849 (when enabled) would report every `Validate` and `ValidateMember` call inside
+async code. It does not: the analyzer package ships the `ZODSUP001` suppressor, which removes those reports by call
+target. The synchronous call is the cheap path (no `ValueTask`, no state machine) and never blocks. `ValidateAsync`
+is the call to make when the graph has asynchronous rules — `RequiresAsyncValidation` is the compile-time answer and
+`ZODSGEN048` says so at build time; a synchronous `Validate` of such a type throws rather than skip them. Nothing
+else is suppressed: CA1849 still reports for `Task.Wait`, `Thread.Sleep` and another library's
+`Validate`/`ValidateAsync` pair.
 
 > [!WARNING]
 > The async custom validation method is mutually exclusive with the `OnZodValidate` refinement hook. A

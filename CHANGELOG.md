@@ -214,6 +214,11 @@ Released versions correspond to `v<version>` GitHub releases.
   within 10% (`scripts/check-wasm-size.ps1`, `just wasm-size`). A nightly workflow (`wasm-nightly.yml`, also on
   demand) publishes it with `RunAOTCompilation=true` and drives the published sample in Chromium, one form per render
   mode.
+- **`ZODSUP001`, a CA1849 suppressor.** The analyzer package now suppresses CA1849 ("call async methods when in an
+  async method") for ZodSharp's synchronous validation entry points: generated `Validate`/`ValidateMember`, the
+  generated and core validator adapters, and the fluent schemas. An async method can call the cheap synchronous path
+  without a warning, and the suppression is by call target rather than by rule, so `Task.Wait`, `Thread.Sleep` and
+  another library's `Validate`/`ValidateAsync` pair still report CA1849.
 ### Breaking behaviour changes
 
 - **Dropped net8.0 and net9.0; supported target frameworks are net10.0 and net11.0.** Every package ships
@@ -561,14 +566,15 @@ Each note names the old form, the new form, and the edit to make.
   register a validator per name if you relied on the old scope.
 - **Endpoint filter.** `WithZodSharpValidation<T>()` threw on every request when no validator was registered → it
   fails when the endpoint is built. Register the validator (or factory) before mapping the endpoint.
-- **CA1849 on synchronous `Validate` calls.** Every generated schema and validator adapter now has `ValidateAsync`, so
-  CA1849 ("call async methods when in an async method"), when enabled, reports each `Schema.Validate(value)` or
-  `validator.Validate(value)` inside async code. For a type whose `{Type}Schema.RequiresAsyncValidation` is `false`
-  (the generated `Validate` remarks say which) the sync call is correct and never blocks. Either await
-  `ValidateAsync(value, services, cancellationToken)`, which completes synchronously without allocating for such a
-  type and also runs asynchronous rules if they are added later (the recommended edit), or suppress CA1849 at the call
-  site with a justification. ZodSharp does not suppress the analyzer for you, and nothing in generated code can tell
-  it a call is fine. For a type that requires async validation the warning is real: `Validate` cannot run those rules.- **Option-less ProblemDetails overloads (CS0618).** `result.ToHttpValidationProblemDetails()` and the other overloads
+- **CA1849 on synchronous `Validate` calls.** Every generated schema and validator adapter now has `ValidateAsync`,
+  so CA1849 ("call async methods when in an async method"), when enabled, reports each `Schema.Validate(value)`,
+  `Schema.ValidateMember(...)`, `validator.Validate(value)` and fluent `schema.Validate(value)` inside async code.
+  The analyzer package now suppresses those reports (`ZODSUP001`), because the synchronous pipeline is the cheap
+  path and never blocks; `ValidateAsync` earns its `ValueTask` only when the graph has asynchronous rules. Remove
+  any `NoWarn`, `#pragma` or `SuppressMessage` added for CA1849 on those calls. CA1849 for anything else — `Task.Wait`,
+  `Thread.Sleep`, another library's `Validate`/`ValidateAsync` pair — is untouched. A type that does have asynchronous
+  rules still has to use `ValidateAsync`: `ZODSGEN048` says so at build time, and `Validate` throws.
+- **Option-less ProblemDetails overloads (CS0618).** `result.ToHttpValidationProblemDetails()` and the other overloads
   that take only a status code, an `ErrorTypeRegistry` or a lookup (and `result.ToValidationProblem()`) still return
   their 2.x body, built from defaults rather than your `ZodProblemDetailsOptions` → in a request call
   `ToHttpValidationProblemDetails(httpContext)` / `ToValidationProblem(httpContext)`, which apply the registered

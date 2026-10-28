@@ -112,10 +112,10 @@ public class ToJsonSchemaVendorExtensionTests
 		JsonSchemaDefinition schema = new();
 
 		// Act
-		var act = () => schema.SetVendorExtension("zod-thing", true);
+		void Act() => schema.SetVendorExtension("zod-thing", true);
 
 		// Assert
-		await Assert.That(act).Throws<ArgumentException>();
+		await Assert.That(Act).Throws<ArgumentException>();
 	}
 
 	[Test]

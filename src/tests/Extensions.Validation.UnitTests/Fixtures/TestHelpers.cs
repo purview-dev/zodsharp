@@ -41,8 +41,11 @@ static class TestHelpers
 
 	public static IValidatableTypeInfo GetTypeInfo<T>(this IServiceProvider provider)
 	{
+		// A conditional expression would turn the guard into a throw expression inside the return.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (!provider.GetValidationOptions().TryGetValidatableTypeInfo(typeof(T), out var info))
 			throw new InvalidOperationException($"No type info for {typeof(T).Name}.");
+#pragma warning restore IDE0046
 
 		return info;
 	}
@@ -91,8 +94,11 @@ sealed class FakeStringLocalizer(Dictionary<string, string> resources) : IString
 		{
 			// Culture-specific entries are keyed "{culture}:{key}" so tests can prove the culture is honoured.
 			var culture = CultureInfo.CurrentUICulture.Name;
+			// A conditional expression would nest the culture-specific lookup inside the fallback lookup.
+#pragma warning disable IDE0046 // Convert to conditional expression
 			if (resources.TryGetValue($"{culture}:{name}", out var specific))
 				return new(name, specific, resourceNotFound: false);
+#pragma warning restore IDE0046
 
 			return resources.TryGetValue(name, out var value)
 				? new(name, value, resourceNotFound: false)

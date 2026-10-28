@@ -18,7 +18,8 @@ public class NewtonsoftJsonErrorTests
 		// Defect J5
 		// Arrange
 		PassThroughSchema<Person> schema = new();
-		const string json = """{"Name":"Ada","Age":"forty-two"}""";
+		const string json = /*lang=json,strict*/
+			"""{"Name":"Ada","Age":"forty-two"}""";
 
 		// Act
 		var result = schema.DeserializeAndValidate(json);
@@ -42,7 +43,8 @@ public class NewtonsoftJsonErrorTests
 		// Defect J5
 		// Arrange
 		PassThroughSchema<Team> schema = new();
-		const string json = """{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""";
+		const string json = /*lang=json,strict*/
+			"""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""";
 
 		// Act
 		var result = schema.DeserializeAndValidate(json);
@@ -58,7 +60,10 @@ public class NewtonsoftJsonErrorTests
 	}
 
 	[Test]
-	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""", "Members[1].Age")]
+	[Arguments( /*lang=json,strict*/
+		"""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":"x"}]}""",
+		"Members[1].Age"
+	)]
 	[Arguments("""{"Members":[{"Name":"Ada","Age":1},{"Name":"Bob","Age":}]}""", "Members[1].Age")]
 	public async Task DeserializeAndValidate_GivenUnreadableValueUnderAValidatingConverter_ReportsTheFullPath(
 		string json,
@@ -121,7 +126,11 @@ public class NewtonsoftJsonErrorTests
 		// Defect J6
 		// Arrange
 		AsyncOnlyFailingSchema schema = new();
-		using MemoryStream stream = new(Encoding.UTF8.GetBytes("""{"Name":"Ada","Age":1}"""));
+		using MemoryStream stream = new(
+			Encoding.UTF8.GetBytes( /*lang=json,strict*/
+				"""{"Name":"Ada","Age":1}"""
+			)
+		);
 
 		// Act
 		var result = await schema.DeserializeAndValidateAsync(stream);
@@ -138,7 +147,8 @@ public class NewtonsoftJsonErrorTests
 		// Arrange
 		PassThroughSchema<Household> schema = new();
 		JsonSerializerSettings settings = new() { Converters = { new PersonSchema().CreateValidatingConverter() } };
-		const string json = """{"Owner":{"Name":"","Age":30}}""";
+		const string json = /*lang=json,strict*/
+			"""{"Owner":{"Name":"","Age":30}}""";
 
 		// Act
 		var result = schema.DeserializeAndValidate(json, settings);
@@ -160,7 +170,8 @@ public class NewtonsoftJsonErrorTests
 		// Defect J4
 		// Arrange
 		JsonSerializerSettings settings = new() { Converters = { new PersonSchema().CreateValidatingConverter() } };
-		const string json = """{"Owner":{"Name":"","Age":30}}""";
+		const string json = /*lang=json,strict*/
+			"""{"Owner":{"Name":"","Age":30}}""";
 
 		// Act
 		var exception = Assert.Throws<ZodNewtonsoftJsonValidationException>(() =>

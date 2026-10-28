@@ -180,7 +180,7 @@ public sealed class StringLocalizerZodMessageFormatter : IZodMessageFormatter
 
 	static ZodValidationError WithDisplayName(in ZodValidationError error, string displayName)
 	{
-		Dictionary<string, object?> parameters = new(StringComparer.Ordinal);
+		Dictionary<string, object?> parameters = [with(StringComparer.Ordinal)];
 		if (error.Parameters is not null)
 		{
 			foreach (var pair in error.Parameters)

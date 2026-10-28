@@ -19,8 +19,6 @@ public static class ZodValidationDepth
 	/// </summary>
 	public const int DefaultMaxDepth = 32;
 
-	static int CurrentMaxDepth = DefaultMaxDepth;
-
 	/// <summary>
 	/// Gets or sets the maximum nesting depth. Process-wide; hosts that configure
 	/// <c>ValidationOptions.MaxDepth</c> may mirror the value here.
@@ -28,13 +26,13 @@ public static class ZodValidationDepth
 	/// <exception cref="ArgumentOutOfRangeException">The value is zero or negative.</exception>
 	public static int MaxDepth
 	{
-		get => Volatile.Read(ref CurrentMaxDepth);
+		get => Volatile.Read(ref field);
 		set
 		{
 			ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
-			Volatile.Write(ref CurrentMaxDepth, value);
+			Volatile.Write(ref field, value);
 		}
-	}
+	} = DefaultMaxDepth;
 
 	/// <summary>
 	/// Throws when <paramref name="depth"/> has reached <see cref="MaxDepth"/>.

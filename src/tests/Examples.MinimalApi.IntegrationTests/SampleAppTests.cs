@@ -12,7 +12,8 @@ namespace ZodSharp.Examples.MinimalApi;
 /// </summary>
 public partial class SampleAppTests
 {
-	const string InvalidOrder = """
+	const string InvalidOrder = /*lang=json,strict*/
+		"""
 		{
 			"customerEmail": "not-an-email",
 			"shippingAddress": { "street": "1 Main Street", "city": "", "postCode": "LS1 1AA" },
@@ -21,7 +22,8 @@ public partial class SampleAppTests
 		}
 		""";
 
-	const string ValidOrder = """
+	const string ValidOrder = /*lang=json,strict*/
+		"""
 		{
 			"customerEmail": "ann@example.com",
 			"shippingAddress": { "street": "1 Main Street", "city": "Leeds", "postCode": "LS1 1AA" },

@@ -11,7 +11,8 @@ namespace ZodSharp.Json;
 /// </summary>
 public class DualPackageCallTests
 {
-	const string PersonJson = """{"Name":"Ada"}""";
+	const string PersonJson = /*lang=json,strict*/
+		"""{"Name":"Ada"}""";
 
 	[Test]
 	public async Task DeserializeAndValidate_GivenBothPackagesAndNoOptions_ResolvesToSystemTextJson(

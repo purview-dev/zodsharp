@@ -45,7 +45,7 @@ sealed class Order : IValidatableObject
 
 	public string? Notes { get; set; }
 
-	public IEnumerable<System.ComponentModel.DataAnnotations.ValidationResult> Validate(
+	public IEnumerable<ValidationResult> Validate(
 		ValidationContext validationContext
 	)
 	{
@@ -93,7 +93,7 @@ sealed class Dog
 }
 
 /// <summary>A C# union member, dispatched to the case's generated schema.</summary>
-union Pet(Cat, Dog);
+readonly union Pet(Cat, Dog);
 
 /// <summary>A JSON request model, deserialized through a source-generated <see cref="JsonSerializerContext"/>.</summary>
 [ZodSchema]

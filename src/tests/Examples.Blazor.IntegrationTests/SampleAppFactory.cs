@@ -99,13 +99,13 @@ sealed class SampleAppFactory : WebApplicationFactory<App>
 			?? throw new InvalidOperationException("No client validation payload was rendered.");
 		using var json = JsonDocument.Parse(element.GetAttribute("data-rules") ?? "{}");
 
-		Dictionary<string, List<ClientRule>> fields = new(StringComparer.Ordinal);
+		Dictionary<string, List<ClientRule>> fields = [with(StringComparer.Ordinal)];
 		foreach (var field in json.RootElement.GetProperty("fields").EnumerateArray())
 		{
 			List<ClientRule> rules = [];
 			foreach (var rule in field.GetProperty("rules").EnumerateArray())
 			{
-				Dictionary<string, string> parameters = new(StringComparer.Ordinal);
+				Dictionary<string, string> parameters = [with(StringComparer.Ordinal)];
 				if (rule.TryGetProperty("params", out var values))
 				{
 					foreach (var value in values.EnumerateObject())

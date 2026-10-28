@@ -16,7 +16,8 @@ namespace ZodSharp.Blazor;
 /// </summary>
 public class EndpointValidationRegistrationTests
 {
-	const string InvalidCustomer = """{ "email": "not-an-email" }""";
+	const string InvalidCustomer = /*lang=json,strict*/
+		"""{ "email": "not-an-email" }""";
 
 	[Test]
 	public async Task AddZodSharpBlazor_GivenAnEndpointBindingAZodSchemaType_LeavesTheEndpointUnvalidated(
@@ -92,7 +93,7 @@ public class EndpointValidationRegistrationTests
 		var builder = WebApplication.CreateSlimBuilder();
 		builder.WebHost.UseTestServer();
 		builder.Services.AddZodSharpFactory(static factory =>
-			ZodSharp.Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
+			Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
 		);
 		register(builder.Services);
 

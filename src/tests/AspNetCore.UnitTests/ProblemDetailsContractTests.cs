@@ -16,7 +16,8 @@ namespace ZodSharp.AspNetCore;
 /// </summary>
 public class ProblemDetailsContractTests
 {
-	const string ExpectedContract = """
+	const string ExpectedContract = /*lang=json,strict*/
+		"""
 		{
 		  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
 		  "title": "One or more validation errors occurred.",

@@ -521,7 +521,7 @@ public static class ZodClientValidationRules
 		params (string Key, string? Value)[] parameters
 	)
 	{
-		Dictionary<string, string> values = new(StringComparer.Ordinal);
+		Dictionary<string, string> values = [with(StringComparer.Ordinal)];
 		foreach (var (key, value) in parameters)
 		{
 			if (value is not null)

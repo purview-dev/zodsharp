@@ -165,8 +165,11 @@ static class JsonDeserializationErrors
 		{
 			var expectedSegment =
 				current.Kind == JsonTypeInfoKind.Enumerable ? ZodPathSegmentKind.Index : ZodPathSegmentKind.Key;
+			// A conditional expression here would nest the segment check inside the element lookup.
+#pragma warning disable IDE0046 // Convert to conditional expression
 			if (segment.Kind != expectedSegment && segment.Kind != ZodPathSegmentKind.Member)
 				return null;
+#pragma warning restore IDE0046
 
 			return ElementTypeOf(current) is { } element ? current.Options.GetTypeInfo(element) : null;
 		}

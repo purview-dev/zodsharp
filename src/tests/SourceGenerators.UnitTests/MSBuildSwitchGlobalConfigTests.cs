@@ -164,8 +164,11 @@ public sealed class MSBuildSwitchGlobalConfigTests
 	{
 		var config = AnalyzerConfig.Parse(globalConfig, "/repo/obj/Testing.GeneratedMSBuildEditorConfig.editorconfig");
 		var configSet = AnalyzerConfigSet.Create(ImmutableArray.Create(config), out var configDiagnostics);
+		// A conditional expression would turn the guard into a throw expression inside the return.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (!configDiagnostics.IsEmpty)
 			throw new InvalidOperationException(string.Join(Environment.NewLine, configDiagnostics));
+#pragma warning restore IDE0046
 
 		return configSet.GlobalConfigOptions.AnalyzerOptions;
 	}
@@ -218,7 +221,7 @@ public sealed class MSBuildSwitchGlobalConfigTests
 
 	sealed class DictionaryOptions(ImmutableDictionary<string, string> options) : AnalyzerConfigOptions
 	{
-		public static readonly DictionaryOptions Empty = new(ImmutableDictionary<string, string>.Empty);
+		public static readonly DictionaryOptions Empty = new([]);
 
 		public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) =>
 			options.TryGetValue(key, out value);

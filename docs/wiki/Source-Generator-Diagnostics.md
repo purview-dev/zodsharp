@@ -61,3 +61,10 @@ The `[ErrorType]` generator, shipped in the same analyzer assembly, reports `ZOD
 ## Suppressing
 
 Diagnostics can be suppressed per-project or per-site with the standard `#pragma warning disable ZODSGEN006` / `NoWarn` mechanisms. Refer to the analyzer's shipped release notes (`AnalyzerReleases.Shipped.md` / `AnalyzerReleases.Unshipped.md` in the generator project) for the canonical catalog.
+
+The package also ships one **suppression** that is not a reportable rule: `ZODSUP001` removes `CA1849` ("call async
+methods when in an async method") for ZodSharp's synchronous validation entry points — generated `Validate` and
+`ValidateMember`, the validator adapters and the fluent schemas. CA1849 fires there only because `ValidateAsync`
+exists; the synchronous pipeline is the cheap path and never blocks, and a type whose graph has asynchronous rules is
+already covered by `ZODSGEN048`. The suppression is by call target, so `Task.Wait`, `Thread.Sleep` and another
+library's `Validate`/`ValidateAsync` pair still report CA1849.

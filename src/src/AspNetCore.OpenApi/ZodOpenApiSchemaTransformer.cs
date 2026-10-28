@@ -66,7 +66,7 @@ public sealed class ZodOpenApiSchemaTransformer(ZodOpenApiOptions options) : IOp
 		return Task.CompletedTask;
 	}
 
-	void TransformProperty(
+	static void TransformProperty(
 		OpenApiSchema schema,
 		JsonPropertyInfo property,
 		JsonTypeInfo propertyType,

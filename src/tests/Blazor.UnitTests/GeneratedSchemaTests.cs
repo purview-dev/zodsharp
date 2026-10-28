@@ -226,6 +226,6 @@ public class GeneratedSchemaTests
 
 	static BunitContext CreateContext() =>
 		FormHost.CreateContext(static factory =>
-			ZodSharp.Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
+			Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
 		);
 }

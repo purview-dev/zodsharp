@@ -8,7 +8,6 @@ namespace ZodSharp.Core;
 /// </summary>
 public readonly record struct ValidationError
 {
-	readonly ZodPath _fullPath;
 	readonly ErrorBound? _lower;
 	readonly ErrorBound? _upper;
 
@@ -42,17 +41,13 @@ public readonly record struct ValidationError
 	/// their digits (["items", "0", "name"]), matching Zod. Prefer <see cref="FullPath"/>, which keeps the
 	/// segment kinds.
 	/// </summary>
-	public ImmutableArray<string> Path => _fullPath.LegacySegments;
+	public ImmutableArray<string> Path => FullPath.LegacySegments;
 
 	/// <summary>
 	/// The typed path to the field that failed validation. This is the authoritative location; render it with
 	/// <see cref="ZodPath.ToDottedString"/> rather than joining <see cref="Path"/>.
 	/// </summary>
-	public ZodPath FullPath
-	{
-		get => _fullPath;
-		init => _fullPath = value;
-	}
+	public ZodPath FullPath { get; init; }
 
 	/// <summary>
 	/// The origin category for structured issues: the Zod type of the failing value (e.g. "string", "number", "array", "record").
@@ -188,7 +183,7 @@ public readonly record struct ValidationError
 		Code = code;
 		Category = category;
 		Message = message;
-		_fullPath = path;
+		FullPath = path;
 		Parameters = Wrap(parameters);
 		Origin = origin;
 		Minimum = minimum;
@@ -202,11 +197,7 @@ public readonly record struct ValidationError
 	/// </summary>
 	/// <param name="segment">The outer segment.</param>
 	/// <returns>The re-pathed error.</returns>
-	public ValidationError WithPathPrefix(ZodPathSegment segment) =>
-		this with
-		{
-			FullPath = _fullPath.Prepend(segment),
-		};
+	public ValidationError WithPathPrefix(ZodPathSegment segment) => this with { FullPath = FullPath.Prepend(segment) };
 
 	/// <summary>
 	/// Returns a copy of this error located under <paramref name="prefix"/>, keeping every other field.
@@ -214,7 +205,7 @@ public readonly record struct ValidationError
 	/// <param name="prefix">The outer path.</param>
 	/// <returns>The re-pathed error.</returns>
 	public ValidationError WithPathPrefix(ZodPath prefix) =>
-		prefix.IsRoot ? this : this with { FullPath = _fullPath.Prepend(prefix) };
+		prefix.IsRoot ? this : this with { FullPath = FullPath.Prepend(prefix) };
 
 	/// <summary>
 	/// Returns a copy of this error with the supplied parameters, keeping every other field.
@@ -234,7 +225,7 @@ public readonly record struct ValidationError
 		&& string.Equals(Message, other.Message, StringComparison.Ordinal)
 		&& string.Equals(MessageFormat, other.MessageFormat, StringComparison.Ordinal)
 		&& string.Equals(Origin, other.Origin, StringComparison.Ordinal)
-		&& _fullPath.Equals(other._fullPath)
+		&& FullPath.Equals(other.FullPath)
 		&& Minimum == other.Minimum
 		&& Maximum == other.Maximum
 		&& Inclusive == other.Inclusive
@@ -248,7 +239,7 @@ public readonly record struct ValidationError
 			Code,
 			Category,
 			Message,
-			_fullPath,
+			FullPath,
 			Origin,
 			HashCode.Combine(Minimum, Maximum, Inclusive, _lower, _upper),
 			Parameters?.Count ?? 0

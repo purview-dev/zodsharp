@@ -177,7 +177,7 @@ sealed class ExternalSchemaResolver(Compilation compilation)
 		&& !type.IsStatic
 		&& !(
 			ValidationInputsResolver.RoslynFeatures.IsUnion(type)
-			&& !ZodSharp.SourceGenerators.Models.ZodSchemaAttributeData.FromAttributeData(type, out _).Exists
+			&& !Models.ZodSchemaAttributeData.FromAttributeData(type, out _).Exists
 		);
 
 	/// <summary>

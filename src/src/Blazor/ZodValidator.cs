@@ -184,8 +184,12 @@ public sealed partial class ZodValidator : ComponentBase, IDisposable
 		if (preferSchema && Schema is { } schema && schema.ValidatedType.IsAssignableFrom(type))
 			return schema;
 
+		// A conditional expression would nest the schema and resolver lookups; the ordered ifs keep the
+		// precedence of the three sources explicit.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (_resolver is not null && _resolver.TryGetValidator(type, out var registered))
 			return registered;
+#pragma warning restore IDE0046
 
 		return !preferSchema && Schema is { } fallback && fallback.ValidatedType.IsAssignableFrom(type)
 			? fallback

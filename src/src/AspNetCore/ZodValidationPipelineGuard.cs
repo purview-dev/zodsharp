@@ -59,8 +59,12 @@ sealed class ZodValidationPipelineGuard
 		}
 
 		var options = services.GetService<IOptions<ValidationOptions>>()?.Value;
+		// The guard keeps the option lookup and the construction separate; a conditional expression would
+		// bury the three services the guard object needs.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (options is null || !options.Resolvers.Contains(resolver))
 			return null;
+#pragma warning restore IDE0046
 
 		return new(
 			options,
@@ -75,10 +79,9 @@ sealed class ZodValidationPipelineGuard
 	public bool Covers(ParameterInfo parameter)
 	{
 		// The pipeline never validates a parameter the container resolves.
-		if (_isService?.IsService(parameter.ParameterType) == true)
-			return false;
-
-		return _options.TryGetValidatableParameterInfo(parameter, out var info) && info.GetType().Assembly == _bridge;
+		return _isService?.IsService(parameter.ParameterType) != true
+			&& _options.TryGetValidatableParameterInfo(parameter, out var info)
+			&& info.GetType().Assembly == _bridge;
 	}
 
 	/// <summary>

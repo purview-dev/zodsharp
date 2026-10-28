@@ -138,3 +138,10 @@ Standard mechanisms: `#pragma warning disable ZODSGEN006`, a `NoWarn` entry, or 
 severity override. The canonical catalogue is the analyzer's `AnalyzerReleases.Shipped.md` /
 `AnalyzerReleases.Unshipped.md` in the generator project — a new or changed rule must be recorded
 there in the same change.
+
+The package also ships `ZODSUP001`, a **suppression** rather than a reportable rule: it removes CA1849
+("call async methods when in an async method") for ZodSharp's `Validate` and `ValidateMember` calls — generated
+schemas, validator adapters and fluent schemas — because the synchronous pipeline is the cheap path and never blocks.
+`ValidateAsync` is needed only when the graph has asynchronous rules, which `ZODSGEN048` reports. It is scoped to
+those call targets: `Task.Wait`, `Thread.Sleep` and other libraries' `Validate`/`ValidateAsync` pairs still report
+CA1849. Do not add `NoWarn;CA1849` for ZodSharp's own calls.

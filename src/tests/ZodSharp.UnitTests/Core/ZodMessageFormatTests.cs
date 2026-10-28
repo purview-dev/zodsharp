@@ -63,8 +63,8 @@ public class ZodMessageFormatTests
 	public async Task Format_GivenFormatSpecifier_UsesInvariantCultureByDefault()
 	{
 		// Arrange
-		var previous = System.Globalization.CultureInfo.CurrentCulture;
-		System.Globalization.CultureInfo.CurrentCulture = new("de-DE");
+		var previous = CultureInfo.CurrentCulture;
+		CultureInfo.CurrentCulture = new("de-DE");
 		try
 		{
 			// Act
@@ -75,7 +75,7 @@ public class ZodMessageFormatTests
 		}
 		finally
 		{
-			System.Globalization.CultureInfo.CurrentCulture = previous;
+			CultureInfo.CurrentCulture = previous;
 		}
 	}
 

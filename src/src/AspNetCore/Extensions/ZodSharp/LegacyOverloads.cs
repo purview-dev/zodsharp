@@ -2,9 +2,9 @@ namespace ZodSharp;
 
 /// <summary>
 /// The deprecation messages of the 2.x ProblemDetails conversion overloads. They take no
-/// <see cref="AspNetCore.ZodProblemDetailsOptions"/> and no request, so they cannot see the options an application
+/// <see cref="ZodProblemDetailsOptions"/> and no request, so they cannot see the options an application
 /// configures (<c>AddZodSharpProblemDetails</c>) and their output can differ from the endpoint filter, the exception
-/// handler and <see cref="AspNetCore.ZodTypedResults"/>. Their behaviour is unchanged; they are kept for source and
+/// handler and <see cref="ZodTypedResults"/>. Their behaviour is unchanged; they are kept for source and
 /// binary compatibility.
 /// </summary>
 static class LegacyOverloads

@@ -67,7 +67,7 @@ public static class ZodSharpClientValidationServiceCollectionExtensions
 	[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(ZodClientValidationTrimming.Message)]
 	static ServiceDescriptor? FindDefaultProvider()
 	{
-		ServiceCollection scratch = new();
+		ServiceCollection scratch = [];
 		scratch.AddRazorComponents();
 		return scratch.LastOrDefault(static d =>
 			d.ServiceType == typeof(ClientValidationProvider) && !d.IsKeyedService

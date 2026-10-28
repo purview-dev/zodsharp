@@ -136,7 +136,7 @@ partial class SourceGenLibrary
 	static EquatableArray<string> GetAsyncMembers(IMethodSymbol method)
 	{
 		var builder = ImmutableArray.CreateBuilder<string>();
-		HashSet<string> seen = new(StringComparer.Ordinal);
+		HashSet<string> seen = [with(StringComparer.Ordinal)];
 		foreach (var attribute in method.GetAttributes())
 		{
 			if (

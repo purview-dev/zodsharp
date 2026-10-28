@@ -114,7 +114,7 @@ public class ClientValidationRulesTests
 		// Arrange
 		GeneratedOrder order = new();
 		FixedProvider inner = new(
-			"""{"fields":[{"name":"Model.Reference","rules":[{"name":"required","message":"Required"}]}]}"""
+			/*lang=json,strict*/"""{"fields":[{"name":"Model.Reference","rules":[{"name":"required","message":"Required"}]}]}"""
 		);
 		ZodClientValidationProvider provider = new(inner, new());
 		EditContext editContext = new(order);
@@ -130,7 +130,7 @@ public class ClientValidationRulesTests
 		await Assert
 			.That(json)
 			.IsEqualTo(
-				"""{"fields":[{"name":"Model.Reference","rules":[{"name":"required","message":"Required"},{"name":"zod-startswith","message":"String must start with \u0027ORD-\u0027","params":{"prefix":"ORD-","comparison":"ordinal"}}]}]}"""
+				/*lang=json,strict*/"""{"fields":[{"name":"Model.Reference","rules":[{"name":"required","message":"Required"},{"name":"zod-startswith","message":"String must start with \u0027ORD-\u0027","params":{"prefix":"ORD-","comparison":"ordinal"}}]}]}"""
 			);
 	}
 
@@ -139,7 +139,9 @@ public class ClientValidationRulesTests
 	{
 		// Arrange
 		Order order = new();
-		FixedProvider inner = new("""{"fields":[]}""");
+		FixedProvider inner = new( /*lang=json,strict*/
+			"""{"fields":[]}"""
+		);
 		ZodClientValidationProvider provider = new(inner, new());
 		EditContext editContext = new(order);
 		Dictionary<FieldIdentifier, string> fields = new()
@@ -172,17 +174,15 @@ public class ClientValidationRulesTests
 	}
 #pragma warning restore BL0006
 
-	sealed class FixedProvider : ClientValidationProvider
+	sealed class FixedProvider(string json) : ClientValidationProvider
 	{
-		public FixedProvider(string json) =>
-			Fragment = builder =>
+		public RenderFragment Fragment { get; } =
+			builder =>
 			{
 				builder.OpenElement(0, "blazor-client-validation-data");
 				builder.AddAttribute(1, "data-rules", json);
 				builder.CloseElement();
 			};
-
-		public RenderFragment Fragment { get; }
 
 		public override RenderFragment? RenderClientValidationRules(
 			EditContext editContext,

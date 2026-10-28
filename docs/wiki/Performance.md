@@ -127,6 +127,8 @@ What the design guarantees regardless of the numbers:
   Blazor field costs one member, not the whole graph.
 - **Synchronous fast path.** `{Type}Schema.RequiresAsyncValidation` is a compile-time constant. When nothing in
   the graph is asynchronous, `ValidateAsync` completes synchronously (it returns `new ValueTask<…>(Validate(…))`).
+  Prefer `Validate` even inside async code: it skips the `ValueTask` and costs nothing, and CA1849 is suppressed for
+  it (`ZODSUP001`).
 - **Errors cost on failure only.** Paths, bounds and parameters are built when a rule fails; messages are
   formatted with the invariant culture at validation time and re-formatted for a user's culture only at a host
   boundary, so success stays allocation-free.

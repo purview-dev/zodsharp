@@ -39,10 +39,16 @@ static class IntegrationChecks
 		CustomerSchemaValidator schema = new();
 		var typeInfo = HarnessJsonContext.Default.Customer;
 
-		var valid = schema.DeserializeAndValidate("""{"name":"Ada","age":36,"tags":["a"]}""", typeInfo);
+		var valid = schema.DeserializeAndValidate( /*lang=json,strict*/
+			"""{"name":"Ada","age":36,"tags":["a"]}""",
+			typeInfo
+		);
 		h.Expect(valid.IsSuccess && valid.Value.Name == "Ada", "a valid document deserializes and validates");
 
-		var invalid = schema.DeserializeAndValidate("""{"name":"A","age":200,"tags":["a","b","c"]}""", typeInfo);
+		var invalid = schema.DeserializeAndValidate( /*lang=json,strict*/
+			"""{"name":"A","age":200,"tags":["a","b","c"]}""",
+			typeInfo
+		);
 		h.ExpectPaths(invalid.Errors, ["Name", "Age", "Tags"], "an invalid document reports each member");
 
 		var malformed = schema.DeserializeAndValidate("""{"name":""", typeInfo);

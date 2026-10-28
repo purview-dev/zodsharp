@@ -16,7 +16,7 @@ namespace ZodSharp.Extensions.Validation;
 sealed class ZodCompositeValidatableTypeInfo(ZodValidatableTypeInfo zod, ZodValidatableInfoResolver owner)
 	: IValidatableTypeInfo
 {
-	static readonly ConditionalWeakTable<ValidateContext, object> SecondPassContexts = new();
+	static readonly ConditionalWeakTable<ValidateContext, object> SecondPassContexts = [];
 	static readonly object Marker = new();
 
 	public ZodValidatableTypeInfo Zod => zod;
@@ -100,7 +100,7 @@ sealed class ZodCompositeValidatableTypeInfo(ZodValidatableTypeInfo zod, ZodVali
 	}
 
 	static bool Contains(
-		IReadOnlyDictionary<string, IReadOnlyList<Microsoft.Extensions.Validation.ValidationError>>? errors,
+		IReadOnlyDictionary<string, IReadOnlyList<ValidationError>>? errors,
 		string path,
 		string message
 	)

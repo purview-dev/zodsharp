@@ -202,9 +202,9 @@ public class JsonSchemaDefinition
 		if (!name.StartsWith("x-", StringComparison.Ordinal))
 			throw new ArgumentException("A vendor extension name must start with 'x-'.", nameof(name));
 
-		_vendorExtensions ??= new(StringComparer.Ordinal);
+		_vendorExtensions ??= [with(StringComparer.Ordinal)];
 		_vendorExtensions[name] = value;
 	}
 
-	static readonly Dictionary<string, object?> EmptyVendorExtensions = new(StringComparer.Ordinal);
+	static readonly Dictionary<string, object?> EmptyVendorExtensions = [with(StringComparer.Ordinal)];
 }

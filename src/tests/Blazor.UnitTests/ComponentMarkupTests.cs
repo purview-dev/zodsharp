@@ -116,9 +116,11 @@ public class ComponentMarkupTests
 		};
 		await using var context = FormHost.CreateContext(factory => factory.Register(validator));
 		EditContext editContext = new(order);
+
 		var form = context.Render(editContext, FormHost.Zod());
 		await form.ValidateAsync(editContext);
-		RenderFragment<ValidationError> template = error =>
+
+		RenderFragment Template(ValidationError error) =>
 			builder =>
 			{
 				builder.OpenElement(0, "strong");
@@ -130,7 +132,7 @@ public class ComponentMarkupTests
 		var zod = context.Render<ZodValidationMessage<string?>>(parameters =>
 			parameters
 				.Add(static p => p.For, () => order.Reference)
-				.Add(static p => p.Template, template)
+				.Add(static p => p.Template, Template)
 				.AddCascadingValue(editContext)
 		);
 

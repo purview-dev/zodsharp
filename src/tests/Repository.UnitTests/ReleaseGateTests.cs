@@ -57,19 +57,19 @@ public sealed partial class ReleaseGateTests
 				new(
 					"a deps.json library entry",
 					"PackedApp.deps.json",
-					"""{"libraries":{"Purview.SourceGeneratorFramework/1.2.2":{"type":"package"}}}"""
+					/*lang=json,strict*/"""{"libraries":{"Purview.SourceGeneratorFramework/1.2.2":{"type":"package"}}}"""
 				),
 			() =>
 				new(
 					"a runtimeconfig.json reference",
 					"PackedApp.runtimeconfig.json",
-					"""{"runtimeOptions":{"configProperties":{"Microsoft.CodeAnalysis.Leak":true}}}"""
+					/*lang=json,strict*/"""{"runtimeOptions":{"configProperties":{"Microsoft.CodeAnalysis.Leak":true}}}"""
 				),
 			() =>
 				new(
 					"a blazor.boot.json asset",
 					"wwwroot/_framework/blazor.boot.json",
-					"""{"resources":{"assembly":{"Purview.ZodSharp.SourceGenerators.wasm":"sha256-x"}}}"""
+					/*lang=json,strict*/"""{"resources":{"assembly":{"Purview.ZodSharp.SourceGenerators.wasm":"sha256-x"}}}"""
 				),
 			() =>
 				new(
@@ -189,7 +189,7 @@ public sealed partial class ReleaseGateTests
 	{
 		// Arrange
 		using TemporaryDirectory output = new();
-		var path = directoryExists ? output.Path : System.IO.Path.Combine(output.Path, "missing");
+		var path = directoryExists ? output.Path : Path.Combine(output.Path, "missing");
 
 		// Act
 		var result = await RunLeakScanAsync([path], cancellationToken);
@@ -211,10 +211,7 @@ public sealed partial class ReleaseGateTests
 	)
 	{
 		// Arrange
-		var workflows = Directory.GetFiles(
-			System.IO.Path.Combine(RepositoryRoot.Value, ".github", "workflows"),
-			"*.yml"
-		);
+		var workflows = Directory.GetFiles(Path.Combine(RepositoryRoot.Value, ".github", "workflows"), "*.yml");
 
 		// Act
 		List<string> publishing = [];
@@ -227,7 +224,7 @@ public sealed partial class ReleaseGateTests
 				if (!body.Contains("dotnet publish", StringComparison.Ordinal))
 					continue;
 
-				var name = $"{System.IO.Path.GetFileName(workflow)}:{job}";
+				var name = $"{Path.GetFileName(workflow)}:{job}";
 				publishing.Add(name);
 				if (
 					!body.Contains(
@@ -254,7 +251,7 @@ public sealed partial class ReleaseGateTests
 	{
 		// Arrange
 		var text = await File.ReadAllTextAsync(
-			System.IO.Path.Combine(RepositoryRoot.Value, ".github", "workflows", "pr.yml"),
+			Path.Combine(RepositoryRoot.Value, ".github", "workflows", "pr.yml"),
 			cancellationToken
 		);
 
@@ -280,7 +277,7 @@ public sealed partial class ReleaseGateTests
 	{
 		// Arrange
 		var json = await File.ReadAllTextAsync(
-			System.IO.Path.Combine(RepositoryRoot.Value, ".config", "purview-build.json"),
+			Path.Combine(RepositoryRoot.Value, ".config", "purview-build.json"),
 			cancellationToken
 		);
 		using var document = JsonDocument.Parse(
@@ -337,10 +334,17 @@ public sealed partial class ReleaseGateTests
 			new(
 				"clean deps.json",
 				"PackedApp.deps.json",
-				"""{"libraries":{"Purview.ZodSharp/3.0.0":{"type":"package"},"Microsoft.Extensions.Options/11.0.0":{"type":"package"}}}"""
+				/*lang=json,strict*/"""{"libraries":{"Purview.ZodSharp/3.0.0":{"type":"package"},"Microsoft.Extensions.Options/11.0.0":{"type":"package"}}}"""
 			)
 		);
-		Write(output.Path, new("clean runtimeconfig", "PackedApp.runtimeconfig.json", """{"runtimeOptions":{}}"""));
+		Write(
+			output.Path,
+			new(
+				"clean runtimeconfig",
+				"PackedApp.runtimeconfig.json", /*lang=json,strict*/
+				"""{"runtimeOptions":{}}"""
+			)
+		);
 		Write(
 			output.Path,
 			new(
@@ -355,8 +359,8 @@ public sealed partial class ReleaseGateTests
 
 	static void Write(string root, OutputFile file)
 	{
-		var path = System.IO.Path.Combine(root, file.RelativePath.Replace('/', System.IO.Path.DirectorySeparatorChar));
-		Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+		var path = Path.Combine(root, file.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+		Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 		var bytes = Encoding.UTF8.GetBytes(file.Content);
 		if (!file.Brotli)
 		{
@@ -380,7 +384,7 @@ public sealed partial class ReleaseGateTests
 				"-NoProfile",
 				"-NonInteractive",
 				"-File",
-				System.IO.Path.Combine(RepositoryRoot.Value, LeakScanScript),
+				Path.Combine(RepositoryRoot.Value, LeakScanScript),
 				"-Path",
 				.. paths,
 				.. AllowArguments(allow),
@@ -427,8 +431,8 @@ public sealed partial class ReleaseGateTests
 		)
 		{
 			if (
-				File.Exists(System.IO.Path.Combine(directory.FullName, "AGENTS.md"))
-				&& File.Exists(System.IO.Path.Combine(directory.FullName, LeakScanScript))
+				File.Exists(Path.Combine(directory.FullName, "AGENTS.md"))
+				&& File.Exists(Path.Combine(directory.FullName, LeakScanScript))
 			)
 				return directory.FullName;
 		}

@@ -53,12 +53,11 @@ public static class ZodPathNamer
 public readonly struct ZodPath : IEquatable<ZodPath>
 {
 	readonly ImmutableArray<ZodPathSegment> _segments;
-	readonly ImmutableArray<string> _legacy;
 
 	ZodPath(ImmutableArray<ZodPathSegment> segments, ImmutableArray<string> legacy)
 	{
 		_segments = segments;
-		_legacy = legacy;
+		LegacySegments = legacy;
 	}
 
 	/// <summary>
@@ -90,7 +89,7 @@ public readonly struct ZodPath : IEquatable<ZodPath>
 	/// <summary>
 	/// Gets the legacy string projection: members and keys as-is, indexes as invariant digits.
 	/// </summary>
-	public ImmutableArray<string> LegacySegments => _legacy.IsDefault ? [] : _legacy;
+	public ImmutableArray<string> LegacySegments => field.IsDefault ? [] : field;
 
 	/// <summary>
 	/// Creates a path from typed segments.
@@ -245,7 +244,7 @@ public readonly struct ZodPath : IEquatable<ZodPath>
 			{
 				ZodPathSegmentKind.Index => segment.Index.ToString(CultureInfo.InvariantCulture),
 				ZodPathSegmentKind.Member => namer?.GetName(segment.Name!) ?? segment.Name!,
-				_ => segment.Name!,
+				ZodPathSegmentKind.Key or _ => segment.Name!,
 			};
 			builder.Append(
 				text.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal)
@@ -384,8 +383,11 @@ public readonly struct ZodPath : IEquatable<ZodPath>
 			return ZodPathSegment.Member(segment ?? string.Empty);
 
 		var span = segment.AsSpan();
+		// The bracket check is one of three ordered parse attempts; a conditional expression would hide it.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (span.Length > 2 && span[0] == '[' && span[^1] == ']' && TryParseIndex(span[1..^1], out var bracketed))
 			return ZodPathSegment.At(bracketed);
+#pragma warning restore IDE0046
 
 		return TryParseIndex(span, out var index) ? ZodPathSegment.At(index) : ZodPathSegment.Member(segment);
 	}

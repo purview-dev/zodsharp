@@ -47,7 +47,7 @@ public partial class ZodOpenApiSchemaTransformerTests
 			"bracketed",
 			"allOf",
 			null,
-			"""[{"pattern":"^ab"},{"pattern":"yz$"}]"""
+			/*lang=json,strict*/"""[{"pattern":"^ab"},{"pattern":"yz$"}]"""
 		),
 		new("Several patterns", "StringRulesRequest", "bracketed", "pattern", null, null),
 		new("StartsWith", "StringRulesRequest", "prefixed", "pattern", null, "\"^ab\""),
@@ -72,7 +72,14 @@ public partial class ZodOpenApiSchemaTransformerTests
 		new("Base64", "StringRulesRequest", "payload", "contentEncoding", null, "\"base64\""),
 		new("Jwt", "StringRulesRequest", "token", "x-zod-jwt", null, "true"),
 		new("AllowedValues", "StringRulesRequest", "colour", "enum", null, """["red","green"]"""),
-		new("DeniedValues", "StringRulesRequest", "username", "not", null, """{"enum":["admin"]}"""),
+		new(
+			"DeniedValues",
+			"StringRulesRequest",
+			"username",
+			"not",
+			null, /*lang=json,strict*/
+			"""{"enum":["admin"]}"""
+		),
 		new("Enum", "Shade", null, "enum", null, "[0,1]"),
 		new(
 			"Display(Description)",

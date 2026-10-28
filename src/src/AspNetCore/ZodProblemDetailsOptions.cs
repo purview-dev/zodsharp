@@ -65,7 +65,7 @@ public sealed class ZodProblemDetailsOptions
 
 	/// <summary>
 	/// When <c>true</c>, <c>errors</c> entries that did not come from ZodSharp (for example DataAnnotations errors
-	/// produced by Microsoft.Extensions.Validation and merged by <see cref="ZodProblemDetailsWriter.Apply(Microsoft.AspNetCore.Http.HttpValidationProblemDetails, ReadOnlySpan{ZodSharp.Core.ValidationError}, Microsoft.AspNetCore.Http.HttpContext?)"/>) also get an
+	/// produced by Microsoft.Extensions.Validation and merged by <see cref="ZodProblemDetailsWriter.Apply(Microsoft.AspNetCore.Http.HttpValidationProblemDetails, ReadOnlySpan{ValidationError}, Microsoft.AspNetCore.Http.HttpContext?)"/>) also get an
 	/// <c>issues</c> entry, with code <see cref="ZodProblemDetailsWriter.DataAnnotationsCode"/>. Defaults to
 	/// <c>true</c>.
 	/// </summary>

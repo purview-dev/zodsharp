@@ -16,7 +16,9 @@ public class FromJsonSchemaParserErrorTests
 	{
 		// Defect J7
 		// Arrange
-		var schema = FromJsonSchemaParser.Parse("""{"type":"array","items":{"type":"array","minItems":2}}""");
+		var schema = FromJsonSchemaParser.Parse( /*lang=json,strict*/
+			"""{"type":"array","items":{"type":"array","minItems":2}}"""
+		);
 
 		// Act
 		var result = schema.Validate(JToken.Parse("[[1,2],[1]]"));
@@ -34,7 +36,9 @@ public class FromJsonSchemaParserErrorTests
 	{
 		// Defect J8
 		// Arrange
-		var schema = FromJsonSchemaParser.Parse("""{"type":"array","minItems":2,"maxItems":3}""");
+		var schema = FromJsonSchemaParser.Parse( /*lang=json,strict*/
+			"""{"type":"array","minItems":2,"maxItems":3}"""
+		);
 
 		// Act
 		var result = schema.Validate(JToken.Parse("[1]"));
@@ -55,7 +59,9 @@ public class FromJsonSchemaParserErrorTests
 	{
 		// Defect J8
 		// Arrange
-		var schema = FromJsonSchemaParser.Parse("""{"type":"array","maxItems":1}""");
+		var schema = FromJsonSchemaParser.Parse( /*lang=json,strict*/
+			"""{"type":"array","maxItems":1}"""
+		);
 
 		// Act
 		var result = schema.Validate(JToken.Parse("[1,2]"));
@@ -70,12 +76,36 @@ public class FromJsonSchemaParserErrorTests
 	}
 
 	[Test]
-	[Arguments("""{"type":"string"}""", "42", "Expected string, but got number")]
-	[Arguments("""{"type":"number"}""", "\"x\"", "Expected number, but got string")]
-	[Arguments("""{"type":"boolean"}""", "{}", "Expected boolean, but got object")]
-	[Arguments("""{"type":"object"}""", "[]", "Expected object, but got array")]
-	[Arguments("""{"type":"array"}""", "true", "Expected array, but got boolean")]
-	[Arguments("""{"type":"null"}""", "1", "Expected null, but got number")]
+	[Arguments( /*lang=json,strict*/
+		"""{"type":"string"}""",
+		"42",
+		"Expected string, but got number"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"type":"number"}""",
+		"\"x\"",
+		"Expected number, but got string"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"type":"boolean"}""",
+		"{}",
+		"Expected boolean, but got object"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"type":"object"}""",
+		"[]",
+		"Expected object, but got array"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"type":"array"}""",
+		"true",
+		"Expected array, but got boolean"
+	)]
+	[Arguments( /*lang=json,strict*/
+		"""{"type":"null"}""",
+		"1",
+		"Expected null, but got number"
+	)]
 	public async Task Validate_GivenWrongJsonKind_ReportsZodTypeNames(string jsonSchema, string json, string message)
 	{
 		// Defect J9
@@ -97,7 +127,9 @@ public class FromJsonSchemaParserErrorTests
 	{
 		// Defect J9
 		// Arrange
-		var schema = FromJsonSchemaParser.Parse("""{"const":"admin"}""");
+		var schema = FromJsonSchemaParser.Parse( /*lang=json,strict*/
+			"""{"const":"admin"}"""
+		);
 
 		// Act
 		var result = schema.Validate(JToken.Parse("\"secret-value\""));
@@ -114,6 +146,7 @@ public class FromJsonSchemaParserErrorTests
 		// Defect J10
 		// Arrange
 		var schema = FromJsonSchemaParser.Parse(
+			/*lang=json,strict*/
 			"""{"type":"object","additionalProperties":{"type":"array","minItems":2}}"""
 		);
 

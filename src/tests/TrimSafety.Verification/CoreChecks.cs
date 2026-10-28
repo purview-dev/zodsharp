@@ -39,7 +39,7 @@ static class CoreChecks
 		var native = Z.NativeUnion(Z.String(), Z.Number());
 		h.Expect(native.Validate("x").IsSuccess, "a native union accepts an option");
 
-		var compiled = ZodSharp.Expressions.CompiledValidator.Compile(email);
+		var compiled = Expressions.CompiledValidator.Compile(email);
 		h.Expect(compiled("someone@example.com").IsSuccess, "CompiledValidator binds the schema without codegen");
 	}
 
@@ -77,7 +77,7 @@ static class CoreChecks
 	public static void Registration(Harness h)
 	{
 		ZodSchemaFactory generated = new();
-		ZodSharp.Generated.ZodSharpTrimSafetyVerificationZodSharpSchemas.Register(generated);
+		Generated.ZodSharpTrimSafetyVerificationZodSharpSchemas.Register(generated);
 		h.Expect(generated.Resolve<Order>() is not null, "the generated Register names every validator");
 
 		ZodSchemaFactory scanned = new();

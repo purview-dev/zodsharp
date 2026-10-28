@@ -234,7 +234,7 @@ public class ProblemDetailsMappingTests
 		using HttpResponseMessage response = new(HttpStatusCode.BadRequest)
 		{
 			Content = new StringContent(
-				"""
+				/*lang=json,strict*/"""
 				{"status":400,"errors":{"Pet":["Invalid input"]},"issues":[{"path":"Pet","segments":["Pet"],
 				"code":"invalid_union","category":"invalid_union","message":"Invalid input","unionErrors":[[{"path":"Name",
 				"segments":["Name"],"code":"invalid_type","message":"Required"}]]}],"traceId":"00-abc"}
@@ -257,10 +257,18 @@ public class ProblemDetailsMappingTests
 	}
 
 	[Test]
-	[Arguments(HttpStatusCode.OK, "application/json", """{"errors":{"a":["b"]}}""")]
+	[Arguments(
+		HttpStatusCode.OK,
+		"application/json", /*lang=json,strict*/
+		"""{"errors":{"a":["b"]}}"""
+	)]
 	[Arguments(HttpStatusCode.BadRequest, "text/plain", "not json")]
 	[Arguments(HttpStatusCode.BadRequest, "application/json", "{not json")]
-	[Arguments(HttpStatusCode.NotFound, "application/problem+json", """{"title":"Not Found","status":404}""")]
+	[Arguments(
+		HttpStatusCode.NotFound,
+		"application/problem+json", /*lang=json,strict*/
+		"""{"title":"Not Found","status":404}"""
+	)]
 	public async Task TryReadZodValidationProblemAsync_GivenNonValidationResponse_ReturnsNull(
 		HttpStatusCode status,
 		string mediaType,

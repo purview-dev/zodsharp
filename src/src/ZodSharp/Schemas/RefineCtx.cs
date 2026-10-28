@@ -14,7 +14,13 @@ namespace ZodSharp.Schemas;
 /// records, tuples) prefix them with the value's own location, so a refinement never needs to know where it is
 /// used. Issues default to the <see cref="ZodIssueCategories.Custom"/> category, as Zod's custom issues do.
 /// </remarks>
-public sealed class RefineCtx<T>
+/// <remarks>
+/// Initializes a new instance of the <see cref="RefineCtx{T}"/> class with the value under validation and a
+/// typed base path.
+/// </remarks>
+/// <param name="value">The validated value.</param>
+/// <param name="path">The base path prepended to any added issues.</param>
+public sealed class RefineCtx<T>(T value, ZodPath path)
 {
 	// The issue list is allocated on the first issue rather than up front, so a refinement that passes
 	// costs a single context allocation and a refinement that never runs costs none.
@@ -30,21 +36,9 @@ public sealed class RefineCtx<T>
 		: this(value, ZodPath.FromLegacy(path)) { }
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="RefineCtx{T}"/> class with the value under validation and a
-	/// typed base path.
-	/// </summary>
-	/// <param name="value">The validated value.</param>
-	/// <param name="path">The base path prepended to any added issues.</param>
-	public RefineCtx(T value, ZodPath path)
-	{
-		Value = value;
-		FullPath = path;
-	}
-
-	/// <summary>
 	/// The value being validated.
 	/// </summary>
-	public T Value { get; }
+	public T Value { get; } = value;
 
 	/// <summary>
 	/// The base path under which issues are reported, in the legacy string form. Prefer <see cref="FullPath"/>.
@@ -54,7 +48,7 @@ public sealed class RefineCtx<T>
 	/// <summary>
 	/// The typed base path under which issues are reported.
 	/// </summary>
-	public ZodPath FullPath { get; }
+	public ZodPath FullPath { get; } = path;
 
 	/// <summary>
 	/// The issues added by the refinement so far.

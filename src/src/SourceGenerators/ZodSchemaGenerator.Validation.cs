@@ -35,6 +35,10 @@ partial class ZodSchemaGenerator
 			)
 		)
 		{
+			TypeReference zodPathReference = new(
+				new TypeIdentity("ZodPath", TypeLibraryGenerator.ZodSharpCoreNamespace)
+			);
+
 			foreach (var property in schema.Properties)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
@@ -43,9 +47,28 @@ partial class ZodSchemaGenerator
 
 				var name = property.Value.Name;
 				writer.XmlSummary($"The path of {CodeWriter.XmlSee(name)}.");
-				writer.Line(
-					$"public static {(IsInheritedStaticMemberName(name) ? "new " : string.Empty)}readonly {ZodPathType} {GetPathMemberName(name)} = {ZodPathType}.Member({name.StringLiteral()});"
-				);
+				if (IsInheritedStaticMemberName(name))
+				{
+					// FieldDeclarationOptions has no `new` modifier, and this member must hide object.Equals
+					// or object.GetType, so the structured API cannot express it.
+#pragma warning disable PSGFR18 // Prefer a structured CodeWriter declaration API
+					writer.Line(
+						$"public static new readonly {ZodPathType} {GetPathMemberName(name)} = {ZodPathType}.Member({name.StringLiteral()});"
+					);
+#pragma warning restore PSGFR18
+				}
+				else
+				{
+					writer.Field(
+						new FieldDeclarationOptions(GetPathMemberName(name), zodPathReference)
+						{
+							Accessibility = TypeDeclarationAccessibility.Public,
+							IsStatic = true,
+							IsReadOnly = true,
+							Initializer = $"{ZodPathType}.Member({name.StringLiteral()})",
+						}
+					);
+				}
 			}
 		}
 
@@ -71,11 +94,20 @@ partial class ZodSchemaGenerator
 	)
 	{
 		var schema = outputContext.ZodSchema;
-		var memberType = "global::ZodSharp.Core.ZodGeneratedMember";
+		TypeReference memberTypeReference = new(
+			new TypeIdentity("ZodGeneratedMember", TypeLibraryGenerator.ZodSharpCoreNamespace)
+		);
 		var declaringType = GetDeclaringTypeName(schema);
 
-		writer.Line(
-			$"static readonly {memberType} {TypeMemberFieldName} = new({declaringType.StringLiteral()}, \"\", {schema.TargetType.Name.StringLiteral()}, {ZodPathType}.Root);"
+		writer.Field(
+			new FieldDeclarationOptions(TypeMemberFieldName, memberTypeReference)
+			{
+				Accessibility = TypeDeclarationAccessibility.Private,
+				IsStatic = true,
+				IsReadOnly = true,
+				Initializer =
+					$"new({declaringType.StringLiteral()}, \"\", {schema.TargetType.Name.StringLiteral()}, {ZodPathType}.Root)",
+			}
 		);
 
 		foreach (var propertyResult in schema.Properties)
@@ -91,14 +123,30 @@ partial class ZodSchemaGenerator
 			var resolver = property.DisplayNameResourceExpression is { } resource
 				? $", static () => {resource}"
 				: string.Empty;
-			writer.Line(
-				$"static readonly {memberType} {MemberOf(property)} = new({declaringType.StringLiteral()}, {property.Name.StringLiteral()}, {property.DisplayName.StringLiteral()}, {PathOf(property)}{resolver});"
+			writer.Field(
+				new FieldDeclarationOptions(MemberOf(property), memberTypeReference)
+				{
+					Accessibility = TypeDeclarationAccessibility.Private,
+					IsStatic = true,
+					IsReadOnly = true,
+					Initializer =
+						$"new({declaringType.StringLiteral()}, {property.Name.StringLiteral()}, {property.DisplayName.StringLiteral()}, {PathOf(property)}{resolver})",
+				}
 			);
 
 			for (var i = 0; i < property.AsyncValidationAttributes.Count; i++)
 			{
-				writer.Line(
-					$"static readonly global::System.ComponentModel.DataAnnotations.AsyncValidationAttribute {CodeGenHelpers.GetAsyncAttributeFieldName(property.Name, i)} = {property.AsyncValidationAttributes[i]};"
+				writer.Field(
+					new FieldDeclarationOptions(
+						CodeGenHelpers.GetAsyncAttributeFieldName(property.Name, i),
+						new TypeIdentity("AsyncValidationAttribute", "System.ComponentModel.DataAnnotations")
+					)
+					{
+						Accessibility = TypeDeclarationAccessibility.Private,
+						IsStatic = true,
+						IsReadOnly = true,
+						Initializer = property.AsyncValidationAttributes[i],
+					}
 				);
 			}
 		}
@@ -107,7 +155,16 @@ partial class ZodSchemaGenerator
 			schema.CustomValidationMethod.Value.InvocationKind
 			== CustomValidationInvocationKind.DefinedOnSchemaValidator
 		)
-			writer.Line($"static {schema.SchemaType.Name}Validator? {CustomValidatorFieldName};");
+			writer.Field(
+				new FieldDeclarationOptions(
+					CustomValidatorFieldName,
+					new TypeIdentity($"{schema.SchemaType.Name}Validator", null).AsTypeReference().Nullable(writer)
+				)
+				{
+					Accessibility = TypeDeclarationAccessibility.Private,
+					IsStatic = true,
+				}
+			);
 
 		writer.NewLine();
 	}
@@ -135,6 +192,9 @@ partial class ZodSchemaGenerator
 		if (!property.IsDeclaredNullable && property.CanBeNull)
 			return true;
 
+		// The six-part condition is the final branch of a chain of early returns; a conditional expression
+		// would bury it under the checks above.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (
 			Exists(attributes.AllowedValues, static values => values.Exists)
 			|| Exists(attributes.DeniedValues, static values => values.Exists)
@@ -146,6 +206,7 @@ partial class ZodSchemaGenerator
 		{
 			return true;
 		}
+#pragma warning restore IDE0046
 
 		return HasKindRules(property, validateEnumValues);
 	}
@@ -230,21 +291,32 @@ partial class ZodSchemaGenerator
 		var schema = outputContext.ZodSchema;
 		var targetType = schema.TargetType.AsTypeReference();
 		var resultType = TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(schema.TargetType).AsTypeReference();
+		var resultTaskReference = TypeLibraryGenerator
+			.ValueTask.MakeGeneric(TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(schema.TargetType))
+			.AsTypeReference();
+		var serviceProviderReference = new TypeIdentity(typeof(IServiceProvider)).AsTypeReference();
 		var requiresAsync = outputContext.RequiresAsync(schema);
 
 		writer.XmlSummary(
 			"Whether some rules only run asynchronously (a custom asynchronous method, an AsyncValidationAttribute, an",
 			"IAsyncValidatableObject target, or a nested schema that has them), computed when the schema is generated."
 		);
-		writer.Line($"public const bool RequiresAsyncValidation = {(requiresAsync ? "true" : "false")};");
+		writer.Field(
+			new FieldDeclarationOptions("RequiresAsyncValidation", PurviewTypeLibrary.System.Boolean)
+			{
+				Accessibility = TypeDeclarationAccessibility.Public,
+				IsConst = true,
+				Initializer = requiresAsync ? "true" : "false",
+			}
+		);
 		writer.NewLine();
 
 		writer.XmlSummary("Validates an instance of the target type.");
 		writer.XmlParam("value", "The value to validate.");
 		writer.XmlReturn("The validation result.");
 
-		// CA1849 reports every call to this method from async code, because ValidateAsync exists. Whether that matters
-		// is known here, so the remark says which call is right for this type (the analyzer is the consumer's to keep).
+		// CA1849 would report every call to this method from async code, because ValidateAsync exists. ZodSharp's
+		// analyzer suppresses that for this method, so the remark states which call the type actually needs.
 		if (requiresAsync)
 		{
 			writer.XmlRemarks(
@@ -255,13 +327,18 @@ partial class ZodSchemaGenerator
 		else
 		{
 			writer.XmlRemarks(
-				"Every rule in this graph is synchronous (RequiresAsyncValidation is false), so this call never blocks. In an",
-				"asynchronous method, analyzers such as CA1849 suggest ValidateAsync, which for this type completes synchronously",
-				"without allocating; either call is correct."
+				"Every rule in this graph is synchronous (RequiresAsyncValidation is false), so this call never blocks,",
+				"and CA1849 is suppressed for it. Call ValidateAsync only when you need the asynchronous pipeline."
 			);
 		}
 
-		writer.Line($"public static {resultType} Validate({targetType} value) => ValidateCore(value, 0);");
+		writer.MethodExpression(
+			"Validate",
+			resultType,
+			TypeDeclarationAccessibility.Public,
+			static expression => expression.Write("ValidateCore(value, 0)"),
+			declaration => declaration with { IsStatic = true, Parameters = [new("value", targetType)] }
+		);
 		writer.NewLine();
 
 		writer.XmlSummary(
@@ -312,8 +389,25 @@ partial class ZodSchemaGenerator
 		writer.XmlParam("services", "The caller's services, for service-aware rules.");
 		writer.XmlParam("cancellationToken", "The cancellation token.");
 		writer.XmlReturn("The validation result.");
-		writer.Line(
-			$"public static {resultTaskType} ValidateAsync({targetType} value, {ServiceProviderType}? services = null, {CancellationTokenType} cancellationToken = default) => ValidateCoreAsync(value, services, 0, cancellationToken);"
+		writer.MethodExpression(
+			"ValidateAsync",
+			resultTaskReference,
+			TypeDeclarationAccessibility.Public,
+			static expression => expression.Write("ValidateCoreAsync(value, services, 0, cancellationToken)"),
+			declaration =>
+				declaration with
+				{
+					IsStatic = true,
+					Parameters =
+					[
+						new("value", targetType),
+						new("services", serviceProviderReference.Nullable(writer)) { DefaultValue = "null" },
+						new("cancellationToken", TypeLibraryGenerator.CancellationToken.AsTypeReference())
+						{
+							DefaultValue = "default",
+						},
+					],
+				}
 		);
 		writer.NewLine();
 
@@ -329,8 +423,23 @@ partial class ZodSchemaGenerator
 
 		if (!requiresAsync)
 		{
-			writer.Line(
-				$"public static {resultTaskType} ValidateCoreAsync({targetType} value, {ServiceProviderType}? services, int depth, {CancellationTokenType} cancellationToken) => new(ValidateCore(value, depth));"
+			writer.MethodExpression(
+				"ValidateCoreAsync",
+				resultTaskReference,
+				TypeDeclarationAccessibility.Public,
+				static expression => expression.Write("new(ValidateCore(value, depth))"),
+				declaration =>
+					declaration with
+					{
+						IsStatic = true,
+						Parameters =
+						[
+							new("value", targetType),
+							new("services", serviceProviderReference.Nullable(writer)),
+							new("depth", PurviewTypeLibrary.System.Int32),
+							new("cancellationToken", TypeLibraryGenerator.CancellationToken.AsTypeReference()),
+						],
+					}
 			);
 			writer.NewLine();
 		}
@@ -338,8 +447,24 @@ partial class ZodSchemaGenerator
 		{
 			if (adapterParameter.Length > 0)
 			{
-				writer.Line(
-					$"public static {resultTaskType} ValidateCoreAsync({targetType} value, {ServiceProviderType}? services, int depth, {CancellationTokenType} cancellationToken) => ValidateCoreAsync(value, services, depth, cancellationToken, null);"
+				writer.MethodExpression(
+					"ValidateCoreAsync",
+					resultTaskReference,
+					TypeDeclarationAccessibility.Public,
+					static expression =>
+						expression.Write("ValidateCoreAsync(value, services, depth, cancellationToken, null)"),
+					declaration =>
+						declaration with
+						{
+							IsStatic = true,
+							Parameters =
+							[
+								new("value", targetType),
+								new("services", serviceProviderReference.Nullable(writer)),
+								new("depth", PurviewTypeLibrary.System.Int32),
+								new("cancellationToken", TypeLibraryGenerator.CancellationToken.AsTypeReference()),
+							],
+						}
 				);
 				writer.NewLine();
 			}
@@ -556,6 +681,9 @@ partial class ZodSchemaGenerator
 		var targetType = schema.TargetType.AsTypeReference();
 		var resultType = TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(schema.TargetType).AsTypeReference();
 		var resultTaskType = $"global::System.Threading.Tasks.ValueTask<{resultType}>";
+		var resultTaskReference = TypeLibraryGenerator
+			.ValueTask.MakeGeneric(TypeLibrary.ZodSharp.Core.ValidationResult.MakeGeneric(schema.TargetType))
+			.AsTypeReference();
 		var members = GetValidatedMembers(schema).ToList();
 		var asyncMembers = schema.CustomValidationMethod.Value.HasCustomValidation
 			? schema.CustomValidationMethod.Value.AsyncMembers
@@ -653,8 +781,32 @@ partial class ZodSchemaGenerator
 
 		if (!hasAsyncMemberWork)
 		{
-			writer.Line(
-				$"public static {resultTaskType} ValidateMemberAsync({targetType} value, string memberName, {ServiceProviderType}? services = null, {CancellationTokenType} cancellationToken = default) => new(ValidateMember(value, memberName));"
+			writer.MethodExpression(
+				"ValidateMemberAsync",
+				resultTaskReference,
+				TypeDeclarationAccessibility.Public,
+				static expression => expression.Write("new(ValidateMember(value, memberName))"),
+				declaration =>
+					declaration with
+					{
+						IsStatic = true,
+						Parameters =
+						[
+							new("value", targetType),
+							new("memberName", PurviewTypeLibrary.System.String),
+							new(
+								"services",
+								new TypeIdentity(typeof(IServiceProvider)).AsTypeReference().Nullable(writer)
+							)
+							{
+								DefaultValue = "null",
+							},
+							new("cancellationToken", TypeLibraryGenerator.CancellationToken.AsTypeReference())
+							{
+								DefaultValue = "default",
+							},
+						],
+					}
 			);
 			writer.NewLine();
 			return;
@@ -671,7 +823,7 @@ partial class ZodSchemaGenerator
 		)
 		{
 			if (usesAdapter)
-				writer.Line($"{schema.SchemaType.Name}Validator? validator = null;");
+				writer.Assignment($"{schema.SchemaType.Name}Validator? validator", "null");
 
 			HashSet<string> asyncMemberNames = new(asyncMembers, StringComparer.Ordinal);
 

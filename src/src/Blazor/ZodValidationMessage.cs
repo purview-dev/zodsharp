@@ -161,8 +161,7 @@ public class ZodValidationMessage<TValue> : ComponentBase, IDisposable
 
 	void Detach()
 	{
-		if (_previousEditContext is not null)
-			_previousEditContext.OnValidationStateChanged -= _validationStateChangedHandler;
+		_previousEditContext?.OnValidationStateChanged -= _validationStateChangedHandler;
 	}
 }
 

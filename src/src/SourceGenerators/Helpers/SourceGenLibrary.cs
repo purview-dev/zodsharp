@@ -771,10 +771,9 @@ static partial class SourceGenLibrary
 				: property.Type;
 		targetType = targetType is null ? null : TypeHelpers.UnwrapNullableType(targetType);
 
-		if (targetType is not INamedTypeSymbol namedType || externalSchemas.IsSchemaOwnedByThisCompilation(namedType))
-			return (true, false);
-
-		return externalSchemas.GetExistingSchemaFeatures(namedType);
+		return targetType is not INamedTypeSymbol namedType || externalSchemas.IsSchemaOwnedByThisCompilation(namedType)
+			? (true, false)
+			: externalSchemas.GetExistingSchemaFeatures(namedType);
 	}
 
 	/// <summary>

@@ -26,7 +26,7 @@ public class DocumentCrossCheckTests
 	[
 		new(
 			"StringRulesRequest",
-			"""
+			/*lang=json,strict*/"""
 			{
 				"name": "ab", "email": "a@example.com", "legacyEmail": "b@example.com", "website": "https://example.com",
 				"slug": "abc", "prefixed": "abc", "suffixed": "xyz", "containing": "amidb", "bracketed": "abxyz",
@@ -38,92 +38,172 @@ public class DocumentCrossCheckTests
 			Accepted: true,
 			"every constraint satisfied"
 		),
-		new("StringRulesRequest", """{ "name": "ab" }""", Accepted: true, "optional members absent"),
-		new("StringRulesRequest", """{ "name": "a" }""", Accepted: false, "minLength"),
-		new("StringRulesRequest", """{ "name": "abcdefghijk" }""", Accepted: false, "maxLength"),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab" }""",
+			Accepted: true,
+			"optional members absent"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "a" }""",
+			Accepted: false,
+			"minLength"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "abcdefghijk" }""",
+			Accepted: false,
+			"maxLength"
+		),
 		new("StringRulesRequest", """{ }""", Accepted: false, "required member absent"),
-		new("StringRulesRequest", """{ "name": "ab", "email": "not-an-email" }""", Accepted: false, "format: email"),
-		new("StringRulesRequest", """{ "name": "ab", "legacyEmail": "nope" }""", Accepted: false, "[EmailAddress]"),
-		new("StringRulesRequest", """{ "name": "ab", "slug": "ABC" }""", Accepted: false, "pattern"),
-		new("StringRulesRequest", """{ "name": "ab", "prefixed": "xab" }""", Accepted: false, "startsWith"),
-		new("StringRulesRequest", """{ "name": "ab", "suffixed": "yzx" }""", Accepted: false, "endsWith"),
-		new("StringRulesRequest", """{ "name": "ab", "containing": "nope" }""", Accepted: false, "includes"),
-		new("StringRulesRequest", """{ "name": "ab", "bracketed": "abx" }""", Accepted: false, "allOf patterns"),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "email": "not-an-email" }""",
+			Accepted: false,
+			"format: email"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "legacyEmail": "nope" }""",
+			Accepted: false,
+			"[EmailAddress]"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "slug": "ABC" }""",
+			Accepted: false,
+			"pattern"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "prefixed": "xab" }""",
+			Accepted: false,
+			"startsWith"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "suffixed": "yzx" }""",
+			Accepted: false,
+			"endsWith"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "containing": "nope" }""",
+			Accepted: false,
+			"includes"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "bracketed": "abx" }""",
+			Accepted: false,
+			"allOf patterns"
+		),
 		new(
 			"StringRulesRequest",
-			"""{ "name": "ab", "identifier": "6f1c2d3e-4a5b-1c6d-8e7f-0123456789ab" }""",
+			/*lang=json,strict*/"""{ "name": "ab", "identifier": "6f1c2d3e-4a5b-1c6d-8e7f-0123456789ab" }""",
 			Accepted: false,
 			"uuid version"
 		),
-		new("StringRulesRequest", """{ "name": "ab", "addressV4": "::1" }""", Accepted: false, "format: ipv4"),
-		new("StringRulesRequest", """{ "name": "ab", "addressV6": "10.0.0.1" }""", Accepted: false, "format: ipv6"),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "addressV4": "::1" }""",
+			Accepted: false,
+			"format: ipv4"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "addressV6": "10.0.0.1" }""",
+			Accepted: false,
+			"format: ipv6"
+		),
 		new(
 			"StringRulesRequest",
-			"""{ "name": "ab", "timestamp": "2024-01-01T10:00:00+01:00" }""",
+			/*lang=json,strict*/"""{ "name": "ab", "timestamp": "2024-01-01T10:00:00+01:00" }""",
 			Accepted: false,
 			"UTC date-time"
 		),
-		new("StringRulesRequest", """{ "name": "ab", "day": "2024-13-01" }""", Accepted: false, "format: date"),
-		new("StringRulesRequest", """{ "name": "ab", "timeOfDay": "25:00" }""", Accepted: false, "time pattern"),
-		new("StringRulesRequest", """{ "name": "ab", "colour": "blue" }""", Accepted: false, "enum"),
-		new("StringRulesRequest", """{ "name": "ab", "username": "admin" }""", Accepted: false, "not enum"),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "day": "2024-13-01" }""",
+			Accepted: false,
+			"format: date"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "timeOfDay": "25:00" }""",
+			Accepted: false,
+			"time pattern"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "colour": "blue" }""",
+			Accepted: false,
+			"enum"
+		),
+		new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "username": "admin" }""",
+			Accepted: false,
+			"not enum"
+		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
 			Accepted: true,
 			"every constraint satisfied"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 0, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 0, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
 			Accepted: false,
 			"minimum"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 11, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 11, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
 			Accepted: false,
 			"maximum"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 5, "ratio": 0, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 5, "ratio": 0, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
 			Accepted: false,
 			"exclusiveMinimum"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 5, "ratio": 100, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 5, "ratio": 100, "bounded": 5, "step": 10, "whole": 3, "safe": 7 }""",
 			Accepted: false,
 			"exclusiveMaximum"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 5, "ratio": 50.5, "bounded": 7, "step": 10, "whole": 3, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 5, "ratio": 50.5, "bounded": 7, "step": 10, "whole": 3, "safe": 7 }""",
 			Accepted: false,
 			"maximum (LessThanOrEqual)"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 7, "whole": 3, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 7, "whole": 3, "safe": 7 }""",
 			Accepted: false,
 			"multipleOf"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3.5, "safe": 7 }""",
+			/*lang=json,strict*/"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3.5, "safe": 7 }""",
 			Accepted: false,
 			"integer"
 		),
 		new(
 			"NumberRulesRequest",
-			"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 30000000000 }""",
+			/*lang=json,strict*/"""{ "count": 5, "ratio": 50.5, "bounded": 5, "step": 10, "whole": 3, "safe": 30000000000 }""",
 			Accepted: false,
 			"safe integer"
 		),
 		new(
 			"ShapesRequest",
-			"""
+			/*lang=json,strict*/"""
 			{
 				"tags": ["a"], "scores": { "x": 1 }, "reference": "r", "title": "t", "createdAt": "2024-01-01T00:00:00Z",
 				"birthday": "2024-01-01", "elapsed": "00:00:01", "home": { "street": "Main" },
@@ -135,37 +215,37 @@ public class DocumentCrossCheckTests
 		),
 		new(
 			"ShapesRequest",
-			"""{ "tags": [], "scores": {}, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [] }""",
+			/*lang=json,strict*/"""{ "tags": [], "scores": {}, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [] }""",
 			Accepted: false,
 			"minItems"
 		),
 		new(
 			"ShapesRequest",
-			"""{ "tags": ["a","b","c","d"], "scores": {}, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [] }""",
+			/*lang=json,strict*/"""{ "tags": ["a","b","c","d"], "scores": {}, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [] }""",
 			Accepted: false,
 			"maxItems"
 		),
 		new(
 			"ShapesRequest",
-			"""{ "tags": ["a"], "scores": { "a": 1, "b": 2, "c": 3 }, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [] }""",
+			/*lang=json,strict*/"""{ "tags": ["a"], "scores": { "a": 1, "b": 2, "c": 3 }, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [] }""",
 			Accepted: false,
 			"maxProperties"
 		),
 		new(
 			"ShapesRequest",
-			"""{ "tags": ["a"], "scores": {}, "reference": null, "title": "t", "home": { "street": "Main" }, "others": [] }""",
+			/*lang=json,strict*/"""{ "tags": ["a"], "scores": {}, "reference": null, "title": "t", "home": { "street": "Main" }, "others": [] }""",
 			Accepted: false,
 			"null where ZodSharp requires a value"
 		),
 		new(
 			"ShapesRequest",
-			"""{ "tags": ["a"], "scores": {}, "reference": "r", "title": "t", "home": { "street": "" }, "others": [] }""",
+			/*lang=json,strict*/"""{ "tags": ["a"], "scores": {}, "reference": "r", "title": "t", "home": { "street": "" }, "others": [] }""",
 			Accepted: false,
 			"nested minLength"
 		),
 		new(
 			"ShapesRequest",
-			"""{ "tags": ["a"], "scores": {}, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [{ "street": "S", "postCode": "abc" }] }""",
+			/*lang=json,strict*/"""{ "tags": ["a"], "scores": {}, "reference": "r", "title": "t", "home": { "street": "Main" }, "others": [{ "street": "S", "postCode": "abc" }] }""",
 			Accepted: false,
 			"nested collection pattern"
 		),
@@ -208,10 +288,15 @@ public class DocumentCrossCheckTests
 	{
 		// Arrange - ZodSharp rejects these, but JSON Schema has no keyword for a JWT or a CIDR block, so the
 		// schema accepts them. The document says so instead of staying silent.
-		Payload jwt = new("StringRulesRequest", """{ "name": "ab", "token": "x" }""", Accepted: false, "jwt");
+		Payload jwt = new(
+			"StringRulesRequest", /*lang=json,strict*/
+			"""{ "name": "ab", "token": "x" }""",
+			Accepted: false,
+			"jwt"
+		);
 		Payload cidr = new(
 			"StringRulesRequest",
-			"""{ "name": "ab", "network": "10.0.0.1" }""",
+			/*lang=json,strict*/"""{ "name": "ab", "network": "10.0.0.1" }""",
 			Accepted: false,
 			"cidr"
 		);

@@ -39,8 +39,11 @@ sealed class SampleOptions
 	)
 	{
 		var registry = services.GetRequiredService<ICustomerEmailRegistry>();
+		// The awaited guard and the failure construction would become one long conditional expression.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (value.SupportEmail is null || !await registry.IsRegisteredAsync(value.SupportEmail, cancellationToken))
 			return ValidationResult<SampleOptions>.Success(value);
+#pragma warning restore IDE0046
 
 		return ValidationResult<SampleOptions>.Failure(
 			ValidationError.Create(

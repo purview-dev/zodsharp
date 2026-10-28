@@ -15,18 +15,17 @@ namespace ZodSharp.AspNetCore;
 public sealed class ZodRequestValidationReport
 {
 	readonly Lock _lock = new();
-	ImmutableArray<ValidationError> _errors = [];
 
 	/// <summary>
 	/// Gets the errors reported so far, in the order they were reported. Paths are canonical: they already
 	/// include the validation path prefix they were reported under.
 	/// </summary>
-	public ImmutableArray<ValidationError> Errors => _errors;
+	public ImmutableArray<ValidationError> Errors { get; private set; } = [];
 
 	/// <summary>
 	/// Gets whether any error was reported.
 	/// </summary>
-	public bool HasErrors => !_errors.IsEmpty;
+	public bool HasErrors => !Errors.IsEmpty;
 
 	/// <summary>
 	/// Gets the report for <paramref name="httpContext"/>, or <see langword="null"/> when nothing was reported.
@@ -49,7 +48,7 @@ public sealed class ZodRequestValidationReport
 			return;
 
 		lock (_lock)
-			_errors = _errors.AddRange(errors);
+			Errors = Errors.AddRange(errors);
 	}
 
 	internal static ZodRequestValidationReport GetOrCreate(HttpContext httpContext)

@@ -48,7 +48,7 @@ public class CustomerEndpointTests
 		// Act
 		var (status, mediaType, problem) = await PostCustomerAsync(
 			client,
-			"""{ "name": "A", "email": "not-an-email", "age": 5 }""",
+			/*lang=json,strict*/"""{ "name": "A", "email": "not-an-email", "age": 5 }""",
 			cancellationToken
 		);
 
@@ -76,7 +76,7 @@ public class CustomerEndpointTests
 		// Act
 		var (status, _, problem) = await PostCustomerAsync(
 			client,
-			$$"""{ "name": "Ann", "email": "{{InMemoryCustomerEmailRegistry.SeededEmail}}", "age": 30 }""",
+			/*lang=json,strict*/$$"""{ "name": "Ann", "email": "{{InMemoryCustomerEmailRegistry.SeededEmail}}", "age": 30 }""",
 			cancellationToken,
 			acceptLanguage: "fr"
 		);
@@ -96,7 +96,8 @@ public class CustomerEndpointTests
 		// Arrange
 		await using SampleAppFactory factory = new();
 		using var client = factory.CreateClient();
-		const string customer = """{ "name": "Ann", "email": "ann@example.com", "age": 30 }""";
+		const string customer = /*lang=json,strict*/
+			"""{ "name": "Ann", "email": "ann@example.com", "age": 30 }""";
 
 		// Act
 		var (first, _, _) = await PostCustomerAsync(client, customer, cancellationToken);

@@ -302,8 +302,11 @@ public sealed class CrossAssemblyMarkerAttributeTests
 			cancellationToken
 		);
 
+		// A conditional expression would turn the guard into a throw expression inside the tuple return.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (generatorDiagnostics.Any(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
 			throw new InvalidOperationException(string.Join(Environment.NewLine, generatorDiagnostics));
+#pragma warning restore IDE0046
 
 		return (output, driver.GetRunResult().GeneratedTrees);
 	}
@@ -312,12 +315,15 @@ public sealed class CrossAssemblyMarkerAttributeTests
 	{
 		using MemoryStream stream = new();
 		var result = compilation.Emit(stream, cancellationToken: cancellationToken);
+		// A conditional expression would turn the block into a throw expression inside the return.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (!result.Success)
 		{
 			throw new InvalidOperationException(
 				$"{compilation.AssemblyName} did not compile:{Environment.NewLine}{string.Join(Environment.NewLine, Errors(result.Diagnostics))}"
 			);
 		}
+#pragma warning restore IDE0046
 
 		return stream.ToArray();
 	}

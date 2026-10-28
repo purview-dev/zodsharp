@@ -17,7 +17,6 @@ namespace ZodSharp.Core;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class ZodGeneratedMember
 {
-	readonly string _displayName;
 	readonly Func<string?>? _displayNameResolver;
 
 	/// <summary>
@@ -38,7 +37,7 @@ public sealed class ZodGeneratedMember
 	{
 		DeclaringType = declaringType ?? throw new ArgumentNullException(nameof(declaringType));
 		Member = member ?? throw new ArgumentNullException(nameof(member));
-		_displayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
+		DisplayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
 		Path = path;
 		_displayNameResolver = displayNameResolver;
 	}
@@ -58,10 +57,10 @@ public sealed class ZodGeneratedMember
 		get
 		{
 			if (_displayNameResolver is null)
-				return _displayName;
+				return field;
 
 			var resolved = _displayNameResolver();
-			return string.IsNullOrEmpty(resolved) ? _displayName : resolved;
+			return string.IsNullOrEmpty(resolved) ? field : resolved;
 		}
 	}
 }

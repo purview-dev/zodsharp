@@ -38,8 +38,6 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 	const string RulesAttribute = "data-rules";
 
 	static readonly ConcurrentDictionary<(Type Container, string Field), List<ZodClientRule>> AttributeRules = new();
-
-	readonly ClientValidationProvider? _inner;
 	readonly ZodClientValidationOptions _options;
 	readonly IZodSchemaFactory? _factory;
 
@@ -57,7 +55,7 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 	{
 		ArgumentNullException.ThrowIfNull(options);
 
-		_inner = inner is ZodClientValidationProvider { _inner: var unwrapped } ? unwrapped : inner;
+		Inner = inner is ZodClientValidationProvider { Inner: var unwrapped } ? unwrapped : inner;
 		_options = options;
 		_factory = factory;
 	}
@@ -65,7 +63,7 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 	/// <summary>
 	/// Gets the decorated provider.
 	/// </summary>
-	public ClientValidationProvider? Inner => _inner;
+	public ClientValidationProvider? Inner { get; }
 
 	/// <inheritdoc/>
 	public override RenderFragment? RenderClientValidationRules(
@@ -76,7 +74,7 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 		ArgumentNullException.ThrowIfNull(editContext);
 		ArgumentNullException.ThrowIfNull(renderedFields);
 
-		var inner = _inner?.RenderClientValidationRules(editContext, renderedFields);
+		var inner = Inner?.RenderClientValidationRules(editContext, renderedFields);
 		var own = CollectRules(editContext, renderedFields);
 		if (own.Count == 0)
 			return inner;
@@ -197,7 +195,7 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 			writer.WritePropertyName("fields");
 			writer.WriteStartArray();
 
-			HashSet<string> written = new(StringComparer.Ordinal);
+			HashSet<string> written = [with(StringComparer.Ordinal)];
 			if (innerJson is not null)
 			{
 				using var document = JsonDocument.Parse(innerJson);

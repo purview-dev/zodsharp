@@ -14,7 +14,10 @@ public class SystemTextJsonConverterTests
 		TestUserSchema schema = new();
 		var options = CreateOptions(schema);
 
-		var deserialized = JsonSerializer.Deserialize<TestUser>("""{"Name":"John","Age":30}""", options);
+		var deserialized = JsonSerializer.Deserialize<TestUser>( /*lang=json,strict*/
+			"""{"Name":"John","Age":30}""",
+			options
+		);
 
 		await Assert.That(deserialized).IsNotNull();
 		await Assert.That(deserialized!.Name).IsEqualTo("John");
@@ -41,7 +44,10 @@ public class SystemTextJsonConverterTests
 		var options = CreateOptions(schema);
 
 		var exception = Assert.Throws<JsonException>(() =>
-			JsonSerializer.Deserialize<TestUser>("""{"Name":"","Age":30}""", options)
+			JsonSerializer.Deserialize<TestUser>( /*lang=json,strict*/
+				"""{"Name":"","Age":30}""",
+				options
+			)
 		);
 
 		await Assert.That(exception).IsNotNull();

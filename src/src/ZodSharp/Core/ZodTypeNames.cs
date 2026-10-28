@@ -99,8 +99,11 @@ public static class ZodTypeNames
 		if (IsNumber(type))
 			return Number;
 
+		// The final branch of an ordered set of type checks; a conditional expression would hide it.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(DateOnly))
 			return Date;
+#pragma warning restore IDE0046
 
 		return type == typeof(JsonElement) || type == typeof(object) ? Unknown : null;
 	}
@@ -123,8 +126,11 @@ public static class ZodTypeNames
 			return Set;
 		}
 
+		// The final branch of an ordered set of type checks; a conditional expression would hide it.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (typeof(IEnumerable).IsAssignableFrom(type))
 			return Array;
+#pragma warning restore IDE0046
 
 		return Object;
 	}

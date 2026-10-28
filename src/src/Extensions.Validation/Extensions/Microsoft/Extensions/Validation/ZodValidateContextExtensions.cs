@@ -8,7 +8,7 @@ namespace Microsoft.Extensions.Validation;
 /// </summary>
 public static class ZodValidateContextExtensions
 {
-	static readonly ConditionalWeakTable<ValidateContext, ZodValidationReport> Reports = new();
+	static readonly ConditionalWeakTable<ValidateContext, ZodValidationReport> Reports = [];
 
 	extension(ValidateContext context)
 	{

@@ -56,6 +56,10 @@ if (result.IsSuccess)
 Reach for `Validate` by default and `Parse` only where a throw is the right control flow. Exceptions
 for expected invalid input are expensive and lose the structured issue list unless you catch.
 
+`Validate` is also the right call inside an async method: the analyzer package suppresses CA1849 for it
+(`ZODSUP001`), because the pipeline is synchronous and never blocks. `ValidateAsync` is for a type whose graph has
+asynchronous rules.
+
 ## `ValidationResult<T>`
 
 A `readonly record struct` in `ZodSharp.Core`:

@@ -33,7 +33,6 @@ public class ZodDiscriminatedUnion(
 	// The option keys in a deterministic order for messages and parameters: declaration order when built by
 	// ZodDiscriminatedUnionBuilder, otherwise ordinal order. The dictionary's own enumeration order is
 	// hash-based, so it could differ between processes.
-	readonly ImmutableArray<string> _optionKeys = [.. options.Keys.Order(StringComparer.Ordinal)];
 
 	readonly ImmutableArray<DiscriminatorReader> _readers = [];
 
@@ -53,7 +52,7 @@ public class ZodDiscriminatedUnion(
 	)
 		: this(discriminator, options)
 	{
-		_optionKeys = optionOrder;
+		OptionKeys = optionOrder;
 		_readers = readers;
 	}
 
@@ -70,7 +69,7 @@ public class ZodDiscriminatedUnion(
 
 	internal ImmutableDictionary<string, IZodSchema<object, object>> Options => options;
 
-	internal ImmutableArray<string> OptionKeys => _optionKeys;
+	internal ImmutableArray<string> OptionKeys { get; } = [.. options.Keys.Order(StringComparer.Ordinal)];
 
 	/// <summary>
 	/// Parses and validates the value using the discriminated union.
@@ -116,7 +115,7 @@ public class ZodDiscriminatedUnion(
 			new Dictionary<string, object?>(StringComparer.Ordinal)
 			{
 				[ZodIssueParameters.Discriminator] = discriminator,
-				[ZodIssueParameters.Options] = _optionKeys,
+				[ZodIssueParameters.Options] = OptionKeys,
 			}
 		);
 

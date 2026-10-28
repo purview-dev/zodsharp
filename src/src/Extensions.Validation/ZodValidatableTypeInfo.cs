@@ -26,7 +26,6 @@ namespace ZodSharp.Extensions.Validation;
 /// </remarks>
 public sealed class ZodValidatableTypeInfo : IValidatableTypeInfo
 {
-	readonly ZodValidationOptions _options;
 	readonly ConcurrentDictionary<string, ZodValidatablePropertyInfo?> _properties = new(StringComparer.Ordinal);
 
 	/// <summary>
@@ -39,7 +38,7 @@ public sealed class ZodValidatableTypeInfo : IValidatableTypeInfo
 		ArgumentNullException.ThrowIfNull(validator);
 
 		Validator = validator;
-		_options = options ?? new();
+		Options = options ?? new();
 	}
 
 	/// <summary>
@@ -52,7 +51,7 @@ public sealed class ZodValidatableTypeInfo : IValidatableTypeInfo
 	/// </summary>
 	public Type ValidatedType => Validator.ValidatedType;
 
-	internal ZodValidationOptions Options => _options;
+	internal ZodValidationOptions Options { get; }
 
 	/// <inheritdoc/>
 	/// <remarks>
@@ -102,7 +101,7 @@ public sealed class ZodValidatableTypeInfo : IValidatableTypeInfo
 			);
 
 		var errors = value is null ? NullValue() : Validator.Validate(value);
-		ZodErrorEmitter.Emit(Validator, value, errors, context, _options, valueKey, prefixWithKey);
+		ZodErrorEmitter.Emit(Validator, value, errors, context, Options, valueKey, prefixWithKey);
 	}
 
 	internal Task ValidateCoreAsync(
@@ -121,14 +120,14 @@ public sealed class ZodValidatableTypeInfo : IValidatableTypeInfo
 
 			if (value is null)
 			{
-				ZodErrorEmitter.Emit(Validator, value, NullValue(), context, _options, valueKey, prefixWithKey);
+				ZodErrorEmitter.Emit(Validator, value, NullValue(), context, Options, valueKey, prefixWithKey);
 				return Task.CompletedTask;
 			}
 
 			pending = Validator.ValidateAsync(value, context.ServiceProvider, cancellationToken);
 			if (pending.IsCompletedSuccessfully)
 			{
-				ZodErrorEmitter.Emit(Validator, value, pending.Result, context, _options, valueKey, prefixWithKey);
+				ZodErrorEmitter.Emit(Validator, value, pending.Result, context, Options, valueKey, prefixWithKey);
 				return Task.CompletedTask;
 			}
 		}
@@ -149,7 +148,7 @@ public sealed class ZodValidatableTypeInfo : IValidatableTypeInfo
 	)
 	{
 		var errors = await pending.ConfigureAwait(false);
-		ZodErrorEmitter.Emit(Validator, value, errors, context, _options, valueKey, prefixWithKey);
+		ZodErrorEmitter.Emit(Validator, value, errors, context, Options, valueKey, prefixWithKey);
 	}
 
 	// A null value has nothing to validate members on: report it rather than hand null to a validator that may

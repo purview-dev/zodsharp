@@ -17,7 +17,6 @@ public sealed class ZodValidationReport
 {
 	readonly Lock _lock = new();
 	ImmutableArray<ZodValidationError> _errors = [];
-	ImmutableHashSet<string> _keys = ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal);
 
 	/// <summary>
 	/// Creates an empty report.
@@ -44,14 +43,15 @@ public sealed class ZodValidationReport
 	/// </summary>
 	public bool HasErrors => !_errors.IsEmpty;
 
-	internal ImmutableHashSet<string> Keys => _keys;
+	internal ImmutableHashSet<string> Keys { get; private set; } =
+		ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal);
 
 	internal void Add(ImmutableArray<ZodValidationError> errors, IEnumerable<string> keys)
 	{
 		lock (_lock)
 		{
 			_errors = _errors.AddRange(errors);
-			_keys = _keys.Union(keys);
+			Keys = Keys.Union(keys);
 		}
 	}
 }

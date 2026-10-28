@@ -128,8 +128,11 @@ sealed class FakeStringLocalizer(Dictionary<string, string> resources) : IString
 		get
 		{
 			var culture = CultureInfo.CurrentUICulture.Name;
+			// A conditional expression would nest the culture-specific lookup inside the fallback lookup.
+#pragma warning disable IDE0046 // Convert to conditional expression
 			if (resources.TryGetValue($"{culture}:{name}", out var specific))
 				return new(name, specific, resourceNotFound: false);
+#pragma warning restore IDE0046
 
 			return resources.TryGetValue(name, out var value)
 				? new(name, value, resourceNotFound: false)

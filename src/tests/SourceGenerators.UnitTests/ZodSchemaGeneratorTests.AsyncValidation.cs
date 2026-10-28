@@ -171,8 +171,8 @@ partial class ZodSchemaGeneratorTests
 		CancellationToken cancellationToken
 	)
 	{
-		// Arrange - CA1849 reports Validate in async code whenever ValidateAsync exists; the generated remark says when
-		// that is noise (no asynchronous rule) and when it is not.
+		// Arrange - CA1849 pairs Validate with ValidateAsync; ZodSharp's analyzer suppresses it for both, so the
+		// generated remark states which call the type actually needs.
 		var source = sourceName == "FlatMembers" ? FlatMembersSource : ServiceAwareSource;
 
 		// Act

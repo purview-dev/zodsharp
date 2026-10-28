@@ -223,10 +223,12 @@ the member), then the custom method, and merges the errors. It completes synchro
 the graph is asynchronous; `{Type}Schema.RequiresAsyncValidation` is that compile-time answer.
 Without `[ZodAsyncMember]`, the custom method runs only on full validation.
 
-CA1849, when enabled, reports every `Validate` call inside async code because `ValidateAsync` exists. When
-`RequiresAsyncValidation` is `false` (the generated `Validate` remarks say so) the sync call is fine; prefer
-awaiting `ValidateAsync` there anyway (it completes synchronously, and picks up async rules added later) rather than
-suppressing the analyzer. When it is `true`, the warning is real.
+CA1849, when enabled, would report every `Validate` and `ValidateMember` call inside async code because
+`ValidateAsync` exists. The analyzer package suppresses it (`ZODSUP001`), so call the synchronous path freely: it is
+cheaper (no `ValueTask`, no state machine) and never blocks. Use `ValidateAsync` when the graph has asynchronous
+rules — `RequiresAsyncValidation` is the compile-time answer, and `ZODSGEN048` says so at build time. The suppression
+is by call target: CA1849 still reports for `Task.Wait`, `Thread.Sleep` and other libraries' `Validate`/`ValidateAsync`
+pairs.
 
 ## Automatic enum validation
 

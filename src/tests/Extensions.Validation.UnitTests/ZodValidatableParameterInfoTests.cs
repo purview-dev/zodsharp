@@ -129,12 +129,15 @@ public class ZodValidatableParameterInfoTests
 
 	static (Microsoft.Extensions.DependencyInjection.ServiceProvider Provider, IValidatableParameterInfo Info) Create(
 		string parameter,
-		ZodSharp.Core.ValidationError error
+		Core.ValidationError error
 	)
 	{
 		var provider = CreateProvider(factory => factory.Register(new ScriptedValidator<Order>(error)));
+		// A conditional expression would turn the guard into a throw expression inside the return.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (!provider.GetValidationOptions().TryGetValidatableParameterInfo(Parameter(parameter), out var info))
 			throw new InvalidOperationException($"Parameter '{parameter}' was not claimed.");
+#pragma warning restore IDE0046
 
 		return (provider, info);
 	}

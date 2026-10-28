@@ -54,7 +54,7 @@ partial class ZodSchemaGenerator
 				using (writer.OpenBlockScope($"public static {factoryType} Register({factoryType} factory)"))
 				{
 					writer.IfBlock("factory is null", body =>
-						body.Line("throw new global::System.ArgumentNullException(nameof(factory));")
+						body.Throw("new global::System.ArgumentNullException(nameof(factory))")
 					);
 
 					foreach (var schema in registrable)
@@ -97,8 +97,32 @@ partial class ZodSchemaGenerator
 					);
 					writer.XmlParam("services", "The service collection.");
 					writer.XmlReturn("The service collection, for chaining.");
-					writer.Line(
-						$"public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection AddZodSharp{identifier}Schemas(this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services) => services.AddZodSchemaRegistration(static factory => global::{RegistrationNamespace}.{className}.Register(factory));"
+					writer.MethodExpression(
+						$"AddZodSharp{identifier}Schemas",
+						new TypeIdentity("IServiceCollection", "Microsoft.Extensions.DependencyInjection"),
+						TypeDeclarationAccessibility.Public,
+						expression =>
+							expression.Write(
+								$"services.AddZodSchemaRegistration(static factory => global::{RegistrationNamespace}.{className}.Register(factory))"
+							),
+						declaration =>
+							declaration with
+							{
+								IsStatic = true,
+								Parameters =
+								[
+									new(
+										"services",
+										new TypeIdentity(
+											"IServiceCollection",
+											"Microsoft.Extensions.DependencyInjection"
+										)
+									)
+									{
+										IsThis = true,
+									},
+								],
+							}
 					);
 				}
 			}

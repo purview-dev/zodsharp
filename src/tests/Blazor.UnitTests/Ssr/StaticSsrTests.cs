@@ -75,7 +75,7 @@ public class StaticSsrTests
 			{
 				services.AddRazorComponents();
 				services.AddZodSharpFactory(static factory =>
-					ZodSharp.Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
+					Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
 				);
 				services.AddZodSharpBlazor();
 			},
@@ -184,7 +184,7 @@ public class StaticSsrTests
 				services.AddZodSharpClientValidation();
 				services.AddRazorComponents();
 				services.AddZodSharpFactory(static factory =>
-					ZodSharp.Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
+					Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)
 				);
 				services.AddZodSharpBlazor();
 			},
@@ -221,7 +221,7 @@ public class StaticSsrTests
 			?? throw new InvalidOperationException("No client validation payload was rendered.");
 		using var json = JsonDocument.Parse(element.GetAttribute("data-rules") ?? "{}");
 
-		Dictionary<string, List<Rule>> fields = new(StringComparer.Ordinal);
+		Dictionary<string, List<Rule>> fields = [with(StringComparer.Ordinal)];
 		foreach (var field in json.RootElement.GetProperty("fields").EnumerateArray())
 		{
 			List<Rule> rules = [];

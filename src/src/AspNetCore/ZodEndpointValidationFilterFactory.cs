@@ -181,10 +181,9 @@ static class ZodEndpointValidationFilterFactory
 				errors.Add(target.Rebase(error));
 		}
 
-		if (errors is not null)
-			return new ZodProblemDetailsResult(writer, writer.Create(CollectionsMarshal.AsSpan(errors), httpContext));
-
-		return await next(invocation).ConfigureAwait(false);
+		return errors is not null
+			? new ZodProblemDetailsResult(writer, writer.Create(CollectionsMarshal.AsSpan(errors), httpContext))
+			: await next(invocation).ConfigureAwait(false);
 	}
 
 	internal static ZodProblemDetailsResult CreateBindingFailureResult(
@@ -244,8 +243,12 @@ static class ZodEndpointValidationFilterFactory
 		if (factory.TryGetUntypedValidator(parameterType, out var validator) && validator is not null)
 			return validator;
 
+		// A conditional expression here would nest two lookups into one unreadable expression; the two ifs
+		// keep the fallback order explicit.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (factory.TryGetUntypedValidator(validatedType, out validator) && validator is not null)
 			return validator;
+#pragma warning restore IDE0046
 
 		return AdaptRegisteredValidator(factory, validatedType);
 	}

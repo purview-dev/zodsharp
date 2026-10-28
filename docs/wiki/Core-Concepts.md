@@ -20,6 +20,9 @@ ValidationResult<TOutput> result = schema.Validate(value);
 | `Parse(TInput value)` | Returns the validated `TOutput`, or throws `ZodException` on failure (via `GetValueOrThrow()`). |
 | `ValidateAsync(TInput value, CancellationToken)` | `ValueTask` wrapper around `Validate`. The pipeline is synchronous; the token is observed before validation and throws `OperationCanceledException` when already cancelled. Genuinely async work only happens in the source generator's custom async validation. |
 
+Reach for `Validate` even inside an async method: it is the cheaper call, and the analyzer package suppresses CA1849
+for it (`ZODSUP001`). `ValidateAsync` is what runs a type's asynchronous rules, which is the only reason to await it.
+
 ## ValidationResult<T>
 
 `ValidationResult<T>` is a `readonly record struct` in `ZodSharp.Core`:

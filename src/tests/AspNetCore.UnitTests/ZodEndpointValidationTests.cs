@@ -29,7 +29,7 @@ public class ZodEndpointValidationTests
 			options.ConfigureFactory = factory =>
 			{
 				factory.Register(orderValidator ?? new OrderRequestValidator());
-				factory.Register<CustomerQuery>(new CustomerQueryValidator());
+				factory.Register(new CustomerQueryValidator());
 			}
 		);
 		services.AddZodSharpProblemDetails(options =>

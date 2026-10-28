@@ -54,8 +54,9 @@ public sealed class ZodProblemDetailsWriter
 
 	const int MaxUnionDepth = 8;
 
-	static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
-	{
+	static readonly HashSet<string> ReservedNames =
+	[
+		with(StringComparer.OrdinalIgnoreCase),
 		"type",
 		"title",
 		"status",
@@ -64,7 +65,7 @@ public sealed class ZodProblemDetailsWriter
 		"errors",
 		"issues",
 		"traceId",
-	};
+	];
 
 	static readonly Action<ILogger, string, string, Exception?> LogReservedParameter = LoggerMessage.Define<
 		string,
@@ -74,8 +75,6 @@ public sealed class ZodProblemDetailsWriter
 		new EventId(1, "ZodReservedParameter"),
 		"The validation error parameter '{Parameter}' collides with a reserved ProblemDetails member and was written as '{Renamed}'."
 	);
-
-	readonly ZodProblemDetailsOptions _options;
 	readonly IZodMessageFormatter? _formatter;
 	readonly ILogger? _logger;
 	JsonNamingPolicy? _cachedPolicy;
@@ -107,7 +106,7 @@ public sealed class ZodProblemDetailsWriter
 	{
 		ArgumentNullException.ThrowIfNull(options);
 
-		_options = options;
+		Options = options;
 		_formatter = formatter;
 		_logger = logger;
 	}
@@ -115,7 +114,7 @@ public sealed class ZodProblemDetailsWriter
 	/// <summary>
 	/// Gets the options this writer applies.
 	/// </summary>
-	public ZodProblemDetailsOptions Options => _options;
+	public ZodProblemDetailsOptions Options { get; }
 
 	/// <summary>
 	/// Returns the writer registered in <paramref name="services"/>, or creates one from the registered
@@ -209,8 +208,8 @@ public sealed class ZodProblemDetailsWriter
 	internal void ProjectExternalIssues(HttpValidationProblemDetails problemDetails)
 	{
 		if (
-			!_options.IncludeIssues
-			|| !_options.ProjectDataAnnotationsIssues
+			!Options.IncludeIssues
+			|| !Options.ProjectDataAnnotationsIssues
 			|| problemDetails.Errors.Count == 0
 			|| problemDetails.Extensions.ContainsKey("issues")
 		)
@@ -263,7 +262,7 @@ public sealed class ZodProblemDetailsWriter
 		ArgumentNullException.ThrowIfNull(httpContext);
 		ArgumentNullException.ThrowIfNull(problemDetails);
 
-		httpContext.Response.StatusCode = problemDetails.Status ?? _options.DefaultStatusCode;
+		httpContext.Response.StatusCode = problemDetails.Status ?? Options.DefaultStatusCode;
 
 		if (httpContext.RequestServices?.GetService<IProblemDetailsService>() is { } service)
 		{
@@ -295,8 +294,8 @@ public sealed class ZodProblemDetailsWriter
 		bool mergeExistingErrors
 	)
 	{
-		Dictionary<string, List<string>> grouped = new(StringComparer.Ordinal);
-		var issues = _options.IncludeIssues ? new List<ValidationIssue>(errors.Length) : null;
+		Dictionary<string, List<string>> grouped = [with(StringComparer.Ordinal)];
+		var issues = Options.IncludeIssues ? new List<ValidationIssue>(errors.Length) : null;
 
 		var highest = CollectErrors(errors, httpContext, grouped, issues);
 
@@ -321,7 +320,7 @@ public sealed class ZodProblemDetailsWriter
 		if (issues is not null)
 			target.Extensions["issues"] = issues.ToArray();
 
-		if (_options.MergeParametersIntoExtensions)
+		if (Options.MergeParametersIntoExtensions)
 			MergeParameters(target, errors);
 
 		var traceId = Activity.Current?.Id ?? httpContext?.TraceIdentifier;
@@ -361,7 +360,7 @@ public sealed class ZodProblemDetailsWriter
 		List<ValidationIssue>? issues
 	)
 	{
-		var project = issues is not null && _options.ProjectDataAnnotationsIssues;
+		var project = issues is not null && Options.ProjectDataAnnotationsIssues;
 		foreach (var pair in target.Errors)
 		{
 			if (grouped.ContainsKey(pair.Key))
@@ -380,14 +379,14 @@ public sealed class ZodProblemDetailsWriter
 
 	int ComputeStatus(ReadOnlySpan<ValidationError> errors, ErrorType? highest)
 	{
-		var status = highest?.HttpStatus ?? _options.DefaultStatusCode;
-		if (_options.StatusCodeSelector is null && _options.StatusCodeOverride is null)
+		var status = highest?.HttpStatus ?? Options.DefaultStatusCode;
+		if (Options.StatusCodeSelector is null && Options.StatusCodeOverride is null)
 			return status;
 
 		var snapshot = ImmutableArray.Create(errors);
-		if (_options.StatusCodeSelector is { } selector)
+		if (Options.StatusCodeSelector is { } selector)
 			status = selector(snapshot);
-		if (_options.StatusCodeOverride is { } statusOverride)
+		if (Options.StatusCodeOverride is { } statusOverride)
 			status = statusOverride(snapshot, status);
 
 		return status;
@@ -398,17 +397,21 @@ public sealed class ZodProblemDetailsWriter
 		if (string.IsNullOrEmpty(code))
 			return null;
 
-		if (_options.ErrorTypeResolver is { } resolver)
+		// The resolver deliberately does not fall through to the registry when it returns null, so this is
+		// not a ?? and the conditional expression would be a nested ternary.
+#pragma warning disable IDE0046 // Convert to conditional expression
+		if (Options.ErrorTypeResolver is { } resolver)
 			return resolver(code);
+#pragma warning restore IDE0046
 
-		return _options.Registry is { } registry && registry.TryGet(code, out var errorType) ? errorType : null;
+		return Options.Registry is { } registry && registry.TryGet(code, out var errorType) ? errorType : null;
 	}
 
 	string ResolveMessage(in ValidationError error, ErrorType? errorType, CultureInfo culture)
 	{
 		try
 		{
-			if (_options.FormatMessages && errorType?.MessageFormat is { Length: > 0 } template)
+			if (Options.FormatMessages && errorType?.MessageFormat is { Length: > 0 } template)
 			{
 				var templated = error with { MessageFormat = template };
 				return _formatter is null
@@ -567,7 +570,7 @@ public sealed class ZodProblemDetailsWriter
 			if (!IsClientParameter(pair.Key) || !TryNormalize(pair.Value, allowCollections: true, out var safe))
 				continue;
 
-			result ??= new Dictionary<string, object?>(StringComparer.Ordinal);
+			result ??= [with(StringComparer.Ordinal)];
 			result[JsonNamingPolicy.CamelCase.ConvertName(pair.Key)] = safe;
 		}
 
@@ -579,7 +582,7 @@ public sealed class ZodProblemDetailsWriter
 	bool IsClientParameter(string key) =>
 		!IsUnionParameter(key)
 		&& (
-			_options.IncludeDiagnosticParameters
+			Options.IncludeDiagnosticParameters
 			|| !(
 				string.Equals(key, ZodIssueParameters.DeclaringType, StringComparison.Ordinal)
 				|| string.Equals(key, ZodIssueParameters.Member, StringComparison.Ordinal)
@@ -604,7 +607,7 @@ public sealed class ZodProblemDetailsWriter
 				ZodPathSegmentKind.Member => namer?.GetName(segment.Name ?? string.Empty)
 					?? segment.Name
 					?? string.Empty,
-				_ => segment.Name ?? string.Empty,
+				ZodPathSegmentKind.Key or _ => segment.Name ?? string.Empty,
 			};
 		}
 
@@ -695,7 +698,7 @@ public sealed class ZodProblemDetailsWriter
 
 	IZodPathNamer? ResolveNamer(HttpContext? httpContext)
 	{
-		if (_options.PathNaming != ZodPathNaming.Json)
+		if (Options.PathNaming != ZodPathNaming.Json)
 			return null;
 
 		var jsonOptions = httpContext?.RequestServices?.GetService<IOptions<HttpJsonOptions>>();
@@ -717,6 +720,8 @@ public sealed class ZodProblemDetailsWriter
 	static JsonTypeInfo<HttpValidationProblemDetails> ResolveTypeInfo(HttpContext httpContext)
 	{
 		var options = httpContext.RequestServices?.GetService<IOptions<HttpJsonOptions>>()?.Value.SerializerOptions;
+		// The three-part pattern is clearer as a guard than as a conditional expression.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (
 			options is not null
 			&& options.TryGetTypeInfo(typeof(HttpValidationProblemDetails), out var typeInfo)
@@ -725,6 +730,7 @@ public sealed class ZodProblemDetailsWriter
 		{
 			return typed;
 		}
+#pragma warning restore IDE0046
 
 		return ZodProblemDetailsJsonContext.Default.HttpValidationProblemDetails;
 	}

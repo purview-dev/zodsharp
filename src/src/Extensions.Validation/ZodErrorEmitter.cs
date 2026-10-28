@@ -116,12 +116,12 @@ static class ZodErrorEmitter
 
 	static IZodMessageFormatter? ResolveFormatter(ValidateContext context, ZodValidationOptions options)
 	{
-		if (options.MessageFormatter is not null)
-			return options.MessageFormatter;
-
-		return context.ServiceProvider?.GetService(typeof(IStringLocalizerFactory)) is IStringLocalizerFactory factory
-			? new StringLocalizerZodMessageFormatter(factory, context.ValidationOptions.LocalizerProvider)
-			: null;
+		return options.MessageFormatter
+			?? (
+				context.ServiceProvider?.GetService(typeof(IStringLocalizerFactory)) is IStringLocalizerFactory factory
+					? new StringLocalizerZodMessageFormatter(factory, context.ValidationOptions.LocalizerProvider)
+					: null
+			);
 	}
 
 	static string FormatMessage(

@@ -31,17 +31,10 @@ static class ZodOptionsFailureFormatter
 		if (!string.IsNullOrEmpty(optionsName))
 			builder.Append(optionsName).Append(": ");
 
-		string location;
-		if (!string.IsNullOrEmpty(configurationSection))
-		{
-			location = error.FullPath.IsRoot
-				? configurationSection
-				: configurationSection + ":" + error.FullPath.ToConfigurationKey();
-		}
-		else
-		{
-			location = error.FullPath.ToDottedString();
-		}
+		var location =
+			string.IsNullOrEmpty(configurationSection) ? error.FullPath.ToDottedString()
+			: error.FullPath.IsRoot ? configurationSection
+			: configurationSection + ":" + error.FullPath.ToConfigurationKey();
 
 		builder
 			.Append(location.Length == 0 ? "(root)" : location)

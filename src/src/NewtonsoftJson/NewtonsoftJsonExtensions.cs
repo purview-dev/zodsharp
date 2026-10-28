@@ -35,8 +35,11 @@ public static class NewtonsoftJsonExtensions
 		JsonSerializerSettings? settings = null
 	)
 	{
+		// A conditional expression would turn the argument guard into a throw expression inside the return.
+#pragma warning disable IDE0046 // Convert to conditional expression
 		if (schema == null)
 			throw new ArgumentNullException(nameof(schema));
+#pragma warning restore IDE0046
 
 		return TryDeserialize<T>(json, settings, out var deserialized, out var errors)
 			? schema.Validate(deserialized)

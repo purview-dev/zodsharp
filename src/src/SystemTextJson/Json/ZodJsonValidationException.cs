@@ -19,8 +19,6 @@ public sealed class ZodJsonValidationException : JsonException
 {
 	const string DefaultMessage = "Validation failed.";
 
-	readonly ImmutableArray<ValidationError> _errors;
-
 	/// <summary>
 	/// Initializes a new instance with no errors.
 	/// </summary>
@@ -34,7 +32,7 @@ public sealed class ZodJsonValidationException : JsonException
 	public ZodJsonValidationException(string? message)
 		: base(message)
 	{
-		_errors = [];
+		Errors = [];
 	}
 
 	/// <summary>
@@ -45,7 +43,7 @@ public sealed class ZodJsonValidationException : JsonException
 	public ZodJsonValidationException(string? message, Exception? innerException)
 		: base(message, innerException)
 	{
-		_errors = [];
+		Errors = [];
 	}
 
 	/// <summary>
@@ -58,7 +56,7 @@ public sealed class ZodJsonValidationException : JsonException
 	ZodJsonValidationException(ImmutableArray<ValidationError> errors)
 		: base(BuildMessage(errors))
 	{
-		_errors = errors;
+		Errors = errors;
 	}
 
 	/// <summary>
@@ -71,10 +69,10 @@ public sealed class ZodJsonValidationException : JsonException
 		{
 			var prefix = ZodPath.ParseJsonPath(Path);
 			if (prefix.IsRoot)
-				return _errors;
+				return field;
 
-			var builder = ImmutableArray.CreateBuilder<ValidationError>(_errors.Length);
-			foreach (var error in _errors)
+			var builder = ImmutableArray.CreateBuilder<ValidationError>(field.Length);
+			foreach (var error in field)
 				builder.Add(error.WithPathPrefix(prefix));
 
 			return builder.MoveToImmutable();
