@@ -773,7 +773,7 @@ partial class ZodSchemaGenerator
 				property.PropertyType.SpecialType == SpecialType.System_String && !required.AllowEmptyStrings;
 			var comparison = rejectsBlankStrings
 				? $"string.IsNullOrWhiteSpace(value.{propertyName})"
-				: $"value.{propertyName} == null";
+				: $"value.{propertyName} is null";
 
 			// The shared missing-field identity (code missing_field, category invalid_type, the runtime
 			// "{displayName} is required" template); an attribute message replaces only the text.
@@ -804,7 +804,7 @@ partial class ZodSchemaGenerator
 			// A non-nullable reference type rejects null — the exported JSON Schema marks it required — so
 			// the rules below run only for a present value. This keeps null acceptance consistent with the
 			// schema and makes length/count access null-safe.
-			using (writer.IfBlockScope($"value.{propertyName} == null"))
+			using (writer.IfBlockScope($"value.{propertyName} is null"))
 			{
 				WriteAddError(
 					writer,
@@ -822,7 +822,7 @@ partial class ZodSchemaGenerator
 		{
 			GenerateValueSetValidations(writer, property, emitEnumRule);
 			if (property.IsDeclaredNullable)
-				block = writer.IfBlockScope($"value.{propertyName} != null");
+				block = writer.IfBlockScope($"value.{propertyName} is not null");
 		}
 
 		GenerateTypeSpecificValidations(writer, property, emitEnumRule, skipRequiredRule: hasRequiredRule);

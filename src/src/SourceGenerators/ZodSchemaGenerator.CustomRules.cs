@@ -91,7 +91,7 @@ partial class ZodSchemaGenerator
 				PathOf(property),
 				MemberOf(property),
 				GetFallbackOrigin(property),
-				invalidCondition: $"value.{propertyName} == null || {scalarExpression}.{scalarPropertyName} == null"
+				invalidCondition: $"value.{propertyName} is null || {scalarExpression}.{scalarPropertyName} is null"
 			);
 			return;
 		}
@@ -109,7 +109,7 @@ partial class ZodSchemaGenerator
 				PathOf(property),
 				MemberOf(property),
 				GetFallbackOrigin(property),
-				invalidCondition: $"value.{propertyName} == null"
+				invalidCondition: $"value.{propertyName} is null"
 			);
 			return;
 		}
@@ -275,7 +275,7 @@ partial class ZodSchemaGenerator
 				pathExpression,
 				memberExpression,
 				fallbackOrigin,
-				invalidCondition: $"{underlyingExpression} == null"
+				invalidCondition: $"{underlyingExpression} is null"
 			);
 			writer.NewLine();
 			return;

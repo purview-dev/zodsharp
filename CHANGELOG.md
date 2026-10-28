@@ -355,6 +355,14 @@ Released versions correspond to `v<version>` GitHub releases.
   every name).
 ### Fixed
 
+- **Generated validators compile for member types with their own equality operators.** The generator tested for null
+  with `value.Member == null` (and `!= null`), which binds a user-defined operator when the member type declares
+  one. A `[Required]` `Nullable<T>` member whose type defines `==(string?, T)` and an implicit conversion to `string`
+  (every string-backed Purview.ValueObjects scalar does) failed to compile with CS9342 (ambiguous between
+  `==(string?, T)` and `==(T, T)`), and a reference type with a `==(T?, string?)` overload failed the same way.
+  Every generated null test is now a pattern (`is null`, `is not null`), which never binds an operator; the
+  remaining value comparisons already go through `EqualityComparer<T>.Default` or `CompareTo`. **2.x is affected
+  too** (2.4.2 emitted the same comparison).
 - **A multi-project solution's OpenAPI document no longer crashes with "An item with the same key has already been
   added. Key: T:ZodSharp.Core.ErrorTypeAttribute".** The generators emitted `ZodSharp.ZodSchemaAttribute` and
   `ZodSharp.Core.ErrorTypeAttribute` - public, with XML documentation - into every compilation as

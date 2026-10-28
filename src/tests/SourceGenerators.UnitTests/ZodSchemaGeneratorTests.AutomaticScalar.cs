@@ -247,7 +247,7 @@ partial class ZodSchemaGeneratorTests
 		var generated = driverResult.GetSource("ScoreSchema");
 
 		// Assert — the synthesized nullable property is guarded, so null is accepted.
-		await Assert.That(generated).DoesNotContain("value.Value == null");
+		await Assert.That(generated).DoesNotContain("value.Value is null");
 		await Assert.That(generated).ContainsGeneratedCode("ZodPath.Member(\"Value\")");
 	}
 
@@ -646,7 +646,7 @@ partial class ZodSchemaGeneratorTests
 		// Assert — the synthesized property is DateTimeOffset?, so null is accepted and exported.
 		foreach (var generated in new[] { generic, typeofGenerated })
 		{
-			await Assert.That(generated).DoesNotContain("value.Value == null");
+			await Assert.That(generated).DoesNotContain("value.Value is null");
 			await Assert.That(generated).ContainsGeneratedCode("ZodPath.Member(\"Value\")");
 			await Assert.That(generated).ContainsGeneratedCode("AnyOf = new()");
 			await Assert.That(generated).ContainsGeneratedCode("Type = \"null\"");
@@ -852,7 +852,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(errors.Any(error => error.Code == Rules.RequiredRule<int>.ErrorCode)).IsTrue();
 		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
 
-		await Assert.That(generated).ContainsGeneratedCode("value.Value == null");
+		await Assert.That(generated).ContainsGeneratedCode("value.Value is null");
 		await Assert.That(generated).DoesNotContain("Type = \"null\"");
 	}
 
@@ -994,6 +994,6 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
 
 		var generated = driverResult.GetSource("ScoreHolderSchema");
-		await Assert.That(generated).ContainsGeneratedCode("value.Score == null || value.Score.Value.Value == null");
+		await Assert.That(generated).ContainsGeneratedCode("value.Score is null || value.Score.Value.Value is null");
 	}
 }
