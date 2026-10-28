@@ -11,6 +11,9 @@
 		<ExcludePurviewTelemetry>true</ExcludePurviewTelemetry>
 		<RepositoryUrl>https://github.com/purview-dev/zodsharp</RepositoryUrl>
 		<NoWarn>$(NoWarn);CA1031;CA1307;CA1510;</NoWarn>
+		<!-- Installed skills live in the universal .agents/skills/ folder only, and are committed. The
+		     SDK's default (*) would make InstallPurviewSkills write a copy into every agent's folder. -->
+		<PurviewSkillsAgents>universal</PurviewSkillsAgents>
 	</PropertyGroup>
 
 	<Import Sdk="Purview.BuildSdk" Project="Sdk.props" />

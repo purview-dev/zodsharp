@@ -2,9 +2,10 @@
 name: purview-architecture
 description: >-
   Use when deciding the shape of a .NET solution that uses Purview libraries — how many projects,
-  whether to add a repository or CQRS layer, where validation lives — or before generating substantial
-  implementation code. Establishes project context first, then applies DRY, KISS and architecture
-  proportional to the actual requirements rather than to an enterprise reference diagram.
+  whether to add a repository or CQRS layer, where validation lives, how an API and its clients share
+  a contract (Contracts, OpenAPI or Hybrid) and when a BFF is earned — or before generating
+  substantial implementation code. Establishes project context first, then applies DRY, KISS and
+  architecture proportional to the actual requirements rather than to an enterprise reference diagram.
 license: MIT
 metadata:
   author: Purview-Dev
@@ -110,7 +111,34 @@ The rules that matter most:
 When a boundary is worth having, make it fail the build rather than the review — see
 `purview-architecture-testing`.
 
-## 5. DRY, applied where it pays
+## 5. Choose how an API and its clients share a contract
+
+When there is an HTTP API and at least one client, choose **Contracts**, **OpenAPI** or **Hybrid**
+from the clients that **exist today**. A planned client is noted; it does not count.
+
+| Clients today | Strategy | Failure it prevents |
+| -- | -- | -- |
+| All .NET, same solution, shipped in lockstep | **Contracts** — a library of request/response types on the domain's value objects, referenced by the server and every .NET client | Rules drifting, and a weaker second copy of them in the UI |
+| At least one non-.NET client, or one that ships independently | **Hybrid** — Contracts is the source; the OpenAPI document and its schemas are generated from it | Non-.NET clients hand-writing shapes, and .NET clients losing their value objects to a generated client |
+| No .NET client — partners or the public only | **OpenAPI**, generated from the server's types; no Contracts project | A project with no consumer but the server |
+
+The rules that do not bend:
+
+- **OpenAPI is an output, never an input**, while Contracts exists. Never regenerate a C# client from
+  your own API's document when that client is in the same solution.
+- **Never hand-maintain a parallel set of models**, and **the server always validates** — a shared
+  validator is for user experience, not trust.
+- **Contracts is browser-safe** when a WebAssembly client references it: architecture-policy bans,
+  the trim and AOT analyzers and the browser platform analyzer check it, not a reviewer.
+- **A BFF is earned by keeping tokens out of the browser.** It holds the tokens, gives the browser an
+  `HttpOnly` cookie, forwards with the user's token, and requires an anti-forgery header on every
+  forwarded call. In Blazor it is the host that serves the WebAssembly client, and a BFF that only
+  forwards does not reference Contracts. The policy does not define a BFF yet, so these are review
+  obligations until a future Build SDK release adds Blazor and BFF support.
+
+Full procedure, version-skew rules, BFF guidance and worked examples: `references/contract-strategy.md`.
+
+## 6. DRY, applied where it pays
 
 Reuse the Purview libraries when they remove a real source of truth, not for coverage:
 
@@ -126,7 +154,7 @@ Duplication that matters: validation repeated per entry point, a domain rule res
 configuration bound in two places, two types that both claim to be the truth. Duplication that does
 not: two similar-looking methods that answer to different owners.
 
-## 6. Telemetry is not an advanced topic
+## 7. Telemetry is not an advanced topic
 
 Recommend instrumentation from the first commit, at every project size. A small application gets
 small telemetry — it does not get none. See `purview-telemetry`.
@@ -136,6 +164,8 @@ small telemetry — it does not get none. See `purview-telemetry`.
 - Did you read the four context dimensions rather than ask for them?
 - Can you name, for each project and each abstraction you are proposing, the failure it prevents here?
 - Is anything in your proposal there only because a reference architecture has it?
+- If there is an API with clients, did you choose its contract strategy from the clients that exist
+  today?
 - Did you include telemetry?
 
 ## See also

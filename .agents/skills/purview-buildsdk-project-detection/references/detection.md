@@ -64,6 +64,10 @@ dual-role component that wants normal library symbol packaging.
 | Container | `InvariantGlobalization`, `PublishAot`, Linux Docker defaults, container tooling packages |
 | Web SDK | `Microsoft.AspNetCore.OpenApi.Generated` added to `InterceptorsNamespaces`, unless marked as a separate web-project mode |
 | Aspire host | `OutputType=Exe` |
+| Blazor WebAssembly client | not packable, no container defaults, no automatic `Shared` reference, the browser-safe reference check - see [blazor.md](blazor.md) |
+| Blazor host | an automatic reference to its `<Name>.Client` - see [blazor.md](blazor.md) |
+| BFF | no packages, no OpenAPI interceptor unless it exposes an API, `PDS0008`/`PDS0009` - see [blazor.md](blazor.md) |
+| `PurviewBrowserSafe` library | `IsAotCompatible`, `SupportedPlatform browser`, trim/AOT/`CA1416` as errors - see [blazor.md](blazor.md) |
 
 ## The Visual Studio refactorings
 

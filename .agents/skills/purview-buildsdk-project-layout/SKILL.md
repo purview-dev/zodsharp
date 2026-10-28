@@ -1,6 +1,6 @@
 ---
 name: purview-buildsdk-project-layout
-description: Decide where a project goes and what to call it in a repository that uses Purview.BuildSdk. Use when creating, moving, splitting or renaming a project or test project, choosing a test suffix, aligning namespaces and assembly identity with NamespacePrefix, or relying on the SDK's automatic project references. Also use when rationalising a repository's shape so the SDK's conventions work without overrides.
+description: Decide where a project goes and what to call it in a repository that uses Purview.BuildSdk. Use when creating, moving, splitting or renaming a project or test project, choosing a test suffix, aligning namespaces and assembly identity with NamespacePrefix, laying out a Blazor Web App host, WebAssembly client and browser-safe Contracts library, or relying on the SDK's automatic project references. Also use when rationalising a repository's shape so the SDK's conventions work without overrides.
 license: MIT
 metadata:
   package: Purview.BuildSdk
@@ -103,7 +103,32 @@ Test projects probe for their target, in order:
 - `../../src/$(TargetProjectName)/$(TargetProjectName).csproj`
 
 Non-test projects pick up sibling shared projects via `../Shared*/Shared*.csproj`; test projects
-pick up `../SharedTesting*/SharedTesting*.csproj`.
+pick up `../SharedTesting*/SharedTesting*.csproj`. A Blazor WebAssembly client is the exception: it
+does not pick up `Shared*`, because everything it references is downloaded to the browser.
+
+## Blazor Web App: host and client
+
+```text
+src/src/
+  Shop/Shop.csproj                        Microsoft.NET.Sdk.Web - the host
+  Shop.Client/Shop.Client.csproj          Microsoft.NET.Sdk.BlazorWebAssembly - the client
+  Shop.ClientShared/Shop.ClientShared.csproj   a PurviewBrowserSafe library both use
+  Shop.Bff/Shop.Bff.csproj                a BFF, when tokens are kept server-side in a separate host
+src/tests/
+  Shop.Client.UnitTests/                  TargetProjectName = Shop.Client
+```
+
+- A web host named `<Name>` beside a WebAssembly client named `<Name>.Client` is the pairing the SDK
+  recognises: the host gets `IsBlazorHostProject=true` and a reference to the client automatically
+  (skipped when declared; `PurviewAutoBlazorClientReference=false` opts out).
+- Identities with `NamespacePrefix=Acme`: `Shop.Client` is `Acme.Shop.Client`; `Shop.Bff` is
+  `Acme.Shop.Bff`; `ClientShared` is a stripped segment, so `Shop.ClientShared` has namespace
+  `Acme.Shop` and assembly `Acme.Shop.ClientShared`.
+- Every library the client references must set `<PurviewBrowserSafe>true</PurviewBrowserSafe>`, or the
+  build reports `PRBLZ0001`. Keep server-only code (file, process, database access) out of anything
+  the client references.
+- Name a BFF host `*Bff` (case-sensitive) for `IsBffProject=true`. Being the client's host does not
+  make a project a BFF.
 
 ## Creating a new project
 

@@ -1,6 +1,6 @@
 ---
 name: purview-buildsdk-project-detection
-description: Explain why Purview.BuildSdk classified a project as test, shared, shared-testing, CLI, web, worker, Aspire host, container or Roslyn component, and why it added a package, a project reference, a namespace or an analyzer automatically. Use when SDK behaviour looks surprising, when a test project gets no runner or no InternalsVisibleTo, or when reasoning about RootNamespace, AssemblyName and TargetProjectName.
+description: Explain why Purview.BuildSdk classified a project as test, shared, shared-testing, CLI, web, worker, Aspire host, container, Roslyn component, Blazor WebAssembly client, Razor class library, Blazor host or BFF, and why it added a package, a project reference, a namespace or an analyzer automatically. Use when SDK behaviour looks surprising, when a test project gets no runner or no InternalsVisibleTo, or when reasoning about RootNamespace, AssemblyName and TargetProjectName.
 license: MIT
 metadata:
   package: Purview.BuildSdk
@@ -26,7 +26,8 @@ dotnet msbuild <project> -getProperty:PurviewLogicalProjectName -getProperty:Roo
 The values worth inspecting first: `MSBuildProjectName`, `NamespacePrefix`,
 `PurviewLogicalProjectName`, `RootNamespace`, `TestingType`, `TargetProjectName`, `SdkProjectName`,
 `IsTestProject`, `IsSharedProject`, `IsSharedTestingProject`, `IsContainerProject`, `IsCLIProject`,
-`IsWebSdkProject`, `IsAspireHostProject`.
+`IsWebSdkProject`, `IsAspireHostProject`, `IsBlazorWebAssemblyProject`, `IsRazorClassLibraryProject`,
+`IsBlazorHostProject`, `IsBffProject`.
 
 ## Detection rules
 
@@ -67,6 +68,24 @@ Recognised by **exact name**, never by substring. The two lists are in
 | SDK starts with `Aspire.Sdk.Host` or `Aspire.AppHost.Sdk` | `IsAspireHostProject=true` |
 | `Dockerfile`, `dockerfile` or `Dockerfile.dev` in the project directory | `IsContainerProject=true` |
 | name ends with `CLI`, `Console`, `CommandLine`, `QuickStart`, `QuickStarts` | `IsCLIProject=true` |
+| `Microsoft.NET.Sdk.BlazorWebAssembly` | `IsBlazorWebAssemblyProject=true` |
+| `Microsoft.NET.Sdk.Razor` | `IsRazorClassLibraryProject=true` |
+| a web SDK project whose name ends with `Bff` (case-sensitive, like `CLI`), or that sets `IsBffProject=true` | `IsBffProject=true` |
+| a web SDK project that references an `IsBlazorWebAssemblyProject` project | `IsBlazorHostProject=true` |
+
+`IsBffProject=false` opts a `*Bff` project out. `IsBlazorHostProject` is **never** inferred into
+`IsBffProject`: a host that keeps no tokens is not a BFF, and BFF rules do not describe it.
+
+`IsBlazorHostProject` is known at evaluation for the `<Name>`/`<Name>.Client` pairing. A host
+referencing a client under any other name is resolved during the build, so ask for it with the
+target that resolves it:
+
+```bash
+dotnet msbuild <host> -t:ResolvePurviewBlazorHostProject -getProperty:IsBlazorHostProject
+```
+
+What each Blazor and BFF classification applies - and the browser-safe library check - is in
+[references/blazor.md](references/blazor.md).
 
 ## Namespace and identity
 
@@ -94,6 +113,8 @@ Recognised by **exact name**, never by substring. The two lists are in
   Shared-testing projects skip the runnable test package.
 - **Packable projects**, **Roslyn components** and **special project types** (CLI, container, web,
   Aspire host): see [references/detection.md](references/detection.md).
+- **Blazor WebAssembly clients, Blazor hosts, BFFs and browser-safe libraries**: see
+  [references/blazor.md](references/blazor.md).
 
 Project-reference probing is layout-driven and covered by `purview-buildsdk-project-layout`.
 
@@ -107,6 +128,8 @@ surface in command-line builds and in Visual Studio. The code-fix assembly ships
 | `PDS0002` | Extensions classes live under `Extensions/<receiver namespace>/` |
 | `PDS0003` | Explicit types with target-typed `new()` |
 | `PDS0004` | Correct acronym capitalisation |
+| `PDS0008` | A BFF's authentication cookie is not set `HttpOnly = false` |
+| `PDS0009` | A BFF's authentication cookie is not set `SameSite = None` |
 
 `PDS0004` follows .NET naming guidance: well-known framework spellings (`Sql`, `Guid`, `Uuid`,
 `Url`, `Dns`, `Tcp`, `Http`, `Xml`, `Db`, …) are exempt — `Db` among them, so `DbContext`,

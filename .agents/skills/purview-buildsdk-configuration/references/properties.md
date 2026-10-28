@@ -81,6 +81,24 @@ forces SourceLink's CI-mode dirty-repository checks.
 | `SourceLinkPackageName` | `Microsoft.SourceLink.GitHub` | |
 | `DisableSourceLink` | `false` | |
 
+## Blazor WebAssembly, browser-safe libraries and BFF hosts
+
+| Property | Default | Behaviour |
+| -- | -- | -- |
+| `IsBffProject` | `true` for a web SDK project named `*Bff`, else `false` | Classifies a BFF host. `false` opts a `*Bff` project out; `true` opts another web project in |
+| `IsBlazorHostProject` | *(computed)* | `true` for a web SDK project that references a WebAssembly client. Set `false` to opt out. Never implies `IsBffProject` |
+| `PurviewAutoBlazorClientReference` | `true` | A host named `<Name>` references its `<Name>.Client` WebAssembly client automatically. Skipped when the reference is already declared |
+| `DisablePurviewBlazorWebAssemblyDefaults` | `false` | Keeps the generic defaults on a WebAssembly client: packable when asked, Dockerfile container detection, the automatic `Shared` reference. Set before the SDK import |
+| `PurviewBrowserSafe` | *(unset)* | `true` on a class library applies `IsAotCompatible`, `SupportedPlatform browser` and the browser-safe `WarningsAsErrors`, each only where the project set nothing |
+| `PurviewBrowserSafeWarningsAsErrors` | `true` | `false` keeps the trim and AOT diagnostics as warnings; `CA1416` then falls back to the repository's severity (`suggestion` in the shipped `.editorconfig`) |
+| `PurviewBrowserSafeWarningCodes` | `CA1416`, `IL2001`-`IL2128`, `IL3000`-`IL3005`, `IL3050`-`IL3059` | The ids a browser-safe library adds to `WarningsAsErrors` |
+| `DisablePurviewBrowserSafeReferenceCheck` | `false` | Turns off `PRBLZ0001`, the check that every project a client (or browser-safe library) references sets `PurviewBrowserSafe` |
+| `PurviewBrowserSafeReferenceCheckAsError` | `false` | Reports `PRBLZ0001` as an error |
+| `PurviewBffExposesApi` | `true` when the BFF references `Microsoft.AspNetCore.OpenApi`, else `false` | Whether a BFF keeps the `Microsoft.AspNetCore.OpenApi.Generated` interceptor namespace |
+
+`PurviewBrowserSafe="true"` is also accepted as `ProjectReference` metadata, recording that a
+reference was judged browser-safe when it cannot say so itself.
+
 ## Version detection
 
 | Property | Default | Behaviour |
@@ -101,7 +119,7 @@ forces SourceLink's CI-mode dirty-repository checks.
 | `RepositoryEditorConfigFilePath` | *(derived)* | Overrides the destination `.editorconfig` |
 | `BootstrapGlobalJsonToRepoRoot` | `true` | |
 | `RepositoryGlobalJsonFilePath` | *(derived)* | Overrides the destination `global.json` |
-| `PurviewBuildSdkVersionForGlobalJson` | detected SDK version, else `1.0.0` | |
+| `PurviewBuildSdkVersionForGlobalJson` | restored package version, else the version it was packed as | |
 | `PurviewRepoBootstrapCopyRetries` | `3` | |
 | `PurviewRepoBootstrapCopyRetryDelayMilliseconds` | `500` | |
 | `PurviewRepoBootstrapCopyFailureAsError` | `true` | `false` downgrades a persistent write failure to a warning |
@@ -134,6 +152,10 @@ Exported to analyzers and generators as `build_property.<PropertyName>`:
 - `TestingType`, `TargetProjectName`
 - `IsContainerProject`, `IsSdkProject`, `SdkProjectName`, `IsWebProject`, `IsWebSdkProject`,
   `IsWorkerSdkProject`, `IsAspireHostProject`, `IsCLIProject`
+- `IsBlazorWebAssemblyProject`, `IsRazorClassLibraryProject`, `IsBlazorHostProject`, `IsBffProject`
+- `PurviewBrowserSafe`, `PurviewBrowserSafeWarningsAsErrors`, `DisablePurviewBrowserSafeReferenceCheck`,
+  `PurviewBrowserSafeReferenceCheckAsError`, `DisablePurviewBlazorWebAssemblyDefaults`,
+  `PurviewAutoBlazorClientReference`, `PurviewBffExposesApi`
 - `EditorConfigFilePath`, `RepositoryEditorConfigFilePath`, `BootstrapEditorConfigToRepoRoot`
 - `RepositoryGlobalJsonFilePath`, `BootstrapGlobalJsonToRepoRoot`, `DisableAutoCopySdkFiles`
 - `PurviewRepoBootstrapMode`, `PurviewRepoBootstrapCopyRetries`,

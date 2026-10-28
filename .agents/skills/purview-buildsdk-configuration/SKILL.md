@@ -1,6 +1,6 @@
 ---
 name: purview-buildsdk-configuration
-description: Configure Purview.BuildSdk from Directory.Build.props or a .csproj. Use when setting NamespacePrefix, choosing a testing or mocking framework, turning telemetry or SourceLink off, controlling version detection from package.json, tuning the repository bootstrap, or working out whether a property must be set before the SDK import. Also use when the SDK "did something automatically" and you need the property that controls it.
+description: Configure Purview.BuildSdk from Directory.Build.props or a .csproj. Use when setting NamespacePrefix, choosing a testing or mocking framework, turning telemetry or SourceLink off, controlling version detection from package.json, tuning the repository bootstrap, making a library browser-safe for a Blazor WebAssembly client, configuring a BFF host, or working out whether a property must be set before the SDK import. Also use when the SDK "did something automatically" and you need the property that controls it.
 license: MIT
 metadata:
   package: Purview.BuildSdk
@@ -27,6 +27,7 @@ Pre-import properties include:
 - `EnableAssemblyNameGeneration`
 - `PurviewSharedTestingOutputType`, `PurviewTestContextNoWarn`
 - `AutoIncludeUsings`
+- `DisablePurviewBlazorWebAssemblyDefaults`
 - repo-wide testing-framework selection you want every project to inherit
 
 Everything else is read in `Sdk.targets` and can be set in a project file. Prefer repo-wide defaults
@@ -46,6 +47,9 @@ in `Directory.Build.props` unless the setting is deliberately project-specific.
 | `ExcludePurviewTelemetry` | `false` | Drops the telemetry source generator |
 | `DisableSourceLink` | `false` | Drops SourceLink from packable projects |
 | `EnableAssemblyNameGeneration` | `true` | `AssemblyName`/`PackageId` follow the resolved `RootNamespace` |
+| `PurviewBrowserSafe` | *(unset)* | On a class library a WebAssembly client downloads: trim, AOT and browser-unsupported APIs fail the build |
+| `IsBffProject` | name ends `Bff` | Classifies a BFF host; `false` opts out |
+| `PurviewBrowserSafeReferenceCheckAsError` | `false` | Makes `PRBLZ0001` (a client reference that is not browser-safe) an error |
 
 The full set, grouped by area and with the behaviour each one changes, is in
 [references/properties.md](references/properties.md). Read it rather than guessing a property name —
@@ -58,7 +62,8 @@ name:
 
 `PurviewLogicalProjectName`, `PurviewNamespacePrefix`, `PurviewProjectShortName`, `PurviewTestType`,
 `RootNamespace`, `AssemblyName`, `PackageVersion`, `TestingType`, `TargetProjectName`, `RepoRoot`,
-`RootPackageJson`.
+`RootPackageJson`, `IsBlazorHostProject`, `IsBffProject`, `PurviewBffExposesApi`, `IsAotCompatible`,
+`WarningsAsErrors`.
 
 Ask MSBuild for one directly:
 
