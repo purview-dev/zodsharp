@@ -30,10 +30,14 @@ static class SampleApp
 		services.AddZodSharpClientValidation();
 
 		// The same two calls as the client Program.cs: the generated, trim-safe registration of the Examples.Shared
-		// [ZodSchema] models, then ZodSharp for Blazor forms (which also makes ZodSharp the first
-		// Microsoft.Extensions.Validation resolver, so the minimal API below is validated by the built-in pipeline).
+		// [ZodSchema] models, then ZodSharp for Blazor forms. AddZodSharpBlazor validates form models only; it does not
+		// change how endpoints behave.
 		services.AddZodSharpZodSharpExamplesSharedSchemas();
 		services.AddZodSharpBlazor();
+
+		// Opt the minimal API below in to the built-in .NET 11 validation pipeline: ZodSharp-typed parameters are
+		// validated before their handlers run.
+		services.AddZodSharpValidation();
 
 		// One ProblemDetails contract (errors + issues + traceId) for the API, which the WebAssembly form maps back
 		// onto its fields with AddZodProblemDetails.

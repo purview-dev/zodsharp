@@ -39,6 +39,22 @@ public sealed class ZodValidationOptions
 	public IZodMessageFormatter? MessageFormatter { get; set; }
 
 	/// <summary>
+	/// Gets or sets whether the ZodSharp resolver claims parameters (minimal-API handler parameters and other
+	/// parameter-level validation). Microsoft.Extensions.Validation's endpoint filter validates every parameter a
+	/// registered resolver claims, before the handler runs, so claiming them turns on minimal-API validation for every
+	/// ZodSharp type in the application.
+	/// </summary>
+	/// <remarks>
+	/// <see langword="null"/> (the default) decides by registration: parameters are claimed when the application calls
+	/// <c>AddZodSharpValidation()</c>, and are not when the bridge was registered only by
+	/// <c>AddZodSharpBlazor()</c>, which needs type validation for forms but should not change how the host's APIs
+	/// behave. Set <see langword="true"/> or <see langword="false"/> to decide explicitly. A resolver constructed
+	/// directly, outside dependency injection, claims parameters unless this is <see langword="false"/>. Endpoints can
+	/// also opt out one at a time with <c>DisableValidation()</c>.
+	/// </remarks>
+	public bool? ValidateParameters { get; set; }
+
+	/// <summary>
 	/// Gets explicit, trim-safe validator sources, consulted before <see cref="IZodSchemaFactory"/>.
 	/// </summary>
 	public IList<IZodValidatableInfoSource> Sources { get; } = [];

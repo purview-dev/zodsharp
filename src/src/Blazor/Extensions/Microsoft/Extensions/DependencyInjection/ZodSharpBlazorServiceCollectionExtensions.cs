@@ -23,11 +23,18 @@ public static class ZodSharpBlazorServiceCollectionExtensions
 		/// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
 		/// <remarks>
 		/// <para>
-		/// Calls <c>AddZodSharpValidation</c>, so the standard <c>&lt;DataAnnotationsValidator /&gt;</c> validates every
+		/// Registers the Microsoft.Extensions.Validation bridge, so the standard <c>&lt;DataAnnotationsValidator /&gt;</c> validates every
 		/// type that has a ZodSharp validator with ZodSharp - nested members, collections and dictionaries included -
 		/// with no <c>[ValidatableType]</c> and no Microsoft.Extensions.Validation generator. Also registers the
 		/// options <see cref="ZodValidator"/> reads and <see cref="TimeProvider.System"/> when no
 		/// <see cref="TimeProvider"/> is registered.
+		/// </para>
+		/// <para>
+		/// The bridge is registered for <b>type validation only</b>: it does not claim minimal-API parameters, so a host
+		/// that also maps endpoints keeps its endpoints exactly as they were (no ZodSharp validation runs before their
+		/// handlers). To validate ZodSharp-typed endpoint parameters as well, also call <c>AddZodSharpValidation()</c>
+		/// (in either order), or set <see cref="ZodValidationOptions.ValidateParameters"/> through
+		/// <paramref name="configureValidation"/>.
 		/// </para>
 		/// <para>
 		/// It deliberately does not register an <see cref="IZodValidationReportSink"/>: on Blazor Server the scope
@@ -41,7 +48,8 @@ public static class ZodSharpBlazorServiceCollectionExtensions
 		{
 			ArgumentNullException.ThrowIfNull(services);
 
-			services.AddZodSharpValidation(configureValidation);
+			// Type validation only: forms need it, the host's minimal APIs should not change because forms are used.
+			services.AddZodSharpValidation(configureValidation, validateParameters: false);
 			services.AddOptions<ZodBlazorOptions>();
 			if (configure is not null)
 				services.Configure(configure);

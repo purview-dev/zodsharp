@@ -161,4 +161,93 @@ public class ZodSharpValidationServiceCollectionExtensionsTests
 		// Assert
 		await Assert.That(factory).IsNotNull();
 	}
+
+	[Test]
+	[Arguments(true, true)]
+	[Arguments(false, false)]
+	public async Task AddZodSharpValidation_GivenValidateParameters_ClaimsParametersOnlyWhenAsked(
+		bool validateParameters,
+		bool expected,
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		ServiceCollection services = new();
+		services.AddZodSharpFactory(static factory => factory.Register(new GeneratedPersonSchemaValidator()));
+		services.AddZodSharpValidation(configure: null, validateParameters);
+		await using var provider = services.BuildServiceProvider();
+		var resolver = provider.GetRequiredService<ZodValidatableInfoResolver>();
+		var parameter = typeof(ZodSharpValidationServiceCollectionExtensionsTests)
+			.GetMethod(
+				nameof(Handler),
+				System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static
+			)!
+			.GetParameters()[0];
+
+		// Act
+		var claimed = resolver.TryGetValidatableParameterInfo(parameter, out _);
+		var typeClaimed = resolver.TryGetValidatableTypeInfo(typeof(GeneratedPerson), out _);
+
+		// Assert - type validation (forms, ValidateAsync) is unaffected either way.
+		cancellationToken.ThrowIfCancellationRequested();
+		await Assert.That(resolver.ValidatesParameters).IsEqualTo(expected);
+		await Assert.That(claimed).IsEqualTo(expected);
+		await Assert.That(typeClaimed).IsTrue();
+	}
+
+	[Test]
+	[Arguments(true)]
+	[Arguments(false)]
+	public async Task AddZodSharpValidation_GivenATypeOnlyRegistrationAndAParameterRequest_ClaimsParametersInEitherOrder(
+		bool typeOnlyFirst,
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - AddZodSharpBlazor registers type validation only; the application's own AddZodSharpValidation()
+		// still asks for parameters, whichever comes first.
+		ServiceCollection services = new();
+		if (typeOnlyFirst)
+		{
+			services.AddZodSharpValidation(configure: null, validateParameters: false);
+			services.AddZodSharpValidation();
+		}
+		else
+		{
+			services.AddZodSharpValidation();
+			services.AddZodSharpValidation(configure: null, validateParameters: false);
+		}
+
+		await using var provider = services.BuildServiceProvider();
+
+		// Act
+		var resolver = provider.GetRequiredService<ZodValidatableInfoResolver>();
+
+		// Assert
+		cancellationToken.ThrowIfCancellationRequested();
+		await Assert.That(resolver.ValidatesParameters).IsTrue();
+	}
+
+	[Test]
+	[Arguments(true, false)]
+	[Arguments(false, true)]
+	public async Task ValidateParameters_GivenAnExplicitValue_OverridesTheRegistration(
+		bool registrationAsks,
+		bool configured,
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		ServiceCollection services = new();
+		services.AddZodSharpValidation(options => options.ValidateParameters = configured, registrationAsks);
+		await using var provider = services.BuildServiceProvider();
+
+		// Act
+		var resolver = provider.GetRequiredService<ZodValidatableInfoResolver>();
+
+		// Assert
+		cancellationToken.ThrowIfCancellationRequested();
+		await Assert.That(resolver.ValidatesParameters).IsEqualTo(configured);
+	}
+
+	static void Handler(GeneratedPerson person) => _ = person;
 }

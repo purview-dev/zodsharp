@@ -32,6 +32,10 @@ builder.Services.AddZodSharpBlazor();
   the ZodSharp generator runs there. Models declared in `.razor` files are invisible to generators.
 - Prefer the generated registration. Assembly scanning (`AddZodSharpAssembly*`, `RegisterFromAssembly`) is not
   trim-safe and warns in a WebAssembly publish.
+- `AddZodSharpBlazor` validates **form models only**: it does not claim minimal-API parameters, so a server's
+  endpoints are untouched. The .NET 11 endpoint filter validates whatever a resolver claims, so to validate
+  ZodSharp-typed endpoint parameters too, also call `AddZodSharpValidation()` (either order) or set
+  `ValidateParameters = true` in `configureValidation`; opt single endpoints out with `DisableValidation()`.
 - `AddZodSharpBlazor` does **not** register an `IZodValidationReportSink`; never register a scoped one yourself (a
   Blazor Server scope is the whole circuit). The ASP.NET Core sink is request-bound and safe alongside Blazor.
 

@@ -13,6 +13,12 @@ builder.Services.AddZodSharpMyAppSharedSchemas();   // generated, trim-safe regi
 builder.Services.AddZodSharpBlazor();
 ```
 
+> **`AddZodSharpBlazor()` does not validate your minimal APIs.** It registers the validation bridge for form models
+> only, so a server that also maps endpoints keeps them as they were. To have the .NET 11 pipeline validate
+> ZodSharp-typed endpoint parameters too (a 400 before the handler runs), also call
+> `builder.Services.AddZodSharpValidation()` (either order), or pass
+> `AddZodSharpBlazor(validation => validation.ValidateParameters = true)`; opt endpoints out with `DisableValidation()`.
+
 ## Route 1: the standard `<DataAnnotationsValidator />`
 
 ```razor

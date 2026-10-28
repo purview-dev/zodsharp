@@ -38,15 +38,29 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 	/// <param name="factory">The schema factory; <see langword="null"/> to use only <see cref="ZodValidationOptions.Sources"/>.</param>
 	/// <param name="options">The bridge options; defaults when <see langword="null"/>.</param>
 	public ZodValidatableInfoResolver(IZodSchemaFactory? factory, ZodValidationOptions? options = null)
+		: this(factory, options, parametersRequested: true) { }
+
+	internal ZodValidatableInfoResolver(
+		IZodSchemaFactory? factory,
+		ZodValidationOptions? options,
+		bool parametersRequested
+	)
 	{
 		_factory = factory;
 		_options = options ?? new();
+		ValidatesParameters = _options.ValidateParameters ?? parametersRequested;
 	}
 
 	/// <summary>
 	/// Gets the bridge options.
 	/// </summary>
 	public ZodValidationOptions Options => _options;
+
+	/// <summary>
+	/// Gets whether this resolver claims parameters, so Microsoft.Extensions.Validation's endpoint filter validates
+	/// ZodSharp-typed minimal-API parameters. See <see cref="ZodValidationOptions.ValidateParameters"/>.
+	/// </summary>
+	public bool ValidatesParameters { get; }
 
 	/// <summary>
 	/// Gets the ZodSharp validator for <paramref name="type"/>, from <see cref="ZodValidationOptions.Sources"/> or
@@ -85,7 +99,8 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 	/// <remarks>
 	/// Claims a parameter whose type (a <see cref="Nullable{T}"/> unwrapped) has a ZodSharp validator, or a
 	/// collection parameter whose element type has one. <c>[SkipValidation]</c> and <c>[FromServices]</c>
-	/// parameters, and primitive types, are never claimed.
+	/// parameters, and primitive types, are never claimed, and no parameter is claimed when
+	/// <see cref="ValidatesParameters"/> is <see langword="false"/>.
 	/// </remarks>
 	public bool TryGetValidatableParameterInfo(
 		ParameterInfo parameterInfo,
@@ -93,6 +108,12 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 	)
 	{
 		ArgumentNullException.ThrowIfNull(parameterInfo);
+
+		if (!ValidatesParameters)
+		{
+			validatableParameterInfo = null;
+			return false;
+		}
 
 		validatableParameterInfo = _parameters.GetValue(parameterInfo, CreateParameter);
 		return validatableParameterInfo is not null;

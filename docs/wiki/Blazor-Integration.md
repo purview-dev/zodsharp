@@ -26,9 +26,26 @@ MyApp.Client/   (WASM)    -> Purview.ZodSharp.Blazor
 MyApp.Shared/   (models)  -> Purview.ZodSharp (the generator runs here)
 ```
 
-`AddZodSharpBlazor(configureValidation, configure)` calls `AddZodSharpValidation` (the
-Microsoft.Extensions.Validation bridge), registers `ZodBlazorOptions` and registers `TimeProvider.System` when no
-`TimeProvider` is registered. It never registers an `IZodValidationReportSink`.
+`AddZodSharpBlazor(configureValidation, configure)` registers the Microsoft.Extensions.Validation bridge for **type
+validation only** (`AddZodSharpValidation(configureValidation, validateParameters: false)`), registers
+`ZodBlazorOptions` and registers `TimeProvider.System` when no `TimeProvider` is registered. It never registers an
+`IZodValidationReportSink`.
+
+> [!IMPORTANT]
+> **`AddZodSharpBlazor` does not turn on minimal-API validation.** Forms and minimal APIs share one
+> `ValidationOptions`, and its endpoint filter validates every handler parameter a registered resolver claims, before
+> the handler runs. So the bridge `AddZodSharpBlazor` registers claims no parameters: a Blazor Server host that also
+> maps endpoints keeps them exactly as they were. To have ZodSharp-typed endpoint parameters validated by the .NET 11
+> pipeline as well (an invalid request answered with `400` before the handler), opt in:
+>
+> ```csharp
+> builder.Services.AddZodSharpBlazor();
+> builder.Services.AddZodSharpValidation();   // either order
+> ```
+>
+> or `AddZodSharpBlazor(validation => validation.ValidateParameters = true)`. Once it is on, opt single endpoints or
+> groups out with `DisableValidation()`, or every parameter with `ValidateParameters = false`. A WebAssembly client
+> maps no endpoints, so this only matters on the server.
 
 ## Two routes
 
@@ -284,7 +301,7 @@ builder.Services.AddZodSharpBlazor();
 | `/returns` | Static SSR | `FormName` + `[SupplyParameterFromForm]`, server validation of the posted form, and browser-side checks of `[StartsWith]` and `[UUID]` from `AddZodSharpClientValidation()`. |
 
 The server also exposes the minimal API the WebAssembly form posts to (`POST /api/customers`, validated by the .NET 11
-pipeline through the bridge `AddZodSharpBlazor` registers) and a culture switch (`/culture/set?culture=fr`). One
+pipeline because the server also calls `AddZodSharpValidation()`) and a culture switch (`/culture/set?culture=fr`). One
 `StringLocalizerZodMessageFormatter` over `SampleMessages.fr.resx` localizes the ProblemDetails, both form routes and
 the WebAssembly client, which adopts the server-rendered `<html lang>` at startup so `RunAsync` loads the French
 satellite assembly.

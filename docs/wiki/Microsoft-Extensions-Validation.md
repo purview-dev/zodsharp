@@ -47,6 +47,21 @@ builder.Services.AddValidation();
 Calling `AddZodSharpValidation()` more than once registers the resolver once, and every `configure` callback is
 applied.
 
+### Endpoint validation
+
+The endpoint filter Microsoft.Extensions.Validation adds to minimal APIs validates every handler parameter that a
+registered resolver claims, before the handler runs; it is not switched on by `AddValidation()` itself (called from a
+library, `AddValidation()` adds no resolver at all). So `AddZodSharpValidation()` **turns on minimal-API validation
+for every ZodSharp-typed parameter**: an invalid body is answered with `400` and the handler never runs. That is
+usually the point, but it applies to the whole application:
+
+- Opt an endpoint or a route group out with `DisableValidation()`.
+- Register type validation only with `AddZodSharpValidation(configure, validateParameters: false)`, or set
+  `ZodValidationOptions.ValidateParameters = false`: Blazor forms and `ValidationOptions.ValidateAsync<T>` still use
+  ZodSharp, and no endpoint changes. This is what `AddZodSharpBlazor()` registers.
+- Any registration that asks for parameters wins (so `AddZodSharpBlazor()` plus `AddZodSharpValidation()`, in either
+  order, validates endpoints), and an explicit `ValidateParameters` overrides both.
+
 > [!IMPORTANT]
 > Register every validator before the first validation. The resolver caches lookups per type, including misses, so
 > a validator registered with the factory after its type was first looked up is never seen.
@@ -75,6 +90,7 @@ validated twice.
 | `PathNamer` | `null` (C# member names) | Renames member segments in `ValidationError.Path`, for example `ZodPathNamer.FromFunc(JsonNamingPolicy.CamelCase.ConvertName)`. Blazor ignores `Path`, so this never affects field placement. |
 | `MessageFormatter` | `null` | Formats every `ErrorMessage`. When `null`, a `StringLocalizerZodMessageFormatter` is used whenever the validation's service provider resolves an `IStringLocalizerFactory`, and the ZodSharp message otherwise. See [Localization](Localization.md). |
 | `Sources` | empty | Trim-safe `IZodValidatableInfoSource`s consulted before `IZodSchemaFactory`. |
+| `ValidateParameters` | `null` (by registration) | Whether the resolver claims parameters, which turns on minimal-API endpoint validation for ZodSharp types; see [Endpoint validation](#endpoint-validation). `null`: claimed after `AddZodSharpValidation()`, not when only `AddZodSharpBlazor()` registered the bridge. |
 
 ```csharp
 using System.Text.Json;

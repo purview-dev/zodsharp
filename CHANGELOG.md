@@ -43,12 +43,16 @@ Released versions correspond to `v<version>` GitHub releases.
   platform. Full-fidelity errors are available through `ValidateContext.ZodReport` and an optional
   `IZodValidationReportSink`; `StringLocalizerZodMessageFormatter` localizes messages (auto-enabled when an
   `IStringLocalizerFactory` is registered, honouring `ValidationOptions.LocalizerProvider`); and
-  `ValidationOptions.ValidateAsync<T>` validates outside HTTP and Blazor. References the
+  `ValidationOptions.ValidateAsync<T>` validates outside HTTP and Blazor. The platform's endpoint filter validates every
+  parameter a resolver claims, so `AddZodSharpValidation()` turns on minimal-API validation for ZodSharp-typed
+  parameters; `AddZodSharpValidation(configure, validateParameters: false)` and `ZodValidationOptions.ValidateParameters`
+  register type validation only. References the
   `Microsoft.Extensions.Validation` package only - never the ASP.NET Core shared framework - so it works in
   WebAssembly clients.
 - **`Purview.ZodSharp.Blazor`** (new package, `net11.0`): Blazor forms validated by ZodSharp on Blazor Server,
   Blazor WebAssembly and Auto render mode. `AddZodSharpBlazor()` makes the standard `<DataAnnotationsValidator />`
-  validate `[ZodSchema]` models - nested objects, collections and dictionaries included - with no
+  validate `[ZodSchema]` models (form models only: it does not turn on minimal-API validation in the host; call
+  `AddZodSharpValidation()` as well for that) - nested objects, collections and dictionaries included - with no
   `[ValidatableType]` and no Microsoft.Extensions.Validation generator, which is what nested validation in
   WebAssembly needs. `<ZodValidator />` keeps the full error behind every message (`EditContext.GetZodErrors`),
   validates on `Submit`, `Change` or debounced `Input` through the platform's async validation APIs (pending,

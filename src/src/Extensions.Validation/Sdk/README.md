@@ -32,6 +32,11 @@ builder.Services.AddValidation();
 ZodSharp's resolver ends up first whether `AddValidation()` is called before `AddZodSharpValidation()`, after it,
 or not at all. Types without a ZodSharp validator fall through to the next resolver.
 
+**This turns on minimal-API validation** for every ZodSharp-typed handler parameter: the platform's endpoint filter
+validates every parameter a resolver claims, before the handler runs. Opt endpoints out with `DisableValidation()`, or
+register type validation only with `AddZodSharpValidation(configure, validateParameters: false)` (what
+`AddZodSharpBlazor()` does) or `ValidateParameters = false`.
+
 For trimmed and Native AOT apps (including Blazor WebAssembly), register the generated validators with the
 per-assembly extension the source generator emits instead of scanning: `builder.Services.AddZodSharpMyAppSchemas();`
 (`AddZodSharp{Assembly}Schemas()`, the assembly name in PascalCase). `[ValidatableType]` is not needed on a
@@ -96,6 +101,7 @@ kept. Set `ZodValidationOptions.MessageFormatter` to replace it.
 | `PathNamer` | `null` (C# names) | Renames members in `Path`, for example to camelCase |
 | `MessageFormatter` | `null` | Formats every message |
 | `Sources` | empty | Trim-safe validator sources consulted before `IZodSchemaFactory` |
+| `ValidateParameters` | `null` (by registration) | Whether minimal-API parameters are claimed (endpoint validation): on after `AddZodSharpValidation()`, off when only `AddZodSharpBlazor()` registered the bridge |
 
 Register every validator before the first validation: lookups are cached, including misses. Synchronous
 validation of a type with asynchronous rules throws, as `EditContext.Validate()` does; use the async APIs.
