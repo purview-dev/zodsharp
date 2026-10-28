@@ -996,7 +996,18 @@ partial class ZodSchemaGenerator
 	{
 		writer.Assignment("var", resultName, NestedValidateCall(property, valueName));
 		using (writer.IfBlockScope($"!{resultName}.IsSuccess"))
-			writer.MethodCall($"{GeneratedValidation}.AddNested", "ref errors", resultName, PathOf(property));
+		{
+			if (property.NestedIsScalarValueObject)
+				writer.MethodCall(
+					$"{GeneratedValidation}.AddNested",
+					"ref errors",
+					resultName,
+					PathOf(property),
+					MemberOf(property)
+				);
+			else
+				writer.MethodCall($"{GeneratedValidation}.AddNested", "ref errors", resultName, PathOf(property));
+		}
 	}
 
 	/// <summary>
@@ -1123,7 +1134,11 @@ partial class ZodSchemaGenerator
 		void WriteCall(CodeWriter body)
 		{
 			body.Assignment("var", resultName, NestedValidateAsyncCall(schemaType, valueName));
-			body.Assignment("errors", $"{GeneratedValidation}.WithNested(errors, {resultName}, {PathOf(property)})");
+			var owner = property.NestedIsScalarValueObject ? $", {MemberOf(property)}" : string.Empty;
+			body.Assignment(
+				"errors",
+				$"{GeneratedValidation}.WithNested(errors, {resultName}, {PathOf(property)}{owner})"
+			);
 		}
 
 		if (property.IsNullableValueType)

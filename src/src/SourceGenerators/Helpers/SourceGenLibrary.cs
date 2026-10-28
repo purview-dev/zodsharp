@@ -734,6 +734,11 @@ static partial class SourceGenLibrary
 					validationAttributes
 				),
 				NestedSchemaIsModern = nestedIsModern,
+				NestedIsScalarValueObject = IsNestedScalarValueObject(
+					validationKind,
+					nestedSchemaType,
+					originalPropertyType
+				),
 				ExternalNestedSchemaRequiresAsync = nestedRequiresAsync,
 				AsyncValidationAttributes = ValidationInputsResolver.GetAsyncValidationAttributes(validationAttributes),
 				DispatchKind = dispatchKind,
@@ -1209,6 +1214,20 @@ static partial class SourceGenLibrary
 		var elementType = GetCollectionItemTypeSymbol(type);
 		return elementType is not null && TypeHelpers.CanBeNull(elementType);
 	}
+
+	/// <summary>
+	/// Whether a complex member's nested schema is a Purview.ValueObjects scalar: the scalar's own member (<c>Value</c>)
+	/// is an implementation detail, so its errors are named after the member that holds it.
+	/// </summary>
+	static bool IsNestedScalarValueObject(
+		PropertyValidationKind validationKind,
+		TypeIdentity? nestedSchemaType,
+		ITypeSymbol propertyType
+	) =>
+		validationKind == PropertyValidationKind.Complex
+		&& nestedSchemaType is not null
+		&& propertyType is INamedTypeSymbol namedType
+		&& CustomRuleResolver.TryGetScalarAttribute(namedType, out _);
 
 	static TypeIdentity? GetNestedSchemaTypeIdentity(
 		IPropertySymbol property,

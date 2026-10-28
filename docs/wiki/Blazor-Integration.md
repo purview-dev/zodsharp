@@ -129,6 +129,40 @@ IZodUntypedValidator validator = ZodModelSchema.For<Order>(schema);
 shape the object schema validates and places the errors on the CLR fields. Collections are passed as they are.
 `ZodModelSchema.For<TModel>(IZodSchema<TModel, TModel>)` adapts a schema of the model's own type.
 
+### Value objects and other struct members
+
+A struct cannot be a `FieldIdentifier` model (Blazor rejects a value-type model, and a boxed copy is not the instance
+the form binds), so an error located inside a struct member is placed on the nearest reference-type owner and its
+member. Given a scalar value object on the form model:
+
+```csharp
+[Scalar]
+[ZodSchema]
+public readonly partial record struct EmailAddress
+{
+    [Required]
+    [EmailAddress]
+    public string Value { get; }
+}
+
+[ZodSchema]
+public sealed class Registration
+{
+    public EmailAddress Email { get; set; }
+}
+```
+
+the error at `Email.Value` is shown by `<ValidationMessage For="() => model.Email" />` (or `ZodValidationMessage`),
+next to the value object's input. Both routes, both hosts (Server and WebAssembly) and `AddZodProblemDetails` place
+it the same way; `GetZodErrors(() => model.Email)` returns it, with its full path `Email.Value` unchanged. A struct
+inside a collection (`Stops[1].Latitude`) is placed on the collection member (`Stops`).
+
+A scalar value object's own member is an implementation detail, so its messages use the **owning member's display
+name**: `"Email is required"`, `"Field 'Contact email' must be a valid email address."` with
+`[Display(Name = "Contact email")]`, rather than `"Value is required"`. The `displayName` parameter carries the
+owner's name too; `member` and `declaringType` still identify the value object's member, for localization. A rule's
+own message text (one not produced from its template) is kept. A struct that is not a scalar keeps its members'
+names (`"Field 'Latitude' must be greater than or equal to -90 and less than or equal to 90."`), since it may have several.
 ## Message components
 
 `<ZodValidationMessage For="..." />` and `<ZodValidationSummary />` render the same markup and CSS classes as

@@ -136,6 +136,11 @@ returns `false`; a model-level error resolves to the root with an empty member n
 Microsoft.Extensions.Validation bridge uses this to give every error the `Container` and `Name` Blazor needs to
 place the message on the right field.
 
+The container is never a struct. A struct cannot own a field (Blazor's `FieldIdentifier` rejects a value-type
+model, and a boxed copy is not the instance a form binds), so an error inside a struct member resolves to the
+nearest reference-type owner and its member: `Email.Value`, where `Email` is a value object on `SignUp`,
+resolves to (`signUp`, `"Email"`), and `Stops[1].Latitude` over a `List<Coordinates>` to (`signUp`, `"Stops"`).
+
 ### Depth guard
 
 Generated validators count the nesting depth as they walk a graph and throw `InvalidOperationException`

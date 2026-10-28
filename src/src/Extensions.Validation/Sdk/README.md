@@ -43,7 +43,7 @@ per-assembly extension the source generator emits instead of scanning: `builder.
 | --- | --- |
 | `Path` | The ZodSharp path, prefixed with `ValidateContext.CurrentValidationPath`: `Customer.Address.Street`, `Lines[0].Sku`, `ByCode[abc].Sku` |
 | `Name` | The failing member's name (`Street`); empty for a model-level error |
-| `Container` | The object that owns the member (`order.Customer.Address`), which is what Blazor uses to place the message on the right field |
+| `Container` | The object that owns the member (`order.Customer.Address`), which is what Blazor uses to place the message on the right field. Never a struct: an error inside a struct member (`Email.Value`) belongs to the nearest reference-type owner and its member (`Email`) |
 | `ErrorMessage` | The ZodSharp message, localized when an `IStringLocalizerFactory` is registered (see below) |
 
 Runtime `Z.Object()` schemas over dictionaries have no owning object, so their errors carry `Container = null`

@@ -291,8 +291,11 @@ partial class ZodSchemaGenerator
 					var caseName = CodeGenHelpers.GetLocalIdentifier(property.Name, $"Case{i}");
 					writer.Line($"case {dispatchCase.CaseType.AsTypeReference()} {caseName}:");
 					writer.Return(
-						dispatchCase.SchemaType.StaticMember(
-							$"TryResolveMember({caseName}, path, offset + 1, out container, out memberName)"
+						ReferenceOwned(
+							dispatchCase.SchemaType.StaticMember(
+								$"TryResolveMember({caseName}, path, offset + 1, out container, out memberName)"
+							),
+							property
 						)
 					);
 				}
@@ -333,10 +336,13 @@ partial class ZodSchemaGenerator
 				writer.IfBlock($"{elementName} is null", body => body.Return("false"));
 			}
 
+			var elementCall = elementSchema.StaticMember(
+				$"TryResolveMember({elementExpression}, path, offset + 2, out container, out memberName)"
+			);
 			writer.Return(
-				elementSchema.StaticMember(
-					$"TryResolveMember({elementExpression}, path, offset + 2, out container, out memberName)"
-				)
+				property.ElementTypeIsNullableValueType || !property.ElementTypeCanBeNull
+					? ReferenceOwned(elementCall, property)
+					: elementCall
 			);
 			return;
 		}
@@ -358,8 +364,16 @@ partial class ZodSchemaGenerator
 				writer.IfBlock($"{valueName} is null", body => body.Return("false"));
 		}
 
-		writer.Return(
-			schemaType.StaticMember($"TryResolveMember({valueName}, path, offset + 1, out container, out memberName)")
+		var call = schemaType.StaticMember(
+			$"TryResolveMember({valueName}, path, offset + 1, out container, out memberName)"
 		);
+		writer.Return(property.IsNullableValueType || !property.CanBeNull ? ReferenceOwned(call, property) : call);
 	}
+
+	/// <summary>
+	/// Wraps a nested resolution step whose value can be a struct, so its result is attributed to this object and
+	/// member rather than to a boxed copy of the struct, which cannot own a field.
+	/// </summary>
+	static string ReferenceOwned(string nestedCall, ZodPropertyDescriptor property) =>
+		$"{GeneratedValidation}.ResolveToReferenceOwner({nestedCall}, value, {property.Name.StringLiteral()}, ref container, ref memberName)";
 }

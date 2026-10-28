@@ -278,6 +278,12 @@ readonly record struct ZodPropertyDescriptor(
 	/// </summary>
 	public bool NestedSchemaIsModern { get; init; } = true;
 
+	/// <summary>
+	/// Whether the nested complex type is a Purview.ValueObjects scalar, so its errors are named after this member (its
+	/// display name replaces the scalar's own <c>Value</c>).
+	/// </summary>
+	public bool NestedIsScalarValueObject { get; init; }
+
 	/// <summary>Whether an external nested schema reports <c>RequiresAsyncValidation</c>.</summary>
 	public bool ExternalNestedSchemaRequiresAsync { get; init; }
 

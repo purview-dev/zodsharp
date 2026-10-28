@@ -286,6 +286,123 @@ public static class ZodGeneratedValidation
 	}
 
 	/// <summary>
+	/// Adds the errors of a nested scalar value object's result under <paramref name="prefix"/>, naming them after
+	/// <paramref name="owner"/>: the <c>displayName</c> parameter becomes the owner's display name, and a message
+	/// produced from the error's <see cref="ValidationError.MessageFormat"/> is re-formatted with it. A scalar's own
+	/// member (<c>Value</c>) is an implementation detail, so <c>"Field 'Value' is required"</c> reads
+	/// <c>"Field 'Email' is required"</c>. A message the template does not reproduce (a rule's own text, an attribute
+	/// message without a placeholder) is kept as it is.
+	/// </summary>
+	/// <typeparam name="T">The nested type.</typeparam>
+	/// <param name="errors">The error list.</param>
+	/// <param name="nested">The nested result.</param>
+	/// <param name="prefix">The path the nested errors are placed under.</param>
+	/// <param name="owner">The member that holds the scalar.</param>
+	public static void AddNested<T>(
+		ref List<ValidationError>? errors,
+		in ValidationResult<T> nested,
+		ZodPath prefix,
+		ZodGeneratedMember owner
+	)
+	{
+		ArgumentNullException.ThrowIfNull(owner);
+
+		if (nested.IsSuccess || nested.Errors.IsDefaultOrEmpty)
+			return;
+
+		errors ??= [];
+		var displayName = owner.DisplayName;
+		foreach (var error in nested.Errors)
+			errors.Add(NameAfterOwner(error, displayName).WithPathPrefix(prefix));
+	}
+
+	/// <summary>
+	/// Adds the errors of a nested scalar value object's result under <paramref name="prefix"/>, naming them after
+	/// <paramref name="owner"/>, and returns the list; see
+	/// <see cref="AddNested{T}(ref List{ValidationError}?, in ValidationResult{T}, ZodPath, ZodGeneratedMember)"/>.
+	/// </summary>
+	/// <typeparam name="T">The nested type.</typeparam>
+	/// <param name="errors">The error list.</param>
+	/// <param name="nested">The nested result.</param>
+	/// <param name="prefix">The path the nested errors are placed under.</param>
+	/// <param name="owner">The member that holds the scalar.</param>
+	/// <returns>The error list.</returns>
+	public static List<ValidationError>? WithNested<T>(
+		List<ValidationError>? errors,
+		ValidationResult<T> nested,
+		ZodPath prefix,
+		ZodGeneratedMember owner
+	)
+	{
+		AddNested(ref errors, nested, prefix, owner);
+		return errors;
+	}
+
+	/// <summary>
+	/// Completes a nested <c>TryResolveMember</c> step so the resolved container is never a value type. A struct
+	/// member's errors resolve to the struct, and a boxed copy of it cannot own a field (Blazor's
+	/// <c>FieldIdentifier</c> rejects a value-type model), so they are attributed to the nearest reference-type
+	/// owner: <paramref name="owner"/> and its member <paramref name="ownerMember"/>.
+	/// </summary>
+	/// <param name="resolved">What the nested step returned.</param>
+	/// <param name="owner">The object that holds the nested value.</param>
+	/// <param name="ownerMember">The member of <paramref name="owner"/> that holds the nested value.</param>
+	/// <param name="container">The container the nested step resolved.</param>
+	/// <param name="memberName">The member name the nested step resolved.</param>
+	/// <returns><paramref name="resolved"/>.</returns>
+	public static bool ResolveToReferenceOwner(
+		bool resolved,
+		object owner,
+		string ownerMember,
+		ref object? container,
+		ref string memberName
+	)
+	{
+		if (container is not null && container.GetType().IsValueType)
+		{
+			container = owner;
+			memberName = ownerMember;
+		}
+
+		return resolved;
+	}
+
+	static ValidationError NameAfterOwner(in ValidationError error, string displayName)
+	{
+		var parameters = error.Parameters;
+		if (
+			parameters is null
+			|| !parameters.TryGetValue(ZodIssueParameters.DisplayName, out var current)
+			|| current is not string currentName
+			|| string.Equals(currentName, displayName, StringComparison.Ordinal)
+		)
+			return error;
+
+		Dictionary<string, object?> renamed = new(parameters.Count, StringComparer.Ordinal);
+		foreach (var pair in parameters)
+			renamed[pair.Key] = pair.Value;
+		renamed[ZodIssueParameters.DisplayName] = displayName;
+
+		var result = error.WithParameters(renamed);
+		if (
+			error.MessageFormat is { Length: > 0 } format
+			&& string.Equals(
+				ZodMessageFormat.Format(format, in error, System.Globalization.CultureInfo.InvariantCulture),
+				error.Message,
+				StringComparison.Ordinal
+			)
+		)
+		{
+			result = result with
+			{
+				Message = ZodMessageFormat.Format(format, in result, System.Globalization.CultureInfo.InvariantCulture),
+			};
+		}
+
+		return result;
+	}
+
+	/// <summary>
 	/// Adds the errors of a nested result under <paramref name="prefix"/>, returning the list. Used from async
 	/// methods, which cannot take <see langword="ref"/> parameters.
 	/// </summary>

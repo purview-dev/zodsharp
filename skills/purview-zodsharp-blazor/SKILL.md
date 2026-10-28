@@ -57,6 +57,13 @@ which is the only way to get nested validation in WebAssembly, where that genera
 on the right `FieldIdentifier` (`order.Lines[1].Quantity`). A field change runs only that member's rules. Async
 rules drive `IsValidationPending`/`IsValidationFaulted` and the `pending`/`faulted` CSS classes.
 
+**Struct members (value objects).** An error inside a struct member - `Email.Value`, where `Email` is a value
+object on the model - is placed on the nearest reference-type owner's member, `FieldIdentifier(model, "Email")`,
+on both routes and on server errors: a struct cannot be a `FieldIdentifier` model. So bind
+`<ValidationMessage For="() => model.Email" />` next to the value object's input, not `model.Email.Value`. A
+scalar value object's messages use the owning member's display name (`"Email is required"`, not
+`"Value is required"`); a non-scalar struct keeps its own member names in the text.
+
 ## Route 2 - ZodValidator
 
 ```razor

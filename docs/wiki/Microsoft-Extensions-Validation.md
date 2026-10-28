@@ -96,7 +96,7 @@ Each ZodSharp error becomes one `Microsoft.Extensions.Validation.ValidationError
 |---|---|
 | `Path` | The canonical ZodSharp path prefixed with `ValidateContext.CurrentValidationPath`: `Customer.Address.Street`, `Lines[0].Sku`, `ByCode[abc].Sku`. See [Core Concepts](Core-Concepts.md#paths). |
 | `Name` | The failing member's name (`Street`); empty for a model-level error. |
-| `Container` | The object that owns the member (`order.Customer.Address`). Blazor uses it to place the message on the right field. |
+| `Container` | The object that owns the member (`order.Customer.Address`). Blazor uses it to place the message on the right field. Never a struct: an error inside a struct member (`Email.Value`) is attributed to the nearest reference-type owner and its member (`signUp`, `Email`), because a value type cannot be a `FieldIdentifier` model. |
 | `ErrorMessage` | The ZodSharp message, formatted by `MessageFormatter` or localized (see [Localization](Localization.md)). |
 
 `Container` and `Name` come from the generated `TryResolveMember`, so no reflection is needed. Validators that are

@@ -371,6 +371,21 @@ Released versions correspond to `v<version>` GitHub releases.
   `(IZodRule)rule`, or `null` when the rule has no identity; no emitted code type-tests a value type against an
   interface. The packed-consumer gate's Blazor WebAssembly consumer now carries such a scalar, so its AOT publish
   proves it.
+- **Blazor places an error inside a struct member on the owning field.** An error inside a value object on a form
+  model (`Email.Value`, where `Email` is a struct) resolved to the struct itself. A boxed copy of a struct cannot be a
+  `FieldIdentifier` model (the constructor throws), so with `<DataAnnotationsValidator />` (any host) and with
+  `<ZodValidator>` on Blazor Server the form was invalid but the message was dropped, and with `<ZodValidator>` on
+  WebAssembly it reached only the summary. The generated `TryResolveMember`, the Microsoft.Extensions.Validation
+  bridge's `Container`/`Name`, and the Blazor field locator (used by `<ZodValidator>` and `AddZodProblemDetails`)
+  now attribute such an error to the nearest reference-type owner and its member, `FieldIdentifier(model, "Email")`;
+  a struct element of a collection is attributed to the collection member. The error's path is unchanged.
+  `ZodGeneratedValidation.ResolveToReferenceOwner` is the new generated-code helper.
+- **A scalar value object's messages name the owning member.** A nested Purview.ValueObjects scalar's errors read
+  "Field 'Value' ..." (its own member); they now use the owning member's display name ("Email is required", or the
+  member's `[Display(Name)]`), through the new `ZodGeneratedValidation.AddNested`/`WithNested` overloads that take the
+  owning member. The `displayName` parameter is renamed too, and a message produced from the error's template is
+  re-formatted; `member` and `declaringType` still name the value object's member, and a rule's own message text is
+  kept. A struct that is not a scalar keeps its members' names.
 - **A multi-project solution's OpenAPI document no longer crashes with "An item with the same key has already been
   added. Key: T:ZodSharp.Core.ErrorTypeAttribute".** The generators emitted `ZodSharp.ZodSchemaAttribute` and
   `ZodSharp.Core.ErrorTypeAttribute` - public, with XML documentation - into every compilation as

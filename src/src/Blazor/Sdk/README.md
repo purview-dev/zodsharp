@@ -86,5 +86,8 @@ Limitations:
 - Don't validate in `OnInitialized` of prerendered components; it would run once per render phase.
 - WebAssembly: prefer the generated `AddZodSharp{Assembly}Schemas()` registration; assembly scanning is not
   trim-safe.
+- Value objects and other struct members: an error inside one (`Email.Value`) is shown on the owning member's
+  field (`For="() => model.Email"`), because a struct cannot be a `FieldIdentifier` model; a scalar value object's
+  messages use the owning member's display name.
 
 Documentation: <https://purview.dev/docs/zodsharp/>
