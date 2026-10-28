@@ -291,6 +291,11 @@ if (!assetIdCustomRule0.IsValid(value))
 
 The reported error keeps the **empty path**, and the error identity (`Code`/`Origin`) is read from the **wrapped** rule, not the adapter.
 
+Whether the wrapped rule has an identity is decided when the schema is generated: a rule that implements `IZodRule` is
+passed with a direct cast, and one that does not is passed as `null`. Generated code never tests a boxed rule at runtime
+(`(object)rule as IZodRule`), which crashed the Mono AOT compiler, so a scalar with a type-level rule publishes for
+Blazor WebAssembly with `RunAOTCompilation=true`.
+
 > [!NOTE]
 > If the type has no value-object contract (a plain class with a `Guid` property), the property-level form still works: map the attribute to an `IValidationRule<Guid>` and put it on `Value`. See [Exposing a rule as a DataAnnotations attribute](Custom-Rules.md#exposing-a-rule-as-a-dataannotations-attribute) and [Generic rules](Custom-Rules.md#generic-rules).
 

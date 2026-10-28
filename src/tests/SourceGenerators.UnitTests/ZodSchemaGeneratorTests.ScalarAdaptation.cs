@@ -200,7 +200,9 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(generated).ContainsGeneratedCode(".IsValid(value)");
 		await Assert
 			.That(generated)
-			.ContainsGeneratedCode("EmptyPath, (object)tenantIdCustomRuleInner0 as global::ZodSharp.Core.IZodRule)");
+			.ContainsGeneratedCode("EmptyPath, (global::ZodSharp.Core.IZodRule)tenantIdCustomRuleInner0)");
+		// A runtime type test on the boxed rule crashes the Mono AOT compiler; the cast is known to succeed.
+		await Assert.That(generated).DoesNotContain("(object)");
 		// The wrapped rule owns the identity, not the adapter.
 		await Assert
 			.That(generated)
@@ -399,5 +401,41 @@ partial class ZodSchemaGeneratorTests
 			.ContainsGeneratedCode(
 				"new global::Purview.ValueObjects.ScalarRuleAdapter<global::Testing.TenantId, global::System.Guid, global::Testing.NonSentinelRule<global::System.Guid>>("
 			);
+	}
+
+	[Test]
+	public async Task ScalarAdaptation_GivenWrappedRuleWithoutZodIdentity_PassesNoIdentityAndFailsAtRuntime(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - the wrapped rule does not implement IZodRule, so the generator knows statically that there is no
+		// identity to copy and passes null, rather than testing the boxed rule at runtime.
+		var source = ScalarAdaptationSource
+			.Replace(": IValidationRule<T>, IZodRule", ": IValidationRule<T>", StringComparison.Ordinal)
+			.Replace("string? IZodRule.Code => \"invalid_value\";", string.Empty, StringComparison.Ordinal)
+			.Replace("string? IZodRule.Origin => \"value_object\";", string.Empty, StringComparison.Ordinal);
+
+		// Act
+		using var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var generated = driverResult.GetSource("TenantIdSchema");
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var modelType = assembly.GetType("Testing.TenantId")!;
+		var validate = assembly.GetType("Testing.TenantIdSchema")!.GetMethod("Validate")!;
+		var emptyResult = validate.Invoke(null, [Activator.CreateInstance(modelType)!])!;
+
+		// Assert
+		await Assert.That(generated).ContainsGeneratedCode("EmptyPath, null)");
+		await Assert.That(generated).DoesNotContain("(object)");
+		await Assert.That(generated).DoesNotContain("IZodRule)tenantIdCustomRuleInner0");
+
+		var errors = (System.Collections.Immutable.ImmutableArray<Core.ValidationError>)
+			emptyResult.GetType().GetProperty("Errors")!.GetValue(emptyResult)!;
+		await Assert.That(errors).HasSingleItem();
+		await Assert.That(errors[0].Code).IsEqualTo("validation_failed");
+		await Assert.That(errors[0].Message).IsEqualTo("TenantId must not be the default.");
 	}
 }

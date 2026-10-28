@@ -363,6 +363,14 @@ Released versions correspond to `v<version>` GitHub releases.
   Every generated null test is now a pattern (`is null`, `is not null`), which never binds an operator; the
   remaining value comparisons already go through `EqualityComparer<T>.Default` or `CompareTo`. **2.x is affected
   too** (2.4.2 emitted the same comparison).
+- **Blazor WebAssembly AOT publishes a scalar value object with a type-level rule.** For an adapted rule (a
+  Purview.ValueObjects scalar with `[NonSentinel]` or another type-level `[ZodRule]`) and for a required rule the
+  generator passed the rule's identity as `(object)rule as IZodRule`, a runtime type test on a boxed struct that
+  crashed the Mono AOT compiler (`Precompiling failed ... exit code -1073741819`, 0xC0000005) under
+  `RunAOTCompilation=true`. The generator knows whether the rule implements `IZodRule`, so it now emits a direct cast
+  `(IZodRule)rule`, or `null` when the rule has no identity; no emitted code type-tests a value type against an
+  interface. The packed-consumer gate's Blazor WebAssembly consumer now carries such a scalar, so its AOT publish
+  proves it.
 - **A multi-project solution's OpenAPI document no longer crashes with "An item with the same key has already been
   added. Key: T:ZodSharp.Core.ErrorTypeAttribute".** The generators emitted `ZodSharp.ZodSchemaAttribute` and
   `ZodSharp.Core.ErrorTypeAttribute` - public, with XML documentation - into every compilation as

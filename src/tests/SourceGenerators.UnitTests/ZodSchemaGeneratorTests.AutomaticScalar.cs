@@ -392,7 +392,9 @@ partial class ZodSchemaGeneratorTests
 			);
 		await Assert
 			.That(generated)
-			.ContainsGeneratedCode("EmptyPath, (object)externalIdCustomRuleInner0 as global::ZodSharp.Core.IZodRule)");
+			.ContainsGeneratedCode("EmptyPath, (global::ZodSharp.Core.IZodRule)externalIdCustomRuleInner0)");
+		// A runtime type test on the boxed rule crashes the Mono AOT compiler; the cast is known to succeed.
+		await Assert.That(generated).DoesNotContain("(object)");
 	}
 
 	[Test]

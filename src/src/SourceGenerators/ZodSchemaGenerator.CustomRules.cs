@@ -381,10 +381,16 @@ partial class ZodSchemaGenerator
 		// copied by ZodRuleErrors, so a generated failure matches the runtime schema's failure for the same
 		// rule. An adapted rule has no identity of its own, so the wrapped rule supplies it.
 		var originArgument = originExpression == "null" ? string.Empty : $", fallbackOrigin: {originExpression}";
+
+		// The identity is passed with a direct cast when the rule implements IZodRule, and as null otherwise: the
+		// rule is constructed with its exact type, so the answer is known here. A runtime type test on a boxed
+		// value-type rule ((object)rule as IZodRule) crashes the Mono AOT compiler (Blazor WebAssembly with
+		// RunAOTCompilation=true), so the generator never emits one.
+		var identityArgument = rule.RuleOwnsIdentity ? $"({zodRuleInterface}){identityVariable}" : "null";
 		var ruleError =
 			identityVariable == ruleVariable && valueVariable != "default!"
 				? $"global::ZodSharp.Core.ZodRuleErrors.Create({ruleVariable}, {valueVariable}, {pathExpression}{originArgument}, code: {codeExpression})"
-				: $"global::ZodSharp.Core.ZodRuleErrors.Build({codeExpression}, {ruleVariable}.GetErrorMessage({valueVariable}), {pathExpression}, (object){identityVariable} as {zodRuleInterface}{originArgument})";
+				: $"global::ZodSharp.Core.ZodRuleErrors.Build({codeExpression}, {ruleVariable}.GetErrorMessage({valueVariable}), {pathExpression}, {identityArgument}{originArgument})";
 
 		var errorExpression =
 			!string.IsNullOrEmpty(rule.Message.ErrorMessage)

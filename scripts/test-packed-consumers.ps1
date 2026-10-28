@@ -27,8 +27,9 @@
 	       and AspNetCore.OpenApi. Published with -warnaserror, then run: it checks generated validation, member
 	       resolution, count attributes, JSON Schema export, the validation bridge and ProblemDetails, and exits
 	       non-zero on any mismatch.
-	   (b) BlazorWasm - a Blazor WebAssembly app with <ZodValidator>. Published trimmed with -warnaserror, and with
-	       RunAOTCompilation=true when the wasm-tools workload is installed. _framework must hold the ZodSharp
+	   (b) BlazorWasm - a Blazor WebAssembly app with <ZodValidator>, whose model includes a scalar value object with a
+	       type-level [ZodRule] (the shape that once crashed the Mono AOT compiler). Published trimmed with -warnaserror,
+	       and with RunAOTCompilation=true when the wasm-tools workload is installed. _framework must hold the ZodSharp
 	       assemblies and _content the Blazor package's static web assets.
 	   (c) MinimalApi - a Native AOT minimal API. Published with -warnaserror and started; an invalid POST must return
 	       400 application/problem+json with issues, and /openapi/v1.json must describe ZodValidationProblemDetails.

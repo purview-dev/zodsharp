@@ -234,6 +234,11 @@ with an empty path, and the wrapped rule owns the reported `Code`. Closing such 
 scalar type instead (`NonSentinelRule<UserId>`) compiles but **always passes**, because the check only
 knows the primitive.
 
+Such a scalar works under every publish mode, including Blazor WebAssembly with `RunAOTCompilation=true`:
+the generated code passes the wrapped rule's identity with a direct `(IZodRule)` cast (or `null` when the
+rule has none), never a runtime type test on the boxed rule. 3.0.0-prerelease.1 builds before that fix
+crashed the Mono AOT compiler (exit code -1073741819); drop no rules to work around it, upgrade instead.
+
 ## Diagnostics you will meet
 
 `ZODSGEN030` (mapped rule does not implement `IValidationRule<T>` for the property type),
