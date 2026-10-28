@@ -57,6 +57,13 @@ var validated = UserSchema.Parse(user);   // throws ZodException on failure
 `BuildJsonSchema` is built from the same metadata as `Validate`, so a generated schema exports through
 `Z.ToJsonSchema` without rebuilding its rules by hand.
 
+No marker type is emitted: `[ZodSchema]` and `[ErrorType]` are ordinary types in `Purview.ZodSharp` (3.x). ZodSharp
+2 generated `[Embedded]` copies of both into every compilation, so a **library** packed against 2.x and rebuilt
+against 3.x fails package validation with `CP0001` for `T:ZodSharp.ZodSchemaAttribute` and
+`T:ZodSharp.Core.ErrorTypeAttribute`. The removal is safe (no compiler binds to an `[Embedded]` type in a reference):
+run `dotnet pack -p:ApiCompatGenerateSuppressionFile=true` and check in the `CompatibilitySuppressions.xml` it writes,
+until the baseline is a 3.x build. The changelog's upgrade notes give the entries by hand.
+
 ```csharp
 var adult  = UserSchema.ApplyRefine(user, u => u.Age >= 18, "Must be adult");
 var both   = UserSchema.ApplyAnd(user, u => u.Name.Length > 5, "Name too short");

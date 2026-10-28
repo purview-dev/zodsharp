@@ -560,12 +560,42 @@ Each note names the old form, the new form, and the edit to make.
   options like the exception handler does. Outside a request, pass options: `(statusCode)` is
   `new ZodProblemDetailsOptions { Registry = new(), FormatMessages = false, DefaultStatusCode = statusCode }`,
   `(registry, statusCode)` is `{ Registry = registry, DefaultStatusCode = statusCode }` and `(lookup, statusCode)` is
-  `{ ErrorTypeResolver = lookup, DefaultStatusCode = statusCode }`.- **`[ZodSchema]` and `[ErrorType]` come from `Purview.ZodSharp`.** They were generated into each project as
+  `{ ErrorTypeResolver = lookup, DefaultStatusCode = statusCode }`.
+- **`[ZodSchema]` and `[ErrorType]` come from `Purview.ZodSharp`.** They were generated into each project as
   `[Embedded]` types, which the compiler hides from other assemblies; they are now ordinary public types in the
   package (same names, namespaces and members), so no source edit is needed. A project that declared its own
   `partial class ZodSchemaAttribute` or `ErrorTypeAttribute` to extend the generated one now gets CS0436 → remove
   the declaration. A library compiled with 2.x still carries hidden `[Embedded]` copies, which do not conflict.
+- **Package validation reports CP0001 for a library that upgrades.** A library packed against ZodSharp 2 contains the generated
+  `[Embedded]` copies of `ZodSharp.ZodSchemaAttribute` and `ZodSharp.Core.ErrorTypeAttribute` (the 2.x generators
+  emitted both into every compilation that referenced the package, whether or not it used them). Rebuilt against
+  ZodSharp 3 it no longer does, because the generators stopped emitting them, so `EnablePackageValidation` with a `PackageValidationBaselineVersion` from the 2.x era fails with
+  `CP0001: Type 'ZodSharp.ZodSchemaAttribute' exists on lib/net10.0/My.Library.dll but not on
+  lib/net10.0/My.Library.dll` (and the same for `ErrorTypeAttribute`, per target framework). The removal cannot break
+  a consumer: the compiler never binds to an `[Embedded]` type in a referenced assembly, so no compiled code could
+  reference the copies (consumers bind to the package's own types instead). Suppress it as a baseline difference →
+  regenerate the suppression file with `dotnet pack -p:ApiCompatGenerateSuppressionFile=true` (it writes
+  `CompatibilitySuppressions.xml` beside the project; check it in), or add one entry per type and target framework:
 
+  ```xml
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:ZodSharp.ZodSchemaAttribute</Target>
+    <Left>lib/net10.0/My.Library.dll</Left>
+    <Right>lib/net10.0/My.Library.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:ZodSharp.Core.ErrorTypeAttribute</Target>
+    <Left>lib/net10.0/My.Library.dll</Left>
+    <Right>lib/net10.0/My.Library.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  ```
+
+  Repeat both for every target framework the package ships (`lib/net11.0/...`). The suppressions can be removed
+  once the baseline is a version built against ZodSharp 3.
 ## 2.4.1
 
 ### Fixed
