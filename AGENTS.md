@@ -178,6 +178,8 @@ source, so a clone has them without running anything.
 | `purview-sourcegenerator-tunit-tests` | `purview-dev/sourcegenerator-framework` | the TUnit test base classes and assertion extensions |
 | `purview-architecture`, `purview-architecture-testing`, `purview-engineering-principles`, `purview-testing-conventions`, `purview-persistence`, `purview-telemetry` | `purview-dev/engineering-playbook` | solution shape, architecture tests, the Purview engineering and testing conventions |
 
+This repository's own skills in `skills/` are authored for **consumers** of its packages, not for use while working on this repository. They are never installed into this repository's `.agents/skills/`, which holds only skills installed from other repositories; `InstalledSkillTests` enforces this.
+
 Skills are installed into the universal `.agents/skills/` location **only**. Never install copies
 into `.claude/` or any other per-agent folder, and never commit a `CLAUDE.md`: this repository is not
 agent-specific, and `AGENTS.md` is its one instruction file. `/.claude/` is gitignored for that
