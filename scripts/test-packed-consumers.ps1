@@ -32,6 +32,11 @@
 	       assemblies and _content the Blazor package's static web assets.
 	   (c) MinimalApi - a Native AOT minimal API. Published with -warnaserror and started; an invalid POST must return
 	       400 application/problem+json with issues, and /openapi/v1.json must describe ZodValidationProblemDetails.
+	   (d) MultiProject - a class library of [ZodSchema] models and an [ErrorType] (Contracts), referenced by a minimal
+	       API (Api) that references Microsoft.AspNetCore.OpenApi directly with XML documentation on in both projects.
+	       Published and started: /openapi/v1.json must be served (it crashed when every project carried its own
+	       generated copy of the ZodSharp marker attributes), describe both projects' schemas and carry their XML
+	       comments; an invalid body must return the library's issue paths and a taken email the library's ErrorType.
 	4. Scans every consumer bin and publish folder with scripts/assert-no-compiler-host-assemblies.ps1.
 
 	The temporary workspace is deleted afterwards unless -KeepArtifacts is passed. Packing restores the shipping
@@ -219,16 +224,28 @@ $mappingXml
 "@ | Set-Content $path -Encoding utf8
 }
 
-function Start-Api([string] $directory, [int] $port) {
+function Start-Api([string] $directory, [int] $port, [string] $executable = "PackedApi$exe", [string] $logName = 'minimal-api') {
 	$env:ASPNETCORE_URLS = "http://127.0.0.1:$port"
 	try {
-		return Start-Process -FilePath (Join-Path $directory "PackedApi$exe") -WorkingDirectory $directory -PassThru `
-			-RedirectStandardOutput (Join-Path $logs 'minimal-api.stdout.log') `
-			-RedirectStandardError (Join-Path $logs 'minimal-api.stderr.log')
+		return Start-Process -FilePath (Join-Path $directory $executable) -WorkingDirectory $directory -PassThru `
+			-RedirectStandardOutput (Join-Path $logs "$logName.stdout.log") `
+			-RedirectStandardError (Join-Path $logs "$logName.stderr.log")
 	}
 	finally {
 		Remove-Item Env:\ASPNETCORE_URLS -ErrorAction SilentlyContinue
 	}
+}
+
+# Polls until the OpenAPI document answers, returning the first response - a 500 included, so the caller can report
+# why the document failed rather than only that it timed out.
+function Wait-OpenApi($process, [string] $base) {
+	$deadline = [DateTime]::UtcNow.AddSeconds(30)
+	while ([DateTime]::UtcNow -lt $deadline) {
+		if ($process.HasExited) { throw "The API exited with $($process.ExitCode) before it was ready." }
+		try { return Invoke-WebRequest "$base/openapi/v1.json" -TimeoutSec 5 -SkipHttpErrorCheck }
+		catch { Start-Sleep -Milliseconds 500 }
+	}
+	throw "The API did not serve $base/openapi/v1.json within 30 seconds."
 }
 
 # PowerShell returns a body it does not recognise as text - application/problem+json among them - as bytes.
@@ -533,6 +550,106 @@ try {
 		}
 
 		Assert-NoLeaks @((Join-Path $consumers 'MinimalApi/bin'), $publish)
+	}
+
+	Invoke-Step '(d) Multi-project API with OpenAPI XML comments: publish, start and call' {
+		$project = Join-Path $consumers 'MultiProject/Api/Api.csproj'
+		$publish = Join-Path $output 'multi-project-api'
+
+		Invoke-Dotnet 'multi-project-api-publish' (@(
+				'publish', $project, '--configuration', 'Release', '--output', $publish, '-warnaserror'
+			) + $consumerProperties)
+
+		# The library's XML documentation file must have reached the OpenAPI XML-comment generator, or the document
+		# could not have collided in the first place - and this step would prove nothing.
+		$commentCache = Get-ChildItem (Join-Path $consumers 'MultiProject/Api/obj') -Recurse -File `
+			-Filter 'OpenApiXmlCommentSupport.generated.cs' | Select-Object -First 1
+		if (-not $commentCache) { throw 'The OpenAPI XML-comment generator produced no comment cache for the API.' }
+		$cacheSource = Get-Content $commentCache.FullName -Raw
+		if (-not $cacheSource.Contains('"T:PackedContracts.RegisterCustomer"')) {
+			throw "The OpenAPI comment cache holds no entry for the library's types: its XML file was not read."
+		}
+		$keys = [regex]::Matches($cacheSource, 'cache\.Add\(@"([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
+		$duplicates = @($keys | Group-Object | Where-Object Count -gt 1 | ForEach-Object Name)
+		if ($duplicates.Count -gt 0) {
+			throw "The OpenAPI comment cache adds the same documentation ID twice: $($duplicates -join ', ')."
+		}
+		# Per-assembly generated types (ZodSharp.Generated.{Assembly}ZodSharpSchemas) are named for their assembly; a
+		# marker attribute is not, so a consumer that documents one repeats it in every project of the solution.
+		$markerKeys = @($keys | Where-Object { $_ -match '^[A-Z]:(ZodSharp\.ZodSchemaAttribute|ZodSharp\.Core\.ErrorTypeAttribute|Microsoft\.CodeAnalysis\.EmbeddedAttribute)\b' })
+		if ($markerKeys.Count -gt 0) {
+			throw "A consumer project documents a ZodSharp marker attribute, so every project repeats it: $($markerKeys -join ', ')."
+		}
+		Write-Host "  OpenAPI comment cache: $($keys.Count) entries, none duplicated, no ZodSharp marker attribute"
+
+		$port = Get-FreePort
+		$base = "http://127.0.0.1:$port"
+		$process = Start-Api $publish $port "PackedMultiApi$exe" 'multi-project-api'
+		try {
+			$openApi = Wait-OpenApi $process $base
+			$document = Get-Body $openApi
+			if ($openApi.StatusCode -ne 200) {
+				throw "/openapi/v1.json returned $($openApi.StatusCode), not 200: $($document.Substring(0, [Math]::Min(400, $document.Length)))"
+			}
+
+			$schemas = ($document | ConvertFrom-Json -AsHashtable).components.schemas
+			foreach ($name in 'RegisterCustomer', 'DeliveryAddress', 'CustomerRegistered', 'ZodValidationProblemDetails') {
+				if (-not $schemas.ContainsKey($name)) {
+					throw "The OpenAPI document has no '$name' schema (got: $(($schemas.Keys | Sort-Object) -join ', '))."
+				}
+			}
+
+			# ZodSharp's constraints from the library's [ZodSchema] model, and the XML comments from both projects.
+			$email = $schemas['RegisterCustomer'].properties['email']
+			$displayName = $schemas['RegisterCustomer'].properties['displayName']
+			$postalCode = $schemas['DeliveryAddress'].properties['postalCode']
+			if ($email.format -ne 'email') { throw "RegisterCustomer.email is not described as an email ($($email | ConvertTo-Json -Compress))." }
+			if ($displayName.minLength -ne 2 -or $displayName.maxLength -ne 40) {
+				throw "RegisterCustomer.displayName does not carry [StringLength(40, MinimumLength = 2)] ($($displayName | ConvertTo-Json -Compress))."
+			}
+			if ($postalCode.pattern -ne '^[0-9]{5}$') { throw "DeliveryAddress.postalCode does not carry its pattern ($($postalCode | ConvertTo-Json -Compress))." }
+			foreach ($description in @(
+					@{ Subject = 'RegisterCustomer'; Text = 'A request to register a customer.'; Value = $schemas['RegisterCustomer'].description }
+					@{ Subject = 'RegisterCustomer.email'; Text = "The customer's email address, used to sign in."; Value = $email.description }
+					@{ Subject = 'CustomerRegistered'; Text = 'The acknowledgement returned once a customer is registered.'; Value = $schemas['CustomerRegistered'].description }
+				)) {
+				if ($description.Value -ne $description.Text) {
+					throw "$($description.Subject) has description '$($description.Value)', not the XML comment '$($description.Text)'."
+				}
+			}
+			Write-Host '  OpenAPI document: both projects'' schemas, the ZodSharp constraints and the XML-comment descriptions'
+
+			$invalid = Invoke-WebRequest "$base/customers" -Method Post -ContentType 'application/json' -SkipHttpErrorCheck `
+				-Body '{"email":"not-an-email","displayName":"x","address":{"postalCode":"abc"}}'
+			$invalidBody = Get-Body $invalid
+			Write-Host "  invalid registration: $($invalid.StatusCode) $invalidBody"
+			if ($invalid.StatusCode -ne 400) { throw "An invalid registration returned $($invalid.StatusCode), not 400." }
+			$paths = @(($invalidBody | ConvertFrom-Json).issues | ForEach-Object { $_.path })
+			foreach ($expectedPath in 'Email', 'DisplayName', 'Address.PostalCode') {
+				if ($paths -notcontains $expectedPath) {
+					throw "The ProblemDetails issues do not include '$expectedPath' (got: $($paths -join ', '))."
+				}
+			}
+
+			$taken = Invoke-WebRequest "$base/customers" -Method Post -ContentType 'application/json' -SkipHttpErrorCheck `
+				-Body '{"email":"taken@example.com","displayName":"Taken","address":{"postalCode":"12345"}}'
+			$takenBody = Get-Body $taken
+			Write-Host "  taken email: $($taken.StatusCode) $takenBody"
+			if ($taken.StatusCode -ne 409 -or -not $takenBody.Contains('customer_exists')) {
+				throw "A taken email returned $($taken.StatusCode), not 409 with the library's customer_exists ErrorType."
+			}
+
+			$valid = Invoke-WebRequest "$base/customers" -Method Post -ContentType 'application/json' -SkipHttpErrorCheck `
+				-Body '{"email":"new@example.com","displayName":"New","address":{"postalCode":"12345"}}'
+			if ($valid.StatusCode -ne 200) { throw "A valid registration returned $($valid.StatusCode), not 200: $(Get-Body $valid)" }
+			Write-Host "  valid registration: $($valid.StatusCode) $(Get-Body $valid)"
+		}
+		finally {
+			if (-not $process.HasExited) { $process.Kill($true) }
+			$process.WaitForExit()
+		}
+
+		Assert-NoLeaks @((Join-Path $consumers 'MultiProject/Api/bin'), (Join-Path $consumers 'MultiProject/Contracts/bin'), $publish)
 	}
 }
 catch {

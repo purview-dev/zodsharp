@@ -64,7 +64,8 @@ smoke-packed-generator *args:
 
 # Pack every shipping package to an isolated feed and cache, then publish and run throwaway consumers that reference
 # the packages only: a Native AOT console, a Blazor WebAssembly app (trimmed, plus RunAOTCompilation when wasm-tools is
-# installed) and a Native AOT minimal API, each leak-scanned for compiler-host assemblies.
+# installed), a Native AOT minimal API and a multi-project API (a [ZodSchema] class library under an OpenAPI app with
+# XML documentation), each leak-scanned for compiler-host assemblies.
 #
 # Every other publish gate builds against ProjectReferences; this is the one that proves what ships. The CI
 # `packed-consumers` job runs it for linux-x64. Purview.SourceGeneratorFramework is restored from nuget.org, plus
