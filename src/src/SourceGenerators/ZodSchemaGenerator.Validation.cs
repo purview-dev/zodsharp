@@ -242,6 +242,25 @@ partial class ZodSchemaGenerator
 		writer.XmlSummary("Validates an instance of the target type.");
 		writer.XmlParam("value", "The value to validate.");
 		writer.XmlReturn("The validation result.");
+
+		// CA1849 reports every call to this method from async code, because ValidateAsync exists. Whether that matters
+		// is known here, so the remark says which call is right for this type (the analyzer is the consumer's to keep).
+		if (requiresAsync)
+		{
+			writer.XmlRemarks(
+				"Some rules in this graph only run asynchronously (RequiresAsyncValidation is true). Call ValidateAsync, which",
+				"runs them; a synchronous call cannot."
+			);
+		}
+		else
+		{
+			writer.XmlRemarks(
+				"Every rule in this graph is synchronous (RequiresAsyncValidation is false), so this call never blocks. In an",
+				"asynchronous method, analyzers such as CA1849 suggest ValidateAsync, which for this type completes synchronously",
+				"without allocating; either call is correct."
+			);
+		}
+
 		writer.Line($"public static {resultType} Validate({targetType} value) => ValidateCore(value, 0);");
 		writer.NewLine();
 

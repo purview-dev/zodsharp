@@ -161,6 +161,30 @@ partial class ZodSchemaGeneratorTests
 	}
 
 	[Test]
+	[Arguments("FlatMembers", "RegistrationSchema", "so this call never blocks", "a synchronous call cannot")]
+	[Arguments("ServiceAware", "AccountSchema", "a synchronous call cannot", "so this call never blocks")]
+	public async Task Validate_GivenRequiresAsyncValidation_DocumentsWhichCallIsRightInAsyncCode(
+		string sourceName,
+		string schemaName,
+		string expected,
+		string unexpected,
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - CA1849 reports Validate in async code whenever ValidateAsync exists; the generated remark says when
+		// that is noise (no asynchronous rule) and when it is not.
+		var source = sourceName == "FlatMembers" ? FlatMembersSource : ServiceAwareSource;
+
+		// Act
+		using var result = await GenerateAsync(source, cancellationToken);
+		var generated = result.GetSource(schemaName);
+
+		// Assert
+		await Assert.That(generated).Contains(expected);
+		await Assert.That(generated).DoesNotContain(unexpected);
+	}
+
+	[Test]
 	public async Task ValidateAsync_GivenCyclicGraph_ThrowsAtTheMaximumDepth(CancellationToken cancellationToken)
 	{
 		// Arrange

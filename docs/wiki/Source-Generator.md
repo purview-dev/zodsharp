@@ -259,6 +259,11 @@ var handleOnly = await AccountSchema.ValidateMemberAsync(account, nameof(Account
 `RequiresAsyncValidation` is `true` for `Account`, and for every type that nests it. A type whose graph has no
 asynchronous rule completes `ValidateAsync` synchronously, so awaiting it costs nothing.
 
+Because `ValidateAsync` exists, CA1849 (when enabled) reports a `Validate` call in async code. For a type whose
+`RequiresAsyncValidation` is `false` the generated `Validate` remarks say the call never blocks, so the warning is
+noise there: prefer awaiting `ValidateAsync` (free for such a type, and correct if async rules are added later) over
+suppressing it. For a type that requires async validation it is a real finding.
+
 > [!WARNING]
 > The async custom validation method is mutually exclusive with the `OnZodValidate` refinement hook. A
 > model must declare exactly one of the two — declaring both is an error (ZODSGEN029).

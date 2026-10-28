@@ -222,6 +222,12 @@ is `CustomValidationAsync` unless `CustomValidationMethodName` overrides it. A m
 the member), then the custom method, and merges the errors. It completes synchronously when nothing in
 the graph is asynchronous; `{Type}Schema.RequiresAsyncValidation` is that compile-time answer.
 Without `[ZodAsyncMember]`, the custom method runs only on full validation.
+
+CA1849, when enabled, reports every `Validate` call inside async code because `ValidateAsync` exists. When
+`RequiresAsyncValidation` is `false` (the generated `Validate` remarks say so) the sync call is fine; prefer
+awaiting `ValidateAsync` there anyway (it completes synchronously, and picks up async rules added later) rather than
+suppressing the analyzer. When it is `true`, the warning is real.
+
 ## Automatic enum validation
 
 Every non-`[Flags]` enum property is validated automatically: a value that is not a defined member is

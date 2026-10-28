@@ -561,7 +561,14 @@ Each note names the old form, the new form, and the edit to make.
   register a validator per name if you relied on the old scope.
 - **Endpoint filter.** `WithZodSharpValidation<T>()` threw on every request when no validator was registered → it
   fails when the endpoint is built. Register the validator (or factory) before mapping the endpoint.
-- **Option-less ProblemDetails overloads (CS0618).** `result.ToHttpValidationProblemDetails()` and the other overloads
+- **CA1849 on synchronous `Validate` calls.** Every generated schema and validator adapter now has `ValidateAsync`, so
+  CA1849 ("call async methods when in an async method"), when enabled, reports each `Schema.Validate(value)` or
+  `validator.Validate(value)` inside async code. For a type whose `{Type}Schema.RequiresAsyncValidation` is `false`
+  (the generated `Validate` remarks say which) the sync call is correct and never blocks. Either await
+  `ValidateAsync(value, services, cancellationToken)`, which completes synchronously without allocating for such a
+  type and also runs asynchronous rules if they are added later (the recommended edit), or suppress CA1849 at the call
+  site with a justification. ZodSharp does not suppress the analyzer for you, and nothing in generated code can tell
+  it a call is fine. For a type that requires async validation the warning is real: `Validate` cannot run those rules.- **Option-less ProblemDetails overloads (CS0618).** `result.ToHttpValidationProblemDetails()` and the other overloads
   that take only a status code, an `ErrorTypeRegistry` or a lookup (and `result.ToValidationProblem()`) still return
   their 2.x body, built from defaults rather than your `ZodProblemDetailsOptions` → in a request call
   `ToHttpValidationProblemDetails(httpContext)` / `ToValidationProblem(httpContext)`, which apply the registered
