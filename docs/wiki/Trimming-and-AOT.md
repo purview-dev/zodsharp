@@ -100,6 +100,48 @@ is not trim- or AOT-compatible. Every API that reaches it (`DeserializeAndValida
 `[RequiresDynamicCode]`. Use `Purview.ZodSharp.SystemTextJson` with a source-generated context in a trimmed or AOT
 application.
 
+## The rooted publish and IL3054 (generic recursion)
+
+The rooted publish of `src/tests/TrimSafety.Verification` tolerates exactly one warning, IL3054, and the consumer
+publish tolerates none. IL3054 is ILC reporting that it stopped expanding a generic cycle:
+
+```text
+ZodTypedUnion<__Canon,__Canon>: Generic expansion to
+'ZodType<__Canon,Union<Union<Union<Union<Union<Int64,__Canon>,__Canon>,__Canon>,__Canon>,__Canon>>.Or<__Canon>(...)'
+was aborted due to generic recursion.
+```
+
+The cycle is in the public type shape:
+
+- `ZodType<TOutput, TInput>.Or<TOther>(other)` returns `ZodTypedUnion<TOutput, TOther>`.
+- `ZodTypedUnion<T1, T2>` derives from `ZodType<Union<T1, T2>, object>`, so it inherits `Or` (and `And`, `Catch`,
+  `Default`, `Prefault`, `Refine`, `SuperRefine`, `Transform` and `Pipe`, which close their own generic types over
+  the output type in the same way).
+- `Union<T1, T2>` is a `readonly struct`, so `Union<Union<T1, T2>, T3>` is a new, unshareable instantiation at every
+  step. A class would canonicalise to `__Canon` and end the expansion; a struct does not.
+
+Nothing in the library calls `Or` (or any of the others) on its own result, so no reachable code needs a deeper
+instantiation. ILC only builds the chain because `TrimmerRootAssembly` roots every method of every type, including
+the inherited generic methods of each `ZodTypedUnion` it constructs, and the warning's own message ("an exception will
+be thrown at runtime if this codepath is ever reached") describes code no application reaches unless it nests `Or`
+that deep itself. The consumer publish - nothing rooted, `Or()` and `NativeUnion()` called - compiles with no IL3054,
+and so does the packed-consumer gate (`just smoke-packed-consumers`).
+
+It is not fixed in 3.0, because every change that breaks the cycle breaks the 2.4.2 API that package validation holds
+the packages to:
+
+| Change | Why it is not taken |
+|---|---|
+| Seal `ZodTypedUnion<T1, T2>` | Package validation rejects it (`CP0009`: the type gains the `sealed` modifier). It would not help either: measured, the rooted publish still reports 32 IL3054 warnings with the class sealed, because the recursion runs through the methods `ZodTypedUnion` inherits, not through overrides. |
+| Make `Or` non-virtual | It already is. So are `And`, `Catch`, `Default`, `Prefault`, `Refine`, `SuperRefine`, `Transform` and `Pipe`. |
+| Derive `ZodTypedUnion` from a base without `Or` | Changes the base type of a public class, and every caller that holds a union as `ZodType<Union<T1, T2>, object>`. |
+| Make `Union<T1, T2>` a class | Changes a public value type to a reference type: binary-breaking, and an allocation per union result. |
+| Move `Or` off `ZodType` (an extension method constrained away from unions) | Removes a public instance member (`CP0002`). |
+
+The tolerance is scoped as narrowly as ILC allows: `IL3054` is in `NoWarn` only when `TrimVerificationMode` is
+`Rooted`, and every other trim or AOT warning in the rooted publish, including one in a ZodSharp assembly, still fails
+it. Revisit it in the next major version, where the type shape can change.
+
 ## Related
 
 - [Source Generator](Source-Generator.md) — generated registration and validators.

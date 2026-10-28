@@ -78,7 +78,9 @@
 		  their code, not only what this program calls. Rooting also makes ILC expand ZodType<T>.Or<TOther>() over its own
 		  output (Union<Union<...>>) until it gives up, which it reports as IL3054 generic recursion. That expansion only
 		  exists because the generic method is rooted; consumer mode below proves an application that calls Or() and
-		  NativeUnion() compiles without it, so IL3054 alone is tolerated here.
+		  NativeUnion() compiles without it, so IL3054 alone is tolerated here. Breaking the cycle needs a binary-breaking
+		  change to the public type shape; docs/wiki/Trimming-and-AOT.md ("The rooted publish and IL3054") records each
+		  option and why it is not taken.
 		- Consumer (-p:TrimVerificationMode=Consumer): nothing is rooted and nothing is tolerated, exactly as an application
 		  that references the packages is compiled; the published binary must still pass every check.
 	-->
