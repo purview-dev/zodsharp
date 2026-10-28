@@ -69,7 +69,7 @@
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynAnalyzersVersion)" />
 		<PackageVersion Include="TUnit" Version="$(TUnitVersion)" />
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
-		<PackageVersion Include="Purview.Skills.Testing" Version="1.1.0" />
+		<PackageVersion Include="Purview.Skills.Testing" Version="1.2.0" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageVersion Include="System.Text.Json" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="BenchmarkDotNet" Version="0.16.0-preview.2" />

@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 	<PropertyGroup>
+		<!-- Downloaded to and run in the browser by Blazor WebAssembly clients: the SDK's browser-safe defaults fail the
+			build on trim, AOT and browser-unsupported APIs (and satisfy the client's PRBLZ0001 reference check). -->
+		<PurviewBrowserSafe>true</PurviewBrowserSafe>
 		<!--
 			net11.0 only: built on .NET 11's Microsoft.Extensions.Validation and Blazor's async validation APIs
 			(AddAsyncValidator, RegisterAsyncFieldValidator, IsValidationPending/IsValidationFaulted).
