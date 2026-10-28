@@ -18,6 +18,7 @@ public static class ZodExceptionExtensions
 		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" />, without resolving
 		/// <see cref="ErrorType"/>s.
 		/// </summary>
+		[Obsolete(LegacyOverloads.StatusCodeMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			int statusCode = StatusCodes.Status400BadRequest
 		) =>
@@ -29,6 +30,7 @@ public static class ZodExceptionExtensions
 		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s from the supplied registry to derive the status code, title, and messages.
 		/// </summary>
+		[Obsolete(LegacyOverloads.RegistryMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			ErrorTypeRegistry registry,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -44,6 +46,7 @@ public static class ZodExceptionExtensions
 		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s through the supplied lookup to derive the status code, title, and messages.
 		/// </summary>
+		[Obsolete(LegacyOverloads.LookupMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			Func<string, ErrorType?> lookup,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -73,6 +76,7 @@ public static class ZodExceptionExtensions
 		/// <summary>
 		/// Converts a <see cref="ZodException"/> into <see cref="ValidationProblemDetails" />.
 		/// </summary>
+		[Obsolete(LegacyOverloads.StatusCodeMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(int statusCode = StatusCodes.Status400BadRequest)
 		{
 			var details = exception.ToHttpValidationProblemDetails(statusCode);
@@ -83,6 +87,7 @@ public static class ZodExceptionExtensions
 		/// Converts a <see cref="ZodException"/> into <see cref="ValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s from the supplied registry.
 		/// </summary>
+		[Obsolete(LegacyOverloads.RegistryMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(
 			ErrorTypeRegistry registry,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -96,6 +101,7 @@ public static class ZodExceptionExtensions
 		/// Converts a <see cref="ZodException"/> into <see cref="ValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s through the supplied lookup.
 		/// </summary>
+		[Obsolete(LegacyOverloads.LookupMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(
 			Func<string, ErrorType?> lookup,
 			int statusCode = StatusCodes.Status400BadRequest

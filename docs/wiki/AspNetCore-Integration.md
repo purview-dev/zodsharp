@@ -12,8 +12,9 @@ dotnet add package Purview.ZodSharp.AspNetCore
 
 Every path that turns ZodSharp errors into ProblemDetails delegates to one writer, `ZodProblemDetailsWriter`:
 the endpoint filter, `ZodExceptionHandler`, `ZodTypedResults`, the .NET 11 pipeline enrichment, and every
-`ToHttpValidationProblemDetails`/`ToValidationProblemDetails`/`ToValidationProblem` overload. They all produce the
-same body (see [The error contract](#the-error-contract)).
+`ToHttpValidationProblemDetails`/`ToValidationProblemDetails`/`ToValidationProblem` overload. Given the same options
+they all produce the same body (see [The error contract](#the-error-contract)); use an overload that takes the
+request (`HttpContext`) so the options the application registers apply.
 
 ```csharp
 using ZodSharp;
@@ -29,16 +30,35 @@ The extensions are in the `ZodSharp` namespace and exist for both `ValidationRes
 
 | Member | Behaviour |
 |---|---|
-| `ToHttpValidationProblemDetails(int statusCode = 400)` | `HttpValidationProblemDetails` with default options, without resolving `ErrorType`s |
-| `ToHttpValidationProblemDetails(ErrorTypeRegistry registry, int statusCode = 400)` | Resolves `ErrorType`s from `registry` and formats their messages |
-| `ToHttpValidationProblemDetails(Func<string, ErrorType?> lookup, int statusCode = 400)` | Resolves `ErrorType`s through `lookup` |
-| `ToHttpValidationProblemDetails(ZodProblemDetailsOptions options, HttpContext? httpContext = null)` | Uses the supplied options |
-| `ToHttpValidationProblemDetails(HttpContext httpContext)` | Uses the writer, and therefore the options, registered in the request services (`ValidationResult<T>` only) |
+| `ToHttpValidationProblemDetails(HttpContext httpContext)` | Uses the writer, and therefore the options, registered in the request services (`ValidationResult<T>` only). **Prefer this in a request.** |
+| `ToHttpValidationProblemDetails(ZodProblemDetailsOptions options, HttpContext? httpContext = null)` | Uses the supplied options; the form to use outside a request |
 | `ToValidationProblemDetails(...)` | The same overloads, returning MVC `ValidationProblemDetails` with every extension copied |
-| `ToValidationProblem()` | An `IResult` with default options (`ValidationResult<T>` only) |
 | `ToValidationProblem(HttpContext httpContext)` | An `IResult` written by the registered writer, keeping the computed status (prefer this) |
+| `ToHttpValidationProblemDetails(int statusCode = 400)` | *Obsolete.* Built-in defaults, no `ErrorType`s, messages unformatted |
+| `ToHttpValidationProblemDetails(ErrorTypeRegistry registry, int statusCode = 400)` | *Obsolete.* Resolves `ErrorType`s from `registry` and formats their messages; every other option at its default |
+| `ToHttpValidationProblemDetails(Func<string, ErrorType?> lookup, int statusCode = 400)` | *Obsolete.* Resolves `ErrorType`s through `lookup`; every other option at its default |
+| `ToValidationProblem()` | *Obsolete.* An `IResult` with built-in defaults (`ValidationResult<T>` only) |
 
 The `ValidationResult<T>` overloads throw `InvalidOperationException` when the result `IsSuccess`.
+
+### The option-less overloads
+
+The 2.x overloads that take only a status code, an `ErrorTypeRegistry` or a lookup (and `ToValidationProblem()`) take
+neither options nor a request, so they **cannot see the `ZodProblemDetailsOptions` an application configures**
+(`AddZodSharpProblemDetails`, `Configure<ZodProblemDetailsOptions>`): `FormatMessages`, `PathNaming`, `IncludeIssues`,
+`MergeParametersIntoExtensions`, `StatusCodeSelector` and the configured registry are ignored, so their body can differ
+from the endpoint filter and the exception handler. There is no ambient options instance they could read without a
+request, so they keep their 2.x output unchanged and are marked `[Obsolete]` (CS0618). Each one is exactly equivalent
+to the options overload with these options:
+
+| Obsolete call | Equivalent |
+|---|---|
+| `ToHttpValidationProblemDetails(statusCode)` | `ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { Registry = new(), FormatMessages = false, DefaultStatusCode = statusCode })` |
+| `ToHttpValidationProblemDetails(registry, statusCode)` | `ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { Registry = registry, DefaultStatusCode = statusCode })` |
+| `ToHttpValidationProblemDetails(lookup, statusCode)` | `ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { ErrorTypeResolver = lookup, DefaultStatusCode = statusCode })` |
+| `ToValidationProblem()` | `ToValidationProblem(httpContext)` (applies the registered options) |
+
+In a request, move to the `HttpContext` overload; elsewhere (a background job, a test), pass the options you want.
 
 ### Typed results
 
@@ -287,7 +307,7 @@ In the callback, for an `HttpValidationProblemDetails`:
 | Empty (DataAnnotations-only failure) | The payload is left untouched, apart from the `issues` projection (`ProjectDataAnnotationsIssues`, default `true`). |
 
 The body is byte-identical (apart from `traceId`) to the one the endpoint filter, `ZodExceptionHandler` and
-`ToValidationProblem()` produce.
+`ToValidationProblem(httpContext)` produce.
 
 Notes:
 
@@ -536,9 +556,10 @@ Mapping rules:
   (camel-cased, safe scalars only). With `MergeParametersIntoExtensions` they are also merged into the top-level
   extensions, and reserved names are written as `param_{name}`.
 
-`ToHttpValidationProblemDetails` / `ToValidationProblemDetails` accept an `ErrorTypeRegistry` or a
-`Func<string, ErrorType?>` lookup for on-demand mapping, and the same mapping applies to
-`ValidationResult<T>`.
+For on-demand mapping outside a request, pass `ZodProblemDetailsOptions` with a `Registry` or an
+`ErrorTypeResolver` lookup to `ToHttpValidationProblemDetails` / `ToValidationProblemDetails`; the same mapping
+applies to `ValidationResult<T>`. The 2.x registry and lookup overloads still work but are obsolete (see
+[The option-less overloads](#the-option-less-overloads)).
 
 ## Dependency injection
 

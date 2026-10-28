@@ -353,6 +353,17 @@ Released versions correspond to `v<version>` GitHub releases.
   configuration key (`Smtp:Servers:0:Host`) when a section was recorded; the name is omitted for the default
   options name. `OptionsBuilder<T>.AddZodSchemaValidator()` validates only the builder's options name (it validated
   every name).
+### Deprecated
+
+- **The option-less ProblemDetails conversion overloads** (`Purview.ZodSharp.AspNetCore`), for both
+  `ValidationResult<T>` and `ZodException`: `ToHttpValidationProblemDetails(int)`, `(ErrorTypeRegistry, int)`,
+  `(Func<string, ErrorType?>, int)`, the matching `ToValidationProblemDetails` overloads, and
+  `ValidationResult<T>.ToValidationProblem()`. They take neither options nor a request, so they cannot see the
+  `ZodProblemDetailsOptions` an application configures, and their body diverged from the exception handler and the
+  endpoint filter (`FormatMessages`, `PathNaming`, `IncludeIssues`, status selectors). There is no ambient options
+  instance they could read without a request, so rather than guess they keep their 2.x output, now documented
+  exactly, and are `[Obsolete]` (CS0618) with a pointer to the `HttpContext` and `ZodProblemDetailsOptions` overloads.
+  Nothing changes at runtime. See the upgrade note.
 ### Fixed
 
 - **Generated validators compile for member types with their own equality operators.** The generator tested for null
@@ -542,7 +553,14 @@ Each note names the old form, the new form, and the edit to make.
   register a validator per name if you relied on the old scope.
 - **Endpoint filter.** `WithZodSharpValidation<T>()` threw on every request when no validator was registered → it
   fails when the endpoint is built. Register the validator (or factory) before mapping the endpoint.
-- **`[ZodSchema]` and `[ErrorType]` come from `Purview.ZodSharp`.** They were generated into each project as
+- **Option-less ProblemDetails overloads (CS0618).** `result.ToHttpValidationProblemDetails()` and the other overloads
+  that take only a status code, an `ErrorTypeRegistry` or a lookup (and `result.ToValidationProblem()`) still return
+  their 2.x body, built from defaults rather than your `ZodProblemDetailsOptions` → in a request call
+  `ToHttpValidationProblemDetails(httpContext)` / `ToValidationProblem(httpContext)`, which apply the registered
+  options like the exception handler does. Outside a request, pass options: `(statusCode)` is
+  `new ZodProblemDetailsOptions { Registry = new(), FormatMessages = false, DefaultStatusCode = statusCode }`,
+  `(registry, statusCode)` is `{ Registry = registry, DefaultStatusCode = statusCode }` and `(lookup, statusCode)` is
+  `{ ErrorTypeResolver = lookup, DefaultStatusCode = statusCode }`.- **`[ZodSchema]` and `[ErrorType]` come from `Purview.ZodSharp`.** They were generated into each project as
   `[Embedded]` types, which the compiler hides from other assemblies; they are now ordinary public types in the
   package (same names, namespaces and members), so no source edit is needed. A project that declared its own
   `partial class ZodSchemaAttribute` or `ErrorTypeAttribute` to extend the generated one now gets CS0436 → remove

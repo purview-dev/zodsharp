@@ -17,6 +17,7 @@ public static class ProblemDetailsExtensions
 		/// Converts a failed validation result into <see cref="HttpValidationProblemDetails" />, without resolving
 		/// <see cref="ErrorType"/>s.
 		/// </summary>
+		[Obsolete(LegacyOverloads.StatusCodeMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			int statusCode = StatusCodes.Status400BadRequest
 		)
@@ -29,6 +30,7 @@ public static class ProblemDetailsExtensions
 		/// Converts a failed validation result into <see cref="HttpValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s from the supplied registry to derive the status code, title, and messages.
 		/// </summary>
+		[Obsolete(LegacyOverloads.RegistryMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			ErrorTypeRegistry registry,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -43,6 +45,7 @@ public static class ProblemDetailsExtensions
 		/// Converts a failed validation result into <see cref="HttpValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s through the supplied lookup to derive the status code, title, and messages.
 		/// </summary>
+		[Obsolete(LegacyOverloads.LookupMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			Func<string, ErrorType?> lookup,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -84,6 +87,7 @@ public static class ProblemDetailsExtensions
 		/// <summary>
 		/// Converts a failed validation result into <see cref="ValidationProblemDetails" />.
 		/// </summary>
+		[Obsolete(LegacyOverloads.StatusCodeMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(int statusCode = StatusCodes.Status400BadRequest)
 		{
 			var details = result.ToHttpValidationProblemDetails(statusCode);
@@ -94,6 +98,7 @@ public static class ProblemDetailsExtensions
 		/// Converts a failed validation result into <see cref="ValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s from the supplied registry.
 		/// </summary>
+		[Obsolete(LegacyOverloads.RegistryMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(
 			ErrorTypeRegistry registry,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -107,6 +112,7 @@ public static class ProblemDetailsExtensions
 		/// Converts a failed validation result into <see cref="ValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s through the supplied lookup.
 		/// </summary>
+		[Obsolete(LegacyOverloads.LookupMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(
 			Func<string, ErrorType?> lookup,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -137,6 +143,7 @@ public static class ProblemDetailsExtensions
 		/// the <c>ToValidationProblem(HttpContext)</c> overload, which applies the registered options.
 		/// </summary>
 		/// <returns>An <see cref="IResult"/> suitable for returning from a minimal-API handler.</returns>
+		[Obsolete(LegacyOverloads.ResultMessage)]
 		public IResult ToValidationProblem()
 		{
 			var details = result.ToHttpValidationProblemDetails();

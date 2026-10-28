@@ -200,7 +200,7 @@ app.MapPost("/users", Results<Ok<UserDto>, ValidationProblem> (UserDto dto, Http
 | `ZodTypedResults.Problem(result \| exception, ctx)` | `ZodProblemDetailsResult` with the computed status |
 | `result.ToValidationProblem(ctx)` / `exception.ToValidationProblem(ctx)` | the same, as `IResult` |
 | `ToHttpValidationProblemDetails(ctx)` / `(ZodProblemDetailsOptions, ctx?)` | `HttpValidationProblemDetails` |
-| `ToHttpValidationProblemDetails(statusCode = 400)` / `(registry, …)` / `(lookup, …)` | 2.x overloads, no DI |
+| `ToHttpValidationProblemDetails(statusCode = 400)` / `(registry, …)` / `(lookup, …)`, `ToValidationProblem()` | **obsolete** (CS0618) 2.x overloads: they ignore the registered `ZodProblemDetailsOptions`. Move to the `ctx` overload, or pass options explicitly (`{ Registry = new(), FormatMessages = false }` reproduces the status-code form) |
 | `ToValidationProblemDetails(…)` | MVC `ValidationProblemDetails`, every extension copied |
 
 The result-based members **throw `InvalidOperationException` for a successful result**. A `ZodException`

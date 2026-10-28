@@ -74,13 +74,16 @@ public class ProblemDetailsMappingPerformanceTests
 	}
 
 	[Benchmark]
-	public HttpValidationProblemDetails MapWithoutRegistry() => _unmappedException.ToHttpValidationProblemDetails();
+	public HttpValidationProblemDetails MapWithoutRegistry() =>
+		_unmappedException.ToHttpValidationProblemDetails(
+			new ZodProblemDetailsOptions { Registry = new(), FormatMessages = false }
+		);
 
 	[Benchmark]
 	public HttpValidationProblemDetails MapWithRegistryLookup() =>
-		_mappedException.ToHttpValidationProblemDetails(_lookup);
+		_mappedException.ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { ErrorTypeResolver = _lookup });
 
 	[Benchmark]
 	public HttpValidationProblemDetails MapWithRegistryAndFormatting() =>
-		_mappedException.ToHttpValidationProblemDetails(_registry);
+		_mappedException.ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { Registry = _registry });
 }

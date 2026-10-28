@@ -73,7 +73,7 @@ The fixture generator script is intentionally run via Bun rather than `npx tsx` 
 - **Targets `net10.0` and `net11.0`** (3.0.0 dropped `net8.0` and `net9.0`; stay on 2.4.x for those). The source generator remains on `netstandard2.0` so it can run in any compiler host.
 - **System.Text.Json integration.** JSON deserialize-and-validate is available for both major JSON libraries, including validating `JsonConverter<T>` instances.
 - **JSON Schema interoperability.** Schemas can be exported via `Z.ToJsonSchema` and imported via `Z.FromJsonSchema`, enabling cross-language reuse with TypeScript/Zod. The import API lives in the JSON integration package's namespace (`ZodSharp.JsonSchema.SystemTextJson` or `ZodSharp.JsonSchema.NewtonsoftJson`); export stays in the core package.
-- **ASP.NET Core ProblemDetails integration.** Failed validation results convert directly to `HttpValidationProblemDetails` via `result.ToHttpValidationProblemDetails()`.
+- **ASP.NET Core ProblemDetails integration.** Failed validation results convert directly to `HttpValidationProblemDetails` via `result.ToHttpValidationProblemDetails(httpContext)`, which applies the application's `ZodProblemDetailsOptions`.
 - **Expanded DataAnnotations support.** `[Length]`, `[MinLength]`, `[MaxLength]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and more, with structured size failures (`Code`, `Origin`, `Minimum`/`Maximum`, `Inclusive`, `Path`).
 - **Value-first composition methods.** `.ApplyAnd()`, `.ApplyOr()`, and `.ApplyRefine()` are the supported composition surface.
 

@@ -39,7 +39,8 @@ The endpoint filter, the `ZodException` handler, `ZodTypedResults` and the `ToHt
 they produce the same body: `errors` keyed by dotted paths (`Items[0].Quantity`), an `issues` extension of
 structured `ValidationIssue`s (`path`, `segments`, `code`, `category`, `origin`, typed `minimum`/`maximum`,
 `inclusive`, `message`, safe `parameters`, `unionErrors`) and a `traceId`. Configure it with
-`ZodProblemDetailsOptions` (path naming, error-type registry, status selection, parameter merging).
+`ZodProblemDetailsOptions` (path naming, error-type registry, status selection, parameter merging). Use the overloads that take the request (`HttpContext`) or explicit options: the 2.x overloads that take only a
+status code, a registry or a lookup cannot see the configured options and are obsolete.
 
 ### .NET 11: the built-in validation pipeline
 
