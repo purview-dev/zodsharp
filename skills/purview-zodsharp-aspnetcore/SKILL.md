@@ -223,6 +223,8 @@ await writer.WriteAsync(httpContext, problem);
 - `PathNaming`, `IncludeIssues`, `DefaultStatusCode` (400).
 - `MergeParametersIntoExtensions` (`false`) - also copy parameters to the top level (the 2.4 behaviour). Reserved names
   (`type`, `title`, `status`, `detail`, `instance`, `errors`, `issues`, `traceId`) become `param_{name}`.
+- `IncludeDiagnosticParameters` (`false`) - `declaringType` (a full CLR type name) and `member` are kept off
+  `issues[].parameters` and the top level; they stay on `ValidationError.Parameters` for localization.
 - `ProjectDataAnnotationsIssues` (`true`) - `Apply` gives foreign entries a `dataannotations` issue.
 - `StatusCodeSelector(errors)` then `StatusCodeOverride(errors, computed)` - run last and win.
 

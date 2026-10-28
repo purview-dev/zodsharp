@@ -395,7 +395,11 @@ Released versions correspond to `v<version>` GitHub releases.
   now attribute such an error to the nearest reference-type owner and its member, `FieldIdentifier(model, "Email")`;
   a struct element of a collection is attributed to the collection member. The error's path is unchanged.
   `ZodGeneratedValidation.ResolveToReferenceOwner` is the new generated-code helper.
-- **A scalar value object's messages name the owning member.** A nested Purview.ValueObjects scalar's errors read
+- **ProblemDetails no longer sends CLR type names to API clients.** Generated validators attach `declaringType` (the
+  full CLR name of the declaring type) and `member` to every error, for localization, and `issues[].parameters` (and
+  the top level, with `MergeParametersIntoExtensions`) carried both. They are now left out by default: they stay on
+  `ValidationError.Parameters`, the issue's `path` already names the member, and the new
+  `ZodProblemDetailsOptions.IncludeDiagnosticParameters = true` writes them again. `displayName` is still sent.- **A scalar value object's messages name the owning member.** A nested Purview.ValueObjects scalar's errors read
   "Field 'Value' ..." (its own member); they now use the owning member's display name ("Email is required", or the
   member's `[Display(Name)]`), through the new `ZodGeneratedValidation.AddNested`/`WithNested` overloads that take the
   owning member. The `displayName` parameter is renamed too, and a message produced from the error's template is

@@ -54,6 +54,16 @@ public sealed class ZodProblemDetailsOptions
 	public bool MergeParametersIntoExtensions { get; set; }
 
 	/// <summary>
+	/// When <c>true</c>, the diagnostic parameters generated validators attach to every error - <c>declaringType</c>
+	/// (the full CLR name of the type that declares the failing member) and <c>member</c> (its C# name) - are written
+	/// to <c>issues[].parameters</c> (and, with <see cref="MergeParametersIntoExtensions"/>, the top-level extensions).
+	/// Defaults to <c>false</c>: they describe the server's implementation, not the request, so they are kept on
+	/// <see cref="ValidationError.Parameters"/> for localization and logging but not sent to API clients. The error's
+	/// path already names the member in the request's terms.
+	/// </summary>
+	public bool IncludeDiagnosticParameters { get; set; }
+
+	/// <summary>
 	/// When <c>true</c>, <c>errors</c> entries that did not come from ZodSharp (for example DataAnnotations errors
 	/// produced by Microsoft.Extensions.Validation and merged by <see cref="ZodProblemDetailsWriter.Apply(Microsoft.AspNetCore.Http.HttpValidationProblemDetails, ReadOnlySpan{ZodSharp.Core.ValidationError}, Microsoft.AspNetCore.Http.HttpContext?)"/>) also get an
 	/// <c>issues</c> entry, with code <see cref="ZodProblemDetailsWriter.DataAnnotationsCode"/>. Defaults to

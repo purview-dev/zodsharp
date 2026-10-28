@@ -539,7 +539,7 @@ public sealed class ZodProblemDetailsWriter
 
 			foreach (var pair in parameters)
 			{
-				if (IsUnionParameter(pair.Key) || !TryNormalize(pair.Value, allowCollections: true, out var safe))
+				if (!IsClientParameter(pair.Key) || !TryNormalize(pair.Value, allowCollections: true, out var safe))
 					continue;
 
 				var name = JsonNamingPolicy.CamelCase.ConvertName(pair.Key);
@@ -556,7 +556,7 @@ public sealed class ZodProblemDetailsWriter
 		}
 	}
 
-	static Dictionary<string, object?>? ProjectParameters(ErrorTypeParameters? parameters)
+	Dictionary<string, object?>? ProjectParameters(ErrorTypeParameters? parameters)
 	{
 		if (parameters is null || parameters.Count == 0)
 			return null;
@@ -564,7 +564,7 @@ public sealed class ZodProblemDetailsWriter
 		Dictionary<string, object?>? result = null;
 		foreach (var pair in parameters)
 		{
-			if (IsUnionParameter(pair.Key) || !TryNormalize(pair.Value, allowCollections: true, out var safe))
+			if (!IsClientParameter(pair.Key) || !TryNormalize(pair.Value, allowCollections: true, out var safe))
 				continue;
 
 			result ??= new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -573,6 +573,18 @@ public sealed class ZodProblemDetailsWriter
 
 		return result;
 	}
+
+	// The union's nested errors are projected separately (unionErrors); the diagnostic parameters describe the
+	// server's types, not the request, so they are written only when IncludeDiagnosticParameters asks for them.
+	bool IsClientParameter(string key) =>
+		!IsUnionParameter(key)
+		&& (
+			_options.IncludeDiagnosticParameters
+			|| !(
+				string.Equals(key, ZodIssueParameters.DeclaringType, StringComparison.Ordinal)
+				|| string.Equals(key, ZodIssueParameters.Member, StringComparison.Ordinal)
+			)
+		);
 
 	static bool IsUnionParameter(string key) =>
 		string.Equals(key, ZodIssueParameters.UnionErrors, StringComparison.Ordinal);

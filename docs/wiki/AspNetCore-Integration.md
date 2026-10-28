@@ -205,6 +205,9 @@ The contract:
   behaviour, off by default) every issue's parameters are also merged into the top-level extensions, and the last
   issue wins. A parameter whose camel-cased name is reserved (`type`, `title`, `status`, `detail`, `instance`,
   `errors`, `issues`, `traceId`) is written as `param_{name}`.
+- **No implementation details.** `issues[].parameters` leaves out `declaringType` (a full CLR type name) and `member`,
+  which generated validators attach for localization: they describe the server's types, not the request, and the
+  issue's `path` already names the member. `displayName` is kept. Set `IncludeDiagnosticParameters = true` to send them.
 - **`traceId`.** It is present on every path: `Activity.Current?.Id`, else `HttpContext.TraceIdentifier`.
 - **No input values.** Messages and parameters never contain the input unless `ZodErrorOptions.IncludeReceivedValues`
   is enabled. See [Core Concepts](Core-Concepts.md#pii).
@@ -382,6 +385,7 @@ does the following:
 | `PathNaming` | `ZodPathNaming.MemberName` | `Json` renders keys with the minimal-API `JsonOptions` naming policy. |
 | `IncludeIssues` | `true` | Include the `issues` extension. |
 | `MergeParametersIntoExtensions` | `false` | Also merge every issue's parameters into the top-level extensions (last wins). |
+| `IncludeDiagnosticParameters` | `false` | Also write the diagnostic parameters generated validators attach (`declaringType`, the full CLR name of the declaring type, and `member`, the C# member name). They stay on `ValidationError.Parameters` either way, for localization and logging. |
 | `ProjectDataAnnotationsIssues` | `true` | Give non-ZodSharp `errors` entries an `issues` entry with code `dataannotations` (`ZodProblemDetailsWriter.DataAnnotationsCode`). |
 | `DefaultStatusCode` | `400` | The status when no matched `ErrorType` supplies one. |
 | `StatusCodeSelector` | `null` | `Func<ImmutableArray<ValidationError>, int>`: takes complete control of the status. It runs after the highest `ErrorType.HttpStatus` is computed, and its result wins. |
