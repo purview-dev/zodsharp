@@ -578,7 +578,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			var hasAttribute = SourceGenLibrary
 				.GetValidationAttributes(property, context.Compilation)
 				.Any(attribute => TypeLibrary.ZodSharp.CollectionBehaviorAttribute.Equals(attribute.AttributeClass));
-			if (!hasAttribute || SourceGenLibrary.IsCollectionBehaviorApplicable(property))
+			if (!hasAttribute || SourceGenLibrary.IsCollectionBehaviorApplicable(property, context.Compilation))
 				continue;
 
 			var location = GetMemberLocation(property);

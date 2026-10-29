@@ -231,7 +231,9 @@ partial class ZodSchemaGenerator
 					|| Exists(attributes.MinLength, static length => length.Exists && length.Length > 0)
 					|| Exists(attributes.MaxLength, static length => length.Exists && length.Length >= 0)
 				)
-			) || RejectsNullItems(property),
+			)
+				|| RejectsNullItems(property)
+				|| RejectsDefaultArray(property),
 			PropertyValidationKind.Enum => IsEnumValidationEmitted(property, validateEnumValues),
 			PropertyValidationKind.Complex or PropertyValidationKind.Unsupported => false,
 			_ => false,
@@ -934,7 +936,11 @@ partial class ZodSchemaGenerator
 		// the non-null guard, so a missing value fails instead of being skipped.
 		var hasRequiredRule = TryGetRequiredRule(property, out var requiredRule);
 
-		if (property.CanBeNull && attributes.Required.ShouldProcess && attributes.Required.Value.Exists)
+		if (
+			(property.CanBeNull || RejectsDefaultArray(property))
+			&& attributes.Required.ShouldProcess
+			&& attributes.Required.Value.Exists
+		)
 		{
 			var required = attributes.Required.Value;
 
@@ -944,7 +950,7 @@ partial class ZodSchemaGenerator
 				property.PropertyType.SpecialType == SpecialType.System_String && !required.AllowEmptyStrings;
 			var comparison = rejectsBlankStrings
 				? $"string.IsNullOrWhiteSpace(value.{propertyName})"
-				: $"value.{propertyName} is null";
+				: MissingValueCondition(property);
 
 			// The shared missing-field identity (code missing_field, category invalid_type, the runtime
 			// "{displayName} is required" template); an attribute message replaces only the text.
@@ -970,12 +976,12 @@ partial class ZodSchemaGenerator
 			block = writer.ElseScope();
 			GenerateValueSetValidations(writer, property, emitEnumRule);
 		}
-		else if (!property.IsDeclaredNullable && property.CanBeNull)
+		else if (!property.IsDeclaredNullable && (property.CanBeNull || RejectsDefaultArray(property)))
 		{
 			// A non-nullable reference type rejects null — the exported JSON Schema marks it required — so
 			// the rules below run only for a present value. This keeps null acceptance consistent with the
 			// schema and makes length/count access null-safe.
-			using (writer.IfBlockScope($"value.{propertyName} is null"))
+			using (writer.IfBlockScope(MissingValueCondition(property)))
 			{
 				WriteAddError(
 					writer,
@@ -993,7 +999,11 @@ partial class ZodSchemaGenerator
 		{
 			GenerateValueSetValidations(writer, property, emitEnumRule);
 			if (property.IsDeclaredNullable)
-				block = writer.IfBlockScope($"value.{propertyName} is not null");
+				block = writer.IfBlockScope(
+					RejectsDefaultArray(property)
+						? $"!({MissingValueCondition(property)})"
+						: $"value.{propertyName} is not null"
+				);
 		}
 
 		GenerateTypeSpecificValidations(writer, property, emitEnumRule, skipRequiredRule: hasRequiredRule);
@@ -1035,7 +1045,7 @@ partial class ZodSchemaGenerator
 	{
 		requiredRule = default;
 
-		if (!property.CanBeNull)
+		if (!property.CanBeNull && !RejectsDefaultArray(property))
 			return false;
 
 		foreach (var rule in property.CustomRules)
@@ -1333,8 +1343,7 @@ partial class ZodSchemaGenerator
 		var schemaType = property.NestedSchemaType!.Value;
 		var itemExpression = property.ElementTypeIsNullableValueType ? $"{itemName}.Value" : itemName;
 
-		writer.Assignment("var", collectionName, $"value.{property.Name}");
-		using (writer.IfBlockScope($"{collectionName} is not null"))
+		using (CollectionValueScope(writer, property, collectionName))
 		{
 			if (property.IsMap)
 			{

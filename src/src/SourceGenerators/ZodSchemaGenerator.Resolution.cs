@@ -353,8 +353,15 @@ partial class ZodSchemaGenerator
 
 			var elementName = CodeGenHelpers.GetLocalIdentifier(property.Name, "Element");
 			var lookup = property.IsMap ? "TryGetEntryValue" : "TryGetElement";
+			if (property.IsNullableValueType)
+				writer.IfBlock($"!value.{property.Name}.HasValue", body => body.Return("false"));
+			if (property.IsImmutableArray)
+				writer.IfBlock(
+					$"value.{property.Name}{(property.IsNullableValueType ? ".GetValueOrDefault()" : string.Empty)}.IsDefault",
+					body => body.Return("false")
+				);
 			writer.IfBlock(
-				$"!{GeneratedValidation}.{lookup}(value.{property.Name}, path[offset + 1], out var {elementName})",
+				$"!{GeneratedValidation}.{lookup}({CollectionValueExpression(property)}, path[offset + 1], out var {elementName})",
 				body => body.Return("false")
 			);
 

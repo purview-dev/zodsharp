@@ -129,6 +129,16 @@ Enum properties are validated automatically: a value that is not a defined membe
 
 Collection elements reject `null` by default: a null element reports `invalid_type` at its own path (for example `Items[0]`). Opt in per property with `[CollectionBehavior(AllowNulls = true)]`, per element type with `T?` (for example `List<Child?>`), per type with `[ZodSchema(AllowNulls = true)]`, or per assembly with `[assembly: ZodSharpSchemaDefaults(AllowNulls = true)]` or the `ZodSharpAllowNulls` MSBuild property. The most specific statement wins; `[CollectionBehavior]` on a property that cannot hold null elements is reported as `ZODSGEN046`.
 
+Struct collections (including nullable wrappers) are supported. A default `ImmutableArray<T>` is treated
+as missing: `[Required]` reports `missing_field`, a nullable member accepts it unless required, and a
+non-nullable member reports `invalid_type`. To validate it as empty instead, set
+`[CollectionBehavior(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty)]`,
+`[assembly: ZodSharpSchemaDefaults(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty)]`,
+or `<ZodSharpDefaultImmutableArrayBehavior>TreatAsEmpty</ZodSharpDefaultImmutableArrayBehavior>` in MSBuild.
+Precedence is property, assembly, MSBuild, then `ValidationError`. An absent nullable wrapper remains
+missing in either mode; the model is not mutated. A property with this immutable-array option is valid
+even when its elements cannot be null.
+
 A dictionary property (`IDictionary<TKey, TValue>` / `IReadOnlyDictionary<TKey, TValue>`) is validated as a map: every value is checked against the value type's nested schema, a failure is reported at the entry's key (for example `Variants[blue].Sku`), and `AllowNulls` governs null values. It exports as `{ "type": "object", "additionalProperties": … }` rather than as an array.
 
 ## Custom rules

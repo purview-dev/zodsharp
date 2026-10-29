@@ -730,6 +730,8 @@ static partial class SourceGenLibrary
 				dateTimeOffsetSerialization
 			)
 			{
+				IsImmutableArray = IsImmutableArray(originalPropertyType),
+				DefaultImmutableArrayBehavior = GetDefaultImmutableArrayBehavior(validationAttributes),
 				DisplayNameResourceExpression = ValidationInputsResolver.GetDisplayNameResourceExpression(
 					validationAttributes
 				),
@@ -1034,6 +1036,7 @@ static partial class SourceGenLibrary
 	/// </remarks>
 	static ITypeSymbol? GetCollectionItemTypeSymbol(ITypeSymbol type)
 	{
+		type = TypeHelpers.UnwrapNullableType(type);
 		if (type is IArrayTypeSymbol arrayType)
 			return arrayType.ElementType;
 
@@ -1176,6 +1179,27 @@ static partial class SourceGenLibrary
 		return typeAllowNulls;
 	}
 
+	static DefaultImmutableArrayBehavior? GetDefaultImmutableArrayBehavior(ImmutableArray<AttributeData> attributes)
+	{
+		foreach (var attribute in attributes)
+		{
+			if (!TypeLibrary.ZodSharp.CollectionBehaviorAttribute.Equals(attribute.AttributeClass))
+				continue;
+
+			foreach (var argument in attribute.NamedArguments)
+			{
+				if (argument.Key == "DefaultImmutableArrayBehavior" && argument.Value.Value is int behavior)
+					return (DefaultImmutableArrayBehavior)behavior;
+			}
+		}
+
+		return null;
+	}
+
+	static bool IsImmutableArray(ITypeSymbol type) =>
+		type is INamedTypeSymbol { Name: "ImmutableArray", Arity: 1 } named
+		&& named.ContainingNamespace.ToDisplayString() == "System.Collections.Immutable";
+
 	/// <summary>
 	/// Determines whether a collection element type is explicitly declared nullable — <c>T?</c> (an
 	/// annotated reference type) or <c>Nullable&lt;T&gt;</c> — which opts the element out of the default
@@ -1194,13 +1218,30 @@ static partial class SourceGenLibrary
 
 	/// <summary>
 	/// Determines whether a <c>[CollectionBehavior]</c> attribute can take effect on a property: it must be a
-	/// collection whose elements can be null.
+	/// collection whose elements can be null, or an immutable array with a configured default-state policy.
 	/// </summary>
 	/// <param name="property">The property to inspect.</param>
+	/// <param name="compilation">The compilation used to resolve positional parameter attributes.</param>
 	/// <returns><see langword="true"/> when the attribute is meaningful for the property.</returns>
-	internal static bool IsCollectionBehaviorApplicable(IPropertySymbol property)
+	internal static bool IsCollectionBehaviorApplicable(IPropertySymbol property, Compilation compilation)
 	{
 		var type = TypeHelpers.UnwrapNullableType(property.Type);
+		var attributes = GetValidationAttributes(property, compilation);
+		if (GetDefaultImmutableArrayBehavior(attributes) is not null)
+		{
+			if (IsImmutableArray(type))
+				return true;
+
+			if (
+				!attributes.Any(attribute =>
+					TypeLibrary.ZodSharp.CollectionBehaviorAttribute.Equals(attribute.AttributeClass)
+					&& attribute.NamedArguments.Any(static argument =>
+						argument.Key == AttributeGenHelper.AllowNullsPropertyName
+					)
+				)
+			)
+				return false;
+		}
 		if (
 			type is not IArrayTypeSymbol
 			&& !TypeHelpers.IsOrImplements(type, TypeLibrary.System.Collections.IEnumerable)
@@ -1271,7 +1312,7 @@ static partial class SourceGenLibrary
 		if (propertyType.SpecialType == SpecialType.System_String)
 			return new("propertyValue.Length", "string", true);
 
-		if (propertyType is IArrayTypeSymbol)
+		if (propertyType is IArrayTypeSymbol || IsImmutableArray(propertyType))
 			return new("propertyValue.Length", "array", true);
 
 		if (propertyType is INamedTypeSymbol namedType)
@@ -1280,7 +1321,7 @@ static partial class SourceGenLibrary
 			// errors report it: a dictionary is a record, every other collection an array.
 			var origin = TryGetMapArguments(namedType, out _, out _) ? "record" : "array";
 
-			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.Generic.ICollection))
+			if (TypeHelpers.HasAccessibleCountProperty(namedType))
 				return new("propertyValue.Count", origin, true);
 
 			if (TypeHelpers.IsOrImplements(namedType, TypeLibrary.System.Collections.IEnumerable))

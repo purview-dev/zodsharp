@@ -58,6 +58,12 @@ enum PropertyValidationKind
 	Unsupported,
 }
 
+enum DefaultImmutableArrayBehavior
+{
+	ValidationError,
+	TreatAsEmpty,
+}
+
 /// <summary>
 /// How a string-serialized enum's member names are transformed, mirroring the
 /// <c>JsonNamingPolicy</c> a <c>JsonStringEnumConverter</c> may be constructed with.
@@ -266,6 +272,10 @@ readonly record struct ZodPropertyDescriptor(
 	DateTimeOffsetSerialization? DateTimeOffsetSerialization = null
 )
 {
+	public bool IsImmutableArray { get; init; }
+
+	public DefaultImmutableArrayBehavior? DefaultImmutableArrayBehavior { get; init; }
+
 	/// <summary>
 	/// The expression that reads a localized display name (<c>[Display(Name = ..., ResourceType = ...)]</c>), or
 	/// <see langword="null"/> when the display name is a literal.

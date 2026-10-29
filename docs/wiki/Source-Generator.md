@@ -338,6 +338,7 @@ MSBuild switches:
 | `ZodSharpEnumSerialization` | `Number` | `String` makes enums export as their member names, matching a global `JsonStringEnumConverter` |
 | `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
 | `ZodSharpAllowNulls` | `false` | assembly-wide default for whether collection properties may contain `null` elements; explicit `true` accepts them |
+| `ZodSharpDefaultImmutableArrayBehavior` | `ValidationError` | handles uninitialized `ImmutableArray<T>` as missing, or `TreatAsEmpty` to run collection rules against an empty array |
 | `ZodSharpDateTimeOffsetSerialization` | `PreserveOffset` | `Utc` narrows `[NonSentinel] DateTimeOffset` to a zero-offset wire contract; the matching converter must also reject non-UTC input. Both modes export an exact sentinel pattern |
 
 Each failure of a generated options validator reads `{path}: {message} ({code})` (`Bucket: Bucket is required
@@ -469,9 +470,40 @@ public class RepositoryInventoryResponse
 ```
 
 > [!NOTE]
-> `[CollectionBehavior]` and `[ZodSchema(AllowNulls = ...)]` only take effect when the named argument is present; an attribute that leaves it out defers to the next level. `[CollectionBehavior]` on a property that is not a collection of nullable elements (or a dictionary of nullable values) is reported as `ZODSGEN046`.
+> `[CollectionBehavior]` and `[ZodSchema(AllowNulls = ...)]` only take effect when the named argument is present; an attribute that leaves it out defers to the next level. `[CollectionBehavior]` with options that cannot affect the property is reported as `ZODSGEN046`.
 
 A collection whose elements may be null exports its `items` schema with a `null` branch, mirroring how a nullable property is exported. A dictionary exports `{ "type": "object", "additionalProperties": … }` — see [JSON Schema Export](JsonSchema-Export.md#dictionaries).
+
+### Struct collections and default immutable arrays
+
+Struct-backed collections are validated without reference-type null checks. Nullable struct collections
+are unwrapped only when present, for count rules, nested validation, asynchronous validation and member
+resolution. Element nullability is independent of collection nullability.
+
+An uninitialized `ImmutableArray<T>` (`IsDefault`) is treated as **missing**, not enumerated: `[Required]`
+reports `missing_field` (honoring its configured message), a nullable member accepts it unless required,
+and a non-nullable member reports `invalid_type`. `ImmutableArray<T>.Empty` is present and valid unless a
+count rule rejects it.
+
+Use `DefaultImmutableArrayBehavior.TreatAsEmpty` to validate an uninitialized array as empty instead:
+
+```csharp
+[assembly: ZodSharpSchemaDefaults(
+    DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty)]
+
+[ZodSchema]
+public class Inventory
+{
+    [CollectionBehavior(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.ValidationError)]
+    public ImmutableArray<string> Items { get; set; }
+}
+```
+
+Precedence: the property's `[CollectionBehavior(DefaultImmutableArrayBehavior = ...)]` (also supported on
+positional record parameters), the assembly attribute, the `ZodSharpDefaultImmutableArrayBehavior` MSBuild
+property (`ValidationError` or `TreatAsEmpty`), then `ValidationError`. These options are independent of
+`AllowNulls`. `TreatAsEmpty` does not accept a missing nullable wrapper as empty and does not mutate the
+model. It normalizes the value used by generated collection rules; JSON Schema remains an array schema.
 
 ## DateTimeOffset wire form
 

@@ -103,6 +103,12 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]`, then the `ZodSharpAllowNulls` MSBuild
   property. The most specific statement wins; an unset level defers to the next. An explicit
   `AllowNulls = true` exports a `null` branch on the collection's `items` schema.
+- **Struct collections:** nullable wrappers are unwrapped only when present. A default `ImmutableArray<T>`
+  follows missing-value rules (`[Required]` => `missing_field`, optional nullable => accepted, non-nullable
+  => `invalid_type`). To validate it as empty, set `DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty`
+  on `[CollectionBehavior]` or `[assembly: ZodSharpSchemaDefaults]`, or set the
+  `ZodSharpDefaultImmutableArrayBehavior` MSBuild property. Precedence: property, assembly, MSBuild,
+  built-in `ValidationError`. An absent nullable wrapper remains missing; the model is never mutated.
 - **Dictionaries are maps, not arrays.** A property whose type implements `IDictionary<TKey, TValue>`
   or `IReadOnlyDictionary<TKey, TValue>` (for example `Dictionary`, `SortedDictionary`,
   `ConcurrentDictionary`, `ImmutableDictionary`) validates every **value** against the value type's
@@ -274,6 +280,7 @@ type conflicts (`ZODSGEN050`).
 | `ZodSharpEnumSerialization` | `Number` | `String` exports enums as member names, matching a global `JsonStringEnumConverter` |
 | `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
 | `ZodSharpAllowNulls` | `false` | assembly-wide default for whether collections may contain `null` elements; explicit `true` accepts them |
+| `ZodSharpDefaultImmutableArrayBehavior` | `ValidationError` | default immutable arrays follow missing-value rules; `TreatAsEmpty` runs collection rules against empty arrays |
 | `ZodSharpDateTimeOffsetSerialization` | `PreserveOffset` | `Utc` narrows `[NonSentinel] DateTimeOffset` to a zero-offset wire contract; pair with the integration package's `UtcDateTimeOffsetConverter`. Both modes export an exact sentinel pattern |
 
 `DateTimeOffset` precedence: `[DateTimeOffsetBehavior]` on the property/parameter, then on the type, then

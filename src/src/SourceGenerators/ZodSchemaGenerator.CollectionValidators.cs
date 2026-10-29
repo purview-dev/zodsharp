@@ -5,6 +5,48 @@ namespace ZodSharp.SourceGenerators;
 
 partial class ZodSchemaGenerator
 {
+	static bool RejectsDefaultArray(ZodPropertyDescriptor property) =>
+		property.IsImmutableArray
+		&& property.DefaultImmutableArrayBehavior != Models.DefaultImmutableArrayBehavior.TreatAsEmpty;
+
+	static string MissingValueCondition(ZodPropertyDescriptor property)
+	{
+		var value = $"value.{property.Name}";
+		if (!RejectsDefaultArray(property))
+			return $"{value} is null";
+
+		return property.IsNullableValueType
+			? $"({value} is null || {value}.GetValueOrDefault().IsDefault)"
+			: $"{value}.IsDefault";
+	}
+
+	static string CollectionValueExpression(ZodPropertyDescriptor property)
+	{
+		var value = property.IsNullableValueType
+			? $"value.{property.Name}.GetValueOrDefault()"
+			: $"value.{property.Name}";
+		return property.IsImmutableArray && !RejectsDefaultArray(property)
+			? $"({value}.IsDefault ? {property.PropertyType.AsTypeReference()}.Empty : {value})"
+			: value;
+	}
+
+	static CodeWriter.BlockScope CollectionValueScope(
+		CodeWriter writer,
+		ZodPropertyDescriptor property,
+		string localName
+	)
+	{
+		writer.Assignment("var", localName, CollectionValueExpression(property));
+		var condition =
+			property.IsNullableValueType ? $"value.{property.Name}.HasValue"
+			: property.CanBeNull ? $"{localName} is not null"
+			: null;
+		if (RejectsDefaultArray(property))
+			condition = condition is null ? $"!{localName}.IsDefault" : $"{condition} && !{localName}.IsDefault";
+
+		return condition is null ? writer.OpenBlockScope() : writer.IfBlockScope(condition);
+	}
+
 	static void GenerateCollectionValidations(CodeWriter writer, ZodPropertyDescriptor property, bool recurse)
 	{
 		var lengthAttr = property.ValidationAttributes.Length;
@@ -38,8 +80,7 @@ partial class ZodSchemaGenerator
 		var pluralNoun = property.IsMap ? "entries" : "elements";
 		var countValues = ValuesExpression(("count", propertyLengthName));
 
-		writer.Assignment("var", propertyValueName, $"value.{propertyName}");
-		using (writer.IfBlockScope($"{propertyValueName} is not null"))
+		using (CollectionValueScope(writer, property, propertyValueName))
 		{
 			writer.Assignment("var", "propertyValue", propertyValueName);
 			writer.Assignment("var", propertyLengthName, lengthAccessor.LengthExpression);
@@ -181,8 +222,7 @@ partial class ZodSchemaGenerator
 
 		var collectionValueName = CodeGenHelpers.GetLocalIdentifier(property.Name, "Collection");
 
-		writer.Assignment("var", collectionValueName, $"value.{property.Name}");
-		using (writer.IfBlockScope($"{collectionValueName} is not null"))
+		using (CollectionValueScope(writer, property, collectionValueName))
 		{
 			if (property.IsMap)
 				GenerateMapEntryValidation(writer, property, hasNestedSchema, rejectNullItems, collectionValueName);

@@ -81,6 +81,7 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet pack failed with exit code $LASTEXITCOD
 		<Nullable>enable</Nullable>
 		<!-- A generator failure must fail this build, not warn. -->
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<ZodSharpDefaultImmutableArrayBehavior>TreatAsEmpty</ZodSharpDefaultImmutableArrayBehavior>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Purview.ZodSharp" Version="$version" />
@@ -95,6 +96,7 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet pack failed with exit code $LASTEXITCOD
 # it emit rules rather than an empty schema.
 @'
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Immutable;
 using ZodSharp;
 
 namespace PackedSmoke;
@@ -111,6 +113,13 @@ public sealed class Person
 
 	[EmailAddress]
 	public string Email { get; set; } = string.Empty;
+
+	[MinLength(1)]
+	public ImmutableArray<string>? Aliases { get; set; } = default(ImmutableArray<string>);
+
+	[Required]
+	[CollectionBehavior(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.ValidationError)]
+	public ImmutableArray<string> Tags { get; set; } = ImmutableArray<string>.Empty;
 }
 
 public static class Program
@@ -118,8 +127,17 @@ public static class Program
 	public static int Main()
 	{
 		// The generated validator. If the merged generator did not run, this does not compile.
-		var valid = PersonSchema.Validate(new Person { Name = "Ada", Age = 36, Email = "ada@example.com" });
+		var valid = PersonSchema.Validate(new Person { Name = "Ada", Age = 36, Email = "ada@example.com", Aliases = ImmutableArray.Create("Ada") });
 		var invalid = PersonSchema.Validate(new Person { Name = "A", Age = 500, Email = "nope" });
+		var missing = PersonSchema.Validate(new Person { Name = "Ada", Age = 36, Email = "ada@example.com", Tags = default });
+
+		if (missing.Errors.Length != 2
+			|| !System.Linq.Enumerable.Any(missing.Errors, error => error.Path[0] == "Aliases" && error.Code == "too_small")
+			|| !System.Linq.Enumerable.Any(missing.Errors, error => error.Path[0] == "Tags" && error.Code == "missing_field"))
+		{
+			System.Console.Error.WriteLine("FAIL: immutable-array build/property defaults were not honored.");
+			return 1;
+		}
 
 		if (!valid.IsSuccess)
 		{

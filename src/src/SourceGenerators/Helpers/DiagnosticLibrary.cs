@@ -478,12 +478,12 @@ static class DiagnosticLibrary
 
 	/// <summary>
 	/// ZODSGEN046: a <c>[CollectionBehavior]</c> attribute is applied to a property that is not a collection,
-	/// or whose elements cannot be null (a non-nullable value element), so the setting can never take effect.
+	/// or whose configured settings cannot take effect.
 	/// </summary>
 	public static readonly DiagnosticDescriptor CollectionBehaviorNotApplicable = new(
 		id: "ZODSGEN046",
 		title: "Collection behavior attribute is not applicable",
-		messageFormat: "[CollectionBehavior] on '{0}' has no effect: the property is not a collection of nullable elements",
+		messageFormat: "[CollectionBehavior] on '{0}' has no effect: the configured options do not apply to this collection type",
 		category: Category,
 		defaultSeverity: DiagnosticSeverity.Warning,
 		isEnabledByDefault: true

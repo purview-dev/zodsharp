@@ -24,6 +24,9 @@
 		<CompilerVisibleProperty Include="ZodSharpAllowNulls">
 			<Description>Assembly-wide default for whether collection properties may contain null elements; false (the default) rejects them.</Description>
 		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpDefaultImmutableArrayBehavior">
+			<Description>How uninitialized ImmutableArray members are validated: ValidationError (default, normal missing-value rules) or TreatAsEmpty.</Description>
+		</CompilerVisibleProperty>
 		<CompilerVisibleProperty Include="ZodSharpDateTimeOffsetSerialization">
 			<Description>Assembly-wide DateTimeOffset wire form assumed by JSON Schema generation; Utc requires a zero offset and makes the non-sentinel mapping exact, PreserveOffset (the default) keeps the value's offset.</Description>
 		</CompilerVisibleProperty>

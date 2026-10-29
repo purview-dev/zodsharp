@@ -20,6 +20,7 @@
 		<PurviewGeneratorVisibleProperty Include="ZodSharpEnumSerialization" />
 		<PurviewGeneratorVisibleProperty Include="ZodSharpEnumNamingPolicy" />
 		<PurviewGeneratorVisibleProperty Include="ZodSharpAllowNulls" />
+		<PurviewGeneratorVisibleProperty Include="ZodSharpDefaultImmutableArrayBehavior" />
 		<PurviewGeneratorVisibleProperty Include="ZodSharpDateTimeOffsetSerialization" />
 		<PurviewGeneratorVisibleProperty Include="PublishTrimmed" />
 		<PurviewGeneratorVisibleProperty Include="PublishAot" />

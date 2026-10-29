@@ -31,5 +31,7 @@ static class PropertyLibrary
 
 	public const string AllowNullsProperty = "ZodSharpAllowNulls";
 
+	public const string DefaultImmutableArrayBehaviorProperty = "ZodSharpDefaultImmutableArrayBehavior";
+
 	public const string DateTimeOffsetSerializationProperty = "ZodSharpDateTimeOffsetSerialization";
 }

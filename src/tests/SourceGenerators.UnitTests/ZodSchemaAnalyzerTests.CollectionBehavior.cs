@@ -5,6 +5,50 @@ namespace ZodSharp.SourceGenerators;
 public partial class ZodSchemaAnalyzerTests
 {
 	[Test]
+	public async Task CollectionBehavior_GivenDefaultArrayOptionOnReferenceCollection_ProducesZODSGEN046(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			namespace Testing;
+			[ZodSchema]
+			public class Widget
+			{
+				[CollectionBehavior(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty)]
+				public System.Collections.Generic.List<string> Items { get; set; } = [];
+			}
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.CollectionBehaviorNotApplicable);
+	}
+
+	[Test]
+	public async Task CollectionBehavior_GivenValueElementImmutableArrayWithDefaultBehavior_ProducesNoZODSGEN046(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			namespace Testing;
+			[ZodSchema]
+			public record Widget(
+				[CollectionBehavior(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty)]
+				System.Collections.Immutable.ImmutableArray<int> Items);
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.CollectionBehaviorNotApplicable);
+	}
+
+	[Test]
 	public async Task CollectionBehavior_GivenNonCollectionProperty_ProducesZODSGEN046(
 		CancellationToken cancellationToken
 	)

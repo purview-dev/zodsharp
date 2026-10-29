@@ -18,6 +18,10 @@
 
 	<Import Sdk="Purview.BuildSdk" Project="Sdk.props" />
 
+	<PropertyGroup>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	</PropertyGroup>
+
 	<!-- Test and executable projects follow the same set. The SDK gives a non-Roslyn project the set's
 	     targets already; this re-asserts it for projects where another default got in first. -->
 	<PropertyGroup Condition="'$(IsTestProject)' == 'true' OR '$(OutputType)' == 'Exe'">

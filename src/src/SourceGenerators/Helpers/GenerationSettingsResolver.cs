@@ -19,7 +19,8 @@ static class GenerationSettingsResolver
 		bool EnumAsString,
 		EnumJsonNamingPolicy EnumNamingPolicy,
 		bool AllowNulls,
-		DateTimeOffsetSerialization DateTimeOffsetSerialization
+		DateTimeOffsetSerialization DateTimeOffsetSerialization,
+		DefaultImmutableArrayBehavior DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.ValidationError
 	);
 
 	/// <summary>
@@ -28,7 +29,8 @@ static class GenerationSettingsResolver
 	/// </summary>
 	internal readonly record struct AssemblyDefaults(
 		bool? AllowNulls,
-		DateTimeOffsetSerialization? DateTimeOffsetSerialization
+		DateTimeOffsetSerialization? DateTimeOffsetSerialization,
+		DefaultImmutableArrayBehavior? DefaultImmutableArrayBehavior = null
 	);
 
 	public static AutoDetectSettings Read(AnalyzerConfigOptionsProvider provider)
@@ -85,7 +87,13 @@ static class GenerationSettingsResolver
 			enumAsString,
 			enumNamingPolicy,
 			allowNulls,
-			dateTimeOffsetSerialization
+			dateTimeOffsetSerialization,
+			provider.GlobalOptions.TryGetValue(
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.DefaultImmutableArrayBehaviorProperty),
+				out var defaultArrayBehavior
+			) && string.Equals(defaultArrayBehavior?.Trim(), "TreatAsEmpty", StringComparison.OrdinalIgnoreCase)
+				? DefaultImmutableArrayBehavior.TreatAsEmpty
+				: DefaultImmutableArrayBehavior.ValidationError
 		);
 	}
 
@@ -111,8 +119,12 @@ static class GenerationSettingsResolver
 				: (bool?)null;
 
 			DateTimeOffsetSerialization? dateTimeOffsetSerialization = null;
+			DefaultImmutableArrayBehavior? defaultImmutableArrayBehavior = null;
 			foreach (var argument in attribute.NamedArguments)
 			{
+				if (argument.Key == "DefaultImmutableArrayBehavior" && argument.Value.Value is int behavior)
+					defaultImmutableArrayBehavior = (DefaultImmutableArrayBehavior)behavior;
+
 				if (
 					argument.Key == AttributeGenHelper.DateTimeOffsetSerializationPropertyName
 					&& argument.Value.Value is int serialization
@@ -122,7 +134,7 @@ static class GenerationSettingsResolver
 				}
 			}
 
-			return new(allowNulls, dateTimeOffsetSerialization);
+			return new(allowNulls, dateTimeOffsetSerialization, defaultImmutableArrayBehavior);
 		}
 
 		return new(null, null);
@@ -235,7 +247,7 @@ static class GenerationSettingsResolver
 				changed = true;
 			}
 
-			var resolvedProperties = ResolveAllowNulls(schema.Properties, settings, assemblyDefaults);
+			var resolvedProperties = ResolveCollectionBehavior(schema.Properties, settings, assemblyDefaults);
 			if (resolvedProperties is { } properties)
 			{
 				schema = schema with { Properties = properties };
@@ -262,14 +274,13 @@ static class GenerationSettingsResolver
 	}
 
 	/// <summary>
-	/// Resolves each collection property's <c>AllowNulls</c> against the assembly defaults when neither the
-	/// property nor its containing type stated one.
+	/// Resolves each property's collection behavior overrides against the assembly and MSBuild defaults.
 	/// </summary>
 	/// <param name="properties">The schema's properties.</param>
 	/// <param name="settings">The assembly-level MSBuild settings.</param>
 	/// <param name="assemblyDefaults">The source-level assembly defaults.</param>
 	/// <returns>The rewritten properties, or <see langword="null"/> when no property changed.</returns>
-	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>>? ResolveAllowNulls(
+	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>>? ResolveCollectionBehavior(
 		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> properties,
 		AutoDetectSettings settings,
 		AssemblyDefaults assemblyDefaults
@@ -290,13 +301,25 @@ static class GenerationSettingsResolver
 
 			var property = propertyResult.Value;
 			var resolved = property.AllowNulls ?? assemblyDefaults.AllowNulls ?? settings.AllowNulls;
-			if (property.AllowNulls == resolved)
+			var arrayBehavior =
+				property.DefaultImmutableArrayBehavior
+				?? assemblyDefaults.DefaultImmutableArrayBehavior
+				?? settings.DefaultImmutableArrayBehavior;
+			if (property.AllowNulls == resolved && property.DefaultImmutableArrayBehavior == arrayBehavior)
 			{
 				builder.Add(propertyResult);
 				continue;
 			}
 
-			builder.Add(GeneratorResult<ZodPropertyDescriptor>.Create(property with { AllowNulls = resolved }));
+			builder.Add(
+				GeneratorResult<ZodPropertyDescriptor>.Create(
+					property with
+					{
+						AllowNulls = resolved,
+						DefaultImmutableArrayBehavior = arrayBehavior,
+					}
+				)
+			);
 			changed = true;
 		}
 

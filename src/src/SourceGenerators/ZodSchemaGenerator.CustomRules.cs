@@ -23,7 +23,10 @@ partial class ZodSchemaGenerator
 
 		// The resolver closes a generic rule over the property's underlying type, so a nullable value type is
 		// unwrapped to match. The validation runs inside the non-null guard, so the unwrap cannot throw.
-		var valueExpression = property.IsNullableValueType ? $"value.{property.Name}!.Value" : $"value.{property.Name}";
+		var valueExpression =
+			property.ValidationKind == PropertyValidationKind.Collection ? CollectionValueExpression(property)
+			: property.IsNullableValueType ? $"value.{property.Name}!.Value"
+			: $"value.{property.Name}";
 
 		for (var i = 0; i < property.CustomRules.Count; i++)
 		{
@@ -91,12 +94,14 @@ partial class ZodSchemaGenerator
 				PathOf(property),
 				MemberOf(property),
 				GetFallbackOrigin(property),
-				invalidCondition: $"value.{propertyName} is null || {scalarExpression}.{scalarPropertyName} is null"
+				invalidCondition: property.CanBeNull
+					? $"value.{propertyName} is null || {scalarExpression}.{scalarPropertyName} is null"
+					: $"{scalarExpression}.{scalarPropertyName} is null"
 			);
 			return;
 		}
 
-		if (property.IsNullableValueType)
+		if (property.IsNullableValueType || RejectsDefaultArray(property))
 		{
 			// The rule is closed over the underlying value, so it cannot be handed null. An absent value is
 			// reported directly, matching how [Required] handles a Nullable<T> member.
@@ -109,7 +114,7 @@ partial class ZodSchemaGenerator
 				PathOf(property),
 				MemberOf(property),
 				GetFallbackOrigin(property),
-				invalidCondition: $"value.{propertyName} is null"
+				invalidCondition: MissingValueCondition(property)
 			);
 			return;
 		}
@@ -119,7 +124,9 @@ partial class ZodSchemaGenerator
 			requiredRule,
 			ruleVariable,
 			identityVariable,
-			$"value.{propertyName}",
+			property.ValidationKind == PropertyValidationKind.Collection
+				? CollectionValueExpression(property)
+				: $"value.{propertyName}",
 			PathOf(property),
 			MemberOf(property),
 			GetFallbackOrigin(property)
