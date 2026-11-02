@@ -177,3 +177,6 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host "Every ForbiddenContent rule ($($cases.Count)) rejected its file, in every package ($($packages.Count))." -ForegroundColor Green
+# Every rejection run leaves dotnet purview-build's non-zero exit in $LASTEXITCODE, which a caller (GitHub's pwsh step
+# wrapper, or `pwsh -File`) would otherwise report as this script's result.
+exit 0
