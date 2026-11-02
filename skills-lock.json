@@ -89,7 +89,7 @@
       "source": "purview-dev/sourcegenerator-framework",
       "sourceType": "github",
       "skillPath": "skills/purview-sourcegenerator-packaging/SKILL.md",
-      "computedHash": "e0e6372e92aefc8df026a73010d9e7436b0a8c2378a96fdebd8b4de9e025d4a0"
+      "computedHash": "ee2440f1e0aa0cea731eb3eae2ea3c4e9ea77502867abc21e9f0a3c61f20c640"
     },
     "purview-sourcegenerator-pipeline": {
       "source": "purview-dev/sourcegenerator-framework",
