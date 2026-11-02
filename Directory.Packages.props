@@ -36,7 +36,7 @@
 		<PackageVersion Include="FastGuid" Version="1.4.3" />
 		<!-- Test-only: validates fixture payloads against the OpenAPI document Purview.ZodSharp.AspNetCore.OpenApi
 		     emits, proving the document agrees with what ZodSharp enforces. -->
-		<PackageVersion Include="JsonSchema.Net" Version="9.5.0" />
+		<PackageVersion Include="JsonSchema.Net" Version="9.6.0" />
 		<!-- net11.0 only: Purview.ZodSharp.AspNetCore.OpenApi targets the Microsoft.OpenApi 3.x object model that
 		     ASP.NET Core 11 ships. -->
 		<PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0-rc.3.26522.148" />
@@ -52,7 +52,7 @@
 		<PackageVersion Include="Microsoft.Extensions.Localization" Version="$(MicrosoftExtensionsVersion)" />
 		<!-- Test-only: hosts the Blazor sample in memory and parses its HTML (Examples.Blazor.IntegrationTests). -->
 		<PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(AspNetCoreTestHostVersion)" />
-		<PackageVersion Include="AngleSharp" Version="1.8.6" />
+		<PackageVersion Include="AngleSharp" Version="1.9.1" />
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsVersion)" />
 		<PackageVersion
 			Include="Microsoft.Extensions.DependencyInjection.Abstractions"

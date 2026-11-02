@@ -16,6 +16,7 @@
 - [JSON Schema Import](JsonSchema-Import.md)
 - [System.Text.Json Integration](SystemTextJson-Integration.md)
 - [Newtonsoft.Json Integration](NewtonsoftJson-Integration.md)
+- [HttpClient Integration](Http-Integration.md)
 - [ASP.NET Core Integration](AspNetCore-Integration.md)
 - [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md)
 - [OpenAPI Integration](OpenAPI-Integration.md)

@@ -14,7 +14,12 @@
 	</li>
 	<li>
 		<a href="register">Interactive WebAssembly</a>: <code>&lt;ZodValidator&gt;</code> (route 2) with debounced
-		validation, error codes, an async uniqueness check and server errors mapped back onto the form.
+		validation, error codes, an async uniqueness check and server errors mapped back onto the form. It posts from the
+		browser with <code>Purview.ZodSharp.Http</code>, which validates before sending and as the response is read.
+	</li>
+	<li>
+		<a href="register-server">Interactive Server + HttpClient</a>: the same form on the server, whose typed client
+		(<code>IHttpClientFactory</code>) calls the API service-to-service with <code>Purview.ZodSharp.Http</code>.
 	</li>
 	<li>
 		<a href="returns">Static SSR</a>: a posted form with client-side validation of ZodSharp rules

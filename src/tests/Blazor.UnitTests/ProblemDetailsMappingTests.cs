@@ -1,5 +1,3 @@
-using System.Net;
-using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Http;
@@ -8,13 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 using ZodSharp.AspNetCore;
 using ZodSharp.Blazor.Fixtures;
 using ZodSharp.Core;
+using ZodSharp.Http;
 using static ZodSharp.Blazor.Fixtures.Errors;
 
 namespace ZodSharp.Blazor;
 
 /// <summary>
-/// Server validation problems mapped onto forms: <c>TryReadZodValidationProblemAsync</c> and
-/// <c>AddZodProblemDetails</c>.
+/// Server validation problems mapped onto forms with <c>AddZodProblemDetails</c>. Reading them
+/// (<c>TryReadZodValidationProblemAsync</c>) is covered by Purview.ZodSharp.Http's tests.
 /// </summary>
 public class ProblemDetailsMappingTests
 {
@@ -127,6 +126,47 @@ public class ProblemDetailsMappingTests
 	}
 
 	[Test]
+	public async Task AddZodErrors_GivenErrorsFromOutsideTheForm_PlacesThemAndKeepsTheFullErrors()
+	{
+		// Arrange
+		Order order = new() { Lines = [new()] };
+		EditContext editContext = new(order);
+		ValidationError[] errors =
+		[
+			At("too_small", "Sku is required", M("Lines"), I(0), M("Sku")),
+			At("custom", "Order is invalid"),
+		];
+
+		// Act
+		editContext.AddZodErrors(errors);
+
+		// Assert
+		FieldIdentifier sku = new(order.Lines[0], nameof(OrderLine.Sku));
+		await Assert.That(editContext.GetValidationMessages(sku)).IsEquivalentTo(["Sku is required"]);
+		await Assert.That(editContext.GetZodErrors(sku).Single().Code).IsEqualTo("too_small");
+		await Assert
+			.That(editContext.GetValidationMessages(new FieldIdentifier(order, string.Empty)))
+			.IsEquivalentTo(["Order is invalid"]);
+	}
+
+	[Test]
+	public async Task AddZodErrors_GivenEarlierProblemDetails_ReplacesThem()
+	{
+		// Arrange
+		Order order = new();
+		EditContext editContext = new(order);
+		editContext.AddZodProblemDetails(
+			new() { Errors = new Dictionary<string, string[]> { ["Reference"] = ["Reference is taken"] } }
+		);
+
+		// Act
+		editContext.AddZodErrors([At("custom", "Email is invalid", M("Customer"), M("Email"))]);
+
+		// Assert
+		await Assert.That(editContext.GetValidationMessages()).IsEquivalentTo(["Email is invalid"]);
+	}
+
+	[Test]
 	public async Task AddZodProblemDetails_GivenFieldChange_ClearsOnlyThatFieldsServerErrors()
 	{
 		// Arrange
@@ -223,70 +263,6 @@ public class ProblemDetailsMappingTests
 		// Assert
 		await Assert.That(editContext.GetValidationMessages()).IsEmpty();
 		await Assert.That(editContext.GetZodErrors()).IsEmpty();
-	}
-
-	[Test]
-	public async Task TryReadZodValidationProblemAsync_GivenUnionIssue_ReadsTheOptions(
-		CancellationToken cancellationToken
-	)
-	{
-		// Arrange
-		using HttpResponseMessage response = new(HttpStatusCode.BadRequest)
-		{
-			Content = new StringContent(
-				/*lang=json,strict*/"""
-				{"status":400,"errors":{"Pet":["Invalid input"]},"issues":[{"path":"Pet","segments":["Pet"],
-				"code":"invalid_union","category":"invalid_union","message":"Invalid input","unionErrors":[[{"path":"Name",
-				"segments":["Name"],"code":"invalid_type","message":"Required"}]]}],"traceId":"00-abc"}
-				""",
-				Encoding.UTF8,
-				"application/problem+json"
-			),
-		};
-
-		// Act
-		var problem = await response.TryReadZodValidationProblemAsync(cancellationToken);
-
-		// Assert
-		await Assert.That(problem).IsNotNull();
-		await Assert.That(problem!.TraceId).IsEqualTo("00-abc");
-		var error = problem.ToValidationErrors().Single();
-		var options = error.GetUnionErrors();
-		await Assert.That(options.Length).IsEqualTo(1);
-		await Assert.That(options[0][0].Code).IsEqualTo("invalid_type");
-	}
-
-	[Test]
-	[Arguments(
-		HttpStatusCode.OK,
-		"application/json", /*lang=json,strict*/
-		"""{"errors":{"a":["b"]}}"""
-	)]
-	[Arguments(HttpStatusCode.BadRequest, "text/plain", "not json")]
-	[Arguments(HttpStatusCode.BadRequest, "application/json", "{not json")]
-	[Arguments(
-		HttpStatusCode.NotFound,
-		"application/problem+json", /*lang=json,strict*/
-		"""{"title":"Not Found","status":404}"""
-	)]
-	public async Task TryReadZodValidationProblemAsync_GivenNonValidationResponse_ReturnsNull(
-		HttpStatusCode status,
-		string mediaType,
-		string body,
-		CancellationToken cancellationToken
-	)
-	{
-		// Arrange
-		using HttpResponseMessage response = new(status)
-		{
-			Content = new StringContent(body, Encoding.UTF8, mediaType),
-		};
-
-		// Act
-		var problem = await response.TryReadZodValidationProblemAsync(cancellationToken);
-
-		// Assert
-		await Assert.That(problem).IsNull();
 	}
 
 	static System.Text.Json.JsonElement Json(string json) => System.Text.Json.JsonElement.Parse(json);

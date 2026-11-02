@@ -201,13 +201,29 @@ if (await response.TryReadZodValidationProblemAsync() is { } problem)
 ```
 
 - `TryReadZodValidationProblemAsync` reads an unsuccessful JSON response with `errors` or `issues` - the contract
-  [ASP.NET Core Integration](AspNetCore-Integration.md) writes - using source-generated JSON metadata.
+  [ASP.NET Core Integration](AspNetCore-Integration.md) writes - using source-generated JSON metadata. It and
+  `ZodValidationProblemDetails` (namespace `ZodSharp.Http`) come from `Purview.ZodSharp.Http`, which this package
+  references; see [HttpClient Integration](Http-Integration.md) for validating request and response bodies too.
 - `AddZodProblemDetails` places issues by their typed `segments`, so `Lines[0].Quantity` lands on
   `order.Lines[0].Quantity`; without `issues` it parses the dotted `errors` keys. Camel-cased member names match
   case-insensitively, and dictionary keys resolve. When a `ZodValidator` is on the form its validator resolves the
   paths.
 - Server errors replace the previous server errors and are cleared per field when the field changes
   (`clearOnFieldChange: false` keeps them). `ClearZodErrors()` removes every ZodSharp error.
+- `AddZodErrors(errors)` places errors produced outside the form the same way - for example those
+  `PostAsJsonValidatedAsync` returns when it refuses to send an invalid value:
+
+  ```csharp
+  var sent = await http.PostAsJsonValidatedAsync("/orders", order,
+      new OrderSchemaValidator(), AppJsonContext.Default.Order, services);
+  if (!sent.IsSuccess)
+      editContext.AddZodErrors(sent.Errors);
+  else if (await sent.Value!.TryReadZodValidationProblemAsync() is { } problem)
+      editContext.AddZodProblemDetails(problem);
+  ```
+
+  It shares `AddZodProblemDetails`'s store and rules: each call replaces the previous one's errors, they clear per
+  field on change, and `GetZodErrors` returns the full errors.
 
 ## Static SSR client-side validation
 
@@ -297,7 +313,8 @@ builder.Services.AddZodSharpBlazor();
 | Page | Render mode | Shows |
 | --- | --- | --- |
 | `/orders` | Interactive Server | Route 1: `<DataAnnotationsValidator />` over `CreateOrderRequest` - a nested `ShippingAddress`, a list of `Lines` and a dictionary of `AdditionalAddresses` - with field-level validation and each message next to its input. |
-| `/register` | Interactive WebAssembly | Route 2: `<ZodValidator ValidateOn="Change \| Input" DebounceMilliseconds="300">`, `ZodValidationMessage ShowCode`, the service-aware async email-uniqueness rule (its registry calls the server from the browser) with a pending indicator from `IsValidationPending`, and a button that posts without validating so the server's ProblemDetails are mapped back with `AddZodProblemDetails`. |
+| `/register` | Interactive WebAssembly | Route 2: `RegisterCustomerForm` - `<ZodValidator ValidateOn="Change \| Input" DebounceMilliseconds="300">`, `ZodValidationMessage ShowCode`, the service-aware async email-uniqueness rule (its registry calls the server from the browser) with a pending indicator from `IsValidationPending`. It registers through `CustomerAPIClient` ([HttpClient Integration](Http-Integration.md)): `PostAsJsonValidatedAsync` with the browser's services, `ReadFromJsonAndValidateAsync` for the response, and a button that posts without validating so the server's ProblemDetails come back through `TryReadZodValidationProblemAsync` onto the fields with `AddZodErrors`. |
+| `/register-server` | Interactive Server | The same `RegisterCustomerForm` on the server. `CustomerAPIClient` is a typed client from `IHttpClientFactory`, created in the circuit's scope, calling the API service-to-service; the uniqueness rule resolves the server's own registry. |
 | `/returns` | Static SSR | `FormName` + `[SupplyParameterFromForm]`, server validation of the posted form, and browser-side checks of `[StartsWith]` and `[UUID]` from `AddZodSharpClientValidation()`. |
 
 The server also exposes the minimal API the WebAssembly form posts to (`POST /api/customers`, validated by the .NET 11
@@ -316,12 +333,17 @@ just wasm-size          # trimmed WebAssembly publish (fails on IL2xxx/IL3xxx) +
 - `Examples.Blazor.IntegrationTests` hosts the sample in memory (`WebApplicationFactory`): the static-SSR page's
   `data-rules` carry `zod-startswith` and `zod-uuid`, an invalid nested and collection POST re-renders each message
   next to its input (AngleSharp), and `POST /api/customers` returns the ZodValidationProblemDetails contract,
-  localized for `Accept-Language: fr`.
+  localized for `Accept-Language: fr`. `CustomerAPIClientTests` resolves the server's `CustomerAPIClient` registration
+  and drives it against the API: a valid registration, an invalid one and a taken address rejected without a request,
+  and an unvalidated post returning the server's errors.
 - The `wasm-trimmed` PR job publishes the client trimmed with `-warnaserror` and checks the Brotli size of each
   `Purview.ZodSharp*` assembly against `.config/wasm-size-baseline.json` (more than 10% growth fails;
   `scripts/check-wasm-size.ps1 -Update` rewrites the baseline after an intended change).
 - The nightly `wasm-nightly.yml` workflow publishes the client with `RunAOTCompilation=true` (the `wasm-tools`
-  workload) and runs `tests/e2e/blazor-sample.e2e.mjs` against the published sample in Chromium.
+  workload) and runs `tests/e2e/blazor-sample.e2e.mjs` against the published sample in Chromium, including a
+  registration from each of `/register` and `/register-server`. Run it locally with
+  `npm install --no-save --no-package-lock playwright-core@1`, the published sample on `http://127.0.0.1:5090`, and
+  `E2E_BROWSER_CHANNEL=msedge node tests/e2e/blazor-sample.e2e.mjs`.
 - The client does not reference Microsoft.Extensions.Validation directly and has no `[ValidatableType]`; nested,
   collection and dictionary validation still works in the browser because the ZodSharp resolver supplies the type
   info.

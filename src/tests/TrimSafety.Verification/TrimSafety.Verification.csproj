@@ -55,6 +55,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
 		<ProjectReference Include="..\..\src\SystemTextJson\SystemTextJson.csproj" />
+		<ProjectReference Include="..\..\src\Http\Http.csproj" />
 		<ProjectReference Include="..\..\src\AspNetCore\AspNetCore.csproj" />
 		<ProjectReference Include="..\..\src\AspNetCore.OpenApi\AspNetCore.OpenApi.csproj" />
 		<ProjectReference Include="..\..\src\Extensions.Validation\Extensions.Validation.csproj" />
@@ -95,6 +96,7 @@
 	>
 		<TrimmerRootAssembly Include="Purview.ZodSharp" />
 		<TrimmerRootAssembly Include="Purview.ZodSharp.SystemTextJson" />
+		<TrimmerRootAssembly Include="Purview.ZodSharp.Http" />
 		<TrimmerRootAssembly Include="Purview.ZodSharp.AspNetCore" />
 		<TrimmerRootAssembly Include="Purview.ZodSharp.AspNetCore.OpenApi" />
 		<TrimmerRootAssembly Include="Purview.ZodSharp.Extensions.Validation" />

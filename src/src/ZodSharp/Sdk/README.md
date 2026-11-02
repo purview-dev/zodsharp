@@ -8,6 +8,7 @@ A high-performance schema validation library for C#, ported from TypeScript [Zod
 This package is the core library. It also ships the `[ZodSchema]` source generator and JSON Schema **export** (`Z.ToJsonSchema`). JSON Schema **import** (`Z.FromJsonSchema`) and JSON serialization integrations are available in the companion packages:
 
 - [Purview.ZodSharp.SystemTextJson](https://www.nuget.org/packages/Purview.ZodSharp.SystemTextJson) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.SystemTextJson.svg)](https://www.nuget.org/packages/Purview.ZodSharp.SystemTextJson)
+- [Purview.ZodSharp.Http](https://www.nuget.org/packages/Purview.ZodSharp.Http) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.Http.svg)](https://www.nuget.org/packages/Purview.ZodSharp.Http)
 - [Purview.ZodSharp.NewtonsoftJson](https://www.nuget.org/packages/Purview.ZodSharp.NewtonsoftJson) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.NewtonsoftJson.svg)](https://www.nuget.org/packages/Purview.ZodSharp.NewtonsoftJson)
 - [Purview.ZodSharp.AspNetCore](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.AspNetCore.svg)](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore)
 - [Purview.ZodSharp.Extensions.Validation](https://www.nuget.org/packages/Purview.ZodSharp.Extensions.Validation) (.NET 11) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.Extensions.Validation.svg)](https://www.nuget.org/packages/Purview.ZodSharp.Extensions.Validation)

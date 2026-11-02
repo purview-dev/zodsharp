@@ -101,7 +101,29 @@ if (await response.TryReadZodValidationProblemAsync() is { } problem)
 Places `issues[].segments` (or parses the dotted `errors` keys of a plain ValidationProblemDetails), matches
 camel-cased names case-insensitively, replaces the previous server errors, and clears a field's server error
 when it changes (`clearOnFieldChange: false` keeps them). `ClearZodErrors()` removes every ZodSharp error.
-Reading uses source-generated JSON metadata, so it is trim- and AOT-safe.
+Reading uses source-generated JSON metadata, so it is trim- and AOT-safe. `TryReadZodValidationProblemAsync` and
+`ZodValidationProblemDetails` (namespace `ZodSharp.Http`) come from `Purview.ZodSharp.Http`, which this package
+references; that package also sends validated bodies (`PostAsJsonValidatedAsync`) and reads validated responses
+(`ReadFromJsonAndValidateAsync`) - see the `purview-zodsharp-json` skill.
+
+`AddZodErrors(errors)` places errors produced anywhere else by their typed paths, with the same store and clearing
+rules (each call replaces the previous `AddZodErrors`/`AddZodProblemDetails` errors):
+
+```csharp
+@inject IServiceProvider Services
+...
+var sent = await Http.PostAsJsonValidatedAsync("/orders", order,
+    new OrderSchemaValidator(), AppJsonContext.Default.Order, Services); // services: the uniqueness rule runs
+if (!sent.IsSuccess)
+    editContext.AddZodErrors(sent.Errors);                              // rejected before sending
+else if (await sent.Value!.TryReadZodValidationProblemAsync() is { } problem)
+    editContext.AddZodProblemDetails(problem);                          // rejected by the server
+```
+
+For one component in every render mode, put the calls in a typed client: `AddScoped<TClient>()` in the WebAssembly
+client's `Program.cs`, `AddHttpClient<TClient>(...)` on the server (the server-rendered component then calls the API
+service-to-service). The repository's `Examples.Blazor` sample does exactly this: `RegisterCustomerForm` with
+`CustomerAPIClient`, on `/register` (WebAssembly) and `/register-server` (Interactive Server).
 
 ## Static SSR client-side validation
 

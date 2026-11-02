@@ -13,6 +13,10 @@ builder.Services.AddScoped(static sp => new HttpClient
 // asks the server; on the server it is the in-memory store itself.
 builder.Services.AddScoped<ICustomerEmailRegistry, HttpCustomerEmailRegistry>();
 
+// The typed client RegisterCustomerForm posts through (Purview.ZodSharp.Http). Here it uses the browser's HttpClient and
+// services; the server registers the same class with IHttpClientFactory for the Interactive Server page.
+builder.Services.AddScoped<CustomerAPIClient>();
+
 // The same two calls as the server Program.cs: the generated, trim-safe registration of the Examples.Shared
 // [ZodSchema] models (no assembly scanning), then ZodSharp for Blazor forms.
 builder.Services.AddZodSharpZodSharpExamplesSharedSchemas();

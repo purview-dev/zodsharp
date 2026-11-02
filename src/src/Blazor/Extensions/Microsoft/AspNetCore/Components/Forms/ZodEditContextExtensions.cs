@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using ZodSharp.Blazor;
 using ZodSharp.Core;
+using ZodSharp.Http;
 
 namespace Microsoft.AspNetCore.Components.Forms;
 
@@ -73,47 +74,44 @@ public static class ZodEditContextExtensions
 			bool clearOnFieldChange = true
 		)
 		{
-			ArgumentNullException.ThrowIfNull(editContext);
 			ArgumentNullException.ThrowIfNull(problem);
+			editContext.AddZodErrors(problem.ToValidationErrors(), store, clearOnFieldChange);
+		}
 
-			var errors = ZodFormErrors.GetOrCreate(editContext);
-			ClearServerErrors(errors);
+		/// <summary>
+		/// Places ZodSharp errors produced outside the form onto its fields, exactly as <c>AddZodProblemDetails</c>
+		/// places a server's: for example the errors <c>PostAsJsonValidatedAsync</c> returns when it refuses to send an
+		/// invalid value, or <c>ZodValidationProblemDetails.ToValidationErrors()</c> after post-processing. Errors are
+		/// placed by their typed <see cref="ValidationError.FullPath"/>, matching member names case-insensitively when no
+		/// exact match exists.
+		/// </summary>
+		/// <param name="errors">The errors.</param>
+		/// <param name="store">
+		/// The store to add the messages to; <see langword="null"/> to use one the form keeps for these errors.
+		/// </param>
+		/// <param name="clearOnFieldChange">
+		/// Whether a field's errors are cleared when the field changes. Defaults to <see langword="true"/>.
+		/// </param>
+		/// <remarks>
+		/// Previously added errors (from this method or <c>AddZodProblemDetails</c>) are replaced; they are read back by
+		/// <c>GetZodErrors</c> and removed by <c>ClearZodErrors</c>.
+		/// </remarks>
+		public void AddZodErrors(
+			IEnumerable<ValidationError> errors,
+			ValidationMessageStore? store = null,
+			bool clearOnFieldChange = true
+		)
+		{
+			ArgumentNullException.ThrowIfNull(editContext);
+			ArgumentNullException.ThrowIfNull(errors);
 
-			var target = store ?? (errors.ServerStore ??= new ValidationMessageStore(editContext));
-			var validator = errors.Validator?.RootValidator;
-			foreach (var error in problem.ToValidationErrors())
-			{
-				var field = ZodFieldLocator.Locate(editContext.Model, error.FullPath, validator, ignoreCase: true);
-				var message = error.Message ?? string.Empty;
-				target.Add(field, message);
-				errors.AddServerError(field, error, message);
-				errors.ServerStores[field] = target;
-			}
-
-			if (clearOnFieldChange && !errors.ClearsServerErrorsOnFieldChange)
-			{
-				errors.ClearsServerErrorsOnFieldChange = true;
-				editContext.OnFieldChanged += static (sender, e) =>
-				{
-					if (sender is not EditContext context || ZodFormErrors.Get(context) is not { } state)
-						return;
-
-					var field = e.FieldIdentifier;
-					if (state.ServerStores.Remove(field, out var fieldStore))
-					{
-						fieldStore.Clear(field);
-						state.ClearServer(field);
-						context.NotifyValidationStateChanged();
-					}
-				};
-			}
-
-			editContext.NotifyValidationStateChanged();
+			var formErrors = ZodFormErrors.GetOrCreate(editContext);
+			AddExternalErrors(editContext, formErrors, errors, store, clearOnFieldChange);
 		}
 
 		/// <summary>
 		/// Clears every ZodSharp error on the form: the messages and errors <see cref="ZodValidator"/> placed and the
-		/// server errors mapped by <c>AddZodProblemDetails</c>.
+		/// errors added by <c>AddZodProblemDetails</c> and <c>AddZodErrors</c>.
 		/// </summary>
 		public void ClearZodErrors()
 		{
@@ -127,6 +125,48 @@ public static class ZodEditContextExtensions
 			errors.ClearValidator();
 			editContext.NotifyValidationStateChanged();
 		}
+	}
+
+	static void AddExternalErrors(
+		EditContext editContext,
+		ZodFormErrors errors,
+		IEnumerable<ValidationError> source,
+		ValidationMessageStore? store,
+		bool clearOnFieldChange
+	)
+	{
+		ClearServerErrors(errors);
+
+		var target = store ?? (errors.ServerStore ??= new ValidationMessageStore(editContext));
+		var validator = errors.Validator?.RootValidator;
+		foreach (var error in source)
+		{
+			var field = ZodFieldLocator.Locate(editContext.Model, error.FullPath, validator, ignoreCase: true);
+			var message = error.Message ?? string.Empty;
+			target.Add(field, message);
+			errors.AddServerError(field, error, message);
+			errors.ServerStores[field] = target;
+		}
+
+		if (clearOnFieldChange && !errors.ClearsServerErrorsOnFieldChange)
+		{
+			errors.ClearsServerErrorsOnFieldChange = true;
+			editContext.OnFieldChanged += static (sender, e) =>
+			{
+				if (sender is not EditContext context || ZodFormErrors.Get(context) is not { } state)
+					return;
+
+				var field = e.FieldIdentifier;
+				if (state.ServerStores.Remove(field, out var fieldStore))
+				{
+					fieldStore.Clear(field);
+					state.ClearServer(field);
+					context.NotifyValidationStateChanged();
+				}
+			};
+		}
+
+		editContext.NotifyValidationStateChanged();
 	}
 
 	static void ClearServerErrors(ZodFormErrors errors)

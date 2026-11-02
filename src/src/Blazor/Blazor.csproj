@@ -40,6 +40,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Extensions.Validation\Extensions.Validation.csproj" />
+		<!-- The validation-problem contract and TryReadZodValidationProblemAsync; AddZodProblemDetails maps it onto forms. -->
+		<ProjectReference Include="..\Http\Http.csproj" />
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
 	</ItemGroup>
 

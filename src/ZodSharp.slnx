@@ -23,6 +23,7 @@
 		<Project Path="tests/Examples.Blazor.IntegrationTests/Examples.Blazor.IntegrationTests.csproj" />
 		<Project Path="tests/Examples.MinimalApi.IntegrationTests/Examples.MinimalApi.IntegrationTests.csproj" />
 		<Project Path="tests/Extensions.Validation.UnitTests/Extensions.Validation.UnitTests.csproj" />
+		<Project Path="tests/Http.UnitTests/Http.UnitTests.csproj" />
 		<Project Path="tests/JsonInterop.UnitTests/JsonInterop.UnitTests.csproj" />
 		<Project Path="tests/NewtonsoftJson.UnitTests/NewtonsoftJson.UnitTests.csproj" />
 		<Project Path="tests/SourceGenerators.UnitTests/SourceGenerators.UnitTests.csproj" />
@@ -37,6 +38,7 @@
 		<Project Path="src/AspNetCore.OpenApi/AspNetCore.OpenApi.csproj" />
 		<Project Path="src/CodeFixes/CodeFixes.csproj" />
 		<Project Path="src/Extensions.Validation/Extensions.Validation.csproj" />
+		<Project Path="src/Http/Http.csproj" />
 		<Project Path="src/NewtonsoftJson/NewtonsoftJson.csproj" />
 		<Project Path="src/SourceGenerators/SourceGenerators.csproj" />
 		<Project Path="src/SystemTextJson/SystemTextJson.csproj" />

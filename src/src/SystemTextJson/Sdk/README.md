@@ -35,6 +35,26 @@ await using var stream = File.OpenRead("user.json");
 var result = await userSchema.DeserializeAndValidateAsync(stream);
 ```
 
+In a trimmed, Native AOT or Blazor WebAssembly app, pass the contract from a source-generated `JsonSerializerContext`
+(the `JsonTypeInfo<T>` overloads); the overloads above resolve it reflectively and are annotated so the build warns.
+
+```csharp
+var result = schema.DeserializeAndValidate(json, AppJsonContext.Default.User);
+```
+
+Service-aware rules (an async uniqueness check that resolves a repository) run when a generated validator is given the
+caller's services:
+
+```csharp
+var result = await new UserSchemaValidator().DeserializeAndValidateAsync(
+    stream, AppJsonContext.Default.User, services, cancellationToken);
+var written = await new UserSchemaValidator().ValidateAndSerializeAsync(
+    user, output, AppJsonContext.Default.User, services, cancellationToken);
+```
+
+For `HttpClient` request and response bodies, see
+[Purview.ZodSharp.Http](https://www.nuget.org/packages/Purview.ZodSharp.Http), which builds on these.
+
 ## Validating converter
 
 ```csharp

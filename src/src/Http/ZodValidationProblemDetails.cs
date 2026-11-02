@@ -4,13 +4,14 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ZodSharp.Core;
 
-namespace ZodSharp.Blazor;
+namespace ZodSharp.Http;
 
 /// <summary>
 /// A validation problem returned by an API: the RFC 9457 ProblemDetails body that Purview.ZodSharp.AspNetCore writes
 /// (<c>errors</c>, <c>issues</c> and <c>traceId</c>), or a plain ASP.NET Core <c>ValidationProblemDetails</c> with
-/// only <c>errors</c>. Read one with <c>HttpResponseMessage.TryReadZodValidationProblemAsync()</c> and map it onto a
-/// form with <c>EditContext.AddZodProblemDetails</c>.
+/// only <c>errors</c>. Read one with <c>HttpResponseMessage.TryReadZodValidationProblemAsync()</c>, convert it with
+/// <see cref="ToValidationErrors"/>, or (with Purview.ZodSharp.Blazor) map it onto a form with
+/// <c>EditContext.AddZodProblemDetails</c>.
 /// </summary>
 public sealed class ZodValidationProblemDetails
 {
@@ -84,6 +85,14 @@ public sealed class ZodValidationProblemDetails
 
 		return builder.ToImmutable();
 	}
+
+	/// <summary>
+	/// Converts the problem into a failed <see cref="ValidationResult{T}"/> carrying <see cref="ToValidationErrors"/>,
+	/// so a server's verdict reads the same as a local <c>Validate</c>.
+	/// </summary>
+	/// <typeparam name="T">The type the request was validating.</typeparam>
+	/// <returns>The failed result.</returns>
+	public ValidationResult<T> ToValidationResult<T>() => ValidationResult<T>.Failure(ToValidationErrors());
 }
 
 /// <summary>
@@ -247,4 +256,4 @@ public sealed class ZodValidationProblemIssue
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(ZodValidationProblemDetails))]
-sealed partial class ZodBlazorJsonContext : JsonSerializerContext;
+sealed partial class ZodHttpJsonContext : JsonSerializerContext;

@@ -67,7 +67,20 @@ if (await response.TryReadZodValidationProblemAsync() is { } problem)
 ```
 
 Reads Purview.ZodSharp.AspNetCore's `issues[]` (typed `segments`), or a plain `errors` dictionary, with
-source-generated JSON metadata (trim- and AOT-safe).
+source-generated JSON metadata (trim- and AOT-safe). `TryReadZodValidationProblemAsync` and `ZodValidationProblemDetails`
+come from [Purview.ZodSharp.Http](https://www.nuget.org/packages/Purview.ZodSharp.Http), which this package references.
+
+Errors produced anywhere else go on the form the same way, by their typed paths:
+
+```csharp
+var sent = await http.PostAsJsonValidatedAsync("/orders", order,
+    new OrderSchemaValidator(), AppJsonContext.Default.Order, services);
+if (!sent.IsSuccess)
+    editContext.AddZodErrors(sent.Errors);   // rejected before sending; cleared per field like server errors
+```
+
+`AddZodErrors` and `AddZodProblemDetails` replace each other's errors, `GetZodErrors` reads them back, and
+`ClearZodErrors` removes them.
 
 ## Static SSR client-side validation
 

@@ -1,0 +1,106 @@
+@implements IDisposable
+@inject CustomerAPIClient Customers
+
+@* The registration form, shared by the Interactive WebAssembly page (/register) and the Interactive Server page
+   (/register-server): the same component, validator and CustomerAPIClient run in the browser and on the server. *@
+<EditForm EditContext="_editContext" OnValidSubmit="RegisterAsync">
+	<ZodValidator ValidateOn="@(ZodValidationTrigger.Change | ZodValidationTrigger.Input)" DebounceMilliseconds="300" />
+
+	<div class="field">
+		<label for="name">Name</label>
+		<LiveInputText id="name" @bind-Value="_model.Name" />
+		<ZodValidationMessage For="() => _model.Name" ShowCode="true" />
+	</div>
+
+	<div class="field">
+		<label for="email">Email</label>
+		<LiveInputText id="email" @bind-Value="_model.Email" />
+		@if (_editContext.IsValidationPending(() => _model.Email))
+		{
+			<span id="email-pending" class="pending-indicator">Checking...</span>
+		}
+		<ZodValidationMessage For="() => _model.Email" ShowCode="true" />
+	</div>
+
+	<div class="field">
+		<label for="age">Age</label>
+		<InputNumber id="age" @bind-Value="_model.Age" />
+		<ZodValidationMessage For="() => _model.Age" ShowCode="true" />
+	</div>
+
+	<ZodValidationSummary />
+
+	<button type="submit" disabled="@_busy">Register</button>
+	<button type="button" id="post-unvalidated" disabled="@_busy" @onclick="PostUnvalidatedAsync">
+		Send to the server without validating
+	</button>
+</EditForm>
+
+@if (_status is not null)
+{
+	<p id="status" role="status" data-outcome="@_outcome">@_status</p>
+}
+
+@code {
+	readonly RegisterCustomerRequest _model = new();
+	EditContext _editContext = default!;
+	string? _status;
+	RegistrationOutcome? _outcome;
+	bool _busy;
+
+	protected override void OnInitialized()
+	{
+		_editContext = new(_model);
+		_editContext.OnValidationStateChanged += OnValidationStateChanged;
+	}
+
+	void OnValidationStateChanged(object? sender, ValidationStateChangedEventArgs e) => StateHasChanged();
+
+	// The form has validated, and CustomerAPIClient validates again before sending - with the same services, so the
+	// uniqueness check runs - because it never relies on its caller having done so.
+	Task RegisterAsync() => SendAsync(validateBeforeSending: true);
+
+	// Skips every client check, so the server's ProblemDetails are mapped back onto the same fields.
+	Task PostUnvalidatedAsync() => SendAsync(validateBeforeSending: false);
+
+	async Task SendAsync(bool validateBeforeSending)
+	{
+		_busy = true;
+		_status = null;
+		try
+		{
+			Show(await Customers.RegisterAsync(_model, validateBeforeSending));
+		}
+		finally
+		{
+			_busy = false;
+		}
+	}
+
+	void Show(CustomerRegistration registration)
+	{
+		// Whatever was reported before is replaced, so a field never shows the same message twice.
+		_editContext.ClearZodErrors();
+		_outcome = registration.Outcome;
+
+		switch (registration.Outcome)
+		{
+			case RegistrationOutcome.Registered:
+				_status = $"Registered {registration.Customer!.Email}.";
+				break;
+			case RegistrationOutcome.RejectedBeforeSending:
+				_editContext.AddZodErrors(registration.Errors);
+				_status = "Not sent: the registration is invalid.";
+				break;
+			case RegistrationOutcome.RejectedByServer:
+				_editContext.AddZodErrors(registration.Errors);
+				_status = $"The server rejected the registration ({registration.Status}).";
+				break;
+			case RegistrationOutcome.InvalidResponse:
+				_status = $"The server's response was invalid: {registration.Errors[0].Message}";
+				break;
+		}
+	}
+
+	public void Dispose() => _editContext.OnValidationStateChanged -= OnValidationStateChanged;
+}

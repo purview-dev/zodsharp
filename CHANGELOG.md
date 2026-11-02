@@ -59,10 +59,33 @@ Released versions correspond to `v<version>` GitHub releases.
   faulted, supersession), accepts a runtime `Schema` (`ZodModelSchema.For<TModel>`), can re-validate a field's
   owning object (`ValidateNestedOnFieldChange`) and coexists with `DataAnnotationsValidator` without duplicating
   messages. `<ZodValidationMessage>` and `<ZodValidationSummary>` match the built-in markup and add
-  `data-code`/`data-category`, path grouping and union details. `HttpResponseMessage.TryReadZodValidationProblemAsync()`
-  (source-generated JSON, trim-safe) and `EditContext.AddZodProblemDetails` map API validation problems onto fields,
-  cleared per field on change. Ships `zodsharp-validation.js`, browser validators that mirror the C# rules
+  `data-code`/`data-category`, path grouping and union details. `EditContext.AddZodProblemDetails` maps API validation
+  problems (read with `Purview.ZodSharp.Http`'s `TryReadZodValidationProblemAsync()`) onto fields, cleared per field on
+  change. Ships `zodsharp-validation.js`, browser validators that mirror the C# rules
   (verified by a C#-to-JavaScript parity suite), registered through a Blazor JavaScript initializer.
+- **`Purview.ZodSharp.Http`** (new package, `net10.0` and `net11.0`, browser-safe): `HttpClient` integration for
+  WebAssembly and other clients. `PostAsJsonValidatedAsync`/`PutAsJsonValidatedAsync`/`PatchAsJsonValidatedAsync` and
+  `ZodJsonContent.Create`/`CreateAsync` validate a body before it is sent (an invalid value returns the errors and
+  sends nothing); `HttpContent.ReadFromJsonAndValidateAsync` reads and validates a response body, reporting unreadable
+  JSON as `invalid_json`; and the validation-problem contract (`ZodValidationProblemDetails`,
+  `ZodValidationProblemIssue`, `HttpResponseMessage.TryReadZodValidationProblemAsync()`, new `ToValidationResult<T>()`)
+  moved here from `Purview.ZodSharp.Blazor`, so a client without Blazor - or on `net10.0` - reads server validation
+  problems back into ZodSharp errors. Every API takes a `JsonTypeInfo<T>`; there are no reflection-based overloads. A
+  parity test proves every error field `Purview.ZodSharp.AspNetCore` writes (code, category, typed path, origin,
+  bounds, parameters, union options) reads back unchanged. Each send method, `ZodJsonContent.CreateAsync` and
+  `ReadFromJsonAndValidateAsync` has an overload taking an `IZodSchemaValidator<T>` and an `IServiceProvider`, so
+  service-aware rules (an async uniqueness check) run before a request is sent and as a response is read.
+- **`Purview.ZodSharp.SystemTextJson` is browser-safe** (`PurviewBrowserSafe`): trim, AOT and browser-unsupported APIs
+  fail its build, and Blazor WebAssembly clients may reference it. `DeserializeAndValidateAsync` and
+  `ValidateAndSerializeAsync` gain service-aware overloads on `IZodSchemaValidator<T>` (with a `JsonTypeInfo<T>` and an
+  `IServiceProvider`).
+- **`EditContext.AddZodErrors(errors)`** (`Purview.ZodSharp.Blazor`): places ZodSharp errors produced outside the form -
+  such as a `PostAsJsonValidatedAsync` that refused to send - onto its fields by their typed paths, sharing
+  `AddZodProblemDetails`'s store, replacement and clear-on-change behaviour.
+- **The Blazor sample uses `Purview.ZodSharp.Http` in both interactive render modes**: `RegisterCustomerForm` and the
+  typed `CustomerAPIClient` run on `/register` (WebAssembly, posting from the browser) and the new `/register-server`
+  (Interactive Server, a typed client from `IHttpClientFactory` calling the API service-to-service), covered by
+  integration tests against the API and by the browser end-to-end checks.
 - **Static-SSR client-side validation for ZodSharp rules.** On `net11.0`, `Purview.ZodSharp.AspNetCore` adds
   `AddZodSharpClientValidation()`: statically rendered forms carry client rules for ZodSharp rule attributes
   (`[StartsWith]`, `[UUID]`, `[IPAddress]`, `[MinValue]`, …), derived from each rule's `IZodRule` metadata, and for

@@ -1,0 +1,17 @@
+@page "/register-server"
+@rendermode InteractiveServer
+
+<PageTitle>Interactive Server - HttpClient</PageTitle>
+
+<h1>Register a customer (server)</h1>
+<p>
+	<strong>Interactive Server:</strong> the same <code>RegisterCustomerForm</code> as the
+	<a href="register">Interactive WebAssembly page</a>, running on the server. Its <code>CustomerAPIClient</code> is a
+	typed client created by <code>IHttpClientFactory</code> and calls the API service-to-service with
+	<code>Purview.ZodSharp.Http</code>: <code>PostAsJsonValidatedAsync</code> validates with the circuit's services
+	(the uniqueness rule resolves the server's own registry - try
+	<code>@InMemoryCustomerEmailRegistry.SeededEmail</code>), <code>ReadFromJsonAndValidateAsync</code> validates the
+	response, and <code>TryReadZodValidationProblemAsync</code> reads a rejection back into ZodSharp errors.
+</p>
+
+<RegisterCustomerForm />

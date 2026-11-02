@@ -52,6 +52,7 @@ dotnet add package Purview.ZodSharp.AspNetCore
 - **Purview.ZodSharp** — Core validation library and source generator (`[ZodSchema]`). See its [package README](src/src/ZodSharp/Sdk/README.md).
 - **Purview.ZodSharp.SystemTextJson** — System.Text.Json integration and JSON Schema import. See its [package README](src/src/SystemTextJson/Sdk/README.md).
 - **Purview.ZodSharp.NewtonsoftJson** — Newtonsoft.Json integration and JSON Schema import. See its [package README](src/src/NewtonsoftJson/Sdk/README.md).
+- **Purview.ZodSharp.Http** — `HttpClient` integration: validated request and response bodies, and server validation problems read back into ZodSharp errors; trim-, AOT- and WebAssembly-safe. See its [package README](src/src/Http/Sdk/README.md).
 - **Purview.ZodSharp.AspNetCore** — ASP.NET Core ProblemDetails integration. See its [package README](src/src/AspNetCore/Sdk/README.md).
 - **Purview.ZodSharp.Blazor** — Blazor forms validation for Server, WebAssembly and Auto render mode (`net11.0`). See its [package README](src/src/Blazor/Sdk/README.md).
 

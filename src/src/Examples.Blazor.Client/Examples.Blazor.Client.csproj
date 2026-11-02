@@ -43,7 +43,16 @@
 		-->
 		<ProjectReference Include="..\Blazor\Blazor.csproj" />
 		<ProjectReference Include="..\Examples.Shared\Examples.Shared.csproj" />
+		<!-- Validated HTTP bodies (ReadFromJsonAndValidateAsync); published trimmed and AOT-compiled with the client. -->
+		<ProjectReference Include="..\Http\Http.csproj" />
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+		<!-- Direct reference required when we're using a local project ref: the client's own [ZodSchema] contracts. -->
+		<ProjectReference
+			Include="..\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -52,6 +61,8 @@
 			as a Blazor Web App's server always references its client.
 		-->
 		<InternalsVisibleTo Include="ZodSharp.Examples.Blazor" />
+		<!-- The integration tests drive CustomerApiClient against the real API. -->
+		<InternalsVisibleTo Include="ZodSharp.Examples.Blazor.IntegrationTests" />
 	</ItemGroup>
 
 	<ItemGroup>

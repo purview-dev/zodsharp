@@ -13,6 +13,16 @@ plain consumer. Each native binary then runs runtime schemas, generated validato
 the Microsoft.Extensions.Validation bridge, ProblemDetails and options validation, and exits non-zero on any mismatch.
 Run it with `just verify-trim`; the `verify-trim` PR job runs it on Linux.
 
+## Blazor WebAssembly
+
+The packages a WebAssembly client downloads are marked browser-safe (`PurviewBrowserSafe`), so trim, AOT and
+browser-unsupported (`CA1416`) diagnostics fail their own builds: `Purview.ZodSharp`, `Purview.ZodSharp.SystemTextJson`,
+`Purview.ZodSharp.Http`, `Purview.ZodSharp.Extensions.Validation` and `Purview.ZodSharp.Blazor`. `just wasm-size` (CI:
+`wasm-trimmed`, nightly `wasm-aot`) publishes the sample client trimmed with warnings as errors and checks each
+assembly against a size budget. `Purview.ZodSharp.AspNetCore` and `Purview.ZodSharp.AspNetCore.OpenApi` are
+server-only: they reference the ASP.NET Core shared framework, which WebAssembly cannot load. A client reads what they
+write through `Purview.ZodSharp.Http`.
+
 ## Safe everywhere
 
 These need nothing from the application:
@@ -25,6 +35,7 @@ These need nothing from the application:
 | Metadata registration | `RegisterFromAssembly`, `AddZodSharpAssembly`, `ScanAssemblies`, `ScanLoadedAssemblies` (they read `[ZodSchemaGenerated]`, whose `typeof` roots each validator) |
 | JSON Schema | `Z.ToJsonSchema`, `{Type}Schema.BuildJsonSchema()`, `Z.FromJsonSchema` (System.Text.Json), `JsonSchemaSerializerOptions` |
 | System.Text.Json | the `JsonTypeInfo<T>` overloads of `DeserializeAndValidate`, `DeserializeAndValidateAsync`, `ValidateAndSerialize`, `ValidateAndSerializeAsync`; `CreateValidatingConverter` |
+| HttpClient | everything in `Purview.ZodSharp.Http`: `PostAsJsonValidatedAsync`/`PutAsJsonValidatedAsync`/`PatchAsJsonValidatedAsync`, `ZodJsonContent`, `ReadFromJsonAndValidateAsync`, `TryReadZodValidationProblemAsync` (it has no reflection-based overloads) |
 | ASP.NET Core | `AddZodSharp`, `AddZodSharpProblemDetails`, `ZodProblemDetailsWriter`, `WithZodSharpValidation`, `ZodTypedResults` |
 | Validation bridge | `AddZodSharpValidation`, `ValidationOptions.ValidateAsync` |
 | Options | `AddZodSchemaValidator`, `ValidateWithZod(section)` |

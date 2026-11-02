@@ -22,6 +22,7 @@ exceptions, reporting machine-readable issues.
 dotnet add package Purview.ZodSharp                    # core, source generator, JSON Schema export
 dotnet add package Purview.ZodSharp.SystemTextJson     # STJ deserialize-and-validate + schema import
 dotnet add package Purview.ZodSharp.NewtonsoftJson     # Newtonsoft equivalent
+dotnet add package Purview.ZodSharp.Http               # HttpClient: validated bodies + server problems (WASM-safe)
 dotnet add package Purview.ZodSharp.AspNetCore         # ProblemDetails + DI
 dotnet add package Purview.ZodSharp.Extensions.Validation  # net11: Microsoft.Extensions.Validation bridge
 dotnet add package Purview.ZodSharp.AspNetCore.OpenApi     # net11: OpenAPI transformers

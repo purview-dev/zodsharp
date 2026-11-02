@@ -71,6 +71,18 @@ catch (ZodJsonValidationException ex)
 | `ValidateAndSerializeAsync<T>` | `ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(this IZodSchema<T, T> schema, T value, Stream output, JsonSerializerOptions? options = null, CancellationToken cancellationToken = default)` |
 | `CreateValidatingConverter<T>` | `JsonConverter<T> CreateValidatingConverter<T>(this IZodSchema<T, T> schema)` |
 
+Each method also has a trim- and AOT-safe overload that takes a `JsonTypeInfo<T>` in place of the options. The two
+async methods have a service-aware overload on `IZodSchemaValidator<T>` (a generated `{TypeName}SchemaValidator`), so
+rules that resolve services run:
+
+| Member | Signature |
+|---|---|
+| `DeserializeAndValidateAsync<T>` | `ValueTask<ValidationResult<T>> DeserializeAndValidateAsync<T>(this IZodSchemaValidator<T> validator, Stream jsonStream, JsonTypeInfo<T> jsonTypeInfo, IServiceProvider? services, CancellationToken cancellationToken = default)` |
+| `ValidateAndSerializeAsync<T>` | `ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(this IZodSchemaValidator<T> validator, T value, Stream output, JsonTypeInfo<T> jsonTypeInfo, IServiceProvider? services, CancellationToken cancellationToken = default)` |
+
+The package is browser-safe (Blazor WebAssembly). For `HttpClient` bodies and server validation problems, see
+[HttpClient Integration](Http-Integration.md).
+
 ## Failure codes
 
 A failure to read the JSON (malformed JSON, a value that cannot be converted, a `null` document, or a type the serializer cannot handle — `JsonException`, `NotSupportedException`, `InvalidOperationException`) produces one `ValidationError` with code `invalid_json` (`SystemTextJsonExtensions.InvalidJsonCode`) and category `invalid_type`. Its `FullPath` is the location the serializer reported (`$.items[1].age` becomes `items[1].age`), its `line` and `position` parameters hold the serializer's zero-based line number and byte position in the line, and its message is the fixed `"The JSON value could not be converted to {expected}."`, where `expected` is a Zod type name (`string`, `number`, `object`, `array`, …) found by walking the failing path through the serializer contract, or the generic `"the expected type"` when it cannot be described (for example malformed JSON read into a `Dictionary<string, object?>`). The serializer's own message, which names CLR types and can quote the input, is never surfaced. A failure raised by a validating converter is returned as the schema's own errors, located under the converter's path.

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ZodSharp.Rules;
 
 namespace ZodSharp.Examples.Blazor.Client;
 
@@ -10,10 +11,12 @@ namespace ZodSharp.Examples.Blazor.Client;
 sealed record EmailStatus(bool Registered);
 
 /// <summary>
-/// The response of a successful <c>POST /api/customers</c>.
+/// The response of a successful <c>POST /api/customers</c>. The client validates it as it reads it
+/// (<c>ReadFromJsonAndValidateAsync</c>), so a malformed response is an error rather than a half-filled value.
 /// </summary>
 /// <param name="Email">The registered address.</param>
-sealed record CustomerRegistered(string Email);
+[ZodSchema]
+sealed partial record CustomerRegistered([property: Email] string Email);
 
 /// <summary>
 /// Source-generated JSON metadata for the sample's HTTP contract, so the trimmed WebAssembly client serializes without

@@ -54,6 +54,11 @@ async function messagesFor(id) {
   );
 }
 
+/** The outcome RegisterCustomerForm reports on its status line (RegistrationOutcome), or null before one. */
+async function outcome() {
+  return page.evaluate(() => document.querySelector("#status")?.getAttribute("data-outcome") ?? null);
+}
+
 try {
   await check("interactive WebAssembly: debounced validation, codes, async pending state", async () => {
     await page.goto(`${base}/register`);
@@ -83,6 +88,42 @@ try {
     await eventually("the server's invalid_range code on Age", async () =>
       (await messagesFor("age")).some((m) => m.code === "invalid_range"),
     );
+    await eventually("the server's invalid_string code on Email", async () =>
+      (await messagesFor("email")).some((m) => m.code === "invalid_string"),
+    );
+  });
+
+  await check("interactive WebAssembly: a valid registration is sent and its response validated (Purview.ZodSharp.Http)", async () => {
+    await page.goto(`${base}/register`);
+    await page.waitForSelector("#name", { timeout });
+    await page.fill("#name", "Ada");
+    await page.fill("#email", `e2e-wasm-${Date.now()}@example.com`);
+    await page.fill("#age", "36");
+    await page.press("#age", "Tab");
+    await page.click("button[type=submit]");
+    await eventually("the Registered outcome", async () => (await outcome()) === "Registered");
+  });
+
+  await check("interactive Server: the shared form posts service-to-service (Purview.ZodSharp.Http)", async () => {
+    await page.goto(`${base}/register-server`);
+    await page.waitForSelector("#name", { timeout });
+    // Wait for the circuit: validation messages only appear once the page is interactive.
+    await eventually("the interactive circuit", async () => {
+      await page.fill("#name", "A");
+      return (await messagesFor("name")).some((m) => m.code === "invalid_length");
+    });
+
+    await page.fill("#name", "Grace");
+    await page.fill("#email", `e2e-server-${Date.now()}@example.com`);
+    await page.fill("#age", "85");
+    await page.press("#age", "Tab");
+    await page.click("button[type=submit]");
+    await eventually("the Registered outcome", async () => (await outcome()) === "Registered");
+
+    // Unvalidated: the server's ProblemDetails come back through TryReadZodValidationProblemAsync onto the field.
+    await page.fill("#email", "not-an-email");
+    await page.click("#post-unvalidated");
+    await eventually("the RejectedByServer outcome", async () => (await outcome()) === "RejectedByServer");
     await eventually("the server's invalid_string code on Email", async () =>
       (await messagesFor("email")).some((m) => m.code === "invalid_string"),
     );

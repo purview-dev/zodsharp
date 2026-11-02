@@ -4,7 +4,8 @@ description: >-
   Use when combining Purview.ZodSharp with JSON - deserialize-and-validate and validating converters
   for System.Text.Json or Newtonsoft.Json, choosing between the two packages, exporting a schema to
   JSON Schema with Z.ToJsonSchema, importing one with Z.FromJsonSchema, the invalid_json error and
-  converter exceptions, x-zod vendor extensions for OpenAPI, and sharing a contract with TypeScript Zod.
+  converter exceptions, x-zod vendor extensions for OpenAPI, sharing a contract with TypeScript Zod, and
+  HttpClient bodies and server validation problems with Purview.ZodSharp.Http (WebAssembly-safe).
 license: MIT
 metadata:
   product: Purview.ZodSharp
@@ -32,6 +33,46 @@ deserialize/serialize extensions (`SystemTextJsonExtensions`, `NewtonsoftJsonExt
 `ValidateAndSerializeAsync(value, output[, ct])`) resolves to System.Text.Json; pass a `JsonSerializerSettings`
 for Newtonsoft. `CreateValidatingConverter(schema)` stays ambiguous (CS0121): call the class directly,
 `NewtonsoftJsonExtensions.CreateValidatingConverter(schema)`.
+
+`Purview.ZodSharp.SystemTextJson` is browser-safe (Blazor WebAssembly). For `HttpClient` calls, add
+`Purview.ZodSharp.Http` (also browser-safe, `net10.0`+), which builds on it:
+
+```csharp
+// Validate before sending: an invalid value returns the errors and no request is made.
+var sent = await http.PostAsJsonValidatedAsync("api/orders", order, new OrderSchemaValidator(), AppJsonContext.Default.Order);
+
+// Validate while reading: unreadable JSON is an invalid_json error, never an exception.
+var read = await response.Content.ReadFromJsonAndValidateAsync(new OrderSchemaValidator(), AppJsonContext.Default.Order);
+
+// Read a ZodSharp ProblemDetails response back into ZodSharp errors.
+var errors = await response.TryReadZodValidationProblemAsync() is { } problem
+    ? problem.ToValidationErrors() // or problem.ToValidationResult<Order>()
+    : [];
+```
+
+Every `Purview.ZodSharp.Http` API takes a `JsonTypeInfo<T>`; there are no `JsonSerializerOptions` overloads.
+`ZodJsonContent.Create`/`CreateAsync` build a validated `JsonContent` for any other request. `Put`/`PatchAsJsonValidatedAsync`
+mirror `Post`, each with `string?` and `Uri?` URIs.
+
+**Service-aware rules** (`[ZodAsyncMember]` methods that resolve services) need the caller's `IServiceProvider`. Pass a
+generated `{TypeName}SchemaValidator` plus the services - a Blazor component's injected `IServiceProvider` (the
+browser's or the circuit's), `HttpContext.RequestServices` on a server:
+
+```csharp
+var sent = await http.PostAsJsonValidatedAsync("api/customers", customer,
+    new RegisterCustomerRequestSchemaValidator(), AppJsonContext.Default.RegisterCustomerRequest, services, ct);
+var read = await response.Content.ReadFromJsonAndValidateAsync(
+    new CustomerSchemaValidator(), AppJsonContext.Default.Customer, services, ct);
+```
+
+A generated validator with such a rule throws `InvalidOperationException` through an overload without services, so the
+rule is never skipped silently. `SystemTextJsonExtensions` has the same overload for `DeserializeAndValidateAsync` and
+`ValidateAndSerializeAsync`.
+
+Wrap the calls in one typed client and register it per host: `AddScoped<TClient>()` in a WebAssembly client,
+`AddHttpClient<TClient>(...)` on a server (created in the requesting scope, so its injected `IServiceProvider` is the
+circuit's or request's). In Blazor, `editContext.AddZodErrors(sent.Errors)` puts a rejected-before-sending result on the
+form's fields, and `AddZodProblemDetails(problem)` a server rejection.
 
 ## Deserialize and validate
 

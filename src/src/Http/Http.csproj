@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- Downloaded to and run in the browser by Blazor WebAssembly clients: the SDK's browser-safe defaults fail the
+			build on trim, AOT and browser-unsupported APIs (and satisfy the client's PRBLZ0001 reference check). -->
+		<PurviewBrowserSafe>true</PurviewBrowserSafe>
+		<RootNamespace>ZodSharp.Http</RootNamespace>
+		<!-- Explicit: NamespacePrefix is ZodSharp, so the SDK would otherwise derive ZodSharp.* identities. -->
+		<PackageId>Purview.ZodSharp.Http</PackageId>
+		<AssemblyName>Purview.ZodSharp.Http</AssemblyName>
+		<IsPackable>true</IsPackable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<Description>
+			HttpClient integration for ZodSharp: validates request bodies before they are sent and response bodies as they
+			are read, and reads the validation problems Purview.ZodSharp.AspNetCore writes back into ZodSharp errors.
+			Trim-, Native AOT- and Blazor WebAssembly-safe.
+		</Description>
+		<PackageTags>zod;validation;schema;http;httpclient;problemdetails;webassembly</PackageTags>
+		<!-- First release: there is no previous version to validate the public API against. -->
+		<ZodSharpNoPackageValidationBaseline>true</ZodSharpNoPackageValidationBaseline>
+	</PropertyGroup>
+
+	<!--
+		Trimming and Native AOT. Every API takes a JsonTypeInfo<T> (or uses this package's own source-generated
+		ZodHttpJsonContext), so nothing resolves a contract reflectively; there are deliberately no JsonSerializerOptions
+		overloads. No FrameworkReference Microsoft.AspNetCore.App: a WebAssembly client cannot take it, and
+		System.Net.Http.Json is part of the base framework.
+	-->
+	<ItemGroup>
+		<!-- The SDK's implicit usings include System.Net.Http.Json on net11.0 only. -->
+		<Using Include="System.Net.Http.Json" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\SystemTextJson\SystemTextJson.csproj" />
+		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
+	</ItemGroup>
+</Project>

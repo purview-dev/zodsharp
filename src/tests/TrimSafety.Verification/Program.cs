@@ -11,6 +11,7 @@ harness.Run("generated registration and assembly metadata", CoreChecks.Registrat
 harness.Run("assembly scanning through AddZodSharp", IntegrationChecks.AssemblyScanning);
 harness.Run("System.Text.Json with a source-generated context", IntegrationChecks.SystemTextJson);
 harness.Run("JSON Schema export and import", IntegrationChecks.JsonSchemaRoundTrip);
+await harness.RunAsync("HttpClient with validated bodies and validation problems", HttpChecks.HttpClient);
 await harness.RunAsync("Microsoft.Extensions.Validation bridge", IntegrationChecks.ValidationBridge);
 await harness.RunAsync("ZodProblemDetailsWriter without a host", IntegrationChecks.ProblemDetails);
 harness.Run("options validation with ValidateWithZod", IntegrationChecks.OptionsValidation);

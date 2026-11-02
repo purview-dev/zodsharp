@@ -114,6 +114,52 @@ public static class SystemTextJsonExtensions
 	}
 
 	/// <summary>
+	/// Deserializes JSON from a stream and validates it with a validator that has access to the caller's services, so
+	/// service-aware rules (for example an <c>OnZodValidateAsync</c> hook that resolves a repository) run (async).
+	/// </summary>
+	/// <typeparam name="T">The validated type.</typeparam>
+	/// <param name="validator">The validator, typically a generated <c>{TypeName}SchemaValidator</c>.</param>
+	/// <param name="jsonStream">The stream to read JSON from.</param>
+	/// <param name="jsonTypeInfo">
+	/// The contract for <typeparamref name="T"/>, typically from a source-generated
+	/// <see cref="JsonSerializerContext"/>.
+	/// </param>
+	/// <param name="services">The services service-aware rules resolve from.</param>
+	/// <param name="cancellationToken">Cancels the read and the validation.</param>
+	/// <returns>The validated value, or the validation errors.</returns>
+	/// <remarks>
+	/// Safe under trimming and Native AOT: nothing here resolves a contract reflectively.
+	/// </remarks>
+	public static async ValueTask<ValidationResult<T>> DeserializeAndValidateAsync<T>(
+		this IZodSchemaValidator<T> validator,
+		Stream jsonStream,
+		JsonTypeInfo<T> jsonTypeInfo,
+		IServiceProvider? services,
+		CancellationToken cancellationToken = default
+	)
+	{
+		ArgumentNullException.ThrowIfNull(validator);
+		ArgumentNullException.ThrowIfNull(jsonStream);
+		ArgumentNullException.ThrowIfNull(jsonTypeInfo);
+
+		T? deserialized;
+		try
+		{
+			deserialized = await JsonSerializer
+				.DeserializeAsync(jsonStream, jsonTypeInfo, cancellationToken)
+				.ConfigureAwait(false);
+		}
+		catch (Exception ex) when (JsonDeserializationErrors.TryMap(ex, jsonTypeInfo, out var errors))
+		{
+			return ValidationResult<T>.Failure(errors);
+		}
+
+		return deserialized == null
+			? ValidationResult<T>.Failure(JsonDeserializationErrors.NullValue(jsonTypeInfo))
+			: await validator.ValidateAsync(deserialized, services, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
 	/// Validates a value and serializes it to a JSON string, using a supplied contract.
 	/// </summary>
 	/// <typeparam name="T">The validated type.</typeparam>
@@ -172,6 +218,48 @@ public static class SystemTextJsonExtensions
 		ArgumentNullException.ThrowIfNull(jsonTypeInfo);
 
 		var result = await schema.ValidateAsync(value, cancellationToken).ConfigureAwait(false);
+		if (!result.IsSuccess)
+			return ValidationResult<string>.Failure(result.Errors);
+
+		await JsonSerializer
+			.SerializeAsync(output, result.Value, jsonTypeInfo, cancellationToken)
+			.ConfigureAwait(false);
+
+		return ValidationResult<string>.Success(string.Empty);
+	}
+
+	/// <summary>
+	/// Validates a value with a validator that has access to the caller's services, so service-aware rules run, and
+	/// serializes it to a stream, using a supplied contract (async).
+	/// </summary>
+	/// <typeparam name="T">The validated type.</typeparam>
+	/// <param name="validator">The validator, typically a generated <c>{TypeName}SchemaValidator</c>.</param>
+	/// <param name="value">The value to validate and serialize.</param>
+	/// <param name="output">The stream to write to.</param>
+	/// <param name="jsonTypeInfo">
+	/// The contract for <typeparamref name="T"/>, typically from a source-generated
+	/// <see cref="JsonSerializerContext"/>.
+	/// </param>
+	/// <param name="services">The services service-aware rules resolve from.</param>
+	/// <param name="cancellationToken">Cancels the validation and the write.</param>
+	/// <returns>An empty success, or the validation errors.</returns>
+	/// <remarks>
+	/// Safe under trimming and Native AOT: nothing here resolves a contract reflectively.
+	/// </remarks>
+	public static async ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(
+		this IZodSchemaValidator<T> validator,
+		T value,
+		Stream output,
+		JsonTypeInfo<T> jsonTypeInfo,
+		IServiceProvider? services,
+		CancellationToken cancellationToken = default
+	)
+	{
+		ArgumentNullException.ThrowIfNull(validator);
+		ArgumentNullException.ThrowIfNull(output);
+		ArgumentNullException.ThrowIfNull(jsonTypeInfo);
+
+		var result = await validator.ValidateAsync(value, services, cancellationToken).ConfigureAwait(false);
 		if (!result.IsSuccess)
 			return ValidationResult<string>.Failure(result.Errors);
 

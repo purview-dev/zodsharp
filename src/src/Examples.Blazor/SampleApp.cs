@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Localization;
 using ZodSharp.Examples.Blazor.Client;
 using ZodSharp.Examples.Blazor.Components;
@@ -48,6 +50,14 @@ static class SampleApp
 
 		// The store the service-aware async email-uniqueness rule on RegisterCustomerRequest resolves on the server.
 		services.AddSingleton<ICustomerEmailRegistry, InMemoryCustomerEmailRegistry>();
+
+		// The Interactive Server page renders the same RegisterCustomerForm as the WebAssembly page. Its CustomerAPIClient
+		// is a typed client here: IHttpClientFactory creates it in the circuit's scope (so service-aware rules resolve the
+		// circuit's services) and it calls this app's API service-to-service, with Purview.ZodSharp.Http validating the
+		// request before it is sent and the response as it is read.
+		services
+			.AddHttpClient<CustomerAPIClient>()
+			.ConfigureHttpClient(static (provider, http) => http.BaseAddress ??= SelfBaseAddress(provider));
 
 		SampleLocalization.AddSampleLocalization(services);
 	}
@@ -115,6 +125,25 @@ static class SampleApp
 			return TypedResults.LocalRedirect(IsLocal(redirectUri) ? redirectUri! : "/");
 		});
 	}
+
+	// The address this app listens on (preferring http, so a self-call needs no certificate), with wildcard hosts
+	// rewritten to localhost. Null when the server reports none (an in-memory TestServer); tests supply their own.
+	static Uri? SelfBaseAddress(IServiceProvider provider)
+	{
+		var addresses = provider.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()?.Addresses;
+		var address =
+			addresses?.FirstOrDefault(static a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+			?? addresses?.FirstOrDefault();
+		if (address is null)
+			return null;
+
+		foreach (var wildcard in WildcardHosts)
+			address = address.Replace(wildcard, "://localhost", StringComparison.Ordinal);
+
+		return new Uri(address.TrimEnd('/') + "/");
+	}
+
+	static readonly string[] WildcardHosts = ["://+", "://*", "://[::]", "://0.0.0.0"];
 
 	static bool IsLocal(string? uri) =>
 		uri is ['/', ..]

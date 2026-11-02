@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using ZodSharp.Blazor;
+using ZodSharp.Http;
 
 namespace System.Net.Http;
 
@@ -49,7 +49,7 @@ public static class ZodHttpResponseMessageExtensions
 			{
 				problem = await response
 					.Content.ReadFromJsonAsync(
-						ZodBlazorJsonContext.Default.ZodValidationProblemDetails,
+						ZodHttpJsonContext.Default.ZodValidationProblemDetails,
 						cancellationToken
 					)
 					.ConfigureAwait(false);

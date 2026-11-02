@@ -22,7 +22,8 @@ src/
   src/
     ZodSharp/          Core validation library + JSON Schema export (Z.ToJsonSchema)
     SourceGenerators/  Compile-time [ZodSchema] generator (netstandard2.0, Roslyn)
-    SystemTextJson/    System.Text.Json integration + JSON Schema import (Z.FromJsonSchema)
+    SystemTextJson/    System.Text.Json integration + JSON Schema import (Z.FromJsonSchema); browser-safe
+    Http/              HttpClient integration (browser-safe): validated bodies, ZodValidationProblemDetails reading
     NewtonsoftJson/    Newtonsoft.Json integration + JSON Schema import
     AspNetCore/        ASP.NET Core ProblemDetails integration (+ static-SSR client rules on net11)
     Blazor/            Blazor forms integration (net11): ZodValidator, message components, zodsharp-validation.js
