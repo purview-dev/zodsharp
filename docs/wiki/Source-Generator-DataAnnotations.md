@@ -6,9 +6,9 @@ The `[ZodSchema]` generator reads `System.ComponentModel.DataAnnotations` attrib
 
 | Attribute | Generated behaviour | Failure code |
 |---|---|---|
-| `[Required]` | nullable property must not be null (strings with `AllowEmptyStrings=false` must be non-empty) | `missing_field` |
-| `[Length(min, max)]` | min/max size with `too_small`/`too_big`; applies to strings, arrays (incl. jagged/rectangular), and countable collections | `too_small` / `too_big` |
-| `[StringLength(max)]` / `[StringLength(max, MinimumLength=min)]` | string size limits via direct `.Length` | `too_small` / `too_big` |
+| `[Required]` | rejects `null`; on a string also `""` and whitespace-only text, unless `AllowEmptyStrings = true` (which rejects only `null`) — `RequiredAttribute`'s semantics | `missing_field` |
+| `[Length(min, max)]` | min/max size; applies to strings, arrays (incl. jagged/rectangular), and countable collections | strings: `invalid_length`; collections: `too_small` / `too_big` |
+| `[StringLength(max)]` / `[StringLength(max, MinimumLength=min)]` | string size limits via direct `.Length` | `invalid_length` |
 | `[MinLength(n)]` | only checked when `n > 0` | `too_small` |
 | `[MaxLength(n)]` | only checked when `n >= 0` | `too_big` |
 | `[Range(...)]` | inclusive (or exclusive) numeric/parsed bounds | `invalid_range` |
@@ -21,9 +21,22 @@ The `[ZodSchema]` generator reads `System.ComponentModel.DataAnnotations` attrib
 | `[CreditCard]` | reuses `CreditCardRule` | `invalid_string` |
 | `[Base64String]` | reuses `Base64StringRule` | `invalid_string` |
 | `[Compare(otherProperty)]` | typed equality between two properties | `mismatch` |
-| `[Display(Name=...)]` | not validated; `Name` used as the display name in messages and `{0}` placeholders | — |
+| `[Display(Name=...)]` | not validated; `Name` used as the display name in messages and `{0}` placeholders. With `ResourceType`, the localized name is read from the resource property at runtime | — |
 
 `[Length]` follows DataAnnotations null semantics: `null` is valid unless `[Required]` is also present.
+
+Every generated error reports a `Category` (the Zod issue code: `invalid_type`, `too_small`, `too_big`,
+`invalid_format`, `invalid_value`, `custom`), an `Origin` (`string`, `number`, `array`, `enum`, …), and
+`Parameters` with `displayName`, `member` and `declaringType`. `[Required]` reports category `invalid_type`
+and the message `"{displayName} is required"`; `[StringLength]`/`[Length]` on a string report `invalid_length`
+with the direction in `Category` (`too_small`/`too_big`) and both bounds, the same identity as the runtime
+`LengthRule`/`StringLengthRule`.
+
+> [!WARNING]
+> **Behaviour change in 3.0.0.** The generated `[Required]` check on a string was inverted: the default
+> (`AllowEmptyStrings = false`) only rejected `null`, and `AllowEmptyStrings = true` rejected `""`. It now matches
+> `RequiredAttribute`. A model that relied on `""` passing a bare `[Required]` must supply a value or set
+> `AllowEmptyStrings = true`.
 
 `[RequiredZod]` (the generated `RequiredRule<T>` attribute) mirrors `[Required]`: it is emitted outside the generator's non-null guard, so an absent value is reported as `missing_field` even though every other rule bound to the member is skipped for `null`. Its `AllowEmptyStrings` property has the same name and meaning as `RequiredAttribute.AllowEmptyStrings`, and it additionally exposes `TrimWhitespace`, so it is a drop-in replacement for `[Required]`.
 
@@ -60,7 +73,7 @@ Size attributes generate direct `Length` or `Count` access when possible:
 Structured size failures expose the same metadata as the runtime API:
 
 - `Code`: `too_small` or `too_big`.
-- `Origin`: `string` for strings, `array` for arrays, `collection` for countable/`IEnumerable` collections.
+- `Origin`: `string` for strings, `record` for dictionaries, `array` for arrays and every other countable/`IEnumerable` collection (the Zod type of the JSON, as the runtime schemas report it).
 - `Minimum` / `Maximum`: the inclusive bound.
 - `Inclusive`: `true`.
 - `Path`: the property path.
@@ -82,7 +95,7 @@ var result = BasketSchema.Validate(new Basket { Items = ["apple"] });
 ```
 
 > [!NOTE]
-> The generator reports `Origin = "array"` for arrays and `Origin = "collection"` for countable/`IEnumerable` collections.
+> The generator reports `Origin = "array"` for arrays and collections (a `List<string>` is a JSON array) and `Origin = "record"` for dictionaries, matching `ZodArray`, `ZodRecord` and the null-element errors.
 
 ## Collection null items
 
@@ -97,9 +110,89 @@ A collection property rejects `null` elements by default: the generated validato
 
 Comparable range targets include `TimeSpan`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, and `Version` (which uses `CompareTo`), plus any type implementing `IComparable` with user-defined comparison operators. Bounds are emitted as static typed fields and compared without runtime attribute execution.
 
+A failure keeps the code `invalid_range` and reports `Category` `too_small` or `too_big` by direction, an
+origin from the value's Zod type (`number`, `date`, …), and both bounds as `Lower`/`Upper` (`ErrorBound`)
+with `MinimumIsExclusive`/`MaximumIsExclusive` reflected in each bound's `Inclusive`.
+
+## IValidatableObject and asynchronous DataAnnotations
+
+A `[ZodSchema]` type that implements `IValidatableObject` is validated by its `Validate(ValidationContext)`
+after the members and type rules, and only when they all passed — the order DataAnnotations and
+Microsoft.Extensions.Validation use. Each `ValidationResult` becomes an error at its `MemberNames` (or the root),
+with code `validation_failed` (`ZodGeneratedValidation.DataAnnotationsErrorCode`) and category `custom`.
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+using ZodSharp;
+
+[ZodSchema]
+public class Stay : IValidatableObject
+{
+    [Range(1, 30)]
+    public int Nights { get; set; } = 1;
+
+    public int Guests { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Guests > Nights * 4)
+            yield return new ValidationResult("Too many guests", [nameof(Guests)]);
+    }
+}
+
+// Guests = 9 with Nights = 1 reports "Too many guests" at "Guests".
+```
+
+On .NET 11 the asynchronous DataAnnotations inputs run in `ValidateAsync`:
+
+- an `IAsyncValidatableObject` target is awaited after the members and type rules (when they passed);
+- an `AsyncValidationAttribute` on a member is awaited for that member, in `ValidateAsync` and in
+  `ValidateMemberAsync`.
+
+These rules cannot run synchronously, so the generated synchronous `Validate` of such a type throws
+`InvalidOperationException` rather than skipping them, and the generator reports `ZODSGEN048`. Call
+`ValidateAsync` (Microsoft.Extensions.Validation, Blazor and ASP.NET Core do), and pass your services so the
+`ValidationContext` can resolve them.
+
 ## Error message customization
 
-Honours `ErrorMessage`, or `ErrorMessageResourceName` + `ErrorMessageResourceType`, with `{0}` (display name), `{1}`, and `{2}` (bound) placeholders formatted via `string.Format(CultureInfo.CurrentCulture, ...)`. Providing only one of the resource name/type pair is reported as ZODSGEN005.
+Honours `ErrorMessage`, or `ErrorMessageResourceName` + `ErrorMessageResourceType`. Positional placeholders keep
+the attribute's own DataAnnotations meaning — `{0}` is the display name, and `{1}`/`{2}` are the values that
+attribute formats (`[Range]`: minimum, maximum; `[StringLength]`: maximum, minimum; `[Length]`: minimum,
+maximum, like `LengthAttribute`) — and named placeholders such as `{displayName}`, `{minimum}` and `{maximum}`
+work too.
+
+Messages are formatted at runtime by `ZodMessageFormat`, which never throws: an unknown placeholder or a stray
+brace is written out literally, and `{{`/`}}` are literal braces. The template is kept in
+`ValidationError.MessageFormat` and the values in `Parameters`, so a host can re-format the message in the
+request culture. A number `[Range]` reports its `minimum`/`maximum` parameters as numbers of the member's type, so
+ProblemDetails writes `"minimum": 1` rather than `"minimum": "1"`; a converted non-number range (dates, times) keeps
+the attribute's text for them, and its typed bounds are the error's `Lower`/`Upper`. A placeholder the attribute does not supply, or an unbalanced brace, is reported at build time
+as `ZODSGEN052`. Providing only one of the resource name/type pair is reported as ZODSGEN005.
+
+```csharp
+[ZodSchema]
+public class Profile
+{
+    [Length(2, 20, ErrorMessage = "{0} must have between {1} and {2} characters")]
+    public string? Nickname { get; set; }
+}
+
+// "Nickname must have between 2 and 20 characters"
+```
+
+> [!NOTE]
+> In 3.0.0, `[Length]`'s custom message binds `{1}` to the minimum and `{2}` to the maximum, matching
+> `LengthAttribute` (they were swapped), and a custom message containing `{1}` or a stray brace no longer fails
+> the build or throws during validation.
+
+## Microsoft.Extensions.Validation and `[ValidatableType]`
+
+A `[ZodSchema]` type does not need `[ValidatableType]`: the ZodSharp bridge
+(`Purview.ZodSharp.Extensions.Validation`) resolves its generated validator first, and the attribute only makes
+the Microsoft.Extensions.Validation generator emit a second, DataAnnotations-only validator for the same type.
+The generator reports `ZODSGEN047` (info), with a code fix that removes the attribute. See
+[Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md).
 
 ## Type applicability diagnostics
 
@@ -116,4 +209,6 @@ See [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the full
 
 The same pipeline honours custom rules exposed as validation attributes. Mark the attribute with `[ZodRule(typeof(MyRule))]` (or mark the rule itself with `[ZodRule]` to have the attribute generated), and properties annotated with it are validated through the rule. See [Custom Rules](Custom-Rules.md).
 
-Every built-in rule also ships a generated attribute in the `ZodSharp.Rules` namespace, so it can be used directly alongside the attributes above: `[Email]`, `[E164]`, `[Ulid]`, `[Uuid]`, `[Jwt]`, `[IpAddress]`, `[Hex]`, `[Regex]`, `[StartsWith]`, `[EndsWith]`, `[Includes]`, `[MultipleOf]`, `[Finite]`, `[SafeInteger]`, `[Int]`, `[Uri]`, `[Base64Url]`, `[Nanoid]`, `[Cuid2]`, `[DateString]`, `[DatetimeString]`, `[TimeString]`, `[Emoji]`, `[Xid]`, `[Ksuid]`, `[Duration]`, `[Guid]`, `[Cidr]`, `[NonSentinel]`, `[NullOrNonWhiteSpace]`, `[MinValue]`, `[MaxValue]`, `[GreaterThan]`, `[LessThan]`, `[GreaterThanOrEqual]`, `[LessThanOrEqual]`, `[Even]`, `[Odd]`, `[Enum]`, `[RequiredZod]`, `[RangeZod]`, `[LengthZod]`, `[StringLengthZod]`, `[CompareZod]`, `[AllowedValuesZod]`, and `[DeniedValuesZod]`. A value the rule declares without a default is a required constructor argument — `[Regex("…")]`, `[UUID(UuidVersion.V4)]`, `[Uri(UriKind.Absolute)]`, `[MinValue(3)]` — while defaulted values and `Message`/`Code` stay named properties. A rule with overloaded constructors mirrors each overload, so `[Uuid]` uses the versionless UUID rule and `[UUID(UuidVersion.V4)]` the versioned one. `[UUID]` also applies to a `Guid` member or a `[Scalar<Guid>]` type (a `Guid` is a UUID, so the rule validates its bytes), which is how a time-bound identifier that must be an RFC version is constrained. The rules whose name collides with a DataAnnotations attribute use a `Zod` suffix (`[MinLengthZod]`, `[MaxLengthZod]`, `[UrlZod]`, `[PhoneZod]`, `[CreditCardZod]`, `[Base64StringZod]`, `[RequiredZod]`, `[RangeZod]`, `[LengthZod]`, `[StringLengthZod]`, `[CompareZod]`, `[AllowedValuesZod]`, `[DeniedValuesZod]`). See [Built-in attributes](Custom-Rules.md#built-in-attributes-shipped-with-purviewzodsharp).
+Every built-in rule also ships a generated attribute in the `ZodSharp.Rules` namespace, so it can be used directly alongside the attributes above: `[Email]`, `[E164]`, `[Ulid]`, `[Uuid]`, `[Jwt]`, `[IpAddress]`, `[Hex]`, `[Regex]`, `[StartsWith]`, `[EndsWith]`, `[Includes]`, `[MultipleOf]`, `[Finite]`, `[SafeInteger]`, `[Int]`, `[Uri]`, `[Base64Url]`, `[Nanoid]`, `[Cuid2]`, `[DateString]`, `[DatetimeString]`, `[TimeString]`, `[Emoji]`, `[Xid]`, `[Ksuid]`, `[Duration]`, `[Guid]`, `[Cidr]`, `[NonSentinel]`, `[NullOrNonWhiteSpace]`, `[MinValue]`, `[MaxValue]`, `[GreaterThan]`, `[LessThan]`, `[GreaterThanOrEqual]`, `[LessThanOrEqual]`, `[Even]`, `[Odd]`, `[Enum]`, `[MinCount]`, `[MaxCount]`, `[CountRange]`, `[RequiredZod]`, `[RangeZod]`, `[LengthZod]`, `[StringLengthZod]`, `[CompareZod]`, `[AllowedValuesZod]`, and `[DeniedValuesZod]`. A value the rule declares without a default is a required constructor argument — `[Regex("…")]`, `[UUID(UuidVersion.V4)]`, `[Uri(UriKind.Absolute)]`, `[MinValue(3)]` — while defaulted values and `Message`/`Code` stay named properties. A rule with overloaded constructors mirrors each overload, so `[Uuid]` uses the versionless UUID rule and `[UUID(UuidVersion.V4)]` the versioned one. `[UUID]` also applies to a `Guid` member or a `[Scalar<Guid>]` type (a `Guid` is a UUID, so the rule validates its bytes), which is how a time-bound identifier that must be an RFC version is constrained. The rules whose name collides with a DataAnnotations attribute use a `Zod` suffix (`[MinLengthZod]`, `[MaxLengthZod]`, `[UrlZod]`, `[PhoneZod]`, `[CreditCardZod]`, `[Base64StringZod]`, `[RequiredZod]`, `[RangeZod]`, `[LengthZod]`, `[StringLengthZod]`, `[CompareZod]`, `[AllowedValuesZod]`, `[DeniedValuesZod]`). See [Built-in attributes](Custom-Rules.md#built-in-attributes-shipped-with-purviewzodsharp).
+
+`[MinCount(n)]`, `[MaxCount(n)]` and `[CountRange(min, max)]` are the trim-safe spelling of `[MinLength]`, `[MaxLength]` and `[Length]` on a collection or dictionary member: the BCL attributes' constructors are `[RequiresUnreferencedCode]`, so they raise IL2026 in a trimmed or AOT application. The generator validates both spellings through the same code, with the same error identity, and `ZODSGEN053` suggests the swap in a trimmed project. See [Trimming and Native AOT](Trimming-and-AOT.md).

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!--
+		Packed-consumer gate (scripts/test-packed-consumers.ps1), consumer (d), the class library half: [ZodSchema] models and
+		an [ErrorType] in a project of their own, referenced by MultiProject/Api - the shape of a real solution.
+
+		It documents its public surface (GenerateDocumentationFile), so its XML file is the one the ASP.NET Core OpenAPI
+		XML-comment generator reads beside the Api's own comments. When ZodSharp generated [ZodSchema] and [ErrorType]
+		into every project, both projects documented the same type IDs and the generated comment cache threw "An item
+		with the same key has already been added" the first time the OpenAPI document was requested.
+	-->
+	<PropertyGroup>
+		<TargetFramework>net11.0</TargetFramework>
+		<AssemblyName>PackedContracts</AssemblyName>
+		<RootNamespace>PackedContracts</RootNamespace>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Purview.ZodSharp" Version="$(ZodSharpPackageVersion)" />
+	</ItemGroup>
+
+	<Target Name="RequireZodSharpPackageVersion" BeforeTargets="CollectPackageReferences;Restore">
+		<Error
+			Condition="'$(ZodSharpPackageVersion)' == ''"
+			Text="ZodSharpPackageVersion is not set. Run this consumer through scripts/test-packed-consumers.ps1."
+		/>
+	</Target>
+</Project>

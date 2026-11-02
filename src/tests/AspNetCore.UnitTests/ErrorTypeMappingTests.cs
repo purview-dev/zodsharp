@@ -1,3 +1,6 @@
+// The deprecated 2.x conversion overloads are exercised here on purpose: their behaviour is kept for compatibility.
+#pragma warning disable CS0618
+
 using Microsoft.AspNetCore.Http;
 using ZodSharp.Core;
 
@@ -74,7 +77,7 @@ public class ErrorTypeMappingTests
 		// Assert
 		await Assert.That(details.Title).IsEqualTo("Resource is locked");
 		await Assert.That(details.Status).IsEqualTo(StatusCodes.Status423Locked);
-		await Assert.That(details.Extensions["resourceId"]).IsEqualTo("res-42");
+		await Assert.That(details.Extensions.ContainsKey("resourceId")).IsFalse();
 		await Assert.That(issues).HasSingleItem();
 		await Assert.That(issues[0].Parameters).IsNotNull();
 		await Assert.That(issues[0].Parameters!["ResourceId"]).IsEqualTo("res-42");
@@ -117,8 +120,11 @@ public class ErrorTypeMappingTests
 	}
 
 	[Test]
-	public async Task GivenMessageFormat_MissingPlaceholderIsLeftAsIs()
+	public async Task GivenMessageFormat_MissingPlaceholder_KeepsTheErrorMessage()
 	{
+		// Defect D2: a template with an unresolved placeholder used to replace the message, leaving
+		// "{AggregateType}" in the response. The template now applies only when every placeholder resolves.
+
 		// Arrange
 		ErrorTypeRegistry registry = new();
 		registry.Register(
@@ -148,9 +154,7 @@ public class ErrorTypeMappingTests
 		var details = exception.ToHttpValidationProblemDetails(registry);
 
 		// Assert
-		await Assert
-			.That(details.Errors[string.Empty])
-			.IsEquivalentTo(["Aggregate 'agg-123' (of type {AggregateType}) failed to save"]);
+		await Assert.That(details.Errors[string.Empty]).IsEquivalentTo(["Save failed."]);
 	}
 
 	[Test]

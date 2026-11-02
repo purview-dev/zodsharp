@@ -18,7 +18,5 @@ public class ZodNull : ZodType<object?>, IAcceptsNull
 	protected override ValidationResult<object?> ParseInternal(object? value) =>
 		value == null
 			? ValidationResult<object?>.Success(null)
-			: ValidationResult<object?>.Failure(
-				new ValidationError("invalid_type", "Expected null, but got non-null value", [])
-			);
+			: ValidationResult<object?>.Failure(ZodIssues.InvalidType(ZodTypeNames.Null, value));
 }

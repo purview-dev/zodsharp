@@ -19,23 +19,5 @@ public sealed record ZodCodeFixTestOptions : CodeFixTestOptions
 			typeof(Microsoft.Extensions.Options.ValidateOptionsResult),
 		];
 		AdditionalNamespaces = ["ZodSharp"];
-		AdditionalSources =
-		[
-			"""
-				namespace ZodSharp;
-
-				[System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct)]
-				public sealed class ZodSchemaAttribute : System.Attribute
-				{
-					public string? SchemaName { get; init; }
-					public bool GenerateValidateMethod { get; init; } = true;
-					public bool GenerateParseMethod { get; init; } = true;
-					public bool EnableComposition { get; init; } = true;
-					public string? CustomValidationMethodName { get; init; }
-					public bool GenerateIValidateOptions { get; init; } = false;
-					public bool SuppressIValidateOptions { get; init; } = false;
-				}
-				""",
-		];
 	}
 }

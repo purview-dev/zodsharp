@@ -45,6 +45,19 @@ var converter = userSchema.CreateValidatingConverter();
 var value = JsonConvert.DeserializeObject<User>(json, converter);
 ```
 
+## Errors
+
+A failure to read the JSON (malformed text, a `null` document, a value the serializer cannot convert) is reported as one
+error with code `invalid_json` (`NewtonsoftJsonExtensions.InvalidJsonCode`), category `invalid_type` and the fixed
+message `"The JSON value could not be converted to {expected}."`. The serializer's path becomes the error's `FullPath`
+(`items[1].age`) and its line and position become the `line` and `position` parameters. The serializer's own message
+is never surfaced, because it names CLR types and can quote the input. `DeserializeAndValidateAsync` awaits the
+schema's `ValidateAsync`, so asynchronous refinements run.
+
+The validating converter throws `ZodNewtonsoftJsonValidationException` (namespace `ZodSharp.Json`, a
+`JsonSerializationException`) carrying the schema's full `Errors`, located under the converter's JSON path; its
+message still starts with `"Validation failed: "`. `DeserializeAndValidate` unwraps it into the result.
+
 ## UTC DateTimeOffset contract
 
 The default `PreserveOffset` schema is exact and needs no converter. When the generated JSON Schema uses
@@ -76,6 +89,17 @@ var result = schema.Validate(data);
 ```
 
 This lets you share schemas defined in TypeScript/Zod with your .NET backend. (Export via `Z.ToJsonSchema` lives in the core package.)
+
+## Trimming and Native AOT
+
+Newtonsoft.Json is not trim- or Native AOT-compatible: it discovers members and constructors by reflection and
+generates code at runtime. Every API in this package that reaches Newtonsoft serialization (`DeserializeAndValidate`,
+`DeserializeAndValidateAsync`, `ValidateAndSerialize`, `ValidateAndSerializeAsync`, `CreateValidatingConverter`,
+`Z.FromJsonSchema` and `FromJsonSchemaParser.Parse`) is annotated `[RequiresUnreferencedCode]` and
+`[RequiresDynamicCode]`, so a trimmed or AOT application gets an IL2026/IL3050 warning at the call site instead of a
+runtime failure. Use [Purview.ZodSharp.SystemTextJson](https://www.nuget.org/packages/Purview.ZodSharp.SystemTextJson)
+with a source-generated `JsonSerializerContext` in those applications. See
+[Trimming and Native AOT](https://purview.dev/docs/zodsharp/trimming-and-aot/).
 
 ## Documentation
 

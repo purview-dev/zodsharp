@@ -14,7 +14,32 @@
 	<ItemGroup>
 		<ProjectReference Include="..\ZodSharp\ZodSharp.csproj" />
 		<ProjectReference Include="..\AspNetCore\AspNetCore.csproj" />
+		<!-- The generated-validation benchmarks need the [ZodSchema] generator (added as an analyzer below). -->
+		<ProjectReference
+			Include="..\SourceGenerators\SourceGenerators.csproj"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
 	</ItemGroup>
+
+	<!--
+		This project does not import Purview.BuildSdk (see Directory.Build.props), so nothing swaps the
+		generator's unmerged bin assembly for the merged, self-contained one. Resolve the merged generator the
+		same way the package does and hand it to the compiler.
+	-->
+	<Target Name="AddMergedZodSharpGenerator" AfterTargets="ResolveProjectReferences" BeforeTargets="CoreCompile">
+		<MSBuild
+			Projects="..\SourceGenerators\SourceGenerators.csproj"
+			Targets="GetPurviewMergedAnalyzerFile"
+			Properties="Configuration=$(Configuration)"
+			RemoveProperties="TargetFramework;TargetFrameworks;RuntimeIdentifier;SelfContained"
+		>
+			<Output TaskParameter="TargetOutputs" ItemName="_ZodSharpMergedGenerator" />
+		</MSBuild>
+		<ItemGroup>
+			<Analyzer Include="@(_ZodSharpMergedGenerator)" />
+		</ItemGroup>
+	</Target>
 
 	<ItemGroup>
 		<PackageReference Include="BenchmarkDotNet" />

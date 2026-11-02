@@ -9,7 +9,12 @@ namespace ZodSharp.Rules;
 /// declared by <c>System.ComponentModel.DataAnnotations</c>.
 /// </remarks>
 [Core.ZodRule]
-public readonly record struct StringLengthRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct StringLengthRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		Core.IZodFailureDescriber<string>,
+		Core.IZodStringFailureDescriber
 {
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_length";
@@ -17,9 +22,13 @@ public readonly record struct StringLengthRule : Core.IValidationRule<string>, C
 	/// <summary>Gets the message format; <c>{0}</c> is the maximum, <c>{1}</c> the minimum and <c>{2}</c> the actual length.</summary>
 	public const string MessageFormat = "String must be at most {0} characters long and at least {1}, but got {2}";
 
+	static readonly string?[] TemplateNames = [RuleMessage.Maximum, RuleMessage.Minimum, Core.ZodIssueParameters.Count];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
 	readonly int _maximumLength;
 	readonly int _minimumLength;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="StringLengthRule"/> struct.
@@ -32,7 +41,7 @@ public readonly record struct StringLengthRule : Core.IValidationRule<string>, C
 	{
 		_maximumLength = maximumLength;
 		_minimumLength = minimumLength;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -75,5 +84,25 @@ public readonly record struct StringLengthRule : Core.IValidationRule<string>, C
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Including(_minimumLength);
+
+	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(_maximumLength);
+
+	Core.ZodRuleFailure Core.IZodFailureDescriber<string>.DescribeFailure(in string value) =>
+		Describe(value.LengthOrDefault());
+
+	Core.ZodRuleFailure Core.IZodStringFailureDescriber.DescribeFailure(ReadOnlySpan<char> value) =>
+		Describe(value.Length);
+
+	// The Zod issue code follows the bound that failed.
+	Core.ZodRuleFailure Describe(int length) =>
+		new(
+			length < _minimumLength ? Core.ZodIssueCategories.TooSmall : Core.ZodIssueCategories.TooBig,
+			RuleParameters.Count(length)
+		);
 }

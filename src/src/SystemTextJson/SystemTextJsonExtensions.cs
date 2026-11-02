@@ -22,7 +22,14 @@ public static class SystemTextJsonExtensions
 		"Resolves the contract for T reflectively. Use the JsonTypeInfo<T> overload in a trimmed or Native "
 		+ "AOT application, passing the type info from a source-generated JsonSerializerContext.";
 
-	static readonly string[] EmptyPath = [];
+	/// <summary>
+	/// The code of every failure to read JSON: malformed JSON, a value that cannot be converted to the target
+	/// type, a <see langword="null"/> document, or a type the serializer cannot handle. The error's
+	/// <see cref="ValidationError.Category"/> is <see cref="ZodIssueCategories.InvalidType"/>, its
+	/// <see cref="ValidationError.FullPath"/> is the location the serializer reported, and its <c>line</c> and
+	/// <c>position</c> parameters hold the serializer's (zero-based) line number and byte position in the line.
+	/// </summary>
+	public const string InvalidJsonCode = "invalid_json";
 
 	/// <summary>
 	/// Deserializes JSON and validates it using a Zod schema, using a supplied contract.
@@ -48,22 +55,19 @@ public static class SystemTextJsonExtensions
 		ArgumentNullException.ThrowIfNull(json);
 		ArgumentNullException.ThrowIfNull(jsonTypeInfo);
 
+		T? deserialized;
 		try
 		{
-			var deserialized = JsonSerializer.Deserialize(json, jsonTypeInfo);
-
-			return deserialized == null
-				? ValidationResult<T>.Failure(
-					new ValidationError("deserialization_failed", "Failed to deserialize JSON", EmptyPath)
-				)
-				: schema.Validate(deserialized);
+			deserialized = JsonSerializer.Deserialize(json, jsonTypeInfo);
 		}
-		catch (JsonException ex)
+		catch (Exception ex) when (JsonDeserializationErrors.TryMap(ex, jsonTypeInfo, out var errors))
 		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("json_error", $"JSON parsing error: {ex.Message}", EmptyPath)
-			);
+			return ValidationResult<T>.Failure(errors);
 		}
+
+		return deserialized == null
+			? ValidationResult<T>.Failure(JsonDeserializationErrors.NullValue(jsonTypeInfo))
+			: schema.Validate(deserialized);
 	}
 
 	/// <summary>
@@ -92,24 +96,67 @@ public static class SystemTextJsonExtensions
 		ArgumentNullException.ThrowIfNull(jsonStream);
 		ArgumentNullException.ThrowIfNull(jsonTypeInfo);
 
+		T? deserialized;
 		try
 		{
-			var deserialized = await JsonSerializer
+			deserialized = await JsonSerializer
 				.DeserializeAsync(jsonStream, jsonTypeInfo, cancellationToken)
 				.ConfigureAwait(false);
-
-			return deserialized == null
-				? ValidationResult<T>.Failure(
-					new ValidationError("deserialization_failed", "Failed to deserialize JSON", EmptyPath)
-				)
-				: await schema.ValidateAsync(deserialized, cancellationToken).ConfigureAwait(false);
 		}
-		catch (JsonException ex)
+		catch (Exception ex) when (JsonDeserializationErrors.TryMap(ex, jsonTypeInfo, out var errors))
 		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("json_error", $"JSON parsing error: {ex.Message}", EmptyPath)
-			);
+			return ValidationResult<T>.Failure(errors);
 		}
+
+		return deserialized == null
+			? ValidationResult<T>.Failure(JsonDeserializationErrors.NullValue(jsonTypeInfo))
+			: await schema.ValidateAsync(deserialized, cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Deserializes JSON from a stream and validates it with a validator that has access to the caller's services, so
+	/// service-aware rules (for example an <c>OnZodValidateAsync</c> hook that resolves a repository) run (async).
+	/// </summary>
+	/// <typeparam name="T">The validated type.</typeparam>
+	/// <param name="validator">The validator, typically a generated <c>{TypeName}SchemaValidator</c>.</param>
+	/// <param name="jsonStream">The stream to read JSON from.</param>
+	/// <param name="jsonTypeInfo">
+	/// The contract for <typeparamref name="T"/>, typically from a source-generated
+	/// <see cref="JsonSerializerContext"/>.
+	/// </param>
+	/// <param name="services">The services service-aware rules resolve from.</param>
+	/// <param name="cancellationToken">Cancels the read and the validation.</param>
+	/// <returns>The validated value, or the validation errors.</returns>
+	/// <remarks>
+	/// Safe under trimming and Native AOT: nothing here resolves a contract reflectively.
+	/// </remarks>
+	public static async ValueTask<ValidationResult<T>> DeserializeAndValidateAsync<T>(
+		this IZodSchemaValidator<T> validator,
+		Stream jsonStream,
+		JsonTypeInfo<T> jsonTypeInfo,
+		IServiceProvider? services,
+		CancellationToken cancellationToken = default
+	)
+	{
+		ArgumentNullException.ThrowIfNull(validator);
+		ArgumentNullException.ThrowIfNull(jsonStream);
+		ArgumentNullException.ThrowIfNull(jsonTypeInfo);
+
+		T? deserialized;
+		try
+		{
+			deserialized = await JsonSerializer
+				.DeserializeAsync(jsonStream, jsonTypeInfo, cancellationToken)
+				.ConfigureAwait(false);
+		}
+		catch (Exception ex) when (JsonDeserializationErrors.TryMap(ex, jsonTypeInfo, out var errors))
+		{
+			return ValidationResult<T>.Failure(errors);
+		}
+
+		return deserialized == null
+			? ValidationResult<T>.Failure(JsonDeserializationErrors.NullValue(jsonTypeInfo))
+			: await validator.ValidateAsync(deserialized, services, cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -182,6 +229,48 @@ public static class SystemTextJsonExtensions
 	}
 
 	/// <summary>
+	/// Validates a value with a validator that has access to the caller's services, so service-aware rules run, and
+	/// serializes it to a stream, using a supplied contract (async).
+	/// </summary>
+	/// <typeparam name="T">The validated type.</typeparam>
+	/// <param name="validator">The validator, typically a generated <c>{TypeName}SchemaValidator</c>.</param>
+	/// <param name="value">The value to validate and serialize.</param>
+	/// <param name="output">The stream to write to.</param>
+	/// <param name="jsonTypeInfo">
+	/// The contract for <typeparamref name="T"/>, typically from a source-generated
+	/// <see cref="JsonSerializerContext"/>.
+	/// </param>
+	/// <param name="services">The services service-aware rules resolve from.</param>
+	/// <param name="cancellationToken">Cancels the validation and the write.</param>
+	/// <returns>An empty success, or the validation errors.</returns>
+	/// <remarks>
+	/// Safe under trimming and Native AOT: nothing here resolves a contract reflectively.
+	/// </remarks>
+	public static async ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(
+		this IZodSchemaValidator<T> validator,
+		T value,
+		Stream output,
+		JsonTypeInfo<T> jsonTypeInfo,
+		IServiceProvider? services,
+		CancellationToken cancellationToken = default
+	)
+	{
+		ArgumentNullException.ThrowIfNull(validator);
+		ArgumentNullException.ThrowIfNull(output);
+		ArgumentNullException.ThrowIfNull(jsonTypeInfo);
+
+		var result = await validator.ValidateAsync(value, services, cancellationToken).ConfigureAwait(false);
+		if (!result.IsSuccess)
+			return ValidationResult<string>.Failure(result.Errors);
+
+		await JsonSerializer
+			.SerializeAsync(output, result.Value, jsonTypeInfo, cancellationToken)
+			.ConfigureAwait(false);
+
+		return ValidationResult<string>.Success(string.Empty);
+	}
+
+	/// <summary>
 	/// Deserializes JSON and validates it using a Zod schema.
 	/// </summary>
 	/// <remarks>
@@ -202,21 +291,19 @@ public static class SystemTextJsonExtensions
 		if (json == null)
 			throw new ArgumentNullException(nameof(json));
 
+		T? deserialized;
 		try
 		{
-			var deserialized = JsonSerializer.Deserialize<T>(json, options);
-			return deserialized == null
-				? ValidationResult<T>.Failure(
-					new ValidationError("deserialization_failed", "Failed to deserialize JSON", EmptyPath)
-				)
-				: schema.Validate(deserialized);
+			deserialized = JsonSerializer.Deserialize<T>(json, options);
 		}
-		catch (JsonException ex)
+		catch (Exception ex) when (JsonDeserializationErrors.TryMap(ex, TryGetTypeInfo<T>(options), out var errors))
 		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("json_error", $"JSON parsing error: {ex.Message}", EmptyPath)
-			);
+			return ValidationResult<T>.Failure(errors);
 		}
+
+		return deserialized == null
+			? ValidationResult<T>.Failure(JsonDeserializationErrors.NullValue(TryGetTypeInfo<T>(options)))
+			: schema.Validate(deserialized);
 	}
 
 	/// <summary>
@@ -239,9 +326,9 @@ public static class SystemTextJsonExtensions
 		if (jsonStream == null)
 			throw new ArgumentNullException(nameof(jsonStream));
 
+		T? deserialized;
 		try
 		{
-			T? deserialized;
 #if NETSTANDARD2_1_OR_GREATER
 			// Older System.Text.Json packages lack the CancellationToken overload of DeserializeAsync.
 			using StreamReader reader = new(jsonStream, Encoding.UTF8, true, 1024, true);
@@ -250,18 +337,15 @@ public static class SystemTextJsonExtensions
 #else
 			deserialized = await JsonSerializer.DeserializeAsync<T>(jsonStream, options, cancellationToken);
 #endif
-			return deserialized == null
-				? ValidationResult<T>.Failure(
-					new ValidationError("deserialization_failed", "Failed to deserialize JSON", EmptyPath)
-				)
-				: await schema.ValidateAsync(deserialized, cancellationToken);
 		}
-		catch (JsonException ex)
+		catch (Exception ex) when (JsonDeserializationErrors.TryMap(ex, TryGetTypeInfo<T>(options), out var errors))
 		{
-			return ValidationResult<T>.Failure(
-				new ValidationError("json_error", $"JSON parsing error: {ex.Message}", EmptyPath)
-			);
+			return ValidationResult<T>.Failure(errors);
 		}
+
+		return deserialized == null
+			? ValidationResult<T>.Failure(JsonDeserializationErrors.NullValue(TryGetTypeInfo<T>(options)))
+			: await schema.ValidateAsync(deserialized, cancellationToken);
 	}
 
 	/// <summary>
@@ -318,9 +402,108 @@ public static class SystemTextJsonExtensions
 		return ValidationResult<string>.Success(string.Empty);
 	}
 
+	// The overloads below take no options at all. They exist so a project that references both JSON packages can
+	// call the argument-light forms: Purview.ZodSharp.NewtonsoftJson declares same-named extensions in the same
+	// namespace whose settings parameter is optional too, so without these the calls are ambiguous (CS0121).
+	// An overload that needs no default argument beats one that does, so these win and resolve to
+	// System.Text.Json; a call that passes Newtonsoft settings still resolves to Newtonsoft.
+
+	/// <summary>
+	/// Deserializes JSON with the default <see cref="JsonSerializerOptions"/> and validates it using a Zod schema.
+	/// </summary>
+	/// <inheritdoc cref="DeserializeAndValidate{T}(IZodSchema{T, T}, string, JsonSerializerOptions?)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValidationResult<T> DeserializeAndValidate<T>(this IZodSchema<T, T> schema, string json) =>
+		DeserializeAndValidate(schema, json, options: null);
+
+	/// <summary>
+	/// Deserializes JSON from a stream with the default <see cref="JsonSerializerOptions"/> and validates it using
+	/// a Zod schema (async).
+	/// </summary>
+	/// <inheritdoc cref="DeserializeAndValidateAsync{T}(IZodSchema{T, T}, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<T>> DeserializeAndValidateAsync<T>(
+		this IZodSchema<T, T> schema,
+		Stream jsonStream
+	) => DeserializeAndValidateAsync(schema, jsonStream, options: null, CancellationToken.None);
+
+	/// <summary>
+	/// Deserializes JSON from a stream with the default <see cref="JsonSerializerOptions"/> and validates it using
+	/// a Zod schema (async).
+	/// </summary>
+	/// <inheritdoc cref="DeserializeAndValidateAsync{T}(IZodSchema{T, T}, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<T>> DeserializeAndValidateAsync<T>(
+		this IZodSchema<T, T> schema,
+		Stream jsonStream,
+		CancellationToken cancellationToken
+	) => DeserializeAndValidateAsync(schema, jsonStream, options: null, cancellationToken);
+
+	/// <summary>
+	/// Validates a value and serializes it to a JSON string with the default <see cref="JsonSerializerOptions"/>.
+	/// </summary>
+	/// <inheritdoc cref="ValidateAndSerialize{T}(IZodSchema{T, T}, T, JsonSerializerOptions?)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValidationResult<string> ValidateAndSerialize<T>(this IZodSchema<T, T> schema, T value) =>
+		ValidateAndSerialize(schema, value, options: null);
+
+	/// <summary>
+	/// Validates a value and serializes it to a stream with the default <see cref="JsonSerializerOptions"/> (async).
+	/// </summary>
+	/// <inheritdoc cref="ValidateAndSerializeAsync{T}(IZodSchema{T, T}, T, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(
+		this IZodSchema<T, T> schema,
+		T value,
+		Stream output
+	) => ValidateAndSerializeAsync(schema, value, output, options: null, CancellationToken.None);
+
+	/// <summary>
+	/// Validates a value and serializes it to a stream with the default <see cref="JsonSerializerOptions"/> (async).
+	/// </summary>
+	/// <inheritdoc cref="ValidateAndSerializeAsync{T}(IZodSchema{T, T}, T, Stream, JsonSerializerOptions?, CancellationToken)"/>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	public static ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(
+		this IZodSchema<T, T> schema,
+		T value,
+		Stream output,
+		CancellationToken cancellationToken
+	) => ValidateAndSerializeAsync(schema, value, output, options: null, cancellationToken);
+
 	/// <summary>
 	/// Creates a custom JsonConverter that validates using a Zod schema.
 	/// </summary>
 	public static JsonConverter<T> CreateValidatingConverter<T>(this IZodSchema<T, T> schema) =>
 		schema == null ? throw new ArgumentNullException(nameof(schema)) : new ZodJsonConverter<T>(schema);
+
+	/// <summary>
+	/// Resolves the contract for <typeparamref name="T"/> to describe a failure, or <see langword="null"/>
+	/// when the options cannot supply one.
+	/// </summary>
+	[RequiresUnreferencedCode(JsonSerializerRequirement)]
+	[RequiresDynamicCode(JsonSerializerRequirement)]
+	static JsonTypeInfo<T>? TryGetTypeInfo<T>(JsonSerializerOptions? options)
+	{
+		try
+		{
+			var effective = options ?? JsonSerializerOptions.Default;
+			effective.MakeReadOnly(populateMissingResolver: true);
+
+#if NET11_0_OR_GREATER
+			return effective.GetTypeInfo<T>();
+#else
+			return effective.GetTypeInfo(typeof(T)) as JsonTypeInfo<T>;
+#endif
+		}
+		catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or ArgumentException)
+		{
+			return null;
+		}
+	}
 }

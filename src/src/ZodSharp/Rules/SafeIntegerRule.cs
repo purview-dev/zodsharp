@@ -5,15 +5,32 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct SafeIntegerRule : Core.IValidationRule<double>, Core.IZodRule, JsonSchema.IJsonSchemaRule
+public readonly record struct SafeIntegerRule
+	: Core.IValidationRule<double>,
+		Core.IZodRule,
+		Core.IZodFailureDescriber<double>,
+		JsonSchema.IJsonSchemaRule
 {
-	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
+	/// <summary>
+	/// Gets the Zod-compatible error code reported when the rule fails above the safe range. A failure follows its
+	/// direction: <c>too_small</c> below the range and <c>invalid_type</c> for a fraction, unless the rule was
+	/// given a code of its own.
+	/// </summary>
 	public const string ErrorCode = "too_big";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Number must be a safe integer, but got {0}";
+	static readonly IReadOnlyDictionary<string, object?> IntParameters = RuleParameters.One(
+		Core.ZodIssueParameters.Expected,
+		"int"
+	);
 
-	readonly string _message;
+	/// <summary>Gets the message format. The default never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Number must be a safe integer";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the SafeIntegerRule struct.
@@ -22,7 +39,7 @@ public readonly record struct SafeIntegerRule : Core.IValidationRule<double>, Co
 	/// <param name="code">Optional error code override. If one is not specified then the <see cref="ErrorCode"/> is used.</param>
 	public SafeIntegerRule(string? message = null, string? code = null)
 	{
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -56,5 +73,30 @@ public readonly record struct SafeIntegerRule : Core.IValidationRule<double>, Co
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Number;
+
+	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Including(int.MinValue);
+
+	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(int.MaxValue);
+
+	// A fraction (or NaN) is not an integer at all, which Zod reports as invalid_type; an out-of-range
+	// integer is too_small or too_big by direction. The code follows the category unless the rule was given a
+	// code of its own.
+	Core.ZodRuleFailure Core.IZodFailureDescriber<double>.DescribeFailure(in double value)
+	{
+		Core.ZodRuleFailure failure =
+			value != Math.Truncate(value) ? new(Core.ZodIssueCategories.InvalidType, IntParameters)
+			: value < int.MinValue ? new(Core.ZodIssueCategories.TooSmall)
+			: new(Core.ZodIssueCategories.TooBig);
+
+		return string.Equals(Code, ErrorCode, StringComparison.Ordinal)
+			? failure with
+			{
+				Code = failure.Category,
+			}
+			: failure;
+	}
 }

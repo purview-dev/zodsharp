@@ -5,15 +5,23 @@ namespace ZodSharp.Rules;
 /// Uses struct to avoid allocations.
 /// </summary>
 [Core.ZodRule]
-public readonly record struct JWTRule : Core.IValidationRule<string>, Core.IStringValidationRule, Core.IZodRule
+public readonly record struct JWTRule
+	: Core.IValidationRule<string>,
+		Core.IStringValidationRule,
+		Core.IZodRule,
+		JsonSchema.IJsonSchemaRule
 {
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Invalid JWT: {0}";
+	/// <summary>Gets the default message format. It never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Invalid JWT";
 
-	readonly string _message;
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the JWTRule struct.
@@ -22,7 +30,7 @@ public readonly record struct JWTRule : Core.IValidationRule<string>, Core.IStri
 	/// <param name="code">Optional error code override. If one is not specified then the <see cref="ErrorCode"/> is used.</param>
 	public JWTRule(string? message = null, string? code = null)
 	{
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -92,5 +100,24 @@ public readonly record struct JWTRule : Core.IValidationRule<string>, Core.IStri
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => RuleParameters.Format("jwt");
+
+	/// <summary>
+	/// A JWT has no JSON Schema format, so the rule is recorded as unsupported and described by the
+	/// <c>x-zod-jwt</c> vendor extension.
+	/// </summary>
+	/// <param name="schema">The schema being built for the validated string.</param>
+	public void ApplyTo(JsonSchema.JsonSchemaDefinition schema)
+	{
+		ArgumentNullException.ThrowIfNull(schema);
+		schema.SetVendorExtension("x-zod-jwt", true);
+		JsonSchema.JsonSchemaRules.MarkUnsupported(schema, nameof(JWTRule));
+	}
 }

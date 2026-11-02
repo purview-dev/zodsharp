@@ -1,6 +1,6 @@
 # Source Generator Diagnostics
 
-The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, and `ZODSGEN042` are warnings, `ZODSGEN041` and `ZODSGEN043` are informational, and the rest are errors.
+The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`, `ZODSGEN051` and `ZODSGEN052` are warnings, `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are informational, and the rest are errors.
 
 | ID | Meaning |
 |---|---|
@@ -11,9 +11,10 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN006 | Unsupported DataAnnotations usage (string-only attributes on non-string targets; `[AllowedValues]`/`[DeniedValues]` on unsupported types; `[RegularExpression]` on non-strings; `[Range]` on unsupported types) |
 | ZODSGEN007 | Custom validation method configured but not found (when a name is explicitly configured) |
 | ZODSGEN008 | Custom method return type is not `ValueTask<ValidationResult<T>>` |
-| ZODSGEN009 | Custom method parameter count is not 2 |
+| ZODSGEN009 | Custom method does not take two or three parameters: `(T value, CancellationToken ct)` or the service-aware `(T value, IServiceProvider services, CancellationToken ct)` |
 | ZODSGEN010 | First custom method parameter is not the model type |
-| ZODSGEN011 | Second custom method parameter is not `CancellationToken` |
+| ZODSGEN011 | Last custom method parameter is not `CancellationToken` |
+| ZODSGEN054 | A three-parameter (service-aware) custom method's second parameter is not `IServiceProvider` |
 | ZODSGEN012 | Custom method is generic |
 | ZODSGEN013 | Custom method must be static when defined on the model type |
 | ZODSGEN014 | Custom method is inaccessible from the generated validator (private/protected) |
@@ -42,9 +43,28 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN042 | (warning) A validation rule (a type implementing `IValidationRule<T>`) does not expose a public `const string ErrorCode` and a public `const string MessageFormat`, so its error identity cannot be asserted in tests without duplicating literals |
 | ZODSGEN043 | (info) A built-in rule marked `[ZodRule]` does not generate a validation attribute, because a constructor parameter cannot be represented as an attribute property; the rule is still reachable through the runtime/fluent API. A derived name that collides with `System.ComponentModel.DataAnnotations` is *not* skipped — the attribute is emitted under a `Zod` suffix instead |
 | ZODSGEN044 | A `[ZodSchema]` type that uses an automatic `[Scalar]` form (`[Scalar<TValue>]` or `[Scalar(typeof(TValue))]`) cannot produce a usable schema, so the value-object generator's generated `Create` would reference a `{Type}Schema` that does not exist or cannot validate. Reported when `[ZodSchema(GenerateValidateMethod = false)]` suppresses the `Validate` method the value-object generator calls, or when the declared underlying type cannot be represented |
+| ZODSGEN045 | (warning) A type that exports JSON Schema references a nested `[ZodSchema]` type whose export is disabled (`[ZodSchema(GenerateJsonSchema = false)]` or the assembly-level `ZodSharpGenerateJsonSchemas=false` switch), so the parent's exported schema falls back to an empty schema for that property (`"Property '{0}' references type '{1}', which disables JSON Schema generation; the exported schema cannot describe it"`) |
+| ZODSGEN046 | (warning) A `[CollectionBehavior]` attribute has no applicable option: `AllowNulls` requires nullable elements/values; `DefaultImmutableArrayBehavior` applies to `ImmutableArray<T>` (including nullable wrappers) |
+| ZODSGEN047 | (info) `[ValidatableType]` (Microsoft.Extensions.Validation) on a `[ZodSchema]` type is redundant: the ZodSharp bridge resolves the generated validator first, and the attribute only makes the Microsoft.Extensions.Validation generator emit a second, DataAnnotations-only validator for the same type. A code fix removes the attribute |
+| ZODSGEN048 | (warning) A type has rules that only run asynchronously (an `AsyncValidationAttribute` member or an `IAsyncValidatableObject` target) but a synchronous `Validate` is generated; that `Validate` throws `InvalidOperationException` rather than skip them, so call `ValidateAsync` |
+| ZODSGEN049 | (warning) A member is typed as a C# 15 `closed` class whose derived type has no `[ZodSchema]`, so a value of that derived type is not validated (`"Property '{0}' is typed as the closed type '{1}', but the derived type '{2}' has no [ZodSchema], ..."`); add `[ZodSchema]` to the derived type |
+| ZODSGEN050 | A generated `IValidateOptions` validator would conflict with a hand-authored `[OptionsValidator]` class (SYSLIB1205), so the ZodSharp validator is not generated. Keep one generator: remove `[OptionsValidator]`, or set `[ZodSchema(SuppressIValidateOptions = true)]` |
+| ZODSGEN051 | (warning) A `[ZodSchema]` type is declared in a Razor component (`.razor`). Razor compiles components with its own source generator, which the ZodSharp generator cannot see, so no schema is generated; move the type to a `.cs` file |
+| ZODSGEN052 | (warning) An attribute's `ErrorMessage` uses a positional placeholder the attribute does not supply, or an unbalanced brace (`"The ErrorMessage of [{0}] on '{1}' contains '{2}', which the attribute does not supply; it is shown literally"`). Messages are formatted with a never-throw engine, so the text is shown literally at runtime; the diagnostic catches the typo at build time |
+| ZODSGEN053 | (warning) `[MinLength]`, `[MaxLength]` or `[Length]` is applied to a collection member of a `[ZodSchema]` type in a project with `PublishTrimmed`, `PublishAot`, `IsTrimmable` or `IsAotCompatible` (`"[{0}] on the collection member '{1}' is not trim-safe (its constructor is [RequiresUnreferencedCode]); use [{2}] from ZodSharp.Rules, which the generator validates identically"`). The BCL attributes raise IL2026 on every usage; `[MinCount]`, `[MaxCount]` and `[CountRange]` report the same errors. A code fix swaps the attribute. See [Trimming and Native AOT](Trimming-and-AOT.md#collection-counts-mincount-maxcount-and-countrange) |
 
 IDs `ZODSGEN002` and `ZODSGEN022`–`ZODSGEN026` are intentionally unused; rule identifiers are never renumbered or re-used.
+
+The `[ErrorType]` generator, shipped in the same analyzer assembly, reports `ZODSASP001`–`ZODSASP003`,
+`ZODSASP100` and `ZODSASP101`; they are described in [ASP.NET Core Integration](AspNetCore-Integration.md).
 
 ## Suppressing
 
 Diagnostics can be suppressed per-project or per-site with the standard `#pragma warning disable ZODSGEN006` / `NoWarn` mechanisms. Refer to the analyzer's shipped release notes (`AnalyzerReleases.Shipped.md` / `AnalyzerReleases.Unshipped.md` in the generator project) for the canonical catalog.
+
+The package also ships one **suppression** that is not a reportable rule: `ZODSUP001` removes `CA1849` ("call async
+methods when in an async method") for ZodSharp's synchronous validation entry points — generated `Validate` and
+`ValidateMember`, the validator adapters and the fluent schemas. CA1849 fires there only because `ValidateAsync`
+exists; the synchronous pipeline is the cheap path and never blocks, and a type whose graph has asynchronous rules is
+already covered by `ZODSGEN048`. The suppression is by call target, so `Task.Wait`, `Thread.Sleep` and another
+library's `Validate`/`ValidateAsync` pair still report CA1849.

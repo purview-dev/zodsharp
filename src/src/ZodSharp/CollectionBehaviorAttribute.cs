@@ -5,7 +5,7 @@ namespace ZodSharp;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The only setting today is <see cref="AllowNulls"/>, which controls whether a collection may contain
+/// <see cref="AllowNulls"/> controls whether a collection may contain
 /// <see langword="null"/> elements (or a dictionary a <see langword="null"/> value). Null entries are
 /// rejected by default. Set <c>AllowNulls = true</c> to accept them, or <c>AllowNulls = false</c> to reject
 /// them even when the element type is explicitly nullable (<c>T?</c>) or a wider default allows them.
@@ -34,4 +34,12 @@ public sealed class CollectionBehaviorAttribute : Attribute
 	/// the named argument rather than a null value.
 	/// </remarks>
 	public bool AllowNulls { get; set; }
+
+	/// <summary>Gets or sets how an uninitialized immutable array is validated.</summary>
+	/// <remarks>
+	/// Overrides the assembly's <see cref="ZodSharpSchemaDefaultsAttribute.DefaultImmutableArrayBehavior"/>
+	/// and the <c>ZodSharpDefaultImmutableArrayBehavior</c> MSBuild property. Unset options defer to the
+	/// next level; the built-in default is <see cref="ZodSharp.DefaultImmutableArrayBehavior.ValidationError"/>.
+	/// </remarks>
+	public DefaultImmutableArrayBehavior DefaultImmutableArrayBehavior { get; set; }
 }

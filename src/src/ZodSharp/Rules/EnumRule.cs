@@ -26,15 +26,19 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_enum_value";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value and <c>{1}</c> the enum name.</summary>
-	public const string MessageFormat = "'{0}' is not a defined member of {1}";
+	/// <summary>Gets the message format; <c>{1}</c> is the enum name. The default never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Value is not a defined member of {1}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
 
 	// Resolving the defined members once per closed generic type avoids the per-validation
 	// Enum.IsDefined reflection path.
 	static readonly HashSet<TEnum> DefinedValues = [.. Enum.GetValues<TEnum>()];
 
+	static readonly System.Collections.Immutable.ImmutableArray<string> DefinedNames = [.. Enum.GetNames<TEnum>()];
+
 	readonly TEnum[]? _disallowed;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="EnumRule{TEnum}"/> struct that accepts every defined
@@ -55,7 +59,7 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 	public EnumRule(TEnum[]? disallowed, string? message = null, string? code = null)
 	{
 		_disallowed = disallowed is { Length: > 0 } ? disallowed : null;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -101,5 +105,30 @@ public readonly record struct EnumRule<TEnum> : Core.IValidationRule<TEnum>, Cor
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		RuleMessage.Template(_message ?? MessageFormat, 1, typeof(TEnum).Name, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Enum;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidValue;
+
+	// The allowed member names, in declaration order (enum members are configuration, not caller input).
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters
+	{
+		get
+		{
+			var disallowed = _disallowed;
+			return RuleParameters.One(
+				Core.ZodIssueParameters.Options,
+				disallowed is null
+					? DefinedNames
+					:
+					[
+						.. Enum.GetValues<TEnum>()
+							.Where(value => Array.IndexOf(disallowed, value) < 0)
+							.Select(static value => value.ToString()),
+					]
+			);
+		}
+	}
 }

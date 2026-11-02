@@ -1,5 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
+		<!-- Downloaded to and run in the browser by Blazor WebAssembly clients: the SDK's browser-safe defaults fail the
+			build on trim, AOT and browser-unsupported APIs (and satisfy the client's PRBLZ0001 reference check). -->
+		<PurviewBrowserSafe>true</PurviewBrowserSafe>
 		<IsPackable>true</IsPackable>
 		<PackageId>Purview.ZodSharp</PackageId>
 		<AssemblyName>Purview.ZodSharp</AssemblyName>
@@ -19,12 +22,12 @@
 			rule-type names that did not exist, so object properties, array bounds and element schemas,
 			optional inner schemas and union options were all missing from exported schemas.
 
-			RegisterFromAssembly stays reflective by nature and declares [RequiresUnreferencedCode]; the
-			discriminated-union accessor falls back to plain reflection when dynamic code is unavailable.
+			RegisterFromAssembly reads the generator's typeof-rooted attribute, so it is safe too; the
+			discriminated-union accessor falls back to plain reflection when dynamic code is unavailable, behind
+			the ZodSharp.Reflection.IsSupported feature switch.
 
-			The integration packages are NOT marked: Purview.ZodSharp.NewtonsoftJson cannot be, because
-			Newtonsoft.Json is reflection-based throughout, and Purview.ZodSharp.SystemTextJson needs
-			JsonTypeInfo/JsonSerializerContext overloads first.
+			Purview.ZodSharp.NewtonsoftJson is marked too, but only because every API that reaches Newtonsoft.Json
+			declares [RequiresUnreferencedCode]/[RequiresDynamicCode]; Newtonsoft.Json is reflection-based throughout.
 		-->
 		<IsAotCompatible>true</IsAotCompatible>
 		<NoWarn>$(NoWarn);NU5118</NoWarn>

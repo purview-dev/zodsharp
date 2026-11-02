@@ -43,7 +43,7 @@ partial class ZodSchemaGeneratorTests
 			);
 		await Assert.That(generated).ContainsGeneratedCode("InvokeZodRefinementHook(value, refineContext)");
 		await Assert.That(generated).ContainsGeneratedCode("refineContext.HasIssues");
-		await Assert.That(generated).ContainsGeneratedCode("AddError(ref errors, refinementIssue)");
+		await Assert.That(generated).ContainsGeneratedCode("ZodGeneratedValidation.Add(ref errors, refinementIssue)");
 
 		var hooks = driverResult.GetSource("PagingSchema.Hooks.g.cs", HintNameMatchMode.Suffix);
 		await Assert.That(hooks).Contains("partial class Paging");

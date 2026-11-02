@@ -2,7 +2,8 @@
 name: purview-zodsharp-diagnostics
 description: >-
   Use when a Purview.ZodSharp build reports a ZODSGEN or ZODSASP diagnostic - the [ZodSchema]
-  generator's configuration and usage rules, the custom-rule mapping rules, and the ErrorType
+  generator's configuration and usage rules, the custom-rule mapping rules, async-only rules,
+  Microsoft.Extensions.Validation and Razor interplay, error-message placeholders, and the ErrorType
   analyzers - to find what triggered it and how to fix it.
 license: MIT
 metadata:
@@ -18,8 +19,9 @@ Two families, both enabled by default:
 - **`ZODSASP*`** — the `ErrorType` factory's analyzer and generator, which ship in the **core**
   package and need no ASP.NET Core dependency.
 
-`ZODSGEN033` and `ZODSGEN037`–`ZODSGEN040` and `ZODSGEN042` are warnings; `ZODSGEN041` and
-`ZODSGEN043` are informational; the rest are errors.
+`ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`,
+`ZODSGEN051`, `ZODSGEN052` and `ZODSGEN053` are warnings; `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are
+informational; the rest are errors.
 
 IDs `ZODSGEN002` and `ZODSGEN022`–`ZODSGEN026` are intentionally unused. Rule identifiers are never
 renumbered or reused, so a sighting of one means stale tooling or a stale suppression.
@@ -35,6 +37,9 @@ renumbered or reused, so a sighting of one means stale tooling or a stale suppre
 | `ZODSGEN006` | Unsupported DataAnnotations usage: a string-only attribute on a non-string, `[AllowedValues]`/`[DeniedValues]` on an unsupported type, `[RegularExpression]` on a non-string, `[Range]` on an unsupported type. |
 | `ZODSGEN020` | `[Compare]` references an unknown property. |
 | `ZODSGEN021` | `System.ComponentModel.DataAnnotations` reference is missing. |
+| `ZODSGEN048` | *(warning)* The type has rules that only run asynchronously (an `AsyncValidationAttribute` member or `IAsyncValidatableObject`), so the generated synchronous `Validate` throws `InvalidOperationException`. Call `ValidateAsync`. |
+| `ZODSGEN052` | *(warning)* An attribute's `ErrorMessage` uses a positional placeholder the attribute does not supply (for example `{3}` on `[Required]`) or has an unbalanced brace. Messages are formatted with a never-throw engine, so the text is shown literally; fix the placeholder. |
+| `ZODSGEN053` | *(warning)* `[MinLength]`, `[MaxLength]` or `[Length]` on a collection member of a `[ZodSchema]` type in a trimmed or AOT project (`PublishTrimmed`, `PublishAot`, `IsTrimmable`, `IsAotCompatible`). The BCL constructors are `[RequiresUnreferencedCode]`; use `[MinCount]`, `[MaxCount]` or `[CountRange]` from `ZodSharp.Rules` (the code fix swaps it). |
 
 ## Custom async validation method
 
@@ -44,9 +49,10 @@ All of these mean the method the generator was told to call cannot be called:
 | --- | --- |
 | `ZODSGEN007` | Configured but not found. |
 | `ZODSGEN008` | Return type is not `ValueTask<ValidationResult<T>>`. |
-| `ZODSGEN009` | Parameter count is not 2. |
+| `ZODSGEN009` | The method takes neither two parameters `(T value, CancellationToken ct)` nor three, the service-aware `(T value, IServiceProvider services, CancellationToken ct)`. |
 | `ZODSGEN010` | First parameter is not the model type. |
-| `ZODSGEN011` | Second parameter is not `CancellationToken`. |
+| `ZODSGEN011` | The last parameter is not `CancellationToken`. |
+| `ZODSGEN054` | A three-parameter (service-aware) method's second parameter is not `IServiceProvider`. |
 | `ZODSGEN012` | The method is generic. |
 | `ZODSGEN013` | Declared on the model type but not `static`. |
 | `ZODSGEN014` | Inaccessible from the generated validator (private/protected). |
@@ -62,6 +68,7 @@ All of these mean the method the generator was told to call cannot be called:
 | --- | --- |
 | `ZODSGEN027` | Requested, but the `Microsoft.Extensions.Options` reference is missing. |
 | `ZODSGEN028` | Requested on a struct — it requires a class. |
+| `ZODSGEN050` | *(error)* The generated `IValidateOptions` validator would conflict with a hand-authored `[OptionsValidator]` class (`SYSLIB1205`), so it is not generated. Remove `[OptionsValidator]` or set `[ZodSchema(SuppressIValidateOptions = true)]`. |
 
 ## The refinement hook
 
@@ -93,6 +100,13 @@ All of these mean the method the generator was told to call cannot be called:
 | --- | --- |
 | `ZODSGEN046` | *(warning)* `[CollectionBehavior]` is applied to a property that is not a collection of nullable elements or values (a scalar, a collection whose element cannot be `null`, or a dictionary whose value cannot be `null`), so the setting can never take effect. |
 
+## Microsoft.Extensions.Validation and Razor
+
+| ID | Meaning |
+| --- | --- |
+| `ZODSGEN047` | *(info)* `[ValidatableType]` on a `[ZodSchema]` type is redundant: the ZodSharp bridge (`AddZodSharpValidation()`) resolves the generated validator first, and the attribute only makes the Microsoft.Extensions.Validation generator emit a second, DataAnnotations-only validator. A code fix removes the attribute. |
+| `ZODSGEN051` | *(warning)* A `[ZodSchema]` type is declared in a `.razor` file. Razor compiles components with its own source generator, and generators cannot see each other's output, so no schema is generated. Move the type to a `.cs` file. |
+
 ## Unions, value objects, JSON Schema
 
 | ID | Meaning |
@@ -100,6 +114,7 @@ All of these mean the method the generator was told to call cannot be called:
 | `ZODSGEN041` | *(info)* A typed `Z.Union` whose option types are all reference types can use the allocation-free native C# 15 union from `Z.NativeUnion` on .NET 11+. A code fix is offered. |
 | `ZODSGEN044` | A `[ZodSchema]` type using an automatic `[Scalar]` form (`[Scalar<TValue>]` / `[Scalar(typeof(TValue))]`) cannot produce a usable schema, so the value-object generator's `Create` would reference a `{Type}Schema` that does not exist or cannot validate. Reported when `GenerateValidateMethod = false` suppresses the `Validate` it calls, or the declared underlying type cannot be represented. |
 | `ZODSGEN045` | A type referenced by an exported type has `GenerateJsonSchema = false`, so the cross-platform contract surface is incomplete. |
+| `ZODSGEN049` | *(warning)* A member is typed as a C# 15 closed class whose derived type has no `[ZodSchema]`, so a value of that derived type is not validated. Add `[ZodSchema]` to the derived type. |
 
 ## `ErrorType` — `ZODSASP*`
 
@@ -123,3 +138,10 @@ Standard mechanisms: `#pragma warning disable ZODSGEN006`, a `NoWarn` entry, or 
 severity override. The canonical catalogue is the analyzer's `AnalyzerReleases.Shipped.md` /
 `AnalyzerReleases.Unshipped.md` in the generator project — a new or changed rule must be recorded
 there in the same change.
+
+The package also ships `ZODSUP001`, a **suppression** rather than a reportable rule: it removes CA1849
+("call async methods when in an async method") for ZodSharp's `Validate` and `ValidateMember` calls — generated
+schemas, validator adapters and fluent schemas — because the synchronous pipeline is the cheap path and never blocks.
+`ValidateAsync` is needed only when the graph has asynchronous rules, which `ZODSGEN048` reports. It is scoped to
+those call targets: `Task.Wait`, `Thread.Sleep` and other libraries' `Validate`/`ValidateAsync` pairs still report
+CA1849. Do not add `NoWarn;CA1849` for ZodSharp's own calls.

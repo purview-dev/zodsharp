@@ -20,6 +20,22 @@ public class GeneratedSchemaDITests
 	}
 
 	[Test]
+	public async Task AddZodSharp_GivenSchemaRegistration_AppliesItWithoutAssemblyScanning()
+	{
+		// Arrange - the shape the generated AddZodSharp{Assembly}Schemas() extensions register.
+		ServiceCollection services = new();
+		services.AddZodSchemaRegistration(static factory => factory.Register(new UserDtoSchemaValidator()));
+		services.AddZodSharp();
+
+		// Act
+		var factory = services.BuildServiceProvider().GetRequiredService<IZodSchemaFactory>();
+
+		// Assert
+		await Assert.That(factory.IsRegistered<UserDto>()).IsTrue();
+		await Assert.That(factory.TryGetUntypedValidator(typeof(UserDto), out _)).IsTrue();
+	}
+
+	[Test]
 	public async Task GeneratedValidator_ProducesCorrectValidationResult()
 	{
 		ServiceCollection services = new();

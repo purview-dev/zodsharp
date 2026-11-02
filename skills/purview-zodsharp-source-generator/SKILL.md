@@ -3,8 +3,9 @@ name: purview-zodsharp-source-generator
 description: >-
   Use when generating a compile-time validator with Purview.ZodSharp's [ZodSchema] attribute - which
   types it emits, the attribute options, DataAnnotations coverage, the OnZodValidate refinement hook,
-  async custom validation, automatic enum validation, IValidateOptions support, and the MSBuild
-  switches that control it.
+  async and service-aware validation, per-member validation and path resolution, typed Paths and
+  JsonNames, trim-safe registration, IValidatableObject, automatic enum validation, IValidateOptions
+  support, and the MSBuild switches that control it.
 license: MIT
 metadata:
   product: Purview.ZodSharp
@@ -14,8 +15,9 @@ metadata:
 # The `[ZodSchema]` source generator
 
 Mark a class, struct or record with `[ZodSchema]` and a static, zero-allocation validator is emitted
-at compile time — no reflection at runtime. The attribute itself is generated into the `ZodSharp`
-namespace by `Purview.ZodSharp.SourceGenerators`, so nothing beyond `Purview.ZodSharp` is needed.
+at compile time — no reflection at runtime. The attribute itself is `ZodSharp.ZodSchemaAttribute` in the`
+`Purview.ZodSharp` assembly (as is `[ErrorType]`), so nothing beyond `Purview.ZodSharp` is needed and the`
+generator emits no marker types into your project.
 
 ```csharp
 using System.ComponentModel.DataAnnotations;
@@ -43,13 +45,24 @@ var validated = UserSchema.Parse(user);   // throws ZodException on failure
 
 | Artifact | Shape |
 | --- | --- |
-| `{TypeName}Schema` | static partial class — the validator. Accessibility mirrors the target. Holds `Validate`, `Parse`, `BuildJsonSchema`, and (with composition on) `ApplyAnd`, `ApplyOr`, `ApplyRefine`. Renamed by `SchemaName`. |
-| `{TypeName}SchemaValidator` | `partial class : IZodSchemaValidator<{TypeName}>, IJsonSchemaProvider` — the DI adapter, with `Validate`/`ValidateAsync`/`BuildJsonSchema`. Primary schema only; `{SchemaName}Validator` when renamed. |
-| `{TypeName}Validator` | `sealed partial class : IValidateOptions<{TypeName}>` — only when `IValidateOptions` support is on, and the target is a class. |
+| `{TypeName}Schema` | static partial class — the validator. Accessibility mirrors the target. Holds `Validate`, `ValidateAsync(value, services, ct)`, `RequiresAsyncValidation`, the member API below, `Parse`, `BuildJsonSchema`, and (with composition on) `ApplyAnd`, `ApplyOr`, `ApplyRefine`. Renamed by `SchemaName`. |
+| `{TypeName}Schema.Paths` | one `ZodPath` constant per member (`OrderSchema.Paths.Lines`) for refinements and tests |
+| `{TypeName}Schema.JsonNames` | `Get(memberName)` returns the `[JsonPropertyName]` name, or `null`; `ToJsonNamedPath(path, namingPolicy)` renames a whole path without reflection |
+| `{TypeName}SchemaValidator` | `partial class` implementing `IZodSchemaValidator<T>`, `IZodMemberValidator<T>`, `IZodMemberResolver<T>`, `IZodUntypedValidator`, `IZodJsonPathMapper` and `IJsonSchemaProvider` — the adapter hosts use. Primary schema only; `{SchemaName}Validator` when renamed. |
+| `{TypeName}Validator` | `sealed partial class : IValidateOptions<{TypeName}>` (and, on .NET 11, `IAsyncValidateOptions<T>` when the type has async rules) — only when `IValidateOptions` support is on, and the target is a class. |
+| `ZodSharp.Generated.{Assembly}ZodSharpSchemas.Register(factory)` | registers every generated validator in the assembly by name — trim- and AOT-safe |
+| `services.AddZodSharp{Assembly}Schemas()` | the DI form of `Register`, emitted when Microsoft.Extensions.DependencyInjection is referenced. `{Assembly}` is the assembly name in PascalCase (`Contoso.Orders.Api` → `AddZodSharpContosoOrdersApiSchemas()`) |
 | `[assembly: ZodSchemaGenerated(typeof({TypeName}))]` | the marker `IZodSchemaFactory` assembly scanning consumes. Primary, non-nested schemas only. |
 
 `BuildJsonSchema` is built from the same metadata as `Validate`, so a generated schema exports through
 `Z.ToJsonSchema` without rebuilding its rules by hand.
+
+No marker type is emitted: `[ZodSchema]` and `[ErrorType]` are ordinary types in `Purview.ZodSharp` (3.x). ZodSharp
+2 generated `[Embedded]` copies of both into every compilation, so a **library** packed against 2.x and rebuilt
+against 3.x fails package validation with `CP0001` for `T:ZodSharp.ZodSchemaAttribute` and
+`T:ZodSharp.Core.ErrorTypeAttribute`. The removal is safe (no compiler binds to an `[Embedded]` type in a reference):
+run `dotnet pack -p:ApiCompatGenerateSuppressionFile=true` and check in the `CompatibilitySuppressions.xml` it writes,
+until the baseline is a 3.x build. The changelog's upgrade notes give the entries by hand.
 
 ```csharp
 var adult  = UserSchema.ApplyRefine(user, u => u.Age >= 18, "Must be adult");
@@ -90,6 +103,12 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   `[assembly: ZodSharpSchemaDefaults(AllowNulls = ...)]`, then the `ZodSharpAllowNulls` MSBuild
   property. The most specific statement wins; an unset level defers to the next. An explicit
   `AllowNulls = true` exports a `null` branch on the collection's `items` schema.
+- **Struct collections:** nullable wrappers are unwrapped only when present. A default `ImmutableArray<T>`
+  follows missing-value rules (`[Required]` => `missing_field`, optional nullable => accepted, non-nullable
+  => `invalid_type`). To validate it as empty, set `DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty`
+  on `[CollectionBehavior]` or `[assembly: ZodSharpSchemaDefaults]`, or set the
+  `ZodSharpDefaultImmutableArrayBehavior` MSBuild property. Precedence: property, assembly, MSBuild,
+  built-in `ValidationError`. An absent nullable wrapper remains missing; the model is never mutated.
 - **Dictionaries are maps, not arrays.** A property whose type implements `IDictionary<TKey, TValue>`
   or `IReadOnlyDictionary<TKey, TValue>` (for example `Dictionary`, `SortedDictionary`,
   `ConcurrentDictionary`, `ImmutableDictionary`) validates every **value** against the value type's
@@ -98,11 +117,42 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   `[CollectionBehavior(AllowNulls = true)]` accepts it). A dictionary exports as
   `{ "type": "object", "additionalProperties": … }` and `[Length]`/`[MinLength]`/`[MaxLength]` map to
   `minProperties`/`maxProperties` — never `z.array`/`items`.
+- **Collection counts in trimmed apps:** `[MinLength]`/`[MaxLength]`/`[Length]` constructors are
+  `[RequiresUnreferencedCode]` (IL2026). Use `[MinCount(n)]`, `[MaxCount(n)]` and `[CountRange(min, max)]`
+  from `ZodSharp.Rules`: same generated check, error identity and JSON Schema keywords. `ZODSGEN053`
+  (with a code fix) flags the BCL attributes on a collection when `PublishTrimmed`, `PublishAot`,
+  `IsTrimmable` or `IsAotCompatible` is set; on a scalar the count attributes are `ZODSGEN030`.
 - Classes, structs and records are supported. Structs get no `IValidateOptions` (`ZODSGEN028` if
   requested).
 
-DataAnnotations coverage, positional-record attribute targets, structured size issues and the
-`[Range]` shapes are in [references/dataannotations.md](references/dataannotations.md).
+- `IValidatableObject.Validate` runs after the members and type rules, as in DataAnnotations; its
+  results report code `validation_failed`, category `custom`, at the member names they list. On .NET 11
+  `IAsyncValidatableObject` and `AsyncValidationAttribute` members run in `ValidateAsync`; a
+  synchronous `Validate` of such a type throws `InvalidOperationException` (`ZODSGEN048`).
+- **C# 15:** a member typed as a union dispatches to the active case's schema, and a member typed as a
+  closed class to the derived type's schema (`ZODSGEN049` when a derived type has no `[ZodSchema]`).
+  Paths never include the union's `Value`.
+- Nested validation is depth-guarded: `ZodValidationDepth.MaxDepth` (32) throws
+  `InvalidOperationException` instead of overflowing the stack on a cycle.
+- Paths are typed: `Items[0].Name`, `Map[en].Value`, `Map["0"].Value` from `FullPath.ToDottedString()`.
+
+DataAnnotations coverage, codes and categories, positional-record attribute targets, structured size
+issues, error messages and the `[Range]` shapes are in
+[references/dataannotations.md](references/dataannotations.md). The member API, the async graph and
+registration are in [references/generated-api.md](references/generated-api.md).
+
+## Member validation and resolution
+
+```csharp
+OrderSchema.IsValidatableMember("CustomerName");          // has rules of its own?
+var field = OrderSchema.ValidateMember(order, "CustomerName");
+OrderSchema.TryResolveMember(order, error.FullPath, out var container, out var memberName);
+```
+
+`ValidateMember`/`ValidateMemberAsync` run **one member's own rules** - no nested recursion, type
+rules, `IValidatableObject` or refinement - which is what field-level validation (a Blazor field
+change) needs. `TryResolveMember` walks an error path to the object that owns the failing member,
+without reflection.
 
 ## The `OnZodValidate` refinement hook
 
@@ -119,7 +169,7 @@ public partial class Order
     partial void OnZodValidate(RefineCtx<Order> context)
     {
         if (context.Value.Total < 0)
-            context.AddIssue("invalid_range", "Total cannot be negative", [nameof(Total)]);
+            context.AddIssue("invalid_total", "Total cannot be negative", OrderSchema.Paths.Total);
     }
 }
 ```
@@ -146,21 +196,45 @@ the hook while keeping the hook optional. **It is not part of your API; never im
 Mutually exclusive with `OnZodValidate` — declaring both is `ZODSGEN029`.
 
 ```csharp
-public partial class UserSchemaValidator
+[ZodSchema]
+public partial class SignUp
 {
-    public async ValueTask<ValidationResult<User>> CustomValidationAsync(User value, CancellationToken ct)
+    [Required, EmailAddress]
+    public string Email { get; set; } = "";
+
+    [ZodAsyncMember(nameof(Email))]   // also run by ValidateMemberAsync(value, "Email", ...)
+    internal static async ValueTask<ValidationResult<SignUp>> CustomValidationAsync(
+        SignUp value, IServiceProvider services, CancellationToken cancellationToken)
     {
-        await Task.Delay(1, ct);
-        return ValidationResult<User>.Success(value);
+        var directory = services.GetRequiredService<IUserDirectory>();
+        return await directory.IsEmailTakenAsync(value.Email, cancellationToken)
+            ? ValidationResult<SignUp>.Failure(
+                ValidationError.Create("email_taken", "Email is already registered", SignUpSchema.Paths.Email))
+            : ValidationResult<SignUp>.Success(value);
     }
 }
+
+var result = await SignUpSchema.ValidateAsync(model, serviceProvider, cancellationToken);
 ```
 
-Signature `ValueTask<ValidationResult<T>> Name(T value, CancellationToken ct)`. The default lookup
-name is `CustomValidationAsync` unless `CustomValidationMethodName` overrides it. A method on the
-**model type** must be `static`; one on the generated `{TypeName}SchemaValidator` partial may be an
-instance method. The generated `ValidateAsync` runs the synchronous `Validate`, awaits the custom
-method, and merges the error sets.
+Signature `ValueTask<ValidationResult<T>> Name(T value, CancellationToken ct)`, or the service-aware
+`Name(T value, IServiceProvider services, CancellationToken ct)`, which receives the services passed
+to `ValidateAsync` (the bridge, ProblemDetails and options hosts pass theirs). The default lookup name
+is `CustomValidationAsync` unless `CustomValidationMethodName` overrides it. A method on the
+**model type** must be `static` and not `private` (`ZODSGEN013`, `ZODSGEN014`); one on the generated
+`{TypeName}SchemaValidator` partial may be an instance method.
+
+`ValidateAsync` runs the synchronous rules, awaits nested schemas' async validation (re-pathed under
+the member), then the custom method, and merges the errors. It completes synchronously when nothing in
+the graph is asynchronous; `{Type}Schema.RequiresAsyncValidation` is that compile-time answer.
+Without `[ZodAsyncMember]`, the custom method runs only on full validation.
+
+CA1849, when enabled, would report every `Validate` and `ValidateMember` call inside async code because
+`ValidateAsync` exists. The analyzer package suppresses it (`ZODSUP001`), so call the synchronous path freely: it is
+cheaper (no `ValueTask`, no state machine) and never blocks. Use `ValidateAsync` when the graph has asynchronous
+rules — `RequiresAsyncValidation` is the compile-time answer, and `ZODSGEN048` says so at build time. The suppression
+is by call target: CA1849 still reports for `Task.Wait`, `Thread.Sleep` and other libraries' `Validate`/`ValidateAsync`
+pairs.
 
 ## Automatic enum validation
 
@@ -194,6 +268,8 @@ when the property declares an explicit `[AllowedValues]` allow-list (which gover
 
 Enabled by `GenerateIValidateOptions = true`, by auto-detection (unset, target is not a value type,
 and the type name ends with a configured suffix — `Options` or `Settings` by default), or by MSBuild.
+Each failure reads `"{path}: {message} ({code})"`. A hand-authored `[OptionsValidator]` for the same
+type conflicts (`ZODSGEN050`).
 
 | MSBuild property | Default | Behaviour |
 | --- | --- | --- |
@@ -204,6 +280,7 @@ and the type name ends with a configured suffix — `Options` or `Settings` by d
 | `ZodSharpEnumSerialization` | `Number` | `String` exports enums as member names, matching a global `JsonStringEnumConverter` |
 | `ZodSharpEnumNamingPolicy` | `Unchanged` | `CamelCase` applies `JsonNamingPolicy.CamelCase` to string-serialized enum names |
 | `ZodSharpAllowNulls` | `false` | assembly-wide default for whether collections may contain `null` elements; explicit `true` accepts them |
+| `ZodSharpDefaultImmutableArrayBehavior` | `ValidationError` | default immutable arrays follow missing-value rules; `TreatAsEmpty` runs collection rules against empty arrays |
 | `ZodSharpDateTimeOffsetSerialization` | `PreserveOffset` | `Utc` narrows `[NonSentinel] DateTimeOffset` to a zero-offset wire contract; pair with the integration package's `UtcDateTimeOffsetConverter`. Both modes export an exact sentinel pattern |
 
 `DateTimeOffset` precedence: `[DateTimeOffsetBehavior]` on the property/parameter, then on the type, then

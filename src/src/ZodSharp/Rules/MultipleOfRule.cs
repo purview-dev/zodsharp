@@ -14,8 +14,12 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "not_multiple_of";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the divisor and <c>{1}</c> the offending value.</summary>
-	public const string MessageFormat = "Number must be a multiple of {0}, but got {1}";
+	/// <summary>Gets the message format; <c>{0}</c> is the divisor. The default never contains the input; a custom message may use <c>{1}</c> for the offending value.</summary>
+	public const string MessageFormat = "Number must be a multiple of {0}";
+
+	static readonly string?[] TemplateNames = [Core.ZodIssueParameters.Divisor, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	/// <summary>
 	/// The relative tolerance applied when comparing the distance to the nearest multiple.
@@ -24,7 +28,7 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal T Divisor { get; }
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the MultipleOfRule struct.
@@ -38,7 +42,7 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 			throw new ArgumentException("Divisor cannot be zero", nameof(divisor));
 
 		Divisor = divisor;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -87,5 +91,13 @@ public readonly record struct MultipleOfRule<T> : Core.IValidationRule<T>, Core.
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.NotMultipleOf;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		RuleParameters.One(Core.ZodIssueParameters.Divisor, Divisor);
 }

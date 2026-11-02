@@ -42,13 +42,7 @@ static class SchemaValueCoercion
 				: ValidationResult<object>.Failure(result.Errors);
 		}
 
-		return ValidationResult<object>.Failure(
-			new ValidationError(
-				"invalid_type",
-				$"Expected {GetTypeDisplayName(typeof(T))}, but got {value?.GetType().Name ?? "null"}",
-				[]
-			)
-		);
+		return ValidationResult<object>.Failure(ZodIssues.InvalidType(ZodTypeNames.Of(typeof(T)), value));
 	}
 
 	/// <summary>
@@ -139,11 +133,4 @@ static class SchemaValueCoercion
 		|| type == typeof(ulong)
 		|| type == typeof(ushort)
 		|| type == typeof(sbyte);
-
-	/// <summary>
-	/// Returns a human-readable name for <paramref name="type"/>, unwrapping
-	/// <see cref="Nullable{T}"/> to its underlying type for display purposes.
-	/// </summary>
-	public static string GetTypeDisplayName(Type type) =>
-		Nullable.GetUnderlyingType(type) is Type underlying ? underlying.Name : type.Name;
 }

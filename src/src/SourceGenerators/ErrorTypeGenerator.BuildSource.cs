@@ -72,7 +72,7 @@ partial class ErrorTypeGenerator
 
 					method.Line();
 					method.Return(
-						$"ValidationError.Create(errorType.Code, errorType.FormatMessage({parametersName}), path is null ? [] : [.. path], {parametersName}, origin, minimum, maximum, inclusive, errorType.Category)"
+						$"ValidationError.Create(errorType.Code, errorType.FormatMessage({parametersName}), path is null ? [] : [.. path], {parametersName}, origin ?? errorType.Origin, minimum, maximum, inclusive, errorType.Category) with {{ MessageFormat = errorType.MessageFormat }}"
 					);
 				}
 			);

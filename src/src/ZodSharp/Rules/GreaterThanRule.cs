@@ -12,12 +12,16 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "too_small";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the bound and <c>{1}</c> the offending value.</summary>
-	public const string MessageFormat = "Value must be greater than {0}, but got {1}";
+	/// <summary>Gets the message format; <c>{0}</c> is the bound. The default never contains the input; a custom message may use <c>{1}</c> for the offending value.</summary>
+	public const string MessageFormat = "Value must be greater than {0}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Minimum, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly T _exclusiveMinimum;
 
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the GreaterThanRule struct.
@@ -28,7 +32,7 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 	public GreaterThanRule(T exclusiveMinimum, string? message = null, string? code = null)
 	{
 		_exclusiveMinimum = exclusiveMinimum;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -63,5 +67,13 @@ public readonly record struct GreaterThanRule<T> : Core.IValidationRule<T>, Core
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooSmall;
+
+	// Exclusive: the value must be strictly greater than the bound.
+	Core.ErrorBound? Core.IZodRule.Lower => Core.ErrorBound.Excluding(_exclusiveMinimum);
 }

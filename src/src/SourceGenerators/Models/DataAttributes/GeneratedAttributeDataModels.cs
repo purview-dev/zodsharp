@@ -239,6 +239,31 @@ readonly partial record struct DeniedValuesAttributeData(
 	}
 }
 
+// The ZodSharp collection-count attributes, generated into Purview.ZodSharp from MinCountRule, MaxCountRule and
+// CountRangeRule. They are read here so the generator can emit them through the same collection-size path as
+// [MinLength]/[MaxLength]/[Length], which keeps the error identity identical.
+[Generate("ZodSharp.Rules.MinCountAttribute")]
+readonly partial record struct MinCountAttributeData(
+	[Argument("minCount")] int MinCount,
+	[Property] string? Message,
+	[NestedModel] ValidationAttributeData ValidationAttribute
+);
+
+[Generate("ZodSharp.Rules.MaxCountAttribute")]
+readonly partial record struct MaxCountAttributeData(
+	[Argument("maxCount")] int MaxCount,
+	[Property] string? Message,
+	[NestedModel] ValidationAttributeData ValidationAttribute
+);
+
+[Generate("ZodSharp.Rules.CountRangeAttribute")]
+readonly partial record struct CountRangeAttributeData(
+	[Argument("minimum")] int Minimum,
+	[Argument("maximum")] int Maximum,
+	[Property] string? Message,
+	[NestedModel] ValidationAttributeData ValidationAttribute
+);
+
 [Generate("System.ComponentModel.DataAnnotations.LengthAttribute")]
 readonly partial record struct LengthAttributeData(
 	[Argument("minimumLength")] int MinimumLength,

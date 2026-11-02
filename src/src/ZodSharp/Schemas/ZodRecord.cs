@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
@@ -17,8 +16,6 @@ public class ZodRecord<TValue>(IZodSchema<TValue, TValue> valueSchema)
 	: ZodType<Dictionary<string, TValue>, Dictionary<string, TValue>>,
 		JsonSchema.IJsonSchemaRecordInfo
 {
-	static readonly string[] EmptyPath = [];
-
 	// IJsonSchemaRecordInfo: the JSON Schema exporter's non-generic seam. A record exports as an object whose
 	// additionalProperties is the value schema. See IJsonSchemaRecordInfo.
 	object JsonSchema.IJsonSchemaRecordInfo.ValueSchema => valueSchema;
@@ -32,9 +29,7 @@ public class ZodRecord<TValue>(IZodSchema<TValue, TValue> valueSchema)
 	{
 		if (value == null)
 		{
-			return ValidationResult<Dictionary<string, TValue>>.Failure(
-				new ValidationError("invalid_type", "Expected record, but got null", EmptyPath)
-			);
+			return ValidationResult<Dictionary<string, TValue>>.Failure(ZodIssues.NullValue(ZodTypeNames.Record));
 		}
 
 		List<ValidationError> errors = [];
@@ -47,25 +42,9 @@ public class ZodRecord<TValue>(IZodSchema<TValue, TValue> valueSchema)
 			var result = valueSchema.Validate(itemValue);
 			if (!result.IsSuccess)
 			{
+				var segment = ZodPathSegment.Key(key);
 				foreach (var error in result.Errors)
-				{
-					var path = new string[error.Path.Length + 1];
-					path[0] = key;
-					error.Path.CopyTo(0, path, 1, error.Path.Length);
-					errors.Add(
-						ValidationError.Create(
-							error.Code,
-							error.Message,
-							ImmutableArray.Create(path),
-							error.Parameters,
-							error.Origin,
-							error.Minimum,
-							error.Maximum,
-							error.Inclusive,
-							error.Category
-						)
-					);
-				}
+					errors.Add(error.WithPathPrefix(segment));
 			}
 			else
 			{

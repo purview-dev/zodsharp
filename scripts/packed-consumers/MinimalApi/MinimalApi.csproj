@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<!--
+		Packed-consumer gate (scripts/test-packed-consumers.ps1), consumer (c): a Native AOT minimal API that references the
+		Purview.ZodSharp packages, and nothing else from the repository. The script copies this folder outside the
+		repository, beside guard Directory.Build.props/.targets and Directory.Packages.props files that stop any
+		inheritance, and supplies the packed version as $(ZodSharpPackageVersion).
+
+		It is published with every warning an error, then started; the script posts an invalid body and reads the OpenAPI
+		document from the running native binary.
+	-->
+	<PropertyGroup>
+		<TargetFramework>net11.0</TargetFramework>
+		<AssemblyName>PackedApi</AssemblyName>
+		<RootNamespace>PackedApi</RootNamespace>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<PublishAot>true</PublishAot>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<TrimmerSingleWarn>false</TrimmerSingleWarn>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+		<IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Purview.ZodSharp" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.AspNetCore" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.AspNetCore.OpenApi" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.Extensions.Validation" Version="$(ZodSharpPackageVersion)" />
+	</ItemGroup>
+
+	<Target Name="RequireZodSharpPackageVersion" BeforeTargets="CollectPackageReferences;Restore">
+		<Error
+			Condition="'$(ZodSharpPackageVersion)' == ''"
+			Text="ZodSharpPackageVersion is not set. Run this consumer through scripts/test-packed-consumers.ps1."
+		/>
+	</Target>
+</Project>

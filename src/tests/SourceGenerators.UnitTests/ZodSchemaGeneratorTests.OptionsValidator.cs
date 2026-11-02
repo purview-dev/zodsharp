@@ -49,7 +49,11 @@ partial class ZodSchemaGeneratorTests
 				"public global::Microsoft.Extensions.Options.ValidateOptionsResult Validate(string? name, global::Testing.AdminPortal options)"
 			);
 		await Assert.That(generated).ContainsGeneratedCode("var schemaResult = AdminPortalSchema.Validate(options);");
-		await Assert.That(generated).ContainsGeneratedCode("schemaResult.Errors.Select(static error => error.Message)");
+		await Assert
+			.That(generated)
+			.ContainsGeneratedCode(
+				"schemaResult.Errors.Select(static error => global::ZodSharp.Core.ZodGeneratedValidation.FormatOptionsFailure(error))"
+			);
 	}
 
 	[Test]
@@ -123,7 +127,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new()
 		{
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpAutoGenerateOptionsValidators",
+				"build_property.ZodSharpAutoGenerateOptionsValidators",
 				"false"
 			),
 		};
@@ -157,7 +161,7 @@ partial class ZodSchemaGeneratorTests
 		ZodSourceGeneratorTestOptions options = new()
 		{
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpAutoGenerateOptionsValidatorSuffixes",
+				"build_property.ZodSharpAutoGenerateOptionsValidatorSuffixes",
 				"Config"
 			),
 		};
@@ -212,5 +216,51 @@ partial class ZodSchemaGeneratorTests
 		modelType.GetProperty("RoutePrefix")!.SetValue(valid, "/admin/api");
 		var validResult = (ValidateOptionsResult)validateMethod.Invoke(validator, [null, valid])!;
 		await Assert.That(validResult.Succeeded).IsTrue();
+	}
+
+	[Test]
+	public async Task OptionsValidator_GivenMissingRequiredMember_ReportsTheMissingFieldCodeTheDocsShow(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — the shape the AddZodSchemaValidator/BindAndValidateWithZod XML docs describe.
+		var source = """
+			using System.Collections.Generic;
+			using System.ComponentModel.DataAnnotations;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public sealed class SmtpServer
+				{
+					[Required]
+					public string? Host { get; set; }
+				}
+
+				[ZodSchema]
+				public sealed class SmtpOptions
+				{
+					public List<SmtpServer> Servers { get; set; } = [];
+				}
+			}
+			""";
+
+		using var driverResult = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = await Assert.That(driverResult.CompilationResult.Assembly).IsNotNull();
+		var options = Activator.CreateInstance(assembly.GetType("Testing.SmtpOptions")!)!;
+		var servers = (System.Collections.IList)options.GetType().GetProperty("Servers")!.GetValue(options)!;
+		servers.Add(Activator.CreateInstance(assembly.GetType("Testing.SmtpServer")!));
+		var validatorType = assembly.GetType("Testing.SmtpOptionsValidator")!;
+
+		// Act
+		var result = (ValidateOptionsResult)
+			validatorType.GetMethod("Validate")!.Invoke(Activator.CreateInstance(validatorType), [null, options])!;
+
+		// Assert
+		await Assert.That(result.Failures).IsEquivalentTo(["Servers[0].Host: Host is required (missing_field)"]);
 	}
 }

@@ -1,74 +1,82 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using ZodSharp.AspNetCore;
 using ZodSharp.Core;
 
 namespace ZodSharp;
 
 /// <summary>
-/// Converts a thrown <see cref="ZodException"/> into ASP.NET Core ProblemDetails payloads.
+/// Converts a thrown <see cref="ZodException"/> into ASP.NET Core ProblemDetails payloads. Every overload delegates
+/// to <see cref="ZodProblemDetailsWriter"/>, so the body matches the endpoint filter and the exception handler.
 /// </summary>
 public static class ZodExceptionExtensions
 {
 	extension([NotNull] ZodException exception)
 	{
 		/// <summary>
-		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" />.
+		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" />, without resolving
+		/// <see cref="ErrorType"/>s.
 		/// </summary>
+		[Obsolete(LegacyOverloads.StatusCodeMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			int statusCode = StatusCodes.Status400BadRequest
-		)
-		{
-			return ProblemDetailsMapper.Build(
-				exception.Errors,
-				statusCode,
-				registry: null,
-				lookup: null,
-				formatMessages: false
-			);
-		}
+		) =>
+			ProblemDetailsExtensions
+				.CreateWriter(registry: null, lookup: null, formatMessages: false, statusCode)
+				.Create(exception.Errors);
 
 		/// <summary>
 		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s from the supplied registry to derive the status code, title, and messages.
 		/// </summary>
+		[Obsolete(LegacyOverloads.RegistryMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			ErrorTypeRegistry registry,
 			int statusCode = StatusCodes.Status400BadRequest
 		)
 		{
 			ArgumentNullException.ThrowIfNull(registry);
-			return ProblemDetailsMapper.Build(
-				exception.Errors,
-				statusCode,
-				registry,
-				lookup: null,
-				formatMessages: true
-			);
+			return ProblemDetailsExtensions
+				.CreateWriter(registry, lookup: null, formatMessages: true, statusCode)
+				.Create(exception.Errors);
 		}
 
 		/// <summary>
 		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s through the supplied lookup to derive the status code, title, and messages.
 		/// </summary>
+		[Obsolete(LegacyOverloads.LookupMessage)]
 		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
 			Func<string, ErrorType?> lookup,
 			int statusCode = StatusCodes.Status400BadRequest
 		)
 		{
 			ArgumentNullException.ThrowIfNull(lookup);
-			return ProblemDetailsMapper.Build(
-				exception.Errors,
-				statusCode,
-				registry: null,
-				lookup,
-				formatMessages: true
-			);
+			return ProblemDetailsExtensions
+				.CreateWriter(registry: null, lookup, formatMessages: true, statusCode)
+				.Create(exception.Errors);
+		}
+
+		/// <summary>
+		/// Converts a <see cref="ZodException"/> into <see cref="HttpValidationProblemDetails" /> with the supplied
+		/// options.
+		/// </summary>
+		/// <param name="options">The ProblemDetails options.</param>
+		/// <param name="httpContext">The request, for the trace id and JSON naming; optional.</param>
+		public HttpValidationProblemDetails ToHttpValidationProblemDetails(
+			ZodProblemDetailsOptions options,
+			HttpContext? httpContext = null
+		)
+		{
+			ArgumentNullException.ThrowIfNull(options);
+			return new ZodProblemDetailsWriter(options).Create(exception.Errors, httpContext);
 		}
 
 		/// <summary>
 		/// Converts a <see cref="ZodException"/> into <see cref="ValidationProblemDetails" />.
 		/// </summary>
+		[Obsolete(LegacyOverloads.StatusCodeMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(int statusCode = StatusCodes.Status400BadRequest)
 		{
 			var details = exception.ToHttpValidationProblemDetails(statusCode);
@@ -79,6 +87,7 @@ public static class ZodExceptionExtensions
 		/// Converts a <see cref="ZodException"/> into <see cref="ValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s from the supplied registry.
 		/// </summary>
+		[Obsolete(LegacyOverloads.RegistryMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(
 			ErrorTypeRegistry registry,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -92,6 +101,7 @@ public static class ZodExceptionExtensions
 		/// Converts a <see cref="ZodException"/> into <see cref="ValidationProblemDetails" />, resolving
 		/// <see cref="ErrorType"/>s through the supplied lookup.
 		/// </summary>
+		[Obsolete(LegacyOverloads.LookupMessage)]
 		public ValidationProblemDetails ToValidationProblemDetails(
 			Func<string, ErrorType?> lookup,
 			int statusCode = StatusCodes.Status400BadRequest
@@ -100,5 +110,28 @@ public static class ZodExceptionExtensions
 			var details = exception.ToHttpValidationProblemDetails(lookup, statusCode);
 			return ProblemDetailsExtensions.ToValidationProblemDetails(details);
 		}
+
+		/// <summary>
+		/// Converts a <see cref="ZodException"/> into MVC <see cref="ValidationProblemDetails" /> with the supplied
+		/// options. Every extension is copied.
+		/// </summary>
+		/// <param name="options">The ProblemDetails options.</param>
+		/// <param name="httpContext">The request, for the trace id and JSON naming; optional.</param>
+		public ValidationProblemDetails ToValidationProblemDetails(
+			ZodProblemDetailsOptions options,
+			HttpContext? httpContext = null
+		)
+		{
+			var details = exception.ToHttpValidationProblemDetails(options, httpContext);
+			return ProblemDetailsExtensions.ToValidationProblemDetails(details);
+		}
+
+		/// <summary>
+		/// Converts a <see cref="ZodException"/> into a minimal-API <see cref="IResult"/> written by the
+		/// <see cref="ZodProblemDetailsWriter"/> registered in the request services.
+		/// </summary>
+		/// <param name="httpContext">The request.</param>
+		/// <returns>An <see cref="IResult"/>.</returns>
+		public IResult ToValidationProblem(HttpContext httpContext) => ZodTypedResults.Problem(exception, httpContext);
 	}
 }

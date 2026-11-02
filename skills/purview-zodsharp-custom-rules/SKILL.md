@@ -52,20 +52,26 @@ the rule rather than re-typing literals:
 public readonly record struct EmailRule : IValidationRule<string>
 {
     public const string ErrorCode = "invalid_string";
-    public const string MessageFormat = "Invalid email format: {0}";
+    public const string MessageFormat = "Invalid email format";
 
     public string Code => ErrorCode;
 
-    public string GetErrorMessage(in string value) =>
-        string.Format(CultureInfo.CurrentCulture, MessageFormat, value);
+    public string GetErrorMessage(in string value) => RuleMessage.Format(MessageFormat, value);
 }
 ```
 
 - **`ErrorCode`** is the canonical code. `IValidationRule<T>.Code` defaults to `"validation_failed"`;
   a rule accepting a per-usage `code` override returns it (falling back to `ErrorCode`) from both
   `Code` and `IZodRule.Code`, so every route reports the same effective value.
-- **`MessageFormat`** is a `string.Format` template. `{0}` is the offending value; `{1}`, … are
-  rule-specific arguments. Format with `CultureInfo.CurrentCulture`.
+- **`MessageFormat`** is a composite template. `{0}` is the offending value; `{1}`, … are
+  rule-specific arguments. Format it with `ZodSharp.Rules.RuleMessage.Format`: invariant culture (hosts
+  localize at the boundary through `IZodMessageFormatter`) and it never throws on a stray brace.
+- **Keep the input out of the default message.** Errors reach ProblemDetails, logs and UI, so describe
+  what was expected rather than quoting the value. Pass the value anyway (after the rule's own
+  arguments), so a custom message can still use it.
+- To make the message localizable by template, implement `IZodRule.MessageFormat` with a
+  named-placeholder form (`"Must be at least {minimum}"`) and `IZodRule.Parameters` with any value it
+  needs beyond the built-ins; the built-in rules all do.
 - The constants may be inherited from a base rule class, and **abstract bases are exempt**, so a
   shared base can host them for its concrete derivations.
 
@@ -74,7 +80,7 @@ A source-declared rule missing either constant is reported as **`ZODSGEN042`**. 
 ```csharp
 await Assert.That(error.Code).IsEqualTo(EmailRule.ErrorCode);
 await Assert.That(error.Message).IsEqualTo(
-    string.Format(CultureInfo.CurrentCulture, EmailRule.MessageFormat, value));
+    RuleMessage.Format(EmailRule.MessageFormat, value));
 ```
 
 ### Runtime identity: `IZodRule`
@@ -113,8 +119,8 @@ Code and origin resolve first-match-wins:
 ## Writing one
 
 ```csharp
-using System.Globalization;
 using ZodSharp.Core;
+using ZodSharp.Rules;
 
 namespace MyRules;
 
@@ -122,7 +128,7 @@ namespace MyRules;
 public readonly record struct NoWhitespaceRule(string? Message = null) : IValidationRule<string>
 {
     public const string ErrorCode = "invalid_string";
-    public const string MessageFormat = "Whitespace is not allowed in '{0}'.";
+    public const string MessageFormat = "Whitespace is not allowed.";
 
     public bool IsValid(in string value)
     {
@@ -141,7 +147,7 @@ public readonly record struct NoWhitespaceRule(string? Message = null) : IValida
     public string Code => ErrorCode;
 
     public string GetErrorMessage(in string value) =>
-        Message ?? string.Format(CultureInfo.CurrentCulture, MessageFormat, value);
+        Message ?? RuleMessage.Format(MessageFormat, value);
 }
 ```
 
@@ -227,6 +233,11 @@ the generator closes it with the underlying type and wraps it, so it runs agains
 with an empty path, and the wrapped rule owns the reported `Code`. Closing such a rule with the
 scalar type instead (`NonSentinelRule<UserId>`) compiles but **always passes**, because the check only
 knows the primitive.
+
+Such a scalar works under every publish mode, including Blazor WebAssembly with `RunAOTCompilation=true`:
+the generated code passes the wrapped rule's identity with a direct `(IZodRule)` cast (or `null` when the
+rule has none), never a runtime type test on the boxed rule. 3.0.0-prerelease.1 builds before that fix
+crashed the Mono AOT compiler (exit code -1073741819); upgrading is the fix, so do not drop the rule to avoid it.
 
 ## Diagnostics you will meet
 

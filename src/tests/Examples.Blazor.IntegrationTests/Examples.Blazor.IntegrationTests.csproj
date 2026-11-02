@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- net11.0 only, like the sample under test. Directory.Build.props forces the 'Supported' set onto test projects,
+		     so both properties are reset here. The SDK references ../../src/Examples.Blazor automatically. -->
+		<TargetFramework>net11.0</TargetFramework>
+		<TargetFrameworks></TargetFrameworks>
+		<IsPackable>false</IsPackable>
+		<!--
+			Directory.Packages.props picks package lines by $(TargetFramework), which a single-targeted project has not
+			set yet when that file is evaluated; the .NET 11 host packages need the 11.x lines.
+		-->
+		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<AspNetCoreTestHostVersion>11.0.0-rc.3.26522.148</AspNetCoreTestHostVersion>
+		<!-- In-memory host tests touch many framework types by nature. -->
+		<NoWarn>$(NoWarn);CA1506;NU5104</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<!-- Hosts the sample in memory, static web assets and all (TestServer underneath). -->
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+		<!-- Parses the rendered HTML, so assertions are about elements rather than strings. -->
+		<PackageReference Include="AngleSharp" />
+	</ItemGroup>
+</Project>

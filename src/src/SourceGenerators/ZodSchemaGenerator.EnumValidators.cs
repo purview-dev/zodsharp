@@ -35,9 +35,7 @@ partial class ZodSchemaGenerator
 		var propertyName = property.Name;
 		var ruleVariable = CodeGenHelpers.GetLocalIdentifier(propertyName, "EnumRule");
 		var valueVariable = CodeGenHelpers.GetLocalIdentifier(propertyName, "EnumRuleValue");
-		var pathFieldName = CodeGenHelpers.GetPathFieldName(propertyName);
 		var ruleType = GetEnumRuleType(property);
-		var zodRuleInterface = TypeLibrary.ZodSharp.Core.IZodRule.AsTypeReference().RenderFullName;
 
 		// The rule is closed with the underlying enum type, so a nullable property is unwrapped. The
 		// validation always runs inside the non-null guard, so the unwrap cannot throw.
@@ -45,32 +43,16 @@ partial class ZodSchemaGenerator
 		writer.Assignment("var", valueVariable, valueExpression);
 		writer.Assignment("var", ruleVariable, $"new {ruleType}({GetDisallowedEnumValuesExpression(property)})");
 
-		// The rule implements IZodRule, so it owns its error identity; the rule's constant is only the
-		// fallback when the interface reports none. The cast is required because the interface may be
-		// implemented explicitly.
-		var codeExpression = $"(({zodRuleInterface}){ruleVariable}).Code ?? {ruleType}.ErrorCode";
-		var originExpression = $"(({zodRuleInterface}){ruleVariable}).Origin";
-		var messageExpression = GetEnumValidationMessageExpression(property, ruleVariable, valueVariable);
+		// The rule implements IZodRule, so it owns its error identity (code, origin, category, options); a
+		// [DeniedValues] attribute that configures its own message replaces only the message.
+		var message = GetEnumValidationMessage(property);
+		var ruleError =
+			$"global::ZodSharp.Core.ZodRuleErrors.Create({ruleVariable}, {valueVariable}, {PathOf(property)}, \"enum\")";
+		var errorExpression = message is { } template
+			? $"{GeneratedValidation}.ForMember({ruleError}, {MemberOf(property)}, messageFormat: {template.FormatExpression}{(template.OrdinalNamesExpression is null ? string.Empty : $", ordinalNames: {template.OrdinalNamesExpression}")})"
+			: MemberError(ruleError, MemberOf(property));
 
-		writer.IfBlock(
-			$"!{ruleVariable}.IsValid({valueVariable})",
-			ifBody =>
-			{
-				ifBody.IfBlock(
-					"errors is null",
-					errorsBody =>
-						errorsBody.Assignment(
-							"errors",
-							"new global::System.Collections.Generic.List<global::ZodSharp.Core.ValidationError>()"
-						)
-				);
-				ifBody.MethodCallOn(
-					"errors",
-					"Add",
-					$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create({codeExpression}, {messageExpression}, {pathFieldName}, origin: {originExpression})"
-				);
-			}
-		);
+		writer.IfBlock($"!{ruleVariable}.IsValid({valueVariable})", ifBody => WriteAddError(ifBody, errorExpression));
 
 		writer.NewLine();
 	}
@@ -100,33 +82,19 @@ partial class ZodSchemaGenerator
 	}
 
 	/// <summary>
-	/// Builds the message expression: a <c>[DeniedValues]</c> attribute that configures its own message is
-	/// honoured, and otherwise the rule formats its own.
+	/// Builds the replacement message template when a <c>[DeniedValues]</c> attribute configures its own
+	/// message; otherwise the rule's own message is used.
 	/// </summary>
 	/// <param name="property">The enum property the rule validates.</param>
-	/// <param name="ruleVariable">The local the rule instance is assigned to.</param>
-	/// <param name="valueVariable">The local holding the property value.</param>
-	/// <returns>The message expression.</returns>
-	static string GetEnumValidationMessageExpression(
-		ZodPropertyDescriptor property,
-		string ruleVariable,
-		string valueVariable
-	)
+	/// <returns>The template, or <see langword="null"/> to keep the rule's message.</returns>
+	static MessageTemplate? GetEnumValidationMessage(ZodPropertyDescriptor property)
 	{
 		var deniedValues = property.ValidationAttributes.DeniedValues;
 		var validationAttribute = deniedValues.Value.ValidationAttribute;
 
-		if (deniedValues.ShouldProcess && deniedValues.Value.Exists && HasConfiguredMessage(validationAttribute))
-		{
-			return BuildErrorMessageExpression(
-				validationAttribute,
-				"Field '{0}' is invalid.",
-				property.DisplayName.StringLiteral()
-			);
-		}
-
-		// The rule formats its own message, so the property name is not needed.
-		return $"{ruleVariable}.GetErrorMessage({valueVariable})";
+		return deniedValues.ShouldProcess && deniedValues.Value.Exists && HasConfiguredMessage(validationAttribute)
+			? BuildMessageTemplate(validationAttribute, "Field '{displayName}' is invalid.")
+			: null;
 	}
 
 	static bool HasConfiguredMessage(ValidationAttributeData validationAttribute) =>

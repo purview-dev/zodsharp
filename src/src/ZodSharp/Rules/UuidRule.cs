@@ -15,11 +15,23 @@ public readonly record struct UUIDRule
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Invalid UUID format: {0}";
+	/// <summary>
+	/// Gets the default message format. It never contains the input; a custom message may use <c>{0}</c> for the
+	/// offending value and <c>{1}</c> for the required version (empty when no version is required).
+	/// </summary>
+	public const string MessageFormat = "Invalid UUID format";
 
-	/// <summary>Gets the version-specific message format; <c>{0}</c> is the version and <c>{1}</c> the value.</summary>
-	public const string VersionedMessageFormat = "Invalid UUID v{0} format: {1}";
+	/// <summary>
+	/// Gets the version-specific default message format; <c>{1}</c> is the required version as an integer. The
+	/// arguments are the same as for <see cref="MessageFormat"/>: <c>{0}</c> is the offending value.
+	/// </summary>
+	public const string VersionedMessageFormat = "Invalid UUID v{1} format";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Received, Core.ZodIssueParameters.Version];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
+	static readonly string VersionedDefaultTemplate = RuleMessage.Template(VersionedMessageFormat, TemplateNames);
 
 	const string NilUuid = "00000000-0000-0000-0000-000000000000";
 	const string MaxUuid = "ffffffff-ffff-ffff-ffff-ffffffffffff";
@@ -146,13 +158,9 @@ public readonly record struct UUIDRule
 
 	string GetErrorMessageCore(string value)
 	{
-		if (_message is not null)
-			return RuleMessage.Format(_message, value, _version);
-
-		// If a specific version is required, include it in the message; otherwise, use the generic message.
-		return _version is UuidVersion version
-			? RuleMessage.Format(VersionedMessageFormat, (int)version, value)
-			: RuleMessage.Format(MessageFormat, value);
+		// Custom and default messages receive the same arguments: the value, then the version as an integer.
+		var format = _message ?? (_version is null ? MessageFormat : VersionedMessageFormat);
+		return RuleMessage.Format(format, value, _version is UuidVersion version ? (int)version : (int?)null);
 	}
 
 	static bool IsValidVersionless(ReadOnlySpan<char> value)
@@ -206,7 +214,10 @@ public readonly record struct UUIDRule
 		schema.Format = "uuid";
 
 		if (_version is UuidVersion version)
+		{
 			JsonSchema.JsonSchemaRules.ConstrainPattern(schema, JsonSchemaVersionPattern(version));
+			schema.SetVendorExtension("x-zod-uuidVersion", (int)version);
+		}
 	}
 
 	/// <summary>
@@ -225,5 +236,17 @@ public readonly record struct UUIDRule
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is not null ? RuleMessage.Template(_message, TemplateNames)
+		: _version is null ? DefaultTemplate
+		: VersionedDefaultTemplate;
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		_version is UuidVersion version
+			? RuleParameters.Two(Core.ZodIssueParameters.Format, "uuid", Core.ZodIssueParameters.Version, (int)version)
+			: RuleParameters.Format("uuid");
 }

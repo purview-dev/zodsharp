@@ -1,0 +1,15 @@
+<Project>
+	<!--
+		Microsoft.AspNetCore.OpenApi's source generator reaches an application that references only this package (NuGet
+		resolves a transitive package's analyzers), but its build/ targets do not: a package dependency excludes Build
+		assets by default. Those targets add the generator's interceptor namespace, so without them AddOpenApi(...) fails
+		to compile with CS9137. This adds the same namespace, exactly as Microsoft.AspNetCore.OpenApi.targets does, and
+		nothing else - its XML-comment AdditionalFiles target stays with a direct reference.
+
+		scripts/test-packed-consumers.ps1 builds a Native AOT minimal API that references only the ZodSharp packages, which
+		is how this was found.
+	-->
+	<PropertyGroup>
+		<InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.AspNetCore.OpenApi.Generated</InterceptorsNamespaces>
+	</PropertyGroup>
+</Project>

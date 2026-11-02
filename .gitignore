@@ -661,3 +661,9 @@ BenchmarkDotNet.Artifacts/
 
 .tools/purview-build/**
 src/tests/cross-platform/
+
+!.assets/**
+
+# Agent skills are installed into the universal .agents/skills/ folder only, and that folder and
+# skills-lock.json are committed. Per-agent folders (and Claude Code's local settings) stay out.
+/.claude/

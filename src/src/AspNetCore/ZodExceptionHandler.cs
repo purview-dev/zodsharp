@@ -1,35 +1,62 @@
+using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using ZodSharp.Core;
+using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 namespace ZodSharp.AspNetCore;
 
 /// <summary>
-/// An <see cref="IExceptionHandler"/> that converts a thrown <see cref="ZodException"/>
-/// into a standard <see cref="HttpValidationProblemDetails"/> response,
-/// resolving <see cref="ErrorType"/>s from the configured <see cref="ZodProblemDetailsOptions.Registry"/>.
+/// An <see cref="IExceptionHandler"/> that converts a thrown <see cref="ZodException"/> into the ZodSharp
+/// ProblemDetails contract, written by <see cref="ZodProblemDetailsWriter"/> - the same body the endpoint filter
+/// and <see cref="ZodTypedResults"/> produce.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Register with <c>services.AddZodSharpProblemDetails()</c> and ensure
 /// <c>app.UseExceptionHandler()</c> is present in the pipeline, otherwise the handler is never invoked.
 /// </para>
+/// <para>
+/// A <see cref="BadHttpRequestException"/> or <see cref="JsonException"/> whose inner exceptions carry a
+/// <see cref="ZodException"/> - a request body rejected by a strict value object converter while it was deserialized -
+/// is handled too: the errors are located under the member that held the value, with member names mapped from the
+/// endpoint's body contract (see <see cref="ZodJsonExceptions"/>), so the body matches what validating the bound model
+/// reports. Minimal APIs only throw on a bad request in Development unless
+/// <see cref="ZodProblemDetailsOptions.HandleBindingFailures"/> is set (on .NET 11 binding writes a validation problem
+/// instead, which <c>AddZodSharpProblemDetails</c> rewrites the same way). Any other bad request is left to the next
+/// handler, unless <see cref="ZodProblemDetailsOptions.HandleBindingFailures"/> is set, when it is answered with its
+/// own status code and a standard ProblemDetails body.
+/// </para>
 /// </remarks>
 public sealed class ZodExceptionHandler : IExceptionHandler
 {
-	static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-	readonly ZodProblemDetailsOptions _options;
+	readonly ZodProblemDetailsWriter _writer;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="ZodExceptionHandler"/> class.
+	/// Initializes a new instance of the <see cref="ZodExceptionHandler"/> class with a writer built from
+	/// <paramref name="options"/>.
 	/// </summary>
 	public ZodExceptionHandler(IOptions<ZodProblemDetailsOptions> options)
 	{
 		ArgumentNullException.ThrowIfNull(options);
-		_options = options.Value;
+		_writer = new ZodProblemDetailsWriter(options);
+	}
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="ZodExceptionHandler"/> class with the registered writer.
+	/// </summary>
+	/// <param name="options">The options; unused when <paramref name="writer"/> is supplied.</param>
+	/// <param name="writer">The shared ProblemDetails writer.</param>
+	public ZodExceptionHandler(IOptions<ZodProblemDetailsOptions> options, ZodProblemDetailsWriter writer)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+		ArgumentNullException.ThrowIfNull(writer);
+		_writer = writer;
 	}
 
 	/// <inheritdoc/>
@@ -41,38 +68,54 @@ public sealed class ZodExceptionHandler : IExceptionHandler
 	{
 		ArgumentNullException.ThrowIfNull(httpContext);
 
-		if (exception is not ZodException zodException)
+		ImmutableArray<ValidationError> errors;
+		if (exception is ZodException zodException)
+			errors = zodException.Errors;
+		else if (
+			exception is BadHttpRequestException or JsonException
+			&& ZodJsonExceptions.TryGetErrors(exception, ResolveBodyTypeInfo(httpContext), out var rerooted)
+		)
+			errors = rerooted;
+		else if (exception is BadHttpRequestException badRequest && _writer.Options.HandleBindingFailures)
+		{
+			// HandleBindingFailures made binding throw instead of answering; answer as binding would have, plus a body.
+			await ZodProblemDetailsWriter
+				.WriteStatusAsync(httpContext, badRequest.StatusCode, exception)
+				.ConfigureAwait(false);
+			return true;
+		}
+		else
 			return false;
 
-		var defaultStatusCode =
-			_options.StatusCodeSelector?.Invoke(zodException.Errors) ?? StatusCodes.Status400BadRequest;
-
-		var problem = zodException.ToHttpValidationProblemDetails(_options.Registry, defaultStatusCode);
-		problem.Extensions["traceId"] = httpContext.TraceIdentifier;
-
-		httpContext.Response.StatusCode = problem.Status!.Value;
-		await WriteProblemAsync(httpContext, problem, cancellationToken);
+		var problem = _writer.Create(errors, httpContext);
+		await _writer.WriteAsync(httpContext, problem, exception).ConfigureAwait(false);
 
 		return true;
 	}
 
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "The serialized type is the concrete HttpValidationProblemDetails, not object, and is "
-			+ "the same type ASP.NET Core's own problem-details writer emits, so a trimmed or Native AOT host "
-			+ "already roots it. WriteAsJsonAsync carries the requirement unconditionally regardless of T."
-	)]
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"AOT",
-		"IL3050:RequiresDynamicCode",
-		Justification = "The serialized type is the concrete HttpValidationProblemDetails, not object, and is "
-			+ "the same type ASP.NET Core's own problem-details writer emits, so a trimmed or Native AOT host "
-			+ "already roots it. WriteAsJsonAsync carries the requirement unconditionally regardless of T."
-	)]
-	static Task WriteProblemAsync(
-		HttpContext httpContext,
-		HttpValidationProblemDetails problem,
-		CancellationToken cancellationToken
-	) => httpContext.Response.WriteAsJsonAsync(problem, JsonOptions, "application/problem+json", cancellationToken);
+	/// <summary>
+	/// The contract of the endpoint's body, from its <see cref="IAcceptsMetadata"/> and the minimal-API JSON options,
+	/// so the JSON names in a deserialization failure's path map back to member names. The exception handler middleware
+	/// clears the endpoint before handlers run, so it is read from <see cref="IExceptionHandlerFeature"/> first.
+	/// </summary>
+	internal static JsonTypeInfo? ResolveBodyTypeInfo(HttpContext httpContext)
+	{
+		var endpoint = httpContext.Features.Get<IExceptionHandlerFeature>()?.Endpoint ?? httpContext.GetEndpoint();
+		if (endpoint?.Metadata.GetMetadata<IAcceptsMetadata>()?.RequestType is not { } requestType)
+			return null;
+
+		var options = httpContext.RequestServices?.GetService<IOptions<HttpJsonOptions>>()?.Value.SerializerOptions;
+		if (options is null)
+			return null;
+
+		try
+		{
+			return options.TryGetTypeInfo(requestType, out var typeInfo) ? typeInfo : null;
+		}
+		catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or ArgumentException)
+		{
+			// The errors are still reported, under the JSON names.
+			return null;
+		}
+	}
 }

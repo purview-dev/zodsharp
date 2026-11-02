@@ -12,12 +12,16 @@ public readonly record struct MaxValueRule<T> : Core.IValidationRule<T>, Core.IZ
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "too_big";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the bound and <c>{1}</c> the offending value.</summary>
-	public const string MessageFormat = "Value must be at most {0}, but got {1}";
+	/// <summary>Gets the message format; <c>{0}</c> is the bound. The default never contains the input; a custom message may use <c>{1}</c> for the offending value.</summary>
+	public const string MessageFormat = "Value must be at most {0}";
+
+	static readonly string?[] TemplateNames = [RuleMessage.Maximum, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal T MaxValue { get; }
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the MaxValueRule struct.
@@ -28,7 +32,7 @@ public readonly record struct MaxValueRule<T> : Core.IValidationRule<T>, Core.IZ
 	public MaxValueRule(T maxValue, string? message = null, string? code = null)
 	{
 		MaxValue = maxValue;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -62,5 +66,12 @@ public readonly record struct MaxValueRule<T> : Core.IValidationRule<T>, Core.IZ
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Of(typeof(T));
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.TooBig;
+
+	Core.ErrorBound? Core.IZodRule.Upper => Core.ErrorBound.Including(MaxValue);
 }

@@ -23,7 +23,10 @@ partial class ZodSchemaGenerator
 
 		// The resolver closes a generic rule over the property's underlying type, so a nullable value type is
 		// unwrapped to match. The validation runs inside the non-null guard, so the unwrap cannot throw.
-		var valueExpression = property.IsNullableValueType ? $"value.{property.Name}!.Value" : $"value.{property.Name}";
+		var valueExpression =
+			property.ValidationKind == PropertyValidationKind.Collection ? CollectionValueExpression(property)
+			: property.IsNullableValueType ? $"value.{property.Name}!.Value"
+			: $"value.{property.Name}";
 
 		for (var i = 0; i < property.CustomRules.Count; i++)
 		{
@@ -40,9 +43,10 @@ partial class ZodSchemaGenerator
 				property.Name,
 				i,
 				valueExpression,
-				CodeGenHelpers.GetPathFieldName(property.Name),
-				property.DisplayName,
-				declareValueLocal: true
+				PathOf(property),
+				MemberOf(property),
+				declareValueLocal: true,
+				fallbackOrigin: GetFallbackOrigin(property)
 			);
 		}
 	}
@@ -87,14 +91,17 @@ partial class ZodSchemaGenerator
 				ruleVariable,
 				identityVariable,
 				"default!",
-				CodeGenHelpers.GetPathFieldName(propertyName),
-				property.DisplayName,
-				invalidCondition: $"value.{propertyName} == null || {scalarExpression}.{scalarPropertyName} == null"
+				PathOf(property),
+				MemberOf(property),
+				GetFallbackOrigin(property),
+				invalidCondition: property.CanBeNull
+					? $"value.{propertyName} is null || {scalarExpression}.{scalarPropertyName} is null"
+					: $"{scalarExpression}.{scalarPropertyName} is null"
 			);
 			return;
 		}
 
-		if (property.IsNullableValueType)
+		if (property.IsNullableValueType || RejectsDefaultArray(property))
 		{
 			// The rule is closed over the underlying value, so it cannot be handed null. An absent value is
 			// reported directly, matching how [Required] handles a Nullable<T> member.
@@ -104,9 +111,10 @@ partial class ZodSchemaGenerator
 				ruleVariable,
 				identityVariable,
 				"default!",
-				CodeGenHelpers.GetPathFieldName(propertyName),
-				property.DisplayName,
-				invalidCondition: $"value.{propertyName} == null"
+				PathOf(property),
+				MemberOf(property),
+				GetFallbackOrigin(property),
+				invalidCondition: MissingValueCondition(property)
 			);
 			return;
 		}
@@ -116,9 +124,12 @@ partial class ZodSchemaGenerator
 			requiredRule,
 			ruleVariable,
 			identityVariable,
-			$"value.{propertyName}",
-			CodeGenHelpers.GetPathFieldName(propertyName),
-			property.DisplayName
+			property.ValidationKind == PropertyValidationKind.Collection
+				? CollectionValueExpression(property)
+				: $"value.{propertyName}",
+			PathOf(property),
+			MemberOf(property),
+			GetFallbackOrigin(property)
 		);
 	}
 
@@ -137,7 +148,7 @@ partial class ZodSchemaGenerator
 			schema.TargetType.Name,
 			"value",
 			"EmptyPath",
-			schema.TargetType.Name,
+			TypeMemberFieldName,
 			declareValueLocal: false
 		);
 	}
@@ -148,7 +159,7 @@ partial class ZodSchemaGenerator
 		string localPrefix,
 		string valueExpression,
 		string pathExpression,
-		string displayName,
+		string memberExpression,
 		bool declareValueLocal
 	)
 	{
@@ -161,8 +172,9 @@ partial class ZodSchemaGenerator
 				i,
 				valueExpression,
 				pathExpression,
-				displayName,
-				declareValueLocal
+				memberExpression,
+				declareValueLocal,
+				fallbackOrigin: null
 			);
 		}
 	}
@@ -174,8 +186,9 @@ partial class ZodSchemaGenerator
 		int index,
 		string valueExpression,
 		string pathExpression,
-		string displayName,
-		bool declareValueLocal
+		string memberExpression,
+		bool declareValueLocal,
+		string? fallbackOrigin
 	)
 	{
 		if (rule.GuardedScalarPropertyName is { Length: > 0 } scalarPropertyName)
@@ -188,7 +201,8 @@ partial class ZodSchemaGenerator
 				valueExpression,
 				scalarPropertyName,
 				pathExpression,
-				displayName
+				memberExpression,
+				fallbackOrigin
 			);
 			return;
 		}
@@ -210,7 +224,16 @@ partial class ZodSchemaGenerator
 			arguments
 		);
 
-		WriteRuleFailure(writer, rule, ruleVariable, identityVariable, valueVariable, pathExpression, displayName);
+		WriteRuleFailure(
+			writer,
+			rule,
+			ruleVariable,
+			identityVariable,
+			valueVariable,
+			pathExpression,
+			memberExpression,
+			fallbackOrigin
+		);
 
 		writer.NewLine();
 	}
@@ -227,7 +250,8 @@ partial class ZodSchemaGenerator
 	/// <param name="scalarExpression">The expression holding the scalar value object.</param>
 	/// <param name="scalarPropertyName">The scalar property that holds the nullable underlying value.</param>
 	/// <param name="pathExpression">The error path expression.</param>
-	/// <param name="displayName">The display name used for a custom error message.</param>
+	/// <param name="memberExpression">The member-info expression for the failing member.</param>
+	/// <param name="fallbackOrigin">The origin reported when neither the rule nor the attribute supplies one.</param>
 	static void EmitGuardedScalarRule(
 		CodeWriter writer,
 		CustomRuleDescriptor rule,
@@ -236,7 +260,8 @@ partial class ZodSchemaGenerator
 		string scalarExpression,
 		string scalarPropertyName,
 		string pathExpression,
-		string displayName
+		string memberExpression,
+		string? fallbackOrigin
 	)
 	{
 		var ruleVariable = CodeGenHelpers.GetLocalIdentifier(localPrefix, $"CustomRule{index}");
@@ -255,21 +280,28 @@ partial class ZodSchemaGenerator
 				requiredIdentity,
 				"default!",
 				pathExpression,
-				displayName,
-				invalidCondition: $"{underlyingExpression} == null"
+				memberExpression,
+				fallbackOrigin,
+				invalidCondition: $"{underlyingExpression} is null"
 			);
 			writer.NewLine();
 			return;
 		}
 
-		writer.IfBlock(
-			$"{underlyingExpression} is {{ }} scalarValue",
-			body =>
-			{
-				var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
-				WriteRuleFailure(body, rule, ruleVariable, identity, "scalarValue", pathExpression, displayName);
-			}
-		);
+		writer.IfBlock($"{underlyingExpression} is {{ }} scalarValue", body =>
+		{
+			var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
+			WriteRuleFailure(
+				body,
+				rule,
+				ruleVariable,
+				identity,
+				"scalarValue",
+				pathExpression,
+				memberExpression,
+				fallbackOrigin
+			);
+		});
 
 		writer.NewLine();
 	}
@@ -321,7 +353,8 @@ partial class ZodSchemaGenerator
 	/// <param name="identityVariable">The local name holding the rule that owns the error identity.</param>
 	/// <param name="valueVariable">The expression passed to the rule for the message.</param>
 	/// <param name="pathExpression">The error path expression.</param>
-	/// <param name="displayName">The display name used for a custom error message.</param>
+	/// <param name="memberExpression">The member-info expression for the failing member.</param>
+	/// <param name="fallbackOrigin">The origin reported when neither the rule nor the attribute supplies one.</param>
 	/// <param name="invalidCondition">
 	/// The condition that reports the failure. Defaults to the rule's own <c>!IsValid(...)</c> contract; a
 	/// required rule closed over a value type supplies an explicit null comparison instead.
@@ -333,7 +366,8 @@ partial class ZodSchemaGenerator
 		string identityVariable,
 		string valueVariable,
 		string pathExpression,
-		string displayName,
+		string memberExpression,
+		string? fallbackOrigin,
 		string? invalidCondition = null
 	)
 	{
@@ -345,35 +379,61 @@ partial class ZodSchemaGenerator
 		var codeExpression = rule.RuleOwnsIdentity
 			? $"(({zodRuleInterface}){identityVariable}).Code ?? {codeFallback.Surround()}"
 			: codeFallback.Surround();
-		var originFallback = rule.Origin is { Length: > 0 } customOrigin ? customOrigin.Surround() : null;
-		var originExpression = rule.RuleOwnsIdentity
-			? originFallback is null
-				? $"(({zodRuleInterface}){identityVariable}).Origin"
-				: $"(({zodRuleInterface}){identityVariable}).Origin ?? {originFallback}"
-			: originFallback ?? "null";
+		var originExpression =
+			rule.Origin is { Length: > 0 } customOrigin ? customOrigin.Surround()
+			: fallbackOrigin is null ? "null"
+			: fallbackOrigin;
 
-		var message = !string.IsNullOrEmpty(rule.Message.ErrorMessage)
-			? BuildErrorMessageExpression(rule.Message, "Field '{0}' is invalid.", displayName.StringLiteral())
-			: $"{ruleVariable}.GetErrorMessage({valueVariable})";
+		// The rule's structured identity (origin, category, bounds, parameters, its failure description) is
+		// copied by ZodRuleErrors, so a generated failure matches the runtime schema's failure for the same
+		// rule. An adapted rule has no identity of its own, so the wrapped rule supplies it.
+		var originArgument = originExpression == "null" ? string.Empty : $", fallbackOrigin: {originExpression}";
 
-		writer.IfBlock(
-			invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})",
-			ifBody =>
-			{
-				ifBody.IfBlock(
-					"errors is null",
-					errorsBody =>
-						errorsBody.Assignment(
-							"errors",
-							"new global::System.Collections.Generic.List<global::ZodSharp.Core.ValidationError>()"
-						)
-				);
-				ifBody.MethodCallOn(
-					"errors",
-					"Add",
-					$"{TypeLibrary.ZodSharp.Core.ValidationError}.Create({codeExpression}, {message}, {pathExpression}, origin: {originExpression})"
-				);
-			}
+		// The identity is passed with a direct cast when the rule implements IZodRule, and as null otherwise: the
+		// rule is constructed with its exact type, so the answer is known here. A runtime type test on a boxed
+		// value-type rule ((object)rule as IZodRule) crashes the Mono AOT compiler (Blazor WebAssembly with
+		// RunAOTCompilation=true), so the generator never emits one.
+		var identityArgument = rule.RuleOwnsIdentity ? $"({zodRuleInterface}){identityVariable}" : "null";
+		var ruleError =
+			identityVariable == ruleVariable && valueVariable != "default!"
+				? $"global::ZodSharp.Core.ZodRuleErrors.Create({ruleVariable}, {valueVariable}, {pathExpression}{originArgument}, code: {codeExpression})"
+				: $"global::ZodSharp.Core.ZodRuleErrors.Build({codeExpression}, {ruleVariable}.GetErrorMessage({valueVariable}), {pathExpression}, {identityArgument}{originArgument})";
+
+		var errorExpression =
+			!string.IsNullOrEmpty(rule.Message.ErrorMessage)
+			|| (
+				!string.IsNullOrEmpty(rule.Message.ErrorMessageResourceName)
+				&& rule.Message.ErrorMessageResourceType is not null
+			)
+				? ForMemberWithMessage(
+					ruleError,
+					memberExpression,
+					BuildMessageTemplate(rule.Message, "Field '{displayName}' is invalid.")
+				)
+				: $"{GeneratedValidation}.ForMember({ruleError}, {memberExpression}, fallbackCategory: {Category("Custom")})";
+
+		writer.IfBlock(invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})", ifBody =>
+			WriteAddError(ifBody, errorExpression)
 		);
 	}
+
+	static string ForMemberWithMessage(string errorExpression, string memberExpression, MessageTemplate message) =>
+		message.OrdinalNamesExpression is null
+			? $"{GeneratedValidation}.ForMember({errorExpression}, {memberExpression}, fallbackCategory: {Category("Custom")}, messageFormat: {message.FormatExpression})"
+			: $"{GeneratedValidation}.ForMember({errorExpression}, {memberExpression}, fallbackCategory: {Category("Custom")}, messageFormat: {message.FormatExpression}, ordinalNames: {message.OrdinalNamesExpression})";
+
+	/// <summary>
+	/// The origin reported for a custom rule that supplies none: the member's Zod type for the scalar kinds the
+	/// generator recognizes, so a custom string rule reports <c>string</c> like the built-in string checks.
+	/// </summary>
+	static string? GetFallbackOrigin(ZodPropertyDescriptor property) =>
+		property.ValidationKind switch
+		{
+			PropertyValidationKind.String => StringOrigin,
+			PropertyValidationKind.Numeric or PropertyValidationKind.Comparable or PropertyValidationKind.Enum =>
+				$"global::ZodSharp.Core.ZodTypeNames.Of(typeof({property.PropertyType.AsTypeReference()}))",
+			PropertyValidationKind.Collection or PropertyValidationKind.Complex or PropertyValidationKind.Unsupported =>
+				null,
+			_ => null,
+		};
 }

@@ -19,14 +19,14 @@ public class NewtonsoftJsonExtensionsTests
 	}
 
 	[Test]
-	public async Task DeserializeAndValidate_GivenMalformedJson_ReturnsJsonErrorFailure()
+	public async Task DeserializeAndValidate_GivenMalformedJson_ReturnsInvalidJsonFailure()
 	{
 		TestUserSchema schema = new();
 
 		var result = schema.DeserializeAndValidate("{bad json");
 
 		await Assert.That(result.IsSuccess).IsFalse();
-		await Assert.That(result.Errors[0].Code).IsEqualTo("json_error");
+		await Assert.That(result.Errors[0].Code).IsEqualTo("invalid_json");
 	}
 
 	[Test]

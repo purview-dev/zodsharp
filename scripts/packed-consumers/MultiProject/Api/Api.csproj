@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<!--
+		Packed-consumer gate (scripts/test-packed-consumers.ps1), consumer (d), the application half: a minimal API that
+		references MultiProject/Contracts and Microsoft.AspNetCore.OpenApi directly, with XML documentation enabled.
+
+		The direct Microsoft.AspNetCore.OpenApi reference matters: only a direct reference imports the package's build/
+		targets, which add every ProjectReference's XML documentation file to the OpenAPI XML-comment generator. That
+		generator emits one dictionary entry per documented type of this project and of those XML files, and it threw
+		at runtime when both projects carried the same generated ZodSharp marker attribute.
+
+		Published framework-dependent and started by the script, which reads /openapi/v1.json and posts an invalid body.
+	-->
+	<PropertyGroup>
+		<TargetFramework>net11.0</TargetFramework>
+		<AssemblyName>PackedMultiApi</AssemblyName>
+		<RootNamespace>PackedMultiApi</RootNamespace>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<!-- The script reads the OpenAPI XML-comment cache the generator emits, to check what it was given. -->
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="$(AspNetCorePackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.AspNetCore" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.AspNetCore.OpenApi" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.Extensions.Validation" Version="$(ZodSharpPackageVersion)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Contracts\Contracts.csproj" />
+	</ItemGroup>
+
+	<Target Name="RequireZodSharpPackageVersion" BeforeTargets="CollectPackageReferences;Restore">
+		<Error
+			Condition="'$(ZodSharpPackageVersion)' == ''"
+			Text="ZodSharpPackageVersion is not set. Run this consumer through scripts/test-packed-consumers.ps1."
+		/>
+	</Target>
+</Project>

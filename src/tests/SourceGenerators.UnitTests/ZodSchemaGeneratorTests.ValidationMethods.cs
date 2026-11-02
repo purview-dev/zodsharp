@@ -38,6 +38,6 @@ partial class ZodSchemaGeneratorTests
 
 		// ...and the async custom method is dropped so the validator does not reference both.
 		await Assert.That(generated).DoesNotContain("CustomValidationAsync", StringComparison.Ordinal);
-		await Assert.That(generated).ContainsGeneratedCode("ValueTask.FromResult");
+		await Assert.That(generated).ContainsGeneratedCode("=> new(ValidateCore(value, depth));");
 	}
 }

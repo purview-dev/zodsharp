@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<RootNamespace>ZodSharp.Http</RootNamespace>
+		<AssemblyName>Purview.ZodSharp.Http.UnitTests</AssemblyName>
+		<!-- In-memory host tests touch many framework types by nature. -->
+		<NoWarn>$(NoWarn);CA1506</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.TestHost" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Http\Http.csproj" />
+		<!-- The server half of the ProblemDetails parity tests: what Purview.ZodSharp.AspNetCore writes, this package reads. -->
+		<ProjectReference Include="..\..\src\AspNetCore\AspNetCore.csproj" />
+		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
+		<!-- Runs the ZodSharp generator against the test project, for the [ZodSchema] fixtures. -->
+		<ProjectReference
+			Include="..\..\src\SourceGenerators\SourceGenerators.csproj"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+			PrivateAssets="all"
+		/>
+	</ItemGroup>
+</Project>

@@ -16,8 +16,12 @@ public readonly record struct RegexRule
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "invalid_string";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the required pattern.</summary>
+	/// <summary>Gets the message format; <c>{0}</c> is the required pattern. A custom message may use <c>{1}</c> for the offending value.</summary>
 	public const string MessageFormat = "String does not match the required pattern: {0}";
+
+	static readonly string?[] TemplateNames = [Core.ZodIssueParameters.Pattern, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	/// <summary>
 	/// The match timeout applied to every pattern this library compiles itself.
@@ -39,9 +43,15 @@ public readonly record struct RegexRule
 	/// Supply a <see cref="Regex"/> yourself if you need a different budget.
 	/// </para>
 	/// </remarks>
-	public static readonly TimeSpan DefaultMatchTimeout = TimeSpan.FromSeconds(2);
+	public static readonly TimeSpan DefaultMatchTimeout = TimeSpan.FromMilliseconds(DefaultMatchTimeoutMilliseconds);
 
-	readonly string _message;
+	/// <summary>
+	/// <see cref="DefaultMatchTimeout"/> in milliseconds, as a constant so it can be used in attribute
+	/// arguments (for example <c>[GeneratedRegex(pattern, options, RegexRule.DefaultMatchTimeoutMilliseconds)]</c>).
+	/// </summary>
+	public const int DefaultMatchTimeoutMilliseconds = 2000;
+
+	readonly string? _message;
 
 	// Read by the JSON Schema exporter, which previously reached this by reflecting on the field name.
 	internal Regex Pattern { get; }
@@ -55,7 +65,7 @@ public readonly record struct RegexRule
 	public RegexRule(Regex pattern, string? message = null, string? code = null)
 	{
 		Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -110,7 +120,8 @@ public readonly record struct RegexRule
 	/// </summary>
 	/// <param name="value">The value that failed validation</param>
 	/// <returns>The error message</returns>
-	public string GetErrorMessage(in string value) => RuleMessage.Format(_message ?? MessageFormat, value);
+	public string GetErrorMessage(in string value) =>
+		RuleMessage.Format(_message ?? MessageFormat, Pattern.ToString(), value);
 
 	/// <summary>
 	/// Gets the error message for a failed span validation.
@@ -124,7 +135,20 @@ public readonly record struct RegexRule
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		RuleParameters.Two(
+			Core.ZodIssueParameters.Format,
+			"regex",
+			Core.ZodIssueParameters.Pattern,
+			Pattern.ToString()
+		);
 
 	/// <summary>Applies the JSON Schema <c>pattern</c> constraint.</summary>
 	/// <param name="schema">The schema for the value being validated.</param>

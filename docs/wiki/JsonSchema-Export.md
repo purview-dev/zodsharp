@@ -43,16 +43,36 @@ var jsonSchema = Z.ToJsonSchema<Dictionary<string, object?>>(userSchema, new ToJ
 
 ## Supported schema types
 
-`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodRecord`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, and `ZodLazy`.
+`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodRecord`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, `ZodDiscriminatedUnion` and `ZodLazy`.
 
 - Objects emit `additionalProperties: false`.
 - Records (`Z.Record(valueSchema)`) emit `{ "type": "object", "additionalProperties": <value> }`.
 - Literals emit `const` (and `type`).
 - Native enums emit `enum` with the defined members in their System.Text.Json wire form: the numeric values by default, or the member names when the enum is serialized as a string. A `[Flags]` enum emits `type: integer` instead, because a combination is valid without being a defined member.
+- Discriminated unions emit `oneOf` with one branch per option (they used to export the empty schema). The discriminator property is recorded as the `x-zod-discriminator` vendor extension and each branch records its value as `x-zod-discriminatorValue` (see [Vendor extensions](#vendor-extensions)).
 - Lazy/recursive schemas emit `$ref` entries under `$defs` (e.g. `#/$defs/__lazyN`).
 
 Rules that describe their own JSON Schema constraint implement `IJsonSchemaRule` and are applied during
 export (see [Validation rules and JSON Schema](#validation-rules-and-json-schema) below).
+
+## Schemas known only at runtime
+
+`ToJsonSchemaConverter.ConvertUntyped(object schema, ToJsonSchemaOptions? options = null)` (namespace
+`ZodSharp.JsonSchema`) converts a schema whose type is only known at runtime: a ZodSharp schema, a generated
+validator (`IJsonSchemaProvider`), or an adapter returned by `IZodSchemaFactory.TryGetUntypedValidator`
+(`ZodSchemaValidator<T>` and `ZodUntypedValidator<T>` are unwrapped). A value the exporter cannot describe
+produces the empty (`any`) schema.
+
+```csharp
+using ZodSharp.JsonSchema;
+
+if (factory.TryGetUntypedValidator(typeof(Order), out var validator))
+{
+    var definition = ToJsonSchemaConverter.ConvertUntyped(validator!);
+}
+```
+
+This is the entry point the OpenAPI transformers use; see [OpenAPI Integration](OpenAPI-Integration.md).
 
 ## Export a generated `[ZodSchema]`
 
@@ -162,6 +182,13 @@ the same, so a rule maps to JSON Schema identically on both paths:
 | `MultipleOfRule<T>` / `EvenRule<T>` / `OddRule<T>` | `multipleOf` (odd uses `not: { multipleOf: 2 }`) |
 | `IntRule<T>` / `SafeIntegerRule` | `type: integer` (safe integer also bounds to the `int` range) |
 | `EmailRule` / `UrlRule` / `UriRule` | `format: email` / `uri` |
+| `IPAddressRule` (IPv4 / IPv6) | `format: ipv4` / `ipv6` |
+| `DurationRule` | `format: duration` |
+| `DateStringRule` | `format: date` |
+| `DatetimeStringRule` | `format: date-time` plus its UTC `pattern` |
+| `TimeStringRule` | a local-time `pattern` |
+| `Base64StringRule` | `contentEncoding: base64` |
+| `CidrRule` / `JWTRule` / `IPAddressRule` (any version) | listed as unsupported; record `x-zod-cidr` / `x-zod-jwt` / `x-zod-ipVersion` |
 | `UUIDRule` (versionless) | `format: uuid` |
 | `UUIDRule(UuidVersion.Vx)` | `format: uuid` plus a `pattern` that pins the version and variant |
 | `GuidRule` | a `pattern` for a canonical 8-4-4-4-12 hexadecimal identifier (any version/variant) |
@@ -193,6 +220,22 @@ A rule that does not implement `IJsonSchemaRule` is reported through
 interface; for example a custom null-or-non-whitespace rule would add `IJsonSchemaRule` and set
 `minLength`/`pattern` on the schema passed to `ApplyTo`. The built-in `NullOrNonWhiteSpaceRule` already does
 this, so a domain that needs that behaviour should use `[NullOrNonWhiteSpace]` rather than a bespoke rule.
+
+## Vendor extensions
+
+Some rules enforce something JSON Schema has no keyword for, or that a keyword only approximates (the literal
+behind a `startsWith` pattern, a UUID version, a CIDR family, a discriminator). The exporter records that
+information as `x-zod-*` vendor extensions on the definition:
+
+```csharp
+IReadOnlyDictionary<string, object?> extensions = definition.GetVendorExtensions();
+definition.SetVendorExtension("x-zod-note", "custom"); // the name must start with "x-"
+```
+
+They are exposed through methods rather than a property on purpose: the JSON Schema serializers write
+properties only, so the exported JSON Schema is unchanged. Hosts whose format carries vendor extensions read
+them - the OpenAPI transformers write them into the document when `ZodOpenApiOptions.EmitVendorExtensions` is
+on (see [OpenAPI Integration](OpenAPI-Integration.md)).
 
 ## Temporal sentinels and the DateTimeOffset wire form
 

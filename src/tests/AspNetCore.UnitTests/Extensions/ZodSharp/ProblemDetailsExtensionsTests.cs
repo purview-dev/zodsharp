@@ -1,3 +1,6 @@
+// The deprecated 2.x conversion overloads are exercised here on purpose: their behaviour is kept for compatibility.
+#pragma warning disable CS0618
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ZodSharp.Core;

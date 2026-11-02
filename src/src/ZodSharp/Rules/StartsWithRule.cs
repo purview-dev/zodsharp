@@ -17,11 +17,15 @@ public readonly record struct StartsWithRule
 	public const string ErrorCode = "invalid_string";
 
 	/// <summary>Gets the message format; <c>{0}</c> is the required prefix and <c>{1}</c> the value.</summary>
-	public const string MessageFormat = "String must start with '{0}', but got '{1}'";
+	public const string MessageFormat = "String must start with '{0}'";
+
+	static readonly string?[] TemplateNames = [Core.ZodIssueParameters.Prefix, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly string _prefix;
 	readonly StringComparison _comparison;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the StartsWithRule struct.
@@ -39,7 +43,7 @@ public readonly record struct StartsWithRule
 	{
 		_prefix = prefix.OrNull() ?? throw new ArgumentNullException(nameof(prefix));
 		_comparison = comparison;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -78,6 +82,7 @@ public readonly record struct StartsWithRule
 	{
 		ArgumentNullException.ThrowIfNull(schema);
 		JsonSchema.JsonSchemaRules.ConstrainPattern(schema, "^" + Regex.Escape(_prefix));
+		schema.SetVendorExtension("x-zod-startsWith", _prefix);
 	}
 
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
@@ -85,5 +90,13 @@ public readonly record struct StartsWithRule
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidFormat;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters =>
+		RuleParameters.Two(Core.ZodIssueParameters.Format, "starts_with", Core.ZodIssueParameters.Prefix, _prefix);
 }

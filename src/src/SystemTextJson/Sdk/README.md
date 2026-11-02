@@ -35,6 +35,26 @@ await using var stream = File.OpenRead("user.json");
 var result = await userSchema.DeserializeAndValidateAsync(stream);
 ```
 
+In a trimmed, Native AOT or Blazor WebAssembly app, pass the contract from a source-generated `JsonSerializerContext`
+(the `JsonTypeInfo<T>` overloads); the overloads above resolve it reflectively and are annotated so the build warns.
+
+```csharp
+var result = schema.DeserializeAndValidate(json, AppJsonContext.Default.User);
+```
+
+Service-aware rules (an async uniqueness check that resolves a repository) run when a generated validator is given the
+caller's services:
+
+```csharp
+var result = await new UserSchemaValidator().DeserializeAndValidateAsync(
+    stream, AppJsonContext.Default.User, services, cancellationToken);
+var written = await new UserSchemaValidator().ValidateAndSerializeAsync(
+    user, output, AppJsonContext.Default.User, services, cancellationToken);
+```
+
+For `HttpClient` request and response bodies, see
+[Purview.ZodSharp.Http](https://www.nuget.org/packages/Purview.ZodSharp.Http), which builds on these.
+
 ## Validating converter
 
 ```csharp
@@ -42,6 +62,19 @@ var converter = userSchema.CreateValidatingConverter();
 var options = new JsonSerializerOptions { Converters = { converter } };
 var value = JsonSerializer.Deserialize<User>(json, options);
 ```
+
+## Errors
+
+A failure to read the JSON (malformed text, a `null` document, a value the serializer cannot convert, or a
+`NotSupportedException`/`InvalidOperationException` thrown while deserializing) is reported as one error with code
+`invalid_json` (`SystemTextJsonExtensions.InvalidJsonCode`), category `invalid_type` and the fixed message
+`"The JSON value could not be converted to {expected}."`. The serializer's path becomes the error's `FullPath`
+(`$.items[1].age` becomes `items[1].age`) and its line and byte position become the `line` and `position`
+parameters. The serializer's own message is never surfaced, because it names CLR types and can quote the input.
+
+The validating converter throws `ZodJsonValidationException` (namespace `ZodSharp.Json`, a `JsonException`) carrying the
+schema's full `Errors`, located under the converter's JSON path; its message still starts with `"Validation failed: "`,
+so existing `catch (JsonException)` blocks keep working. `DeserializeAndValidate` unwraps it into the result.
 
 ## UTC DateTimeOffset contract
 

@@ -5,6 +5,67 @@ namespace ZodSharp.SourceGenerators;
 public partial class ZodSchemaAnalyzerTests
 {
 	[Test]
+	public async Task ZodAsyncMemberAttribute_GivenItsXmlDocExample_CompilesWithoutCustomValidationDiagnostics(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — the example is taken from the attribute's own XML doc, so a broken example fails here.
+		var example = await ReadXmlDocExampleAsync(
+			Path.Combine("src", "src", "ZodSharp", "ZodAsyncMemberAttribute.cs"),
+			cancellationToken
+		);
+		var member = example.Replace(
+			"{ ... }",
+			"{ await Task.Yield(); return ValidationResult<User>.Success(value); }",
+			StringComparison.Ordinal
+		);
+		var source = $$"""
+			using System;
+			using System.Threading;
+			using System.Threading.Tasks;
+			using ZodSharp.Core;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public partial class User
+				{
+					public string? Email { get; set; }
+
+					{{member}}
+				}
+			}
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.CustomValidationInaccessible);
+		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.CustomValidationMethodNotFound);
+		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.CustomValidationInvalidServicesParameter);
+	}
+
+	static async Task<string> ReadXmlDocExampleAsync(string relativePath, CancellationToken cancellationToken)
+	{
+		DirectoryInfo? root = new(AppContext.BaseDirectory);
+		while (root is not null && !File.Exists(Path.Combine(root.FullName, "AGENTS.md")))
+			root = root.Parent;
+
+		var lines = await File.ReadAllLinesAsync(
+			Path.Combine(root?.FullName ?? throw new InvalidOperationException("No repository root."), relativePath),
+			cancellationToken
+		);
+		var code = lines
+			.SkipWhile(static line => !line.Contains("<code>", StringComparison.Ordinal))
+			.Skip(1)
+			.TakeWhile(static line => !line.Contains("</code>", StringComparison.Ordinal))
+			.Select(static line => line.TrimStart().TrimStart('/').TrimStart());
+
+		return System.Net.WebUtility.HtmlDecode(string.Join(Environment.NewLine, code));
+	}
+
+	[Test]
 	public async Task CustomValidation_GivenExplicitNameMissing_ProducesZODSGEN007(CancellationToken cancellationToken)
 	{
 		const string source = """
@@ -125,6 +186,86 @@ public partial class ZodSchemaAnalyzerTests
 
 		var result = await AnalyzeAsync(source, cancellationToken);
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.CustomValidationInvalidCancellationToken);
+	}
+
+	[Test]
+	public async Task CustomValidation_GivenWrongCancellationTokenType_SaysItMustBeTheLastParameter(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		var source = """
+			using System;
+			using System.Threading;
+			using System.Threading.Tasks;
+			using ZodSharp.Core;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class WrongServiceAwareCT
+				{
+					public string? Name { get; set; }
+
+					internal static ValueTask<ValidationResult<WrongServiceAwareCT>> CustomValidationAsync(
+						WrongServiceAwareCT value, IServiceProvider services, string ct) =>
+						ValueTask.FromResult(ValidationResult<WrongServiceAwareCT>.Success(value));
+				}
+			}
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.CustomValidationInvalidCancellationToken);
+		await Assert
+			.That(
+				DiagnosticLibrary.CustomValidationInvalidCancellationToken.MessageFormat.ToString(
+					System.Globalization.CultureInfo.InvariantCulture
+				)
+			)
+			.Contains("last parameter");
+		await Assert
+			.That(
+				DiagnosticLibrary.CustomValidationInvalidCancellationToken.MessageFormat.ToString(
+					System.Globalization.CultureInfo.InvariantCulture
+				)
+			)
+			.DoesNotContain("second parameter");
+	}
+
+	[Test]
+	public async Task CustomValidation_GivenServiceAwareMethodWithWrongServicesType_ProducesZODSGEN054(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		var source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using ZodSharp.Core;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class WrongServices
+				{
+					public string? Name { get; set; }
+
+					internal static ValueTask<ValidationResult<WrongServices>> CustomValidationAsync(
+						WrongServices value, string services, CancellationToken ct) =>
+						ValueTask.FromResult(ValidationResult<WrongServices>.Success(value));
+				}
+			}
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(source, cancellationToken);
+
+		// Assert
+		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.CustomValidationInvalidServicesParameter);
+		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.CustomValidationInvalidParameterCount);
 	}
 
 	[Test]

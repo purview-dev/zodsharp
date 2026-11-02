@@ -133,7 +133,9 @@ partial class ZodSchemaGeneratorTests
 		// Assert
 		var generated = driverResult.GetSource("AppOptionsSchema");
 		await Assert.That(generated).IsNotNull();
-		await Assert.That(generated!).ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.Validate(");
+		await Assert
+			.That(generated!)
+			.ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.ValidateCore(");
 	}
 
 	[Test]
@@ -174,7 +176,9 @@ partial class ZodSchemaGeneratorTests
 
 		var generated = driverResult.GetSource("AppOptionsSchema");
 		await Assert.That(generated).IsNotNull();
-		await Assert.That(generated!).ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.Validate(");
+		await Assert
+			.That(generated!)
+			.ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.ValidateCore(");
 	}
 
 	[Test]
@@ -241,7 +245,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(generated).IsNotNull();
 		await Assert
 			.That(generated!)
-			.ContainsGeneratedCode("global::Testing.Local.LocalServiceOptionsSchema.Validate(");
+			.ContainsGeneratedCode("global::Testing.Local.LocalServiceOptionsSchema.ValidateCore(");
 	}
 
 	const string NestedAppOptionsSource = """
@@ -282,18 +286,33 @@ partial class ZodSchemaGeneratorTests
 
 		var generated = driverResult.GetSource("ChangeOpsAppOptionsSchema");
 		await Assert.That(generated).IsNotNull();
-		await Assert.That(generated!).ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.Validate(");
+		await Assert
+			.That(generated!)
+			.ContainsGeneratedCode("global::Testing.Contracts.ServiceOptionsSchema.ValidateCore(");
 
 		var diagnostics = driverResult.CompilationResult.Compilation.GetDiagnostics(cancellationToken);
 		await Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == "CS0436")).IsFalse();
 	}
 
+	// Schema hint names are namespace-qualified (Testing.ServiceOptionsSchema.g.cs). Every dot-separated suffix is
+	// listed too, so a test can ask for the simple-name form whatever namespace the type is declared in.
 	static List<string> GeneratedHintNames(DriverRunResult driverResult) =>
 		[
 			.. driverResult
 				.DriverResult.Results.SelectMany(static result => result.GeneratedSources)
-				.Select(static source => source.HintName),
+				.SelectMany(static source => DotSuffixes(source.HintName)),
 		];
+
+	static IEnumerable<string> DotSuffixes(string hintName)
+	{
+		yield return hintName;
+		for (
+			var index = hintName.IndexOf('.', StringComparison.Ordinal);
+			index >= 0;
+			index = hintName.IndexOf('.', index + 1)
+		)
+			yield return hintName[(index + 1)..];
+	}
 
 	async Task<MetadataReference> CompileContractAsync(string source, CancellationToken cancellationToken)
 	{

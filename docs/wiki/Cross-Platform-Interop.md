@@ -34,7 +34,24 @@ For each of the eight fixture cases (three valid, five invalid) the script:
 
 **Vitest cross-platform tests** (`tests/ts/cross-platform.test.ts`) re-check fixture validity under Zod, verify canonical serialization, and parse every JSON file in `cross-platform/output` with Zod to prove C# output is acceptable to TypeScript/Zod.
 
-If the C# output directory is empty, the vitest suite emits a note instructing you to run the C# cross-platform tests first.
+If the C# output directory is empty, the vitest suite fails rather than passing vacuously: run the C# cross-platform tests first. `just test` does both, because `Repository.UnitTests` drives every vitest suite from the .NET test run.
+
+## Issue shape
+
+Validity is not the only thing that lines up. Every built-in ZodSharp error reports the Zod v4 issue code as its
+`Category` (`invalid_type`, `too_small`, `too_big`, `invalid_format`, `invalid_union`, `unrecognized_keys`, …)
+while `Code` keeps ZodSharp's more specific identity, and `FullPath.ToZodPath()` returns the path in Zod's issue
+shape (strings for members and keys, integers for indexes). Messages use Zod's type names (`"Expected number,
+received string"`), never CLR names. A client can therefore handle ZodSharp and Zod issues with the same code;
+see [Core Concepts](Core-Concepts.md#error-fields).
+
+| Zod issue | ZodSharp error |
+|---|---|
+| `code` | `Category` |
+| `path` (`["items", 0, "name"]`) | `FullPath.ToZodPath()` |
+| `origin`, `minimum`, `maximum`, `inclusive` | `Origin`, `Lower`/`Upper` (`ErrorBound.Value`, `ErrorBound.Inclusive`) |
+| `expected`, `keys`, `format`, `divisor` | `Parameters` (`ZodIssueParameters.Expected`, `Keys`, `Format`, `Divisor`) |
+| `errors` of `invalid_union` | `error.GetUnionErrors()` |
 
 ## JSON Schema bridge
 

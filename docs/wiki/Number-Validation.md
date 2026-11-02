@@ -1,6 +1,6 @@
 # Number Validation
 
-`ZodNumber` (namespace `ZodSharp.Schemas`) validates `double` values. `ParseInternal` rejects `double.NaN` with an `invalid_type` error (`"Expected number, but got NaN"`); on success the accumulated rules run.
+`ZodNumber` (namespace `ZodSharp.Schemas`) validates `double` values. `ParseInternal` rejects `double.NaN` with an `invalid_type` error (`"Expected number, received nan"`); on success the accumulated rules run.
 
 ```csharp
 using ZodSharp;

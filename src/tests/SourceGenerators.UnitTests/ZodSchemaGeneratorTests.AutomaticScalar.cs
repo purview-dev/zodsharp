@@ -110,7 +110,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(generated).ContainsGeneratedCode("EmptyPath");
 
 		// The property is synthesized from the attribute (name defaults to Value).
-		await Assert.That(generated).ContainsGeneratedCode("ImmutableArray.Create(\"Value\")");
+		await Assert.That(generated).ContainsGeneratedCode("ZodPath.Member(\"Value\")");
 	}
 
 	[Test]
@@ -247,8 +247,8 @@ partial class ZodSchemaGeneratorTests
 		var generated = driverResult.GetSource("ScoreSchema");
 
 		// Assert — the synthesized nullable property is guarded, so null is accepted.
-		await Assert.That(generated).ContainsGeneratedCode("value.Value != null");
-		await Assert.That(generated).ContainsGeneratedCode("ImmutableArray.Create(\"Value\")");
+		await Assert.That(generated).DoesNotContain("value.Value is null");
+		await Assert.That(generated).ContainsGeneratedCode("ZodPath.Member(\"Value\")");
 	}
 
 	[Test]
@@ -295,8 +295,8 @@ partial class ZodSchemaGeneratorTests
 		var typeofGenerated = typeofResult.GetSource("TenantIdSchema");
 
 		// Assert — the synthesized property is named Id for both forms.
-		await Assert.That(generic).ContainsGeneratedCode("ImmutableArray.Create(\"Id\")");
-		await Assert.That(typeofGenerated).ContainsGeneratedCode("ImmutableArray.Create(\"Id\")");
+		await Assert.That(generic).ContainsGeneratedCode("ZodPath.Member(\"Id\")");
+		await Assert.That(typeofGenerated).ContainsGeneratedCode("ZodPath.Member(\"Id\")");
 	}
 
 	[Test]
@@ -390,7 +390,11 @@ partial class ZodSchemaGeneratorTests
 			.ContainsGeneratedCode(
 				"((global::ZodSharp.Core.IZodRule)externalIdCustomRuleInner0).Code ?? \"validation_failed\""
 			);
-		await Assert.That(generated).ContainsGeneratedCode("EmptyPath, origin:");
+		await Assert
+			.That(generated)
+			.ContainsGeneratedCode("EmptyPath, (global::ZodSharp.Core.IZodRule)externalIdCustomRuleInner0)");
+		// A runtime type test on the boxed rule crashes the Mono AOT compiler; the cast is known to succeed.
+		await Assert.That(generated).DoesNotContain("(object)");
 	}
 
 	[Test]
@@ -644,8 +648,8 @@ partial class ZodSchemaGeneratorTests
 		// Assert — the synthesized property is DateTimeOffset?, so null is accepted and exported.
 		foreach (var generated in new[] { generic, typeofGenerated })
 		{
-			await Assert.That(generated).ContainsGeneratedCode("value.Value != null");
-			await Assert.That(generated).ContainsGeneratedCode("ImmutableArray.Create(\"Value\")");
+			await Assert.That(generated).DoesNotContain("value.Value is null");
+			await Assert.That(generated).ContainsGeneratedCode("ZodPath.Member(\"Value\")");
 			await Assert.That(generated).ContainsGeneratedCode("AnyOf = new()");
 			await Assert.That(generated).ContainsGeneratedCode("Type = \"null\"");
 		}
@@ -850,7 +854,7 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(errors.Any(error => error.Code == Rules.RequiredRule<int>.ErrorCode)).IsTrue();
 		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
 
-		await Assert.That(generated).ContainsGeneratedCode("value.Value == null");
+		await Assert.That(generated).ContainsGeneratedCode("value.Value is null");
 		await Assert.That(generated).DoesNotContain("Type = \"null\"");
 	}
 
@@ -992,6 +996,6 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That((bool)validResult.GetType().GetProperty("IsSuccess")!.GetValue(validResult)!).IsTrue();
 
 		var generated = driverResult.GetSource("ScoreHolderSchema");
-		await Assert.That(generated).ContainsGeneratedCode("value.Score == null || value.Score.Value.Value == null");
+		await Assert.That(generated).ContainsGeneratedCode("value.Score is null || value.Score.Value.Value is null");
 	}
 }

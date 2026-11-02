@@ -1,0 +1,7 @@
+@inherits InputText
+@*
+	An InputText that updates its value - and so raises EditContext.OnFieldChanged - on every keystroke (oninput) rather
+	than when the input loses focus. That is what ZodValidationTrigger.Input with DebounceMilliseconds debounces.
+	(@bind-Value:event="oninput" on InputText itself is not supported: component bindings have no event to choose.)
+*@
+<input @attributes="AdditionalAttributes" class="@CssClass" @bind="CurrentValueAsString" @bind:event="oninput" />

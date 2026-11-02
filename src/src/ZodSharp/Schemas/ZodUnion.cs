@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ZodSharp.Core;
 
 namespace ZodSharp.Schemas;
@@ -23,7 +24,7 @@ public class ZodUnion(IReadOnlyList<IZodSchema<object, object>> options) : ZodTy
 	/// <returns>A validation result</returns>
 	protected override ValidationResult<object> ParseInternal(object value)
 	{
-		List<ValidationError>? allErrors = null;
+		var unionErrors = ImmutableArray.CreateBuilder<ImmutableArray<ValidationError>>(options.Count);
 
 		foreach (var option in options)
 		{
@@ -33,17 +34,10 @@ public class ZodUnion(IReadOnlyList<IZodSchema<object, object>> options) : ZodTy
 				return result;
 			}
 
-			allErrors ??= [];
-			allErrors.AddRange(result.Errors);
+			// Each option's issues stay grouped, in declaration order, with paths relative to the union.
+			unionErrors.Add(result.Errors.IsDefault ? [] : result.Errors);
 		}
 
-		return ValidationResult<object>.Failure(
-			new ValidationError(
-				"invalid_union",
-				"Value does not match any of the union options",
-				[],
-				new Dictionary<string, object?> { { "errors", allErrors ?? [] } }
-			)
-		);
+		return ValidationResult<object>.Failure(ZodIssues.InvalidUnion(unionErrors.MoveToImmutable()));
 	}
 }

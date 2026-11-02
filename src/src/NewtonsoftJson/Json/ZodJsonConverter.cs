@@ -7,6 +7,8 @@ namespace ZodSharp.Json;
 /// <summary>
 /// JsonConverter that validates using a Zod schema.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(NewtonsoftJsonTrimming.Message)]
+[System.Diagnostics.CodeAnalysis.RequiresDynamicCode(NewtonsoftJsonTrimming.Message)]
 sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 {
 	public override T ReadJson(
@@ -17,20 +19,54 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 		JsonSerializer serializer
 	)
 	{
+		// Capture the location before the value is consumed, so validation errors are reported under it.
+		var path = reader.Path;
+		var (line, position) = LineInfo(reader as IJsonLineInfo);
+
 		var token = JToken.Load(reader);
 		var validationSerializer = CreateSerializerWithoutThisConverter(serializer);
-		var deserialized =
-			token.ToObject<T>(validationSerializer)
-			?? throw new JsonSerializationException("Failed to deserialize JSON");
 
-		var result = schema.Validate(deserialized);
-		if (!result.IsSuccess)
+		T deserialized;
+		try
 		{
-			var errorMessages = string.Join(", ", result.Errors.Select(e => e.Message));
-			throw new JsonSerializationException($"Validation failed: {errorMessages}");
+			deserialized =
+				token.ToObject<T>(validationSerializer)
+				?? throw new JsonSerializationException("Failed to deserialize JSON", path, line, position, null);
+		}
+		catch (ZodNewtonsoftJsonValidationException nested)
+		{
+			// A validating converter for a nested value only knows its path within this token; locate it
+			// under this value's path too.
+			throw new ZodNewtonsoftJsonValidationException(nested.Errors, path, line, position);
+		}
+		catch (JsonSerializationException unreadable)
+		{
+			// The value was read from the buffered token, so the serializer's path is relative to it ("Age");
+			// report it under this value's path ("Members[1].Age").
+			throw new JsonSerializationException(
+				unreadable.Message,
+				CombinePath(path, unreadable.Path),
+				line,
+				position,
+				unreadable
+			);
+		}
+		catch (JsonReaderException unreadable)
+		{
+			throw new JsonSerializationException(
+				unreadable.Message,
+				CombinePath(path, unreadable.Path),
+				line,
+				position,
+				unreadable
+			);
 		}
 
-		return result.Value;
+		var result = schema.Validate(deserialized);
+
+		return result.IsSuccess
+			? result.Value
+			: throw new ZodNewtonsoftJsonValidationException(result.Errors, path, line, position);
 	}
 
 	public override void WriteJson(JsonWriter writer, T? value, JsonSerializer serializer)
@@ -43,14 +79,21 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 
 		var result = schema.Validate(value);
 		if (!result.IsSuccess)
-		{
-			var errorMessages = string.Join(", ", result.Errors.Select(e => e.Message));
-			throw new JsonSerializationException($"Validation failed: {errorMessages}");
-		}
+			throw new ZodNewtonsoftJsonValidationException(result.Errors, writer.Path, 0, 0);
 
 		var token = JToken.FromObject(value, CreateSerializerWithoutThisConverter(serializer));
 		token.WriteTo(writer);
 	}
+
+	/// <summary>Joins this value's JSON path with a path relative to it.</summary>
+	static string CombinePath(string outer, string? relative) =>
+		string.IsNullOrEmpty(relative) ? outer
+		: string.IsNullOrEmpty(outer) ? relative
+		: relative[0] == '[' ? outer + relative
+		: outer + "." + relative;
+
+	static (int Line, int Position) LineInfo(IJsonLineInfo? info) =>
+		info is { } lineInfo && lineInfo.HasLineInfo() ? (lineInfo.LineNumber, lineInfo.LinePosition) : (0, 0);
 
 	JsonSerializer CreateSerializerWithoutThisConverter(JsonSerializer serializer)
 	{

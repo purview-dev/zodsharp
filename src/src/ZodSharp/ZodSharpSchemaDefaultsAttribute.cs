@@ -19,6 +19,14 @@ namespace ZodSharp;
 [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
 public sealed class ZodSharpSchemaDefaultsAttribute : Attribute
 {
+	/// <summary>Gets or sets how generated schemas validate uninitialized immutable arrays.</summary>
+	/// <remarks>
+	/// Overrides <c>ZodSharpDefaultImmutableArrayBehavior</c> in MSBuild; a property's
+	/// <see cref="CollectionBehaviorAttribute"/> takes precedence. The built-in default is
+	/// <see cref="ZodSharp.DefaultImmutableArrayBehavior.ValidationError"/>.
+	/// </remarks>
+	public DefaultImmutableArrayBehavior DefaultImmutableArrayBehavior { get; set; }
+
 	/// <summary>
 	/// Gets or sets the assembly-wide default for whether collection properties allow <see langword="null"/>
 	/// elements (or <see langword="null"/> dictionary values).

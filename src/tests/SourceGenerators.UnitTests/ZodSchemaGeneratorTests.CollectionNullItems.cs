@@ -334,7 +334,7 @@ namespace Testing
 		{
 			CompileToAssembly = true,
 			AnalyzerConfigOptions = ImmutableDictionary<string, string>.Empty.Add(
-				"build_property:ZodSharpAllowNulls",
+				"build_property.ZodSharpAllowNulls",
 				"true"
 			),
 		};

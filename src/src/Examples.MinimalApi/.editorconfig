@@ -1,0 +1,6 @@
+# Layered over the Purview.BuildSdk-managed root .editorconfig (which must not be edited).
+
+[*.{cs,csx,cake}]
+# "MinimalApi" follows ASP.NET Core's own spelling (the "minimal APIs" docs, OpenApiOptions), as the OpenAPI
+# package does, rather than PDS0004's "MinimalAPI". Scoped to this project.
+dotnet_analyzer_configuration.pds0004.allowed_words = Api

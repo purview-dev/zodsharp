@@ -52,11 +52,7 @@ partial class ZodSchemaGeneratorTests
 			.ContainsGeneratedCode(
 				"static readonly global::System.TimeSpan RangeMaximum_MaxTimeRange = global::System.TimeSpan.Parse(\"365.00:00:00\", global::System.Globalization.CultureInfo.InvariantCulture);"
 			);
-		await Assert
-			.That(generatedSource)
-			.ContainsGeneratedCode(
-				"maxTimeRangeValue < RangeMinimum_MaxTimeRange || maxTimeRangeValue > RangeMaximum_MaxTimeRange"
-			);
+		await Assert.That(generatedSource).ContainsGeneratedCode("maxTimeRangeValue > RangeMaximum_MaxTimeRange");
 
 		await Assert
 			.That(generatedSource)
@@ -71,9 +67,7 @@ partial class ZodSchemaGeneratorTests
 			);
 		await Assert
 			.That(generatedSource)
-			.ContainsGeneratedCode(
-				"apiVersionValue.CompareTo(RangeMinimum_ApiVersion) < 0 || apiVersionValue.CompareTo(RangeMaximum_ApiVersion) > 0"
-			);
+			.ContainsGeneratedCode("apiVersionValue.CompareTo(RangeMaximum_ApiVersion) > 0");
 
 		await Assert
 			.That(generatedSource)

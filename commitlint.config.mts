@@ -1,4 +1,14 @@
 export default {
+	// Accept the Conventional Commits `!` breaking-change marker (`build!: ...`, `feat(api)!: ...`). Without a
+	// parser preset commitlint's default header pattern has no `!`, so such a header parses as having no type and
+	// no subject and fails type-empty/subject-empty.
+	parserPreset: {
+		parserOpts: {
+			headerPattern: /^(\w*)(?:\((.*)\))?!?: (.*)$/,
+			breakingHeaderPattern: /^(\w*)(?:\((.*)\))?!: (.*)$/,
+			headerCorrespondence: ['type', 'scope', 'subject'],
+		},
+	},
 	rules: {
 		'body-leading-blank': [1, 'always'],
 		'body-max-line-length': [2, 'always', 100],

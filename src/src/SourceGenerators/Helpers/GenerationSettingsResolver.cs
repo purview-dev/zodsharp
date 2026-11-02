@@ -19,7 +19,8 @@ static class GenerationSettingsResolver
 		bool EnumAsString,
 		EnumJsonNamingPolicy EnumNamingPolicy,
 		bool AllowNulls,
-		DateTimeOffsetSerialization DateTimeOffsetSerialization
+		DateTimeOffsetSerialization DateTimeOffsetSerialization,
+		DefaultImmutableArrayBehavior DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.ValidationError
 	);
 
 	/// <summary>
@@ -28,7 +29,8 @@ static class GenerationSettingsResolver
 	/// </summary>
 	internal readonly record struct AssemblyDefaults(
 		bool? AllowNulls,
-		DateTimeOffsetSerialization? DateTimeOffsetSerialization
+		DateTimeOffsetSerialization? DateTimeOffsetSerialization,
+		DefaultImmutableArrayBehavior? DefaultImmutableArrayBehavior = null
 	);
 
 	public static AutoDetectSettings Read(AnalyzerConfigOptionsProvider provider)
@@ -36,7 +38,7 @@ static class GenerationSettingsResolver
 		// Auto-detection is on by default; only an explicit "false" disables it.
 		var autoGenerate =
 			!provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.AutoGenerateIValidateOptionsProperty),
 				out var autoGenerateValue
 			)
 			|| !bool.TryParse(autoGenerateValue, out var autoGenerateEnabled)
@@ -44,7 +46,7 @@ static class GenerationSettingsResolver
 
 		var suffixes = ParseAutoGenerateIValidateOptionsSuffixes(
 			provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AutoGenerateIValidateOptionsSuffixesProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.AutoGenerateIValidateOptionsSuffixesProperty),
 				out var suffixValue
 			)
 				? suffixValue
@@ -54,7 +56,7 @@ static class GenerationSettingsResolver
 		// JSON Schema export is on by default; the assembly-level switch disables it for every type.
 		var generateJsonSchemas =
 			!provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.GenerateJsonSchemasProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.GenerateJsonSchemasProperty),
 				out var generateJsonSchemasValue
 			)
 			|| !bool.TryParse(generateJsonSchemasValue, out var generateJsonSchemasEnabled)
@@ -69,7 +71,7 @@ static class GenerationSettingsResolver
 		// them; only an explicit true enables it, so an unparsable value keeps the default.
 		var allowNulls =
 			provider.GlobalOptions.TryGetValue(
-				$"build_property:{PropertyLibrary.AllowNullsProperty}",
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.AllowNullsProperty),
 				out var allowNullsValue
 			)
 			&& bool.TryParse(allowNullsValue, out var allowNullsEnabled)
@@ -85,7 +87,13 @@ static class GenerationSettingsResolver
 			enumAsString,
 			enumNamingPolicy,
 			allowNulls,
-			dateTimeOffsetSerialization
+			dateTimeOffsetSerialization,
+			provider.GlobalOptions.TryGetValue(
+				PropertyLibrary.BuildPropertyKey(PropertyLibrary.DefaultImmutableArrayBehaviorProperty),
+				out var defaultArrayBehavior
+			) && string.Equals(defaultArrayBehavior?.Trim(), "TreatAsEmpty", StringComparison.OrdinalIgnoreCase)
+				? DefaultImmutableArrayBehavior.TreatAsEmpty
+				: DefaultImmutableArrayBehavior.ValidationError
 		);
 	}
 
@@ -111,8 +119,12 @@ static class GenerationSettingsResolver
 				: (bool?)null;
 
 			DateTimeOffsetSerialization? dateTimeOffsetSerialization = null;
+			DefaultImmutableArrayBehavior? defaultImmutableArrayBehavior = null;
 			foreach (var argument in attribute.NamedArguments)
 			{
+				if (argument.Key == "DefaultImmutableArrayBehavior" && argument.Value.Value is int behavior)
+					defaultImmutableArrayBehavior = (DefaultImmutableArrayBehavior)behavior;
+
 				if (
 					argument.Key == AttributeGenHelper.DateTimeOffsetSerializationPropertyName
 					&& argument.Value.Value is int serialization
@@ -122,7 +134,7 @@ static class GenerationSettingsResolver
 				}
 			}
 
-			return new(allowNulls, dateTimeOffsetSerialization);
+			return new(allowNulls, dateTimeOffsetSerialization, defaultImmutableArrayBehavior);
 		}
 
 		return new(null, null);
@@ -131,7 +143,7 @@ static class GenerationSettingsResolver
 	static DateTimeOffsetSerialization ReadDateTimeOffsetSerialization(AnalyzerConfigOptionsProvider provider)
 	{
 		var value = provider.GlobalOptions.TryGetValue(
-			$"build_property:{PropertyLibrary.DateTimeOffsetSerializationProperty}",
+			PropertyLibrary.BuildPropertyKey(PropertyLibrary.DateTimeOffsetSerializationProperty),
 			out var configured
 		)
 			? configured?.Trim()
@@ -143,12 +155,16 @@ static class GenerationSettingsResolver
 	}
 
 	static bool ReadEnumSerializationAsString(AnalyzerConfigOptionsProvider provider) =>
-		provider.GlobalOptions.TryGetValue($"build_property:{PropertyLibrary.EnumSerializationProperty}", out var value)
-		&& string.Equals(value?.Trim(), "String", StringComparison.OrdinalIgnoreCase);
+		provider.GlobalOptions.TryGetValue(
+			PropertyLibrary.BuildPropertyKey(PropertyLibrary.EnumSerializationProperty),
+			out var value
+		) && string.Equals(value?.Trim(), "String", StringComparison.OrdinalIgnoreCase);
 
 	static EnumJsonNamingPolicy ReadEnumNamingPolicy(AnalyzerConfigOptionsProvider provider) =>
-		provider.GlobalOptions.TryGetValue($"build_property:{PropertyLibrary.EnumNamingPolicyProperty}", out var value)
-		&& string.Equals(value?.Trim(), "CamelCase", StringComparison.OrdinalIgnoreCase)
+		provider.GlobalOptions.TryGetValue(
+			PropertyLibrary.BuildPropertyKey(PropertyLibrary.EnumNamingPolicyProperty),
+			out var value
+		) && string.Equals(value?.Trim(), "CamelCase", StringComparison.OrdinalIgnoreCase)
 			? EnumJsonNamingPolicy.CamelCase
 			: EnumJsonNamingPolicy.Unchanged;
 
@@ -231,7 +247,7 @@ static class GenerationSettingsResolver
 				changed = true;
 			}
 
-			var resolvedProperties = ResolveAllowNulls(schema.Properties, settings, assemblyDefaults);
+			var resolvedProperties = ResolveCollectionBehavior(schema.Properties, settings, assemblyDefaults);
 			if (resolvedProperties is { } properties)
 			{
 				schema = schema with { Properties = properties };
@@ -258,14 +274,13 @@ static class GenerationSettingsResolver
 	}
 
 	/// <summary>
-	/// Resolves each collection property's <c>AllowNulls</c> against the assembly defaults when neither the
-	/// property nor its containing type stated one.
+	/// Resolves each property's collection behavior overrides against the assembly and MSBuild defaults.
 	/// </summary>
 	/// <param name="properties">The schema's properties.</param>
 	/// <param name="settings">The assembly-level MSBuild settings.</param>
 	/// <param name="assemblyDefaults">The source-level assembly defaults.</param>
 	/// <returns>The rewritten properties, or <see langword="null"/> when no property changed.</returns>
-	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>>? ResolveAllowNulls(
+	static EquatableArray<GeneratorResult<ZodPropertyDescriptor>>? ResolveCollectionBehavior(
 		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> properties,
 		AutoDetectSettings settings,
 		AssemblyDefaults assemblyDefaults
@@ -286,13 +301,25 @@ static class GenerationSettingsResolver
 
 			var property = propertyResult.Value;
 			var resolved = property.AllowNulls ?? assemblyDefaults.AllowNulls ?? settings.AllowNulls;
-			if (property.AllowNulls == resolved)
+			var arrayBehavior =
+				property.DefaultImmutableArrayBehavior
+				?? assemblyDefaults.DefaultImmutableArrayBehavior
+				?? settings.DefaultImmutableArrayBehavior;
+			if (property.AllowNulls == resolved && property.DefaultImmutableArrayBehavior == arrayBehavior)
 			{
 				builder.Add(propertyResult);
 				continue;
 			}
 
-			builder.Add(GeneratorResult<ZodPropertyDescriptor>.Create(property with { AllowNulls = resolved }));
+			builder.Add(
+				GeneratorResult<ZodPropertyDescriptor>.Create(
+					property with
+					{
+						AllowNulls = resolved,
+						DefaultImmutableArrayBehavior = arrayBehavior,
+					}
+				)
+			);
 			changed = true;
 		}
 

@@ -8,6 +8,656 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## 3.0.0-prerelease.1
+
+### Added
+
+- **Trimming and Native AOT across every package.** Every shipping package is `IsTrimmable`/`IsAotCompatible` on
+  every target framework and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
+  suppressed. `src/tests/TrimSafety.Verification` publishes with `PublishAot=true` (every ZodSharp assembly except
+  NewtonsoftJson rooted, then as a plain consumer), fails on any IL warning and runs the native binary
+  (`just verify-trim`, CI job `verify-trim`). See [Trimming and Native AOT](docs/wiki/Trimming-and-AOT.md).
+- **`[MinCount]`, `[MaxCount]` and `[CountRange]`** (`ZodSharp.Rules`, generated from the new `MinCountRule`,
+  `MaxCountRule` and `CountRangeRule`): trim-safe collection/dictionary count attributes. The generator validates
+  them exactly like `[MinLength]`/`[MaxLength]`/`[Length]` on a collection (same code, origin, bounds, `count`
+  parameter, message and JSON Schema keywords), without the BCL attributes' `[RequiresUnreferencedCode]`
+  constructors. **`ZODSGEN053`** (warning, with a code fix) suggests them for a collection member of a
+  `[ZodSchema]` type when `PublishTrimmed`, `PublishAot`, `IsTrimmable` or `IsAotCompatible` is set; the package
+  exposes those properties to analyzers through `CompilerVisibleProperty`.
+- **`OptionsBuilder<TOptions>.ValidateWithZod(configurationSection, validateOnStart, missingValidatorBehavior)`**:
+  the trim-safe counterpart of `BindAndValidateWithZod`. It records the section so failures name configuration
+  keys but never binds, so it pairs with `BindConfiguration(section)`, which the configuration binder source
+  generator intercepts.
+- **`ZodDiscriminatedUnionBuilder.Option<T>` reads a POCO discriminator without unannotated reflection**: `T` is
+  annotated `[DynamicallyAccessedMembers(PublicProperties)]` and the accessor is built from it, so POCO unions are
+  trim- and AOT-safe.
+- **The `ZodSharp.Reflection.IsSupported` feature switch**, set `false` by the new
+  `buildTransitive/Purview.ZodSharp.targets` when `PublishTrimmed` or `PublishAot` is `true`, so ILLink and ILC
+  remove the reflection fallbacks (see *Breaking behaviour changes*).
+- **`Purview.ZodSharp.Extensions.Validation`** (new package, `net11.0`): the bridge to .NET 11's
+  Microsoft.Extensions.Validation, so minimal APIs, Blazor Server and Blazor WebAssembly validate ZodSharp types
+  with ZodSharp. `AddZodSharpValidation()` registers `ZodValidatableInfoResolver` as the first resolver whether
+  `AddValidation()` is called before, after or not at all; errors carry the owning `Container` and leaf `Name`
+  Blazor needs to place messages on nested, collection and dictionary fields; parameters follow
+  Microsoft.Extensions.Validation's path conventions; `MaxDepth` and synchronous-validation behaviour match the
+  platform. Full-fidelity errors are available through `ValidateContext.ZodReport` and an optional
+  `IZodValidationReportSink`; `StringLocalizerZodMessageFormatter` localizes messages (auto-enabled when an
+  `IStringLocalizerFactory` is registered, honouring `ValidationOptions.LocalizerProvider`); and
+  `ValidationOptions.ValidateAsync<T>` validates outside HTTP and Blazor. The platform's endpoint filter validates every
+  parameter a resolver claims, so `AddZodSharpValidation()` turns on minimal-API validation for ZodSharp-typed
+  parameters; `AddZodSharpValidation(configure, validateParameters: false)` and `ZodValidationOptions.ValidateParameters`
+  register type validation only. References the
+  `Microsoft.Extensions.Validation` package only - never the ASP.NET Core shared framework - so it works in
+  WebAssembly clients.
+- **`Purview.ZodSharp.Blazor`** (new package, `net11.0`): Blazor forms validated by ZodSharp on Blazor Server,
+  Blazor WebAssembly and Auto render mode. `AddZodSharpBlazor()` makes the standard `<DataAnnotationsValidator />`
+  validate `[ZodSchema]` models (form models only: it does not turn on minimal-API validation in the host; call
+  `AddZodSharpValidation()` as well for that) - nested objects, collections and dictionaries included - with no
+  `[ValidatableType]` and no Microsoft.Extensions.Validation generator, which is what nested validation in
+  WebAssembly needs. `<ZodValidator />` keeps the full error behind every message (`EditContext.GetZodErrors`),
+  validates on `Submit`, `Change` or debounced `Input` through the platform's async validation APIs (pending,
+  faulted, supersession), accepts a runtime `Schema` (`ZodModelSchema.For<TModel>`), can re-validate a field's
+  owning object (`ValidateNestedOnFieldChange`) and coexists with `DataAnnotationsValidator` without duplicating
+  messages. `<ZodValidationMessage>` and `<ZodValidationSummary>` match the built-in markup and add
+  `data-code`/`data-category`, path grouping and union details. `EditContext.AddZodProblemDetails` maps API validation
+  problems (read with `Purview.ZodSharp.Http`'s `TryReadZodValidationProblemAsync()`) onto fields, cleared per field on
+  change. Ships `zodsharp-validation.js`, browser validators that mirror the C# rules
+  (verified by a C#-to-JavaScript parity suite), registered through a Blazor JavaScript initializer.
+- **`Purview.ZodSharp.Http`** (new package, `net10.0` and `net11.0`, browser-safe): `HttpClient` integration for
+  WebAssembly and other clients. `PostAsJsonValidatedAsync`/`PutAsJsonValidatedAsync`/`PatchAsJsonValidatedAsync` and
+  `ZodJsonContent.Create`/`CreateAsync` validate a body before it is sent (an invalid value returns the errors and
+  sends nothing); `HttpContent.ReadFromJsonAndValidateAsync` reads and validates a response body, reporting unreadable
+  JSON as `invalid_json`; and the validation-problem contract (`ZodValidationProblemDetails`,
+  `ZodValidationProblemIssue`, `HttpResponseMessage.TryReadZodValidationProblemAsync()`, new `ToValidationResult<T>()`)
+  moved here from `Purview.ZodSharp.Blazor`, so a client without Blazor - or on `net10.0` - reads server validation
+  problems back into ZodSharp errors. Every API takes a `JsonTypeInfo<T>`; there are no reflection-based overloads. A
+  parity test proves every error field `Purview.ZodSharp.AspNetCore` writes (code, category, typed path, origin,
+  bounds, parameters, union options) reads back unchanged. Each send method, `ZodJsonContent.CreateAsync` and
+  `ReadFromJsonAndValidateAsync` has an overload taking an `IZodSchemaValidator<T>` and an `IServiceProvider`, so
+  service-aware rules (an async uniqueness check) run before a request is sent and as a response is read.
+- **`Purview.ZodSharp.SystemTextJson` is browser-safe** (`PurviewBrowserSafe`): trim, AOT and browser-unsupported APIs
+  fail its build, and Blazor WebAssembly clients may reference it. `DeserializeAndValidateAsync` and
+  `ValidateAndSerializeAsync` gain service-aware overloads on `IZodSchemaValidator<T>` (with a `JsonTypeInfo<T>` and an
+  `IServiceProvider`).
+- **`EditContext.AddZodErrors(errors)`** (`Purview.ZodSharp.Blazor`): places ZodSharp errors produced outside the form -
+  such as a `PostAsJsonValidatedAsync` that refused to send - onto its fields by their typed paths, sharing
+  `AddZodProblemDetails`'s store, replacement and clear-on-change behaviour.
+- **The Blazor sample uses `Purview.ZodSharp.Http` in both interactive render modes**: `RegisterCustomerForm` and the
+  typed `CustomerAPIClient` run on `/register` (WebAssembly, posting from the browser) and the new `/register-server`
+  (Interactive Server, a typed client from `IHttpClientFactory` calling the API service-to-service), covered by
+  integration tests against the API and by the browser end-to-end checks.
+- **Static-SSR client-side validation for ZodSharp rules.** On `net11.0`, `Purview.ZodSharp.AspNetCore` adds
+  `AddZodSharpClientValidation()`: statically rendered forms carry client rules for ZodSharp rule attributes
+  (`[StartsWith]`, `[UUID]`, `[IPAddress]`, `[MinValue]`, …), derived from each rule's `IZodRule` metadata, and for
+  registered runtime schemas, merged into ASP.NET Core's `data-rules` payload. It works before or after
+  `AddRazorComponents` and warns at startup in Development when a later registration replaces it.
+  `ZodClientValidationRules` exposes the mapping for custom `IClientValidationRuleProvider` attributes.
+- **Minimal APIs on .NET 11: full-fidelity ProblemDetails from the built-in validation pipeline.** On
+  `net11.0`, `Purview.ZodSharp.AspNetCore` now depends on `Purview.ZodSharp.Extensions.Validation` (that target
+  framework only). `AddZodSharpProblemDetails()` registers a scoped `ZodRequestValidationReport` (the bridge's
+  `IZodValidationReportSink`) and composes `ProblemDetailsOptions.CustomizeProblemDetails`. The ZodSharp callback
+  runs first, then any callback configured before or after it. It rewrites the pipeline's
+  `HttpValidationProblemDetails` with `ZodProblemDetailsWriter.Apply`: DataAnnotations entries are merged with
+  `dataannotations` issues, and the `ErrorType`, `StatusCodeSelector` and `StatusCodeOverride` status is mirrored
+  to the response. A DataAnnotations-only failure only gains the `issues` projection. Endpoints and route
+  groups validated by `AddZodSharpValidation()` therefore return the same body, byte for byte apart from
+  `traceId`, as the endpoint filter, `ZodExceptionHandler` and the manual results. `WithZodSharpValidation()`
+  on an endpoint the pipeline also validates skips the parameters the bridge covers, logged once at `Debug`, so
+  nothing is validated twice.
+- **`IZodMessageFormatter`** in `ZodSharp.Core`: formats an error's user-facing message for a culture at a host
+  boundary.
+- **`Purview.ZodSharp.AspNetCore.OpenApi`** (new package, `net11.0`). `options.AddZodSharp()` on
+  `OpenApiOptions` registers schema, operation and document transformers so the ASP.NET Core 11 OpenAPI
+  document (3.1 and 3.2) describes what ZodSharp enforces: lengths, bounds (exclusive bounds in the 3.1+ form),
+  `multipleOf`, integer narrowing, patterns (several promote to `allOf`), formats (including `[EmailAddress]`,
+  which the platform does not map), `enum`/`not`, `contentEncoding`, required members and `type: [x, "null"]`
+  nullability, with ZodSharp winning when a DataAnnotation disagrees. Polymorphic types are described with
+  `oneOf` + `discriminator`; C# unions keep the platform's `anyOf` and get their cases constrained. Rules with
+  no JSON Schema keyword are described with `x-zod-*` vendor extensions. Operations that bind a ZodSharp-validated
+  parameter list `400` (and `422` when a registered `ErrorType` uses it) as `application/problem+json` with the
+  shared `ZodValidationProblemDetails`/`ZodValidationIssue` components, merging into a declared
+  `ProducesValidationProblem()` response. Types ZodSharp does not know are left exactly as the platform produced
+  them.
+- **JSON Schema export.** `ToJsonSchemaConverter.ConvertUntyped(object)` converts a schema or validator known only
+  at runtime (including the `ZodSchemaValidator<T>`/`ZodUntypedValidator<T>` adapters, which now unwrap);
+  `JsonSchemaDefinition.GetVendorExtensions()`/`SetVendorExtension()` record `x-zod-*` information for hosts that
+  carry it, without changing the serialized JSON Schema. `ZodDiscriminatedUnion` exports as `oneOf` (it exported
+  the empty schema). `IPAddressRule` exports `format: ipv4`/`ipv6`, `DurationRule` `format: duration`,
+  `DateStringRule` `format: date`, `DatetimeStringRule` `format: date-time` plus its UTC pattern,
+  `TimeStringRule` its local-time pattern, and `Base64StringRule` `contentEncoding: base64`; `CidrRule`,
+  `JWTRule` and an any-family `IPAddressRule` stay listed as unsupported and record `x-zod-cidr`, `x-zod-jwt`
+  and `x-zod-ipVersion`.
+- **Source generator — field-level validation and member resolution.** Every generated `{Type}Schema` now has
+  `ValidateMember(value, memberName)`, `ValidateMemberAsync(value, memberName, services, ct)` and
+  `IsValidatableMember(memberName)` (the member's own rules only: no nested recursion, type rules,
+  `IValidatableObject` or refinement), `TryResolveMember(value, path, out container, out memberName)`
+  (reflection-free), `Paths.{Member}` `ZodPath` constants, a `JsonNames.Get(member)` table and
+  `ToJsonNamedPath(path, namingPolicy)`. `Validate` calls one method per member. The `{Type}SchemaValidator`
+  adapter implements `IZodMemberValidator<T>`, `IZodMemberResolver<T>`, `IZodUntypedValidator` and the new
+  `IZodJsonPathMapper`.
+- **Source generator — async graph.** `{Type}Schema.ValidateAsync(value, services, ct)` awaits nested schemas'
+  async validation and threads the caller's services; it completes synchronously when nothing in the graph is
+  asynchronous (`{Type}Schema.RequiresAsyncValidation` is a compile-time constant). A custom async method may take
+  `(T value, IServiceProvider services, CancellationToken ct)`, and `[ZodAsyncMember(nameof(X))]` makes
+  `ValidateMemberAsync` run it for that member only.
+- **Source generator — DataAnnotations inputs.** `IValidatableObject` runs after the members and type rules (as in
+  DataAnnotations and Microsoft.Extensions.Validation); on .NET 11 `IAsyncValidatableObject` and
+  `AsyncValidationAttribute` members run in `ValidateAsync`. `[Display(Name, ResourceType)]` reads the resource
+  property at runtime.
+- **Source generator — C# 15.** A member typed as a union dispatches to the active case's schema, and a member
+  typed as a closed class to the derived type's schema (paths do not include the union's `Value`).
+- **Source generator — trim-safe registration.** Each assembly gets
+  `ZodSharp.Generated.{Assembly}ZodSharpSchemas.Register(IZodSchemaFactory)` and, with dependency injection,
+  `services.AddZodSharp{Assembly}Schemas()`; both name every validator directly (no attribute scanning or
+  `Activator`). `AddZodSharpFactory` applies every `ZodSchemaRegistration` added with `AddZodSchemaRegistration`.
+- **Source generator — options.** On .NET 11 the generated `{Type}Validator` also implements
+  `IAsyncValidateOptions<T>` when the type has asynchronous rules.
+- `ZodValidationDepth` (`MaxDepth`, default 32): generated validators throw `InvalidOperationException` at the
+  limit, like Microsoft.Extensions.Validation, instead of overflowing the stack on a cyclic graph.
+- `ErrorType.Origin` (init-only); the generated `Create*` helpers apply it and the `MessageFormat`.
+- `RegexRule.DefaultMatchTimeoutMilliseconds`.
+- Diagnostics `ZODSGEN047` (redundant `[ValidatableType]`, with a code fix), `ZODSGEN048` (async-only rules
+  behind a synchronous `Validate`), `ZODSGEN049` (closed-hierarchy derived type without `[ZodSchema]`),
+  `ZODSGEN050` (generated options validator conflicts with `[OptionsValidator]`, SYSLIB1205),
+  `ZODSGEN051` (`[ZodSchema]` type in a Razor file), `ZODSGEN052` (an `ErrorMessage` placeholder the
+  attribute does not supply) and `ZODSGEN054` (a service-aware custom validation method whose second parameter is
+  not `IServiceProvider`; it was reported as `ZODSGEN009`, whose title is about the parameter count).
+- **Shared error identities.** `ZodIssueCodes` (codes), `ZodMessages` (named-placeholder templates),
+  `ZodIssues` (factories for null/invalid-type/missing-field/refinement/union/collection-size errors and the
+  `GetUnionErrors()` extension) and `ZodTypeNames` (`Of(Type)`/`OfValue(object)`: Zod type names such as
+  `string`, `number`, `array`) in `ZodSharp.Core`, so every producer reports the same failure identically.
+- **`ZodErrorOptions.IncludeReceivedValues`** (default `false`). When enabled, rule failures carry the raw input
+  as the `received` parameter. Development only; built-in messages never contain the input either way.
+- **`IZodFailureDescriber<T>` / `IZodStringFailureDescriber` / `ZodRuleFailure`.** A rule can describe the
+  value-dependent part of its failure (category by direction, `count`); `ZodRuleErrors` applies it.
+- **Structured rule identity.** Every built-in rule reports `Origin` (`string`, `number`, `date`, `enum`, …),
+  `Category` (the Zod v4 issue code), `Lower`/`Upper` bounds with the correct inclusivity, and parameters such as
+  `format`, `divisor`, `pattern`, `prefix`, `options`, `version` and `count`.
+- **`RefineCtx<T>.AddIssue(ValidationError)`** and **`AddIssue(code, message, ZodPath, parameters, category)`**,
+  plus `RefineCtx<T>.FullPath` and a `RefineCtx(T, ZodPath)` constructor.
+- `ZodIssueParameters.Format`, `Divisor`, `Pattern`, `Prefix`, `Suffix`, `Includes`, `Version` and `Key`.
+- `ZodMessageFormat` renders a sequence parameter (an options or keys list) as its elements joined by `, `.
+
+- **One ProblemDetails writer, `ZodProblemDetailsWriter`** (`Purview.ZodSharp.AspNetCore`). The endpoint filter,
+  `ZodExceptionHandler`, `ZodTypedResults` and every `ToHttpValidationProblemDetails`/`ToValidationProblemDetails`/
+  `ToValidationProblem` overload delegate to it, so all paths produce the same body (snapshot-tested). Public
+  `Create(ReadOnlySpan<ValidationError>|IEnumerable<ValidationError>, HttpContext?)`, `Apply(existing,
+  ReadOnlySpan<ValidationError>|IEnumerable<ValidationError>, ...)` (the sequence form takes an `ImmutableArray`
+  without copying, and neither form is ambiguous for arrays, lists or collection expressions)
+  (rewrites an existing `HttpValidationProblemDetails` and keeps non-ZodSharp `errors` entries, projected as
+  `dataannotations` issues), `WriteAsync(...)` (through `IProblemDetailsService`, so `CustomizeProblemDetails` runs)
+  and `GetOrCreate(IServiceProvider?)`.
+- **`WithZodSharpValidation()` for any `IEndpointConventionBuilder`**, including route groups. An endpoint filter
+  factory selects the parameters to validate when the endpoint is built (skipping services, `HttpContext`,
+  `CancellationToken`, `[FromServices]`, keyed services and `[SkipValidation]`), validates every one through
+  `IZodSchemaFactory.TryGetUntypedValidator`, keys errors like Microsoft.Extensions.Validation (complex parameters
+  unprefixed, sequences and root errors prefixed with the parameter name) and adds 400
+  `application/problem+json` response metadata for OpenAPI. `ZodEndpointValidationOptions` (`ThrowIfNoValidator`,
+  `OnBindingFailure`, `ProducesStatusCode`) and `ZodBindingFailureBehavior`.
+- **`ZodTypedResults.ValidationProblem(result|exception, HttpContext)`** (typed `ValidationProblem` for
+  `Results<…>` unions) and **`ZodTypedResults.Problem(...)`** (`ZodProblemDetailsResult`, keeps the computed status).
+  New `ToValidationProblem(HttpContext)`, `ToHttpValidationProblemDetails(HttpContext)` and
+  `ZodProblemDetailsOptions` overloads.
+- **`ZodProblemDetailsOptions`:** `PathNaming` (`ZodPathNaming.MemberName` default, or `Json` from the minimal-API
+  `JsonOptions` naming policy), `IncludeIssues`, `MergeParametersIntoExtensions` (default `false`),
+  `ProjectDataAnnotationsIssues`, `ErrorTypeResolver`, `DefaultStatusCode` and `StatusCodeOverride`.
+- **`ValidationIssue` serializes a Zod-style shape:** `path` (dotted key), `segments` (strings and integer
+  indexes), `code`, `category`, `origin`, typed `minimum`/`maximum` from `Lower`/`Upper` (numbers, or ISO-8601 for
+  dates), `inclusive`, `message`, safe camel-cased `parameters` and nested `unionErrors`. The CLR `Path`,
+  `Minimum`, `Maximum` and `Parameters` members are kept, unserialized.
+- **Native AOT:** the ProblemDetails payload has source-generated JSON metadata, added to the minimal-API
+  `JsonOptions` by `AddZodSharp`/`AddZodSharpProblemDetails`.
+- **`IZodMessageFormatter` and `DefaultZodMessageFormatter`** (core). The writer renders messages through the
+  registered formatter in `CultureInfo.CurrentUICulture`; without one, messages are used as produced.
+- **`ZodPathNaming`** (core): `MemberName` or `Json`, shared by every host.
+- **Options validation on .NET 11:** `ZodSchemaOptionsValidator<T>` implements `IAsyncValidateOptions<T>`, so
+  `ValidateOnStart()` runs asynchronous and service-aware rules (in a scope); `OptionsBuilder<T>.AddZodSchemaValidator`
+  registers through `Validate<TValidator>()`. New `AddZodSchemaValidator(missingValidatorBehavior, validateOnStart,
+  configurationSection)` overload, `BindAndValidateWithZod(section)` (AspNetCore package) and
+  `ZodValidateOptionsResult` (the failure with its full `Errors`). `Microsoft.Extensions.Options` 11 on net11.0.
+- **Examples.MinimalApi sample** (`src/src/Examples.MinimalApi`, `net11.0`, not packed), with its `[ZodSchema]`
+  request models in `src/src/Examples.Shared` for reuse by later samples. It shows generated trim-safe registration
+  (`AddZodSharp{Assembly}Schemas()`), route groups validated by the .NET 11 pipeline (`AddZodSharpValidation()`), the
+  `WithZodSharpValidation()` filter, a manual `ZodTypedResults.ValidationProblem`, a service-aware async uniqueness
+  rule, async options validation on start, French messages, the OpenAPI transformers and an `.http` file. It
+  publishes with `PublishAot=true` and zero IL2xxx/IL3xxx warnings: a new `aot-sample` PR job publishes it for
+  `linux-x64` with `-warnaserror` and smoke-tests the native binary, `just publish-aot-sample` runs the same publish
+  locally, and `Examples.MinimalApi.IntegrationTests` starts it in memory.
+- **Examples.Blazor sample** (`src/src/Examples.Blazor` and its WebAssembly client `src/src/Examples.Blazor.Client`,
+  `net11.0`, not packed): a Blazor Web App over the same `Examples.Shared` models (plus a new `ReturnRequest` with
+  `[StartsWith]` and `[UUID]`). An interactive Server form uses `<DataAnnotationsValidator />` over a nested address,
+  order lines and a dictionary of addresses; an interactive WebAssembly form uses `<ZodValidator>` with debounced
+  `Change | Input` validation, `ZodValidationMessage` codes, a service-aware async uniqueness check with
+  `IsValidationPending`, and server ProblemDetails mapped back with `AddZodProblemDetails`; a static-SSR form gets
+  ZodSharp client rules from `AddZodSharpClientValidation()`. Messages switch between English and French. Both
+  `Program.cs` files register with `AddZodSharpZodSharpExamplesSharedSchemas()` and `AddZodSharpBlazor()`.
+  `Examples.Blazor.IntegrationTests` covers the client rules, the posted static-SSR form and the API contract.
+- **WebAssembly CI:** the `wasm-trimmed` PR job publishes the client trimmed with `-warnaserror` (zero IL2xxx/IL3xxx
+  warnings) and holds the Brotli size of every `Purview.ZodSharp*` assembly to `.config/wasm-size-baseline.json`
+  within 10% (`scripts/check-wasm-size.ps1`, `just wasm-size`). A nightly workflow (`wasm-nightly.yml`, also on
+  demand) publishes it with `RunAOTCompilation=true` and drives the published sample in Chromium, one form per render
+  mode.
+- **`ZODSUP001`, a CA1849 suppressor.** The analyzer package now suppresses CA1849 ("call async methods when in an
+  async method") for ZodSharp's synchronous validation entry points: generated `Validate`/`ValidateMember`, the
+  generated and core validator adapters, and the fluent schemas. An async method can call the cheap synchronous path
+  without a warning, and the suppression is by call target rather than by rule, so `Task.Wait`, `Thread.Sleep` and
+  another library's `Validate`/`ValidateAsync` pair still report CA1849.
+- **Strict deserialization reports the member path.** A converter that rejects a value with
+  `new JsonException(message, zodException)` - the contract Purview.ValueObjects' strict converters adopt - now
+  surfaces the `ZodException`'s errors under the member that held the value, exactly as validating the hydrated model
+  does: `CustomerEmail.Value` and `"Field 'CustomerEmail' ..."` instead of `Value` and `"Field 'Value' ..."`. JSON names
+  in System.Text.Json's `JsonException.Path` are mapped back to member names through the root contract's metadata
+  (no reflection); collections keep their indexes and dictionary entries become key segments.
+  - **`ZodJsonExceptions`** (core, `ZodSharp.Core`): `TryGetErrors`, `TryReroot`, `Reroot` and `ToMemberPath`.
+  - **`DeserializeAndValidate*`** (SystemTextJson) and **`ReadFromJsonAndValidateAsync`** (Http) return those errors
+    rather than `invalid_json`.
+  - **`ZodExceptionHandler`** also handles a `BadHttpRequestException`/`JsonException` chain carrying a
+    `ZodException`, mapping names through the endpoint's body contract (`IAcceptsMetadata`); any other bad request is
+    still left to the next handler.
+  - **.NET 11:** minimal-API binding writes its own validation problem for an unreadable body (keyed by `$.customerEmail`,
+    quoting the converter's message); `AddZodSharpProblemDetails` now rewrites it with the ZodSharp errors when the
+    exception carries a `ZodException`. Other binding problems are unchanged.
+  - **`ZodProblemDetailsOptions.HandleBindingFailures`** (default `false`): sets `RouteHandlerOptions.ThrowOnBadRequest`
+    so .NET 10 Production binding failures reach the handler; non-ZodSharp ones are answered with their own status and
+    a standard ProblemDetails body. A bare `ZodException` is handled exactly as before.
+### Breaking behaviour changes
+
+- **Dropped net8.0 and net9.0; supported target frameworks are net10.0 and net11.0.** Every package ships
+  `lib/net10.0` and `lib/net11.0` only (the .NET 11 integrations stay `net11.0`-only); the source generator and
+  analyzers stay on `netstandard2.0`. The `Microsoft.Extensions.*` dependency lines for 8.x and 9.x are gone, and
+  the net8.0-only trim suppressions were replaced by the feature guards every remaining target understands.
+- **Newly annotated APIs (not binary breaks; trimmed and AOT applications now get IL2026/IL3050 at the call site).**
+  `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` were added to: every `Purview.ZodSharp.NewtonsoftJson` API
+  that reaches Newtonsoft serialization (`NewtonsoftJsonExtensions.DeserializeAndValidate`,
+  `DeserializeAndValidateAsync`, `ValidateAndSerialize`, `ValidateAndSerializeAsync`, `CreateValidatingConverter`,
+  `Z.FromJsonSchema`, `FromJsonSchemaParser.Parse`, the `JsonSchemaSerializerOptions` class) - use
+  `Purview.ZodSharp.SystemTextJson`; `AddZodSharpAssemblyGraph` (all overloads) and
+  `ZodSchemaFactoryOptions.ScanAssemblyGraphs` - use the generated `AddZodSharp{AssemblyId}Schemas()` or
+  `AddZodSharpAssembly`; `ZodModelSchema.For<TModel>(ZodObject)` (Blazor) - use a `[ZodSchema]` validator or
+  `For<TModel>(IZodSchema<TModel, TModel>)`; `AddZodSharpClientValidation`, `ZodClientValidationProvider` and
+  `ZodClientValidationRules.FromAttribute` (static-SSR client validation needs `AddRazorComponents`, itself not
+  trim-compatible) - use `ZodClientValidationRules.For(IZodRule)`/`FromRule`. `BindAndValidateWithZod` keeps its
+  annotations and now names `ValidateWithZod`.
+- **`ZodDiscriminatedUnionBuilder.Option<T>`'s `T` is annotated `[DynamicallyAccessedMembers(PublicProperties)]`.**
+  Generic code that forwards an unannotated type parameter to it gets IL2091 when trim-analyzed.
+- **Reflection fallbacks are removed when trimming.** With `PublishTrimmed` or `PublishAot` (including Blazor
+  WebAssembly, which trims by default), `ZodSharp.Reflection.IsSupported` is `false`: a discriminated union reports
+  a POCO whose type was not added with `Option<T>` as missing its discriminator; the Blazor and
+  Microsoft.Extensions.Validation field walkers no longer place errors from a validator that does not resolve
+  members itself (generated validators do), so such an error stays on the nearest resolved object or the model;
+  and assembly reference-graph scanning registers nothing. Untrimmed applications are unchanged.
+- **The discriminator accessor cache is per union instance** rather than process-wide, so two unions over the same
+  type no longer share a cached accessor.
+- **ProblemDetails no longer copies error parameters to the top level.** In 2.4 every error's parameters were also merged (camel-cased, last error wins) into the root of the ProblemDetails body. They are now only written per issue, in `issues[].parameters`. Set `ZodProblemDetailsOptions.MergeParametersIntoExtensions = true` to restore the old top-level copy.
+- **`[Required]` on a string now matches `RequiredAttribute`** (source generator, defect G1). The generated
+  check was inverted: the default (`AllowEmptyStrings = false`) only rejected `null`, so `""` passed, while
+  `AllowEmptyStrings = true` rejected `""`. The default now rejects `null`, `""` and whitespace-only text, and
+  `AllowEmptyStrings = true` rejects only `null`. *Migration:* a model that relied on `""` passing a bare
+  `[Required]` must either supply a value or set `AllowEmptyStrings = true`.
+- **Generated error messages are formatted at runtime** from a named template kept in
+  `ValidationError.MessageFormat`, with `displayName`, `member`, `declaringType` and the rule's values in
+  `Parameters`. Attribute-specific texts are unchanged; positional placeholders in a custom `ErrorMessage` keep
+  their DataAnnotations meaning. Shared failures now use the runtime schemas' identity:
+  - `[Required]`: `"{displayName} is required"` (was `"Required field '{0}' is null"`), category `invalid_type`.
+  - A null non-nullable member, a null root and a rejected null element: `"Expected {expected}, received null"`
+    (was `"Field '…' cannot be null"`, `"Value cannot be null"`, `"Field '…' cannot contain null …"`).
+  - `ApplyAnd`/`ApplyOr`/`ApplyRefine` failures: code `refinement_failed`, category `custom` (was
+    `validation_failed`).
+  - `[StringLength]`/`[Length]` on a string report the runtime rules' code `invalid_length` (was
+    `too_small`/`too_big`), with the direction in `Category` and both bounds.
+- **Typed generated paths.** Collection and dictionary errors are located with index and key segments
+  (`Items[0].Name`, `Map["a.b"].Value` from `FullPath.ToDottedString()`); keys are rendered with the invariant
+  culture. Nested re-pathing keeps every field of the nested error.
+- **`[Range]`** reports `Category` `too_small`/`too_big`, origin from the value's Zod type and `Lower`/`Upper`
+  with `MinimumIsExclusive`/`MaximumIsExclusive` honoured. **`[Length]`'s custom message** binds `{1}` to the
+  minimum and `{2}` to the maximum, like `LengthAttribute` (it was swapped).
+- **Generated options validators** report `"{path}: {message} ({code})"` per failure (was the message only).
+- **Async-only inputs fail loudly**: a synchronous `Validate` of a type with an `AsyncValidationAttribute` member or
+  `IAsyncValidatableObject` throws `InvalidOperationException`.
+- **Nested types' async rules run**: `ValidateAsync` now awaits nested schemas, so a nested type's custom async
+  method reports its errors (under the member's path) where they were silently dropped.
+- **Index paths.** `ZodArray` and `ZodTuple` element errors are located with typed index segments; the legacy
+  `ValidationError.Path` renders them as `"0"` (was `"[0]"`), matching Zod. `FullPath.ToDottedString()` renders
+  `Items[0].Name`.
+- **Tuple element errors are prefixed with their index** (they were reported at the tuple root).
+- **Null messages** are `"Expected {type}, received null"` for strings, arrays, records, objects, enums, tuples and
+  discriminated unions (were `"Expected array, but got null"` and similar).
+- **Invalid-type messages use Zod type names** (`"Expected number, received string"`), never CLR names such as
+  `Int32`, `Double` or `JsonElement`; `expected`/`received` parameters carry the same names.
+- **Missing fields:** `ZodObject` reports `"{key} is required"` (was `"Required field '{key}' is missing"`), category
+  `invalid_type`. `RequiredRule` reports `"Value is required"` (was `"Field is required"`) with the shared
+  `"{displayName} is required"` template as `MessageFormat`; its `{0}` placeholder is now the display name.
+- **Unrecognized keys:** a strict object reports one `unrecognized_keys` issue at the object's path with a `keys`
+  parameter (was one `unrecognized_key` issue per key, at the key's path).
+- **Unions** report per-option issues under `unionErrors` (`ImmutableArray<ImmutableArray<ValidationError>>`) instead
+  of a flattened mutable list under `errors`; typed and native unions now keep them (they were discarded) and name
+  the options with Zod type names. Category `invalid_union`.
+- **Discriminated unions** report `missing_discriminator`/`invalid_discriminator` at the discriminator's path with
+  `discriminator` and `options` parameters, list options in declaration order, and no longer echo the received
+  discriminator value.
+- **Enums and literals** no longer echo the received value (`"Expected one of: a, b"`, `"Expected literal 1.5"`);
+  `ZodEnum` lists its options in ordinal order; `ZodNativeEnum` reports exactly what `EnumRule` reports.
+- **Array size messages:** `Min`, `Max` and `Length` keep separate custom messages (a shared one reported the wrong
+  message), and the defaults report the count (`"Array must have at least 2 elements, but got 1"`).
+- **Default rule messages no longer contain the input** (email, credit card, JWT, phone, compare, starts/ends
+  with, includes, regex, UUID/GUID and every other string format, allowed/denied values, null-or-non-whitespace).
+  A custom message can still use the positional placeholders. `UUIDRule` custom and default messages now receive
+  the same arguments (`{0}` value, `{1}` version as an integer); `RegexRule`'s `{0}` is the pattern, as documented.
+- **Number rule defaults no longer contain the input either.** `RangeRule`, `MultipleOfRule`, `IntRule`,
+  `SafeIntegerRule`, `MinValueRule`/`MaxValueRule`, `GreaterThanRule`/`LessThanRule` (and their `OrEqual`
+  forms), `EvenRule`, `OddRule` and `FiniteRule` read `"Value must be between 1 and 10"`,
+  `"Number must be a multiple of 5"`, `"Expected integer, received float"`, `"Value must be at least 3"` and so on
+  (was `"…, but got 11"`); `EnumRule` reads `"Value is not a defined member of Colour"` (was `"'42' is not …"`).
+  The value is still passed in the same position, so a custom message using `{1}` (or `{2}` for `RangeRule`) is
+  unchanged.
+- **Every built-in rule reports a `MessageFormat`.** Runtime-schema errors (`Z.String().Min(3)`, `.Email()`,
+  `.Regex()`, `Z.Number().Range()`, …) carried `MessageFormat = null`; each rule now implements
+  `IZodRule.MessageFormat` with a named template (`"String must be at least {minimum} characters long, but got
+  {count}"`) and the `IZodRule.Parameters` it needs, so `DefaultZodMessageFormatter` and
+  `StringLocalizerZodMessageFormatter` localize them by template. A custom message is reported with its positional
+  placeholders renamed (`"At least {0}"` → `"At least {minimum}"`; the value's position becomes `{received}`). The
+  count rules report `count`, and `CountRangeRule` the `too_small`/`too_big` category by direction.
+- Rules no longer store their default message as the custom message (`message.Or(MessageFormat)`), so a rule built
+  without a message and `default(TRule)` behave the same.
+- `ZodIntersection` reports an issue raised identically by both sides once.
+- Refinement and `SuperRefine` issues carry category `custom`; `ZodTransform` failures carry category `custom`.
+
+
+- **JSON read failures use one code, `invalid_json`.** `DeserializeAndValidate`/`DeserializeAndValidateAsync`
+  in both JSON packages used to report `json_error` (with the serializer's exception text in the message) or
+  `deserialization_failed` (for a `null` document). Every failure to read the JSON now reports a single
+  `invalid_json` error (`SystemTextJsonExtensions.InvalidJsonCode`, `NewtonsoftJsonExtensions.InvalidJsonCode`)
+  with category `invalid_type` and the fixed message `"The JSON value could not be converted to {expected}."`,
+  where `expected` is a Zod type name. The serializer's message is no longer surfaced, because it names CLR
+  types and can quote the input.
+- **Validating converters throw a structured exception.** The System.Text.Json converter throws
+  `ZodJsonValidationException` (a `JsonException`) and the Newtonsoft converter throws
+  `ZodNewtonsoftJsonValidationException` (a `JsonSerializationException`). Both still carry the
+  `"Validation failed: …"` message, so existing `catch` blocks keep working, and `DeserializeAndValidate` now
+  returns the schema's full errors instead of one flattened message.
+- **JSON Schema import messages describe JSON kinds.** Type mismatches read `"Expected string, but got number"`
+  instead of naming `JsonElement`/`JToken`/CLR types, `minItems`/`maxItems` failures read
+  `"Array must have at least 2 elements, but got 1"` (matching `ZodArray`), and a literal mismatch no longer
+  echoes the received value.
+
+- **ProblemDetails messages from an `ErrorType.MessageFormat`** replace the error's message only when every
+  placeholder resolves (from parameters or the built-ins `path`, `code`, `origin`, `minimum`, `maximum`,
+  `displayName`); a partly-filled template used to be returned with `{placeholders}` left in.
+- **`StatusCodeSelector` wins.** It runs after the highest `ErrorType.HttpStatus` is computed (it was overridden by
+  it, contrary to the docs).
+- **With `MergeParametersIntoExtensions` enabled, parameters are merged into the top-level extensions on every
+  overload** (they were merged only by the registry/lookup overloads), and only safe scalar values are serialized. A parameter whose camel-cased name is a
+  reserved member (`type`, `title`, `status`, `detail`, `instance`, `errors`, `issues`, `traceId`) is written as
+  `param_{name}`. `issues[].parameters` keys are camel-cased (they kept the raw key).
+- **`issues[].path` is the dotted key** (`"Items[0].Quantity"`, was a string array); the array is `segments`, with
+  integer indexes. `minimum`/`maximum` come from the typed bounds.
+- **`traceId` is on every path** and matches ASP.NET Core's writer: `Activity.Current?.Id`, else
+  `HttpContext.TraceIdentifier` (the exception handler used `TraceIdentifier` only).
+- **The endpoint filter honours `ZodProblemDetailsOptions` and `ErrorTypeRegistry`** (it always answered 400), writes
+  through `IProblemDetailsService`, and validates every matching argument (only the first was validated).
+  `WithZodSharpValidation<T>()` resolves the validator when the endpoint is built and fails then - naming the
+  handler and parameter - when no factory or validator is registered (it threw on every request).
+- **MVC `ValidationProblemDetails` copies every extension** (only `issues` was copied).
+- **`ToValidationProblem()` returns a `ProblemHttpResult` that keeps the computed status** (it was always 400).
+- **Options failures name the setting:** each failure reads `{name}: {path}: {message} ({code})`, with the
+  configuration key (`Smtp:Servers:0:Host`) when a section was recorded; the name is omitted for the default
+  options name. `OptionsBuilder<T>.AddZodSchemaValidator()` validates only the builder's options name (it validated
+  every name).
+### Deprecated
+
+- **The option-less ProblemDetails conversion overloads** (`Purview.ZodSharp.AspNetCore`), for both
+  `ValidationResult<T>` and `ZodException`: `ToHttpValidationProblemDetails(int)`, `(ErrorTypeRegistry, int)`,
+  `(Func<string, ErrorType?>, int)`, the matching `ToValidationProblemDetails` overloads, and
+  `ValidationResult<T>.ToValidationProblem()`. They take neither options nor a request, so they cannot see the
+  `ZodProblemDetailsOptions` an application configures, and their body diverged from the exception handler and the
+  endpoint filter (`FormatMessages`, `PathNaming`, `IncludeIssues`, status selectors). There is no ambient options
+  instance they could read without a request, so rather than guess they keep their 2.x output, now documented
+  exactly, and are `[Obsolete]` (CS0618) with a pointer to the `HttpContext` and `ZodProblemDetailsOptions` overloads.
+  Nothing changes at runtime. See the upgrade note.
+### Fixed
+
+- **Generated validators compile for member types with their own equality operators.** The generator tested for null
+  with `value.Member == null` (and `!= null`), which binds a user-defined operator when the member type declares
+  one. A `[Required]` `Nullable<T>` member whose type defines `==(string?, T)` and an implicit conversion to `string`
+  (every string-backed Purview.ValueObjects scalar does) failed to compile with CS9342 (ambiguous between
+  `==(string?, T)` and `==(T, T)`), and a reference type with a `==(T?, string?)` overload failed the same way.
+  Every generated null test is now a pattern (`is null`, `is not null`), which never binds an operator; the
+  remaining value comparisons already go through `EqualityComparer<T>.Default` or `CompareTo`. **2.x is affected
+  too** (2.4.2 emitted the same comparison).
+- **Blazor WebAssembly AOT publishes a scalar value object with a type-level rule.** For an adapted rule (a
+  Purview.ValueObjects scalar with `[NonSentinel]` or another type-level `[ZodRule]`) and for a required rule the
+  generator passed the rule's identity as `(object)rule as IZodRule`, a runtime type test on a boxed struct that
+  crashed the Mono AOT compiler (`Precompiling failed ... exit code -1073741819`, 0xC0000005) under
+  `RunAOTCompilation=true`. The generator knows whether the rule implements `IZodRule`, so it now emits a direct cast
+  `(IZodRule)rule`, or `null` when the rule has no identity; no emitted code type-tests a value type against an
+  interface. The packed-consumer gate's Blazor WebAssembly consumer now carries such a scalar, so its AOT publish
+  proves it.
+- **Blazor places an error inside a struct member on the owning field.** An error inside a value object on a form
+  model (`Email.Value`, where `Email` is a struct) resolved to the struct itself. A boxed copy of a struct cannot be a
+  `FieldIdentifier` model (the constructor throws), so with `<DataAnnotationsValidator />` (any host) and with
+  `<ZodValidator>` on Blazor Server the form was invalid but the message was dropped, and with `<ZodValidator>` on
+  WebAssembly it reached only the summary. The generated `TryResolveMember`, the Microsoft.Extensions.Validation
+  bridge's `Container`/`Name`, and the Blazor field locator (used by `<ZodValidator>` and `AddZodProblemDetails`)
+  now attribute such an error to the nearest reference-type owner and its member, `FieldIdentifier(model, "Email")`;
+  a struct element of a collection is attributed to the collection member. The error's path is unchanged.
+  `ZodGeneratedValidation.ResolveToReferenceOwner` is the new generated-code helper.
+- **ProblemDetails no longer sends CLR type names to API clients.** Generated validators attach `declaringType` (the
+  full CLR name of the declaring type) and `member` to every error, for localization, and `issues[].parameters` (and
+  the top level, with `MergeParametersIntoExtensions`) carried both. They are now left out by default: they stay on
+  `ValidationError.Parameters`, the issue's `path` already names the member, and the new
+  `ZodProblemDetailsOptions.IncludeDiagnosticParameters = true` writes them again. `displayName` is still sent.- **A scalar value object's messages name the owning member.** A nested Purview.ValueObjects scalar's errors read
+  "Field 'Value' ..." (its own member); they now use the owning member's display name ("Email is required", or the
+  member's `[Display(Name)]`), through the new `ZodGeneratedValidation.AddNested`/`WithNested` overloads that take the
+  owning member. The `displayName` parameter is renamed too, and a message produced from the error's template is
+  re-formatted; `member` and `declaringType` still name the value object's member, and a rule's own message text is
+  kept. A struct that is not a scalar keeps its members' names.
+- **A multi-project solution's OpenAPI document no longer crashes with "An item with the same key has already been
+  added. Key: T:ZodSharp.Core.ErrorTypeAttribute".** The generators emitted `ZodSharp.ZodSchemaAttribute` and
+  `ZodSharp.Core.ErrorTypeAttribute` - public, with XML documentation - into every compilation as
+  post-initialization output, which every other generator sees. So every project in a solution documented the same
+  type IDs. The ASP.NET Core OpenAPI XML-comment generator (`Microsoft.AspNetCore.OpenApi` 10 and later, referenced
+  directly) reads an app's own documented public *and internal* types plus the XML file of every referenced project,
+  emits one `cache.Add` per entry, and threw the first time `/openapi/v1.json` was requested. `[Embedded]` already
+  kept the copies from colliding at compile time (no CS0436), but not in documentation. Making the copies `internal`
+  would not have helped either, because the generator also reads internal types and the XML file still documents
+  them. Both attributes are now defined once, in `Purview.ZodSharp`. The generators emit no marker types (and no
+  `Microsoft.CodeAnalysis.EmbeddedAttribute`) into a consumer compilation. This is binary compatible: the package
+  already exposed both types, with the same members, as generated `[Embedded]` copies. **2.x is affected too**
+  (reproduced with 2.4.2 on `net10.0` and Microsoft.AspNetCore.OpenApi 10.0.13): any app whose OpenAPI XML-comment
+  generator reads a referenced ZodSharp project's XML documentation file. A per-assembly generated type
+  (`ZodSharp.Generated.{Assembly}ZodSharpSchemas`, `{Assembly}ZodSharpServiceCollectionExtensions`,
+  `{Type}Schema` with its `Paths`/`JsonNames`, `{Type}SchemaValidator`) is named for its assembly or type, so it
+  cannot collide. The built-in rule attributes are compiled into `Purview.ZodSharp`, and only a rule declared in the
+  compilation gets a generated attribute. The packed-consumer gate (`just smoke-packed-consumers`) adds a
+  multi-project consumer: a `[ZodSchema]`/`[ErrorType]` class library under a minimal API with XML documentation and
+  a direct Microsoft.AspNetCore.OpenApi reference. It failed with this error before the fix.
+- **`Purview.ZodSharp.AspNetCore.OpenApi` alone is enough to call `AddOpenApi`.** A consumer that installed only
+  `Purview.ZodSharp.AspNetCore.OpenApi` (as its README shows) got Microsoft.AspNetCore.OpenApi's source generator,
+  transitively, but not its `build/` targets, which enable the generator's interceptors, so `AddOpenApi(...)` failed
+  to compile with CS9137. The package now ships `buildTransitive/Purview.ZodSharp.AspNetCore.OpenApi.targets`, which
+  adds the same `InterceptorsNamespaces` entry and nothing else; a direct Microsoft.AspNetCore.OpenApi reference keeps
+  working. Found by the new packed-consumer release gate (`just smoke-packed-consumers`), which builds a Native AOT
+  minimal API against the packed packages only.
+- **Referencing both JSON packages no longer makes option-less calls ambiguous.** Both packages declare
+  `DeserializeAndValidate`, `DeserializeAndValidateAsync`, `ValidateAndSerialize` and `ValidateAndSerializeAsync` in
+  namespace `ZodSharp` with an optional options/settings parameter, so `schema.DeserializeAndValidate(json)` failed
+  with CS0121. `Purview.ZodSharp.SystemTextJson` adds option-less overloads (and `CancellationToken`-only stream
+  overloads), which win, so those calls resolve to System.Text.Json; a call that passes Newtonsoft settings still
+  resolves to Newtonsoft. No existing member changed. `CreateValidatingConverter(schema)` has one signature in both
+  and stays ambiguous: call `NewtonsoftJsonExtensions.CreateValidatingConverter(schema)` or
+  `SystemTextJsonExtensions.CreateValidatingConverter(schema)`.
+- **Generated collection size failures report the Zod origin.** `[MinLength]`/`[MaxLength]`/`[Length]` (and
+  `[MinCount]`/`[MaxCount]`/`[CountRange]`) on a `List<T>` or other collection reported `Origin = "collection"`,
+  which no other producer uses; they now report `array` (`record` for a dictionary), like `ZodArray`, `ZodRecord`,
+  the count rules and the generator's own null-element errors. *Behaviour change* for code matching `"collection"`.
+- **Generated `[Range]` parameters are typed.** A number range's `minimum`/`maximum` parameters were strings
+  (`"1"`), so `issues[].parameters` in ProblemDetails carried JSON strings. They are now numbers of the member's type
+  (`1`, `0.5`); messages are unchanged. A converted non-number range (dates, times) keeps the declared text.
+- **OpenAPI: enums follow the application's System.Text.Json settings.** An enum's `enum` values were always
+  numbers (the generator cannot see a global `JsonStringEnumConverter`), so a document for an API that writes
+  member names described values it never sends. They are now written as System.Text.Json writes them: numbers by
+  default, and member names (with the converter's naming policy) when a `JsonStringEnumConverter` applies globally or
+  to the enum type.
+- **OpenAPI: the `ZodValidationIssue` `code` and `category` descriptions were swapped.** `code` was described as the
+  Zod issue code; it is the ZodSharp error code, and `category` (now described) carries the Zod issue code.
+- **`ZODSGEN011` says `CancellationToken` must be the *last* parameter** (it said "second", which is wrong for the
+  service-aware three-parameter form).
+- **Source generator: `[ZodSchema]` types with the same simple name no longer fail with `ZODSGEN001`.** Two types
+  named `Widget` in different namespaces (or two nested `Item` types in different containing types) produced the
+  same hint name, so generation failed for the compilation. Each schema's outputs are now named by its namespace,
+  containing types and name (`Alpha.WidgetSchema.g.cs`, `Alpha.Outer.ItemSchema.g.cs`), deterministically.
+- **`Z.String().Required()` reports a resolvable template.** Its `"{displayName} is required"` `MessageFormat` had
+  nothing to resolve `displayName` from at the root, so a host re-formatting it got the placeholder back.
+  `ZodMessageFormat`'s built-in `displayName` now falls back to `"Value"` (matching the message) when the path has
+  no member segment; under a member it still names the member.
+- **The `ZodSharp*` MSBuild switches now reach the generator and analyzers.** They were read with the key
+  `build_property:Name`, but the compiler exposes a `CompilerVisibleProperty` as `build_property.Name`, so
+  `ZodSharpAutoGenerateOptionsValidators`, `ZodSharpAutoGenerateOptionsValidatorSuffixes`,
+  `ZodSharpGenerateJsonSchemas`, `ZodSharpEnumSerialization`, `ZodSharpEnumNamingPolicy`, `ZodSharpAllowNulls` and
+  `ZodSharpDateTimeOffsetSerialization` set in a project file had no effect. `DisableErrorTypeGenerator` is now
+  declared compiler-visible by `buildTransitive/Purview.ZodSharp.props` too. *Behaviour change:* a project that
+  already sets one of these switches now gets the behaviour it asked for.
+- Source generator: a custom `ErrorMessage` containing `{1}` or a stray brace no longer fails the build or throws at
+  validation time (G2, G14); `[Display(ResourceType)]` is honoured (G19); `[JsonPropertyName]` is available to
+  hosts through `JsonNames`/`ToJsonNamedPath` (G3); allowed/denied enum values are listed by name (G17); custom
+  string rules and enum rules report an origin (G16, G18); `IValidatableObject` is no longer ignored (G23);
+  cyclic graphs no longer overflow the stack (G24); a rule without constructor arguments no longer breaks the
+  generated JSON Schema.
+- Re-pathing an element, field, catchall, record value or tuple element error no longer drops its origin,
+  bounds, inclusivity, category or message format (`WithPathPrefix` everywhere).
+- `ZodArray.Min(2).Max(5)` reported a too-small failure with the maximum's message.
+- A null tuple element is handed to the element schema when the element type can hold `null`.
+- `GreaterThanRule`/`LessThanRule` report exclusive bounds; `SafeIntegerRule` reports `invalid_type` for a
+  fraction and `too_small`/`too_big` by direction (was always `too_big`), in both its `Category` and its `Code`
+  (the code stayed `too_big` below the range). A code given to the rule is kept. The new
+  `ZodRuleFailure.Code` lets any `IZodFailureDescriber<T>` choose a direction-dependent code the same way.
+- `ZodString` span validation reports the rule's full structured identity.
+- `default(IPAddressRule)` no longer formats a `null` message.
+
+
+
+- **JSON read failures keep their location.** The serializer's path becomes the error's `FullPath`
+  (`$.items[1].age` and Newtonsoft's `items[1].age` both become `items[1].age`), and its line and position
+  become the `line` and `position` parameters. The path is the serializer's: a value that cannot be converted, or
+  a syntax error while reading a value (`"age":}`), is located at the value (`items[1].age`); a System.Text.Json
+  syntax error between members (`"age":1,}`) is located at the element being read (`items[1]`), and one inside a
+  value read by a validating converter at the converted value, because that value is buffered first.
+- **JSON read failures under a validating converter keep the full path.** A value that could not be converted
+  inside a value read by `CreateValidatingConverter` (both JSON packages) was reported at its path within that
+  value (`Age`); it is now reported under the converted value's path too (`items[1].age`).
+- **`invalid_json` names the expected type in more places.** `expected` is found through list, array and
+  dictionary element contracts, and binary members (`byte[]`, `Memory<byte>`) are `string`.
+- **System.Text.Json `NotSupportedException` and `InvalidOperationException`** thrown while deserializing are
+  reported as `invalid_json` instead of escaping `DeserializeAndValidate`.
+- **Validating-converter errors keep every field and their path**, located under the converter's JSON path
+  (`Owner.Name` for a failing nested `Owner`), including when validating converters are nested.
+- **Newtonsoft `DeserializeAndValidateAsync` validates asynchronously.** It called the synchronous `Validate`,
+  so asynchronous refinements never ran; it now awaits `ValidateAsync`.
+- **JSON Schema import paths and metadata.** Array element and record value errors are re-pathed with typed
+  index and key segments and keep every field (origin, bounds, category, parameters); `minItems`/`maxItems`
+  failures carry origin `array`, both bounds, inclusivity and the `too_small`/`too_big` category, like
+  `ZodArray`. A Newtonsoft `JValue` is no longer treated as an empty array.
+
+- **ASP.NET Core (D1-D12):** dotted ProblemDetails keys with escaping, complete-template-only message formatting,
+  consistent parameter handling, reserved-name protection, filter/registry parity, `FormatMessages` honoured,
+  selector precedence, full MVC copies, a safe issue DTO, .NET 11 binding failures passed through (a route, query,
+  header or form binding failure keeps ASP.NET Core's 400 unless `OnBindingFailure = ConvertToProblemDetails`), and
+  every argument validated with a build-time registration check.
+- **Options (O1):** failures keep their path, code and options name; asynchronous rules run at startup on .NET 11.
+
+### Upgrade notes
+
+Each note names the old form, the new form, and the edit to make.
+
+- **Target frameworks.** `net8.0`/`net9.0` → `net10.0`/`net11.0` only. Retarget the consuming project to `net10.0` or
+  later, or stay on 2.4.x.
+- **Trim/AOT annotations.** The APIs listed under *Breaking behaviour changes* now raise IL2026/IL3050 in a trimmed
+  or AOT build. Move to the named alternative: `Purview.ZodSharp.SystemTextJson` with a `JsonTypeInfo<T>` instead of
+  Newtonsoft; the generated `AddZodSharp{Assembly}Schemas()` or `AddZodSharpAssembly` instead of
+  `AddZodSharpAssemblyGraph`/`ScanAssemblyGraphs`; `ZodModelSchema.For<TModel>(IZodSchema<TModel, TModel>)` instead
+  of the `ZodObject` overload; `BindConfiguration(section).ValidateWithZod(section)` instead of
+  `BindAndValidateWithZod`.
+- **`Option<T>` forwarding.** Generic code that passes an unannotated type parameter to `Option<T>` gets IL2091 →
+  annotate it `[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]`.
+- **Reflection fallbacks under trimming.** A discriminated-union POCO not added with `Option<T>` is now reported as
+  missing its discriminator, and graph scanning registers nothing → add each option with `Option<T>` and use
+  generated validators and registration.
+- **ProblemDetails top-level parameters.** Parameters copied to the body root → only `issues[].parameters`. Read
+  them per issue, or set `ZodProblemDetailsOptions.MergeParametersIntoExtensions = true`.
+- **ProblemDetails `issues[].path`.** A string array → the dotted key (`"Items[0].Quantity"`); the array is now
+  `segments`. Read `segments` where you indexed `path`.
+- **Collection paths.** `ZodArray`/`ZodTuple` element `ValidationError.Path` `"[0]"` → `"0"`, and collection/dictionary errors use
+  typed segments (`Items[0].Name`). Update code that matched path strings; use `FullPath.ToDottedString()`.
+- **`[Required]` on a string.** `""` passed a bare `[Required]` → it is rejected, like `RequiredAttribute`. Supply a
+  value or set `AllowEmptyStrings = true`.
+- **Error codes.** `validation_failed` (`ApplyAnd`/`ApplyOr`/`ApplyRefine`) → `refinement_failed`; `too_small`/
+  `too_big` from generated `[StringLength]`/`[Length]` on a string → `invalid_length`; `unrecognized_key` per key →
+  one `unrecognized_keys` with a `keys` parameter; `json_error`/`deserialization_failed` → `invalid_json`; generated
+  collection-size origin `collection` → `array` (`record` for a dictionary). Update code that switches on them.
+- **Messages.** Default messages no longer contain the input and use Zod type names (`"{displayName} is
+  required"`, `"Expected number, received string"`). Match on `Code`/`Category`, not message text; custom messages
+  keep their positional placeholders.
+- **Union errors.** A flattened `errors` parameter → `unionErrors` (`ImmutableArray<ImmutableArray<ValidationError>>`).
+  Read the per-option arrays.
+- **JSON converters.** Validation failures throw `ZodJsonValidationException` (System.Text.Json) or
+  `ZodNewtonsoftJsonValidationException` (Newtonsoft); both derive from the previous exception types, so existing
+  `catch` blocks keep working. Catch the new types to read the full errors.
+- **Options failures.** `"{message}"` → `"{name}: {path}: {message} ({code})"`, and
+  `OptionsBuilder<T>.AddZodSchemaValidator()` validates only the builder's name. Update log or test assertions, and
+  register a validator per name if you relied on the old scope.
+- **Endpoint filter.** `WithZodSharpValidation<T>()` threw on every request when no validator was registered → it
+  fails when the endpoint is built. Register the validator (or factory) before mapping the endpoint.
+- **CA1849 on synchronous `Validate` calls.** Every generated schema and validator adapter now has `ValidateAsync`,
+  so CA1849 ("call async methods when in an async method"), when enabled, reports each `Schema.Validate(value)`,
+  `Schema.ValidateMember(...)`, `validator.Validate(value)` and fluent `schema.Validate(value)` inside async code.
+  The analyzer package now suppresses those reports (`ZODSUP001`), because the synchronous pipeline is the cheap
+  path and never blocks; `ValidateAsync` earns its `ValueTask` only when the graph has asynchronous rules. Remove
+  any `NoWarn`, `#pragma` or `SuppressMessage` added for CA1849 on those calls. CA1849 for anything else — `Task.Wait`,
+  `Thread.Sleep`, another library's `Validate`/`ValidateAsync` pair — is untouched. A type that does have asynchronous
+  rules still has to use `ValidateAsync`: `ZODSGEN048` says so at build time, and `Validate` throws.
+- **Option-less ProblemDetails overloads (CS0618).** `result.ToHttpValidationProblemDetails()` and the other overloads
+  that take only a status code, an `ErrorTypeRegistry` or a lookup (and `result.ToValidationProblem()`) still return
+  their 2.x body, built from defaults rather than your `ZodProblemDetailsOptions` → in a request call
+  `ToHttpValidationProblemDetails(httpContext)` / `ToValidationProblem(httpContext)`, which apply the registered
+  options like the exception handler does. Outside a request, pass options: `(statusCode)` is
+  `new ZodProblemDetailsOptions { Registry = new(), FormatMessages = false, DefaultStatusCode = statusCode }`,
+  `(registry, statusCode)` is `{ Registry = registry, DefaultStatusCode = statusCode }` and `(lookup, statusCode)` is
+  `{ ErrorTypeResolver = lookup, DefaultStatusCode = statusCode }`.
+- **`[ZodSchema]` and `[ErrorType]` come from `Purview.ZodSharp`.** They were generated into each project as
+  `[Embedded]` types, which the compiler hides from other assemblies; they are now ordinary public types in the
+  package (same names, namespaces and members), so no source edit is needed. A project that declared its own
+  `partial class ZodSchemaAttribute` or `ErrorTypeAttribute` to extend the generated one now gets CS0436 → remove
+  the declaration. A library compiled with 2.x still carries hidden `[Embedded]` copies, which do not conflict.
+- **Package validation reports CP0001 for a library that upgrades.** A library packed against ZodSharp 2 contains the generated
+  `[Embedded]` copies of `ZodSharp.ZodSchemaAttribute` and `ZodSharp.Core.ErrorTypeAttribute` (the 2.x generators
+  emitted both into every compilation that referenced the package, whether or not it used them). Rebuilt against
+  ZodSharp 3 it no longer does, because the generators stopped emitting them, so `EnablePackageValidation` with a `PackageValidationBaselineVersion` from the 2.x era fails with
+  `CP0001: Type 'ZodSharp.ZodSchemaAttribute' exists on lib/net10.0/My.Library.dll but not on
+  lib/net10.0/My.Library.dll` (and the same for `ErrorTypeAttribute`, per target framework). The removal cannot break
+  a consumer: the compiler never binds to an `[Embedded]` type in a referenced assembly, so no compiled code could
+  reference the copies (consumers bind to the package's own types instead). Suppress it as a baseline difference →
+  regenerate the suppression file with `dotnet pack -p:ApiCompatGenerateSuppressionFile=true` (it writes
+  `CompatibilitySuppressions.xml` beside the project; check it in), or add one entry per type and target framework:
+
+  ```xml
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:ZodSharp.ZodSchemaAttribute</Target>
+    <Left>lib/net10.0/My.Library.dll</Left>
+    <Right>lib/net10.0/My.Library.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:ZodSharp.Core.ErrorTypeAttribute</Target>
+    <Left>lib/net10.0/My.Library.dll</Left>
+    <Right>lib/net10.0/My.Library.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  ```
+
+  Repeat both for every target framework the package ships (`lib/net11.0/...`). The suppressions can be removed
+  once the baseline is a version built against ZodSharp 3.
 ## 2.4.1
 
 ### Fixed

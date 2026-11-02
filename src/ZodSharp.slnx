@@ -10,20 +10,35 @@
 		<File Path="Directory.Build.targets" />
 	</Folder>
 	<Folder Name="/src/examples/">
+		<Project Path="src/Examples.Blazor/Examples.Blazor.csproj" />
+		<Project Path="src/Examples.Blazor.Client/Examples.Blazor.Client.csproj" />
 		<Project Path="src/Examples.CLI/Examples.CLI.csproj" />
+		<Project Path="src/Examples.MinimalApi/Examples.MinimalApi.csproj" />
+		<Project Path="src/Examples.Shared/Examples.Shared.csproj" />
 	</Folder>
 	<Folder Name="/tests/">
+		<Project Path="tests/AspNetCore.OpenApi.UnitTests/AspNetCore.OpenApi.UnitTests.csproj" />
 		<Project Path="tests/AspNetCore.UnitTests/AspNetCore.UnitTests.csproj" />
+		<Project Path="tests/Blazor.UnitTests/Blazor.UnitTests.csproj" />
+		<Project Path="tests/Examples.Blazor.IntegrationTests/Examples.Blazor.IntegrationTests.csproj" />
+		<Project Path="tests/Examples.MinimalApi.IntegrationTests/Examples.MinimalApi.IntegrationTests.csproj" />
+		<Project Path="tests/Extensions.Validation.UnitTests/Extensions.Validation.UnitTests.csproj" />
+		<Project Path="tests/Http.UnitTests/Http.UnitTests.csproj" />
 		<Project Path="tests/JsonInterop.UnitTests/JsonInterop.UnitTests.csproj" />
 		<Project Path="tests/NewtonsoftJson.UnitTests/NewtonsoftJson.UnitTests.csproj" />
 		<Project Path="tests/SourceGenerators.UnitTests/SourceGenerators.UnitTests.csproj" />
 		<Project Path="tests/SystemTextJson.UnitTests/SystemTextJson.UnitTests.csproj" />
 		<Project Path="tests/ZodSharp.UnitTests/ZodSharp.UnitTests.csproj" />
 		<Project Path="tests/Repository.UnitTests/Repository.UnitTests.csproj" />
+		<Project Path="tests/TrimSafety.Verification/TrimSafety.Verification.csproj" />
 	</Folder>
 	<Folder Name="/src/">
 		<Project Path="src/AspNetCore/AspNetCore.csproj" />
+		<Project Path="src/Blazor/Blazor.csproj" />
+		<Project Path="src/AspNetCore.OpenApi/AspNetCore.OpenApi.csproj" />
 		<Project Path="src/CodeFixes/CodeFixes.csproj" />
+		<Project Path="src/Extensions.Validation/Extensions.Validation.csproj" />
+		<Project Path="src/Http/Http.csproj" />
 		<Project Path="src/NewtonsoftJson/NewtonsoftJson.csproj" />
 		<Project Path="src/SourceGenerators/SourceGenerators.csproj" />
 		<Project Path="src/SystemTextJson/SystemTextJson.csproj" />

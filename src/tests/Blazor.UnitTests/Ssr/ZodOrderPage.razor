@@ -1,0 +1,31 @@
+@page "/order/zod"
+@using ZodSharp.Blazor.Fixtures
+
+<EditForm Model="Model" FormName="order" method="post" OnValidSubmit="Submit">
+	<ZodValidator />
+	<InputText @bind-Value="Model!.Reference" />
+	<ZodValidationMessage For="() => Model!.Reference" />
+	@for (var i = 0; i < Model!.Lines.Count; i++)
+	{
+		var index = i;
+		<InputNumber @bind-Value="Model!.Lines[index].Quantity" />
+		<ZodValidationMessage For="() => Model!.Lines[index].Quantity" />
+	}
+	<button type="submit">Save</button>
+</EditForm>
+
+@if (_submitted)
+{
+	<p id="submitted">Saved</p>
+}
+
+@code {
+	bool _submitted;
+
+	[SupplyParameterFromForm(FormName = "order")]
+	GeneratedOrder? Model { get; set; }
+
+	protected override void OnInitialized() => Model ??= new() { Lines = [new() { Sku = "A" }] };
+
+	void Submit() => _submitted = true;
+}

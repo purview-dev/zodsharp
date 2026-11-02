@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+	<!--
+		Packed-consumer gate (scripts/test-packed-consumers.ps1), consumer (b): a standalone Blazor WebAssembly app that
+		references Purview.ZodSharp and Purview.ZodSharp.Blazor as packages, and nothing else from the repository. The
+		script copies this folder outside the repository, beside guard Directory.Build.props/.targets and
+		Directory.Packages.props files that stop any inheritance, and supplies the packed version as
+		$(ZodSharpPackageVersion) and the ASP.NET Core version as $(AspNetCorePackageVersion).
+
+		It is published trimmed with every warning an error, and again with RunAOTCompilation=true when the wasm-tools
+		workload is installed: Purview.SourceGeneratorFramework.dll once leaked into exactly this output and broke the AOT
+		compile.
+	-->
+	<PropertyGroup>
+		<TargetFramework>net11.0</TargetFramework>
+		<AssemblyName>PackedWasm</AssemblyName>
+		<RootNamespace>PackedWasm</RootNamespace>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<PublishTrimmed>true</PublishTrimmed>
+		<TrimmerSingleWarn>false</TrimmerSingleWarn>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="$(AspNetCorePackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp" Version="$(ZodSharpPackageVersion)" />
+		<PackageReference Include="Purview.ZodSharp.Blazor" Version="$(ZodSharpPackageVersion)" />
+	</ItemGroup>
+
+	<Target Name="RequirePackageVersions" BeforeTargets="CollectPackageReferences;Restore">
+		<Error
+			Condition="'$(ZodSharpPackageVersion)' == '' or '$(AspNetCorePackageVersion)' == ''"
+			Text="ZodSharpPackageVersion and AspNetCorePackageVersion must be set. Run this consumer through scripts/test-packed-consumers.ps1."
+		/>
+	</Target>
+</Project>

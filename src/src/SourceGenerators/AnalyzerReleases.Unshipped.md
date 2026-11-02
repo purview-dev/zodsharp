@@ -6,3 +6,5 @@
 ;
 ; ZODSGEN002 and ZODSGEN022-ZODSGEN026 were retired during development and are never reused.
 
+; ZODSGEN046 now recognizes the default ImmutableArray behavior option, including value-element
+; collections. Its message describes option applicability; its category and severity are unchanged.

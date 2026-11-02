@@ -10,73 +10,332 @@ dotnet add package Purview.ZodSharp.AspNetCore
 
 ## ProblemDetails
 
-```csharp
-using ZodSharp.AspNetCore;
-
-var result = BasketSchema.Validate(basket);
-
-if (!result.IsSuccess)
-{
-    var problem = result.ToHttpValidationProblemDetails();
-    return Results.ValidationProblem(
-        problem.Errors,
-        extensions: new Dictionary<string, object?>
-        {
-            ["issues"] = problem.Extensions["issues"],
-        });
-}
-```
-
-| Member | Behaviour |
-|---|---|
-| `ToHttpValidationProblemDetails<T>(ValidationResult<T> result, int statusCode = 400)` | `HttpValidationProblemDetails`; error paths flattened to dotted keys (`user.email`, array indexes as `[0]`) |
-| `ToValidationProblemDetails<T>(ValidationResult<T> result, int statusCode = 400)` | `ValidationProblemDetails` |
-
-Both throw `InvalidOperationException` when the result `IsSuccess`. The structured metadata is preserved in the `issues` extension as a `ValidationIssue[]`:
+Every path that turns ZodSharp errors into ProblemDetails delegates to one writer, `ZodProblemDetailsWriter`:
+the endpoint filter, `ZodExceptionHandler`, `ZodTypedResults`, the .NET 11 pipeline enrichment, and every
+`ToHttpValidationProblemDetails`/`ToValidationProblemDetails`/`ToValidationProblem` overload. Given the same options
+they all produce the same body (see [The error contract](#the-error-contract)); use an overload that takes the
+request (`HttpContext`) so the options the application registers apply.
 
 ```csharp
-public sealed class ValidationIssue
-{
-    public required string Code { get; init; }
-    public string? Category { get; init; }
-    public string? Origin { get; init; }
-    public int? Minimum { get; init; }
-    public int? Maximum { get; init; }
-    public bool? Inclusive { get; init; }
-    public required string[] Path { get; init; }
-    public required string Message { get; init; }
-    public IReadOnlyDictionary<string, object?>? Parameters { get; init; }
-}
-```
-
-## Minimal API validation
-
-Use `WithZodSharpValidation<T>()` to validate the request DTO at the endpoint and short-circuit to a standard
-validation-problem response, or `ToValidationProblem()` to return a `Results.ValidationProblem` `IResult`
-directly from a handler:
-
-```csharp
-using Microsoft.AspNetCore.Builder;
 using ZodSharp;
-using ZodSharp.AspNetCore;
 
-// Validate the bound request DTO automatically (requires AddZodSharp to register the validator):
-app.MapPost("/users", (UserDto dto) => dto)
-   .WithZodSharpValidation<UserDto>();
-
-// Or validate manually and return a minimal-API IResult:
-app.MapPost("/users", (UserDto dto) =>
+app.MapPost("/baskets", (Basket basket, HttpContext httpContext) =>
 {
-    var result = UserDtoSchema.Validate(dto);
-    return result.IsSuccess ? TypedResults.Ok(result.Value) : result.ToValidationProblem();
+    var result = BasketSchema.Validate(basket);
+    return result.IsSuccess ? Results.Ok(result.Value) : result.ToValidationProblem(httpContext);
 });
 ```
 
-`WithZodSharpValidation<T>()` adds an endpoint filter that validates the first bound argument of type `T`
-against the `IZodSchemaFactory` registered by `AddZodSharp` (or `AddZodSharpFactory`). On failure it returns
-the same `HttpValidationProblemDetails` payload produced by `ToHttpValidationProblemDetails()`; on success it
-passes through to the handler. `ToValidationProblem()` is the handler-side equivalent, returning a status-400
-`Results.ValidationProblem` `IResult`.
+The extensions are in the `ZodSharp` namespace and exist for both `ValidationResult<T>` and `ZodException`:
+
+| Member | Behaviour |
+|---|---|
+| `ToHttpValidationProblemDetails(HttpContext httpContext)` | Uses the writer, and therefore the options, registered in the request services (`ValidationResult<T>` only). **Prefer this in a request.** |
+| `ToHttpValidationProblemDetails(ZodProblemDetailsOptions options, HttpContext? httpContext = null)` | Uses the supplied options; the form to use outside a request |
+| `ToValidationProblemDetails(...)` | The same overloads, returning MVC `ValidationProblemDetails` with every extension copied |
+| `ToValidationProblem(HttpContext httpContext)` | An `IResult` written by the registered writer, keeping the computed status (prefer this) |
+| `ToHttpValidationProblemDetails(int statusCode = 400)` | *Obsolete.* Built-in defaults, no `ErrorType`s, messages unformatted |
+| `ToHttpValidationProblemDetails(ErrorTypeRegistry registry, int statusCode = 400)` | *Obsolete.* Resolves `ErrorType`s from `registry` and formats their messages; every other option at its default |
+| `ToHttpValidationProblemDetails(Func<string, ErrorType?> lookup, int statusCode = 400)` | *Obsolete.* Resolves `ErrorType`s through `lookup`; every other option at its default |
+| `ToValidationProblem()` | *Obsolete.* An `IResult` with built-in defaults (`ValidationResult<T>` only) |
+
+The `ValidationResult<T>` overloads throw `InvalidOperationException` when the result `IsSuccess`.
+
+### The option-less overloads
+
+The 2.x overloads that take only a status code, an `ErrorTypeRegistry` or a lookup (and `ToValidationProblem()`) take
+neither options nor a request, so they **cannot see the `ZodProblemDetailsOptions` an application configures**
+(`AddZodSharpProblemDetails`, `Configure<ZodProblemDetailsOptions>`): `FormatMessages`, `PathNaming`, `IncludeIssues`,
+`MergeParametersIntoExtensions`, `StatusCodeSelector` and the configured registry are ignored, so their body can differ
+from the endpoint filter and the exception handler. There is no ambient options instance they could read without a
+request, so they keep their 2.x output unchanged and are marked `[Obsolete]` (CS0618). Each one is exactly equivalent
+to the options overload with these options:
+
+| Obsolete call | Equivalent |
+|---|---|
+| `ToHttpValidationProblemDetails(statusCode)` | `ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { Registry = new(), FormatMessages = false, DefaultStatusCode = statusCode })` |
+| `ToHttpValidationProblemDetails(registry, statusCode)` | `ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { Registry = registry, DefaultStatusCode = statusCode })` |
+| `ToHttpValidationProblemDetails(lookup, statusCode)` | `ToHttpValidationProblemDetails(new ZodProblemDetailsOptions { ErrorTypeResolver = lookup, DefaultStatusCode = statusCode })` |
+| `ToValidationProblem()` | `ToValidationProblem(httpContext)` (applies the registered options) |
+
+In a request, move to the `HttpContext` overload; elsewhere (a background job, a test), pass the options you want.
+
+### Typed results
+
+`ZodTypedResults` produces the same body for handlers that declare their results:
+
+```csharp
+using Microsoft.AspNetCore.Http.HttpResults;
+using ZodSharp.AspNetCore;
+
+app.MapPost("/orders", Results<Ok<Order>, ValidationProblem> (Order order, HttpContext httpContext) =>
+{
+    var result = OrderSchema.Validate(order);
+    return result.IsSuccess
+        ? TypedResults.Ok(result.Value)
+        : ZodTypedResults.ValidationProblem(result, httpContext);
+});
+```
+
+| Member | Returns |
+|---|---|
+| `ZodTypedResults.ValidationProblem(result, httpContext)` / `ValidationProblem(exception, httpContext)` | ASP.NET Core's `ValidationProblem`, for `Results<...>` unions. It is always `400`, even when a mapped `ErrorType` yields another status. |
+| `ZodTypedResults.Problem(result, httpContext)` / `Problem(exception, httpContext)` | `ZodProblemDetailsResult`, which keeps the computed status (for example a mapped `409`) and writes through `IProblemDetailsService`. |
+
+### `ValidationIssue`
+
+The `issues` extension is a `ValidationIssue[]`. `ValidationIssue` is a `readonly record struct` in
+`ZodSharp.AspNetCore`, and a safe projection of `ValidationError`:
+
+| JSON property | CLR member | Value |
+|---|---|---|
+| `path` | `DottedPath` | The `errors` key (`Items[0].Quantity`); empty for the root |
+| `segments` | `Segments` | Zod's path shape: strings for members and keys, integers for indexes |
+| `code` | `Code` | The ZodSharp code |
+| `category` | `Category` | The Zod issue code for built-in errors (`too_small`, `invalid_type`, ...) |
+| `origin` | `Origin` | `string`, `number`, `array`, `date`, ... |
+| `minimum`/`maximum` | `Lower`/`Upper` | From the error's typed bounds: JSON numbers, or ISO-8601 strings for dates |
+| `inclusive` | `Inclusive` | Whether the bound is inclusive |
+| `message` | `Message` | The message, rendered by the registered `IZodMessageFormatter` |
+| `parameters` | `SafeParameters` | Camel-cased, restricted to invariant scalars and arrays of them |
+| `unionErrors` | `UnionErrors` | For a failed union, each option's issues, with paths relative to the union |
+
+The CLR-only members `Path` (`string[]`), `Minimum`, `Maximum` (`int?`) and `Parameters` (the raw
+`ErrorTypeParameters`) keep their 2.x meaning for in-process code and are not serialized.
+
+## The error contract
+
+A request with a short `CustomerName`, an empty `Lines[0].Sku`, and out-of-range quantities in `Lines[0]` and
+`ByCode["en"]` produces this body. It is real output from the .NET 11 pipeline with `AddZodSharpProblemDetails()`.
+The `WithZodSharpValidation()` filter produces the same body.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "CustomerName": ["Field 'CustomerName' must contain at least 3 characters."],
+    "Lines[0].Sku": ["Sku is required"],
+    "Lines[0].Quantity": ["Field 'Quantity' must be greater than or equal to 1 and less than or equal to 100."],
+    "ByCode[en].Quantity": ["Field 'Quantity' must be greater than or equal to 1 and less than or equal to 100."]
+  },
+  "issues": [
+    {
+      "path": "CustomerName",
+      "segments": ["CustomerName"],
+      "code": "too_small",
+      "category": "too_small",
+      "origin": "string",
+      "minimum": 3,
+      "inclusive": true,
+      "message": "Field 'CustomerName' must contain at least 3 characters.",
+      "parameters": { "count": 2, "displayName": "CustomerName", "declaringType": "Order", "member": "CustomerName" }
+    },
+    {
+      "path": "Lines[0].Sku",
+      "segments": ["Lines", 0, "Sku"],
+      "code": "missing_field",
+      "category": "invalid_type",
+      "message": "Sku is required",
+      "parameters": { "displayName": "Sku", "declaringType": "OrderLine", "member": "Sku" }
+    },
+    {
+      "path": "Lines[0].Quantity",
+      "segments": ["Lines", 0, "Quantity"],
+      "code": "invalid_range",
+      "category": "too_small",
+      "origin": "number",
+      "minimum": 1,
+      "maximum": 100,
+      "inclusive": true,
+      "message": "Field 'Quantity' must be greater than or equal to 1 and less than or equal to 100.",
+      "parameters": { "minimum": "1", "maximum": "100", "displayName": "Quantity", "declaringType": "OrderLine", "member": "Quantity" }
+    },
+    {
+      "path": "ByCode[en].Quantity",
+      "segments": ["ByCode", "en", "Quantity"],
+      "code": "invalid_range",
+      "category": "too_big",
+      "origin": "number",
+      "minimum": 1,
+      "maximum": 100,
+      "inclusive": true,
+      "message": "Field 'Quantity' must be greater than or equal to 1 and less than or equal to 100.",
+      "parameters": { "minimum": "1", "maximum": "100", "displayName": "Quantity", "declaringType": "OrderLine", "member": "Quantity" }
+    }
+  ],
+  "count": 2,
+  "displayName": "Quantity",
+  "declaringType": "OrderLine",
+  "member": "Quantity",
+  "minimum": "1",
+  "maximum": "100",
+  "traceId": "00-3b87d0e8fa5f0b442bf75ffb97d44b3d-103774b7a225269d-02"
+}
+```
+
+A failed union reports its options' issues under `unionErrors`:
+
+```json
+{
+  "path": "Contact",
+  "segments": ["Contact"],
+  "code": "invalid_union",
+  "category": "invalid_union",
+  "message": "Value does not match any of the union options (string, number)",
+  "parameters": { "options": ["string", "number"] },
+  "unionErrors": [
+    [{ "path": "", "segments": [], "code": "invalid_string", "category": "invalid_format", "origin": "string", "message": "Invalid email format", "parameters": { "format": "email" } }],
+    [{ "path": "", "segments": [], "code": "invalid_type", "category": "invalid_type", "message": "Expected number, received string", "parameters": { "expected": "number", "received": "string" } }]
+  ]
+}
+```
+
+The contract:
+
+- **Keys.** `errors` keys and `issues[].path` are `ValidationError.FullPath.ToDottedString()`: members joined with
+  `.`, indexes as `[0]`, and keys as `[en]` or, when ambiguous, quoted (`Map["0"]`, `Map["a.b"]`). The root is `""`.
+  See [Core Concepts](Core-Concepts.md#paths). By default member names are the C# names, matching
+  Microsoft.Extensions.Validation and MVC model state. `PathNaming = ZodPathNaming.Json` applies the minimal-API
+  `JsonOptions` naming policy.
+- **`code` and `category`.** `code` is ZodSharp's specific identity (`invalid_range`). `category` is the Zod issue
+  code (`too_small`), so a client can treat ZodSharp and Zod issues alike.
+- **Top-level parameters.** Parameters are written per issue only. With `MergeParametersIntoExtensions = true` (the 2.4
+  behaviour, off by default) every issue's parameters are also merged into the top-level extensions, and the last
+  issue wins. A parameter whose camel-cased name is reserved (`type`, `title`, `status`, `detail`, `instance`,
+  `errors`, `issues`, `traceId`) is written as `param_{name}`.
+- **No implementation details.** `issues[].parameters` leaves out `declaringType` (a full CLR type name) and `member`,
+  which generated validators attach for localization: they describe the server's types, not the request, and the
+  issue's `path` already names the member. `displayName` is kept. Set `IncludeDiagnosticParameters = true` to send them.
+- **`traceId`.** It is present on every path: `Activity.Current?.Id`, else `HttpContext.TraceIdentifier`.
+- **No input values.** Messages and parameters never contain the input unless `ZodErrorOptions.IncludeReceivedValues`
+  is enabled. See [Core Concepts](Core-Concepts.md#pii).
+- **Messages.** They come from the registered `IZodMessageFormatter` in `CultureInfo.CurrentUICulture`. See
+  [Localization](Localization.md).
+- **OpenAPI.** The body is described by the `ZodValidationProblemDetails` and `ZodValidationIssue` component schemas
+  (see [OpenAPI Integration](OpenAPI-Integration.md)).
+
+## Minimal API validation
+
+There are two ways to validate minimal-API parameters: the `WithZodSharpValidation()` endpoint filter, on every
+target framework, and on .NET 11 the built-in validation pipeline
+([below](#net-11-the-built-in-validation-pipeline)).
+
+```csharp
+using ZodSharp.AspNetCore;
+
+// Every endpoint of a group: each bound parameter with a registered validator is validated.
+var api = app.MapGroup("/api").WithZodSharpValidation(options =>
+{
+    options.ThrowIfNoValidator = false;
+    options.OnBindingFailure = ZodBindingFailureBehavior.PassThrough;
+});
+
+// One endpoint, one type: every bound argument assignable to UserDto is validated.
+app.MapPost("/users", (UserDto dto) => dto).WithZodSharpValidation<UserDto>();
+```
+
+`WithZodSharpValidation()` works on any `IEndpointConventionBuilder`, including route groups:
+
+- **Which parameters.** They are selected when the endpoint is built. Services (`[FromServices]`, keyed services,
+  anything the container resolves), `HttpContext`, `HttpRequest`, `HttpResponse`, `ClaimsPrincipal`,
+  `CancellationToken`, form files, streams and `[SkipValidation]` parameters are skipped. `[FromBody]`,
+  `[FromRoute]`, `[FromQuery]`, `[FromHeader]` and `[FromForm]` force a parameter to be considered.
+- **How.** Every selected parameter is validated through `IZodSchemaFactory.TryGetUntypedValidator`.
+- **Error keys.** They follow Microsoft.Extensions.Validation: a complex parameter's errors are not prefixed
+  (`Name`, `Address.Street`), a sequence parameter's are (`items[0].Name`), and an error about the value itself is
+  keyed by the parameter name.
+- **Response metadata.** The endpoint advertises a `400` `application/problem+json` response (status
+  `ProducesStatusCode`) for OpenAPI.
+- **The body.** The filter honours `ZodProblemDetailsOptions` and the `ErrorTypeRegistry`, and writes through
+  `IProblemDetailsService`.
+
+`WithZodSharpValidation<T>()` (on a `RouteHandlerBuilder`) validates every bound argument assignable to `T`. The
+validator is resolved when the endpoint is built. When no `IZodSchemaFactory` or no validator for `T` is
+registered, building the endpoint fails with a message naming the handler and the parameter.
+
+| `ZodEndpointValidationOptions` | Default | Effect |
+|---|---|---|
+| `ThrowIfNoValidator` | `false` | Fail endpoint building when a complex bound parameter has no registered validator. |
+| `OnBindingFailure` | `PassThrough` | What to do when binding already failed (see below). |
+| `ProducesStatusCode` | `400` | The status advertised in response metadata; set it when a mapped `ErrorType` changes the status. |
+
+On .NET 11, endpoint filters also run after a route, query, header or form binding failure, with the status
+already set to 400 and the argument left at its default. A malformed JSON body is answered by ASP.NET Core itself
+and never reaches a filter. Before .NET 11 this option has no effect.
+
+| `ZodBindingFailureBehavior` | Effect |
+|---|---|
+| `PassThrough` | Do not validate; ASP.NET Core's binding-failure response stands. |
+| `ConvertToProblemDetails` | Write the ZodSharp contract instead: an `invalid_type` issue (`invalid_json` for a body) for each unbound validated parameter, or one root `invalid_type` issue when the failed parameter cannot be identified. |
+
+## .NET 11: the built-in validation pipeline
+
+On .NET 11, ASP.NET Core validates minimal-API parameters itself through Microsoft.Extensions.Validation.
+`AddZodSharpValidation()` (package `Purview.ZodSharp.Extensions.Validation`) makes ZodSharp the first
+validation resolver, and on `net11.0` `AddZodSharpProblemDetails()` turns the pipeline's response into the
+full ZodSharp contract:
+
+```csharp
+builder.Services.AddZodSharp(options => options.ScanAssemblies.Add(typeof(Order).Assembly));
+builder.Services.AddZodSharpValidation();
+builder.Services.AddValidation();          // when DataAnnotations parameters/types or union bodies are used
+builder.Services.AddZodSharpProblemDetails();
+
+var app = builder.Build();
+
+var orders = app.MapGroup("/orders");      // every endpoint is validated - no per-endpoint call
+orders.MapPost("/", (Order order, [Range(1, 100)] int page) => TypedResults.Ok());
+orders.MapPost("/import", (ImportRequest request) => TypedResults.Ok()).DisableValidation();
+```
+
+How it works:
+
+- `AddZodSharpProblemDetails()` registers the bridge's `IZodValidationReportSink`. It appends every
+  full-fidelity ZodSharp error to a `ZodRequestValidationReport` stored on the current request
+  (`HttpContext.Features`), so the report lives and dies with the request. Writes made outside an HTTP request that
+  is still being handled (an interactive Blazor circuit, WebAssembly, a background service) are discarded.
+- It composes `ProblemDetailsOptions.CustomizeProblemDetails` with a post-configure step. The ZodSharp callback
+  runs **first**, then whatever callback the application configured, whether before or after the call or
+  through its `problemDetails` argument. The application can therefore still change the result. A later
+  `PostConfigure` that replaces the callback outright removes the ZodSharp one.
+- It calls `AddProblemDetails()`, without which the callback never runs.
+
+In the callback, for an `HttpValidationProblemDetails`:
+
+| Report | Result |
+|---|---|
+| ZodSharp errors reported | `ZodProblemDetailsWriter.Apply` rebuilds `errors` and `issues`. ZodSharp keys are replaced and DataAnnotations entries are kept, each with a `dataannotations` issue. `status`, `title`, `type` and `detail` come from the highest `ErrorType`, then `StatusCodeSelector` and `StatusCodeOverride` are applied. The status is mirrored to the response. |
+| Empty (DataAnnotations-only failure) | The payload is left untouched, apart from the `issues` projection (`ProjectDataAnnotationsIssues`, default `true`). |
+
+The body is byte-identical (apart from `traceId`) to the one the endpoint filter, `ZodExceptionHandler` and
+`ToValidationProblem(httpContext)` produce.
+
+Notes:
+
+- **Localization**: register `AddLocalization()` and an `IZodMessageFormatter`, for example
+  `new StringLocalizerZodMessageFormatter(factory, sharedResourceType: typeof(ValidationMessages))`. Messages
+  follow `Accept-Language` (with `UseRequestLocalization`); codes and paths are unchanged. See
+  [Localization](Localization.md).
+- **The bridge**: resolver placement, `ZodReport` and non-HTTP validation are covered in
+  [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md).
+- **Unions**: a union parameter is claimed by the runtime parameter resolver, which the application's
+  `AddValidation()` call adds. The active case is reported under `Value` (`Value.Email`).
+- **Double validation**: `WithZodSharpValidation()` on an endpoint the pipeline validates skips the parameters
+  the bridge covers, logging that once at `Debug` when the endpoint is built. On a `DisableValidation()` endpoint
+  it validates as usual.
+- **OpenAPI**: the `Purview.ZodSharp.AspNetCore.OpenApi` operation transformer adds the validation problem
+  response for endpoints with a ZodSharp-known parameter. No endpoint metadata is added by the pipeline path. See
+  [OpenAPI Integration](OpenAPI-Integration.md).
+
+| | `WithZodSharpValidation()` filter | Built-in pipeline |
+|---|---|---|
+| Frameworks | net10.0 and net11.0 | net11.0 |
+| Scope | endpoints and groups you mark | every endpoint; opt out with `DisableValidation()` |
+| DataAnnotations parameters | not validated | validated and merged into one body |
+| Binding failures | `OnBindingFailure` | ASP.NET Core's own response |
+| Response metadata | adds the 400 response | the OpenAPI transformer |
 
 ## Exception handling
 
@@ -84,7 +343,7 @@ A thrown `ZodException` (for example from `Parse`, `GetValueOrThrow()`, or a val
 `Create` under strict deserialization) can be mapped to ProblemDetails on demand:
 
 ```csharp
-using ZodSharp.AspNetCore;
+using ZodSharp;
 
 try
 {
@@ -92,7 +351,7 @@ try
 }
 catch (ZodException ex)
 {
-    return Results.ValidationProblem(ex.ToHttpValidationProblemDetails().Errors);
+    return ex.ToValidationProblem(httpContext);
 }
 ```
 
@@ -108,18 +367,95 @@ app.UseExceptionHandler();
 ```
 
 `AddZodSharpProblemDetails(Action<ZodProblemDetailsOptions>? configure = null, Action<ProblemDetailsOptions>? problemDetails = null)`
-registers `ZodExceptionHandler`, calls `services.AddProblemDetails(problemDetails)`, and configures
-`ZodProblemDetailsOptions`:
+does the following:
 
-- `ErrorTypeRegistry Registry` — resolves error codes to `ErrorType`s. Defaults to
-  `ErrorTypeRegistry.Default`.
-- `bool FormatMessages` — when `true`, messages are formatted from the matched `ErrorType.MessageFormat`.
-- `Func<ImmutableArray<ValidationError>, int>? StatusCodeSelector` — an escape hatch that takes complete
-  control of the response status code.
+- registers `ZodExceptionHandler` and the shared `ZodProblemDetailsWriter`;
+- calls `services.AddProblemDetails(problemDetails)` and configures `ZodProblemDetailsOptions`;
+- adds the ProblemDetails payload's source-generated JSON metadata to the minimal-API `JsonOptions`, so it
+  serializes under Native AOT;
+- on `net11.0`, enriches the built-in validation pipeline ([above](#net-11-the-built-in-validation-pipeline)).
+
+`AddZodSharp` also registers the writer and the JSON metadata.
+
+| `ZodProblemDetailsOptions` | Default | Effect |
+|---|---|---|
+| `Registry` | `ErrorTypeRegistry.Default` | Resolves error codes to `ErrorType`s. |
+| `ErrorTypeResolver` | `null` | A lookup used instead of `Registry`. |
+| `FormatMessages` | `true` | Format messages from the matched `ErrorType.MessageFormat`, only when every placeholder resolves. |
+| `PathNaming` | `ZodPathNaming.MemberName` | `Json` renders keys with the minimal-API `JsonOptions` naming policy. |
+| `IncludeIssues` | `true` | Include the `issues` extension. |
+| `MergeParametersIntoExtensions` | `false` | Also merge every issue's parameters into the top-level extensions (last wins). |
+| `IncludeDiagnosticParameters` | `false` | Also write the diagnostic parameters generated validators attach (`declaringType`, the full CLR name of the declaring type, and `member`, the C# member name). They stay on `ValidationError.Parameters` either way, for localization and logging. |
+| `ProjectDataAnnotationsIssues` | `true` | Give non-ZodSharp `errors` entries an `issues` entry with code `dataannotations` (`ZodProblemDetailsWriter.DataAnnotationsCode`). |
+| `DefaultStatusCode` | `400` | The status when no matched `ErrorType` supplies one. |
+| `StatusCodeSelector` | `null` | `Func<ImmutableArray<ValidationError>, int>`: takes complete control of the status. It runs after the highest `ErrorType.HttpStatus` is computed, and its result wins. |
+| `StatusCodeOverride` | `null` | `Func<ImmutableArray<ValidationError>, int, int>`: like `StatusCodeSelector`, but also receives the computed status. It runs last and wins. |
+| `HandleBindingFailures` | `false` | Sets `RouteHandlerOptions.ThrowOnBadRequest`, so a body rejected during deserialization reaches `ZodExceptionHandler` in every environment. See [Strict deserialization](#strict-deserialization-value-objects-rejected-while-reading). |
+
+`MapErrorType(ErrorType)` registers an `ErrorType` with the configured `Registry`.
+
+### Strict deserialization: value objects rejected while reading
+
+A value object read by a strict converter (Purview.ValueObjects' `ValueObjectDeserializationMode.Strict`) is
+validated while the body is deserialized. A converter cannot know which member of the document it is reading, so it
+wraps the `ZodException` in a `JsonException` (`new JsonException(message, zodException)`), and System.Text.Json
+records the location in `JsonException.Path` (`$.customerEmail`). ZodSharp joins the two: the errors are reported under
+the member that held the value, exactly as validating the bound model reports them.
+
+```http
+POST /orders
+{"customerEmail":"not-an-email","quantity":5}
+```
+
+```json
+{
+  "status": 400,
+  "errors": { "CustomerEmail.Value": ["Field 'CustomerEmail' must be a valid email address."] },
+  "issues": [{ "path": "CustomerEmail.Value", "segments": ["CustomerEmail", "Value"], "code": "invalid_string", "origin": "string", ... }]
+}
+```
+
+- **Member names.** The serializer's path uses JSON names. The endpoint's body type (its `IAcceptsMetadata`) is
+  resolved from the minimal-API `JsonOptions`, and each JSON name is mapped back to its member name through that
+  contract's metadata - no reflection. `PathNaming` then applies as it does everywhere, so the keys match the
+  `WithZodSharpValidation()` body for the same model under either setting. When the body type cannot be resolved,
+  the JSON names are kept. Collections keep their indexes (`$.lines[0].quantity` -> `Lines[0].Quantity.Value`).
+- **Display name.** An error at the value object's own member (`Value`) is named after the member holding it, as nested
+  validation does: `Field 'CustomerEmail' ...`, never `Field 'Value' ...`.
+- **A bare `ZodException`** (older value object releases, or any other caller) is unchanged: its own path.
+- **Any other bad request** (malformed JSON, a `JsonException` without ZodSharp errors) is left as ASP.NET Core
+  answers it, unless `HandleBindingFailures` is set (below).
+
+Whether the failure reaches ZodSharp depends on the framework:
+
+| | Development | Production |
+|---|---|---|
+| **.NET 11** | Rewritten | Rewritten: binding writes its own validation problem through the ProblemDetails service, with the exception attached, and `AddZodSharpProblemDetails` rewrites it. No opt-in needed. |
+| **.NET 10** | Rewritten (`ThrowOnBadRequest` is on in Development) | A bare `400` with no body, unless `HandleBindingFailures = true`. |
+
+```csharp
+builder.Services.AddZodSharpProblemDetails(options => options.HandleBindingFailures = true);
+
+var app = builder.Build();
+app.UseExceptionHandler();
+```
+
+`HandleBindingFailures` sets `RouteHandlerOptions.ThrowOnBadRequest`, which is application-wide: **every**
+minimal-API binding failure becomes a `BadHttpRequestException` that travels through the exception handler middleware
+instead of a status code set in place. `ZodExceptionHandler` then answers the ones without ZodSharp errors with their
+own status (`BadHttpRequestException.StatusCode`) and a standard ProblemDetails body that never includes the exception's message (it can
+quote the request). The costs are an exception per bad request and the middleware's diagnostics, which follow
+`ExceptionHandlerOptions.SuppressDiagnosticsCallback`. An unsupported content type (`415`) is always answered by
+binding itself. MVC (`SystemTextJsonInputFormatter`) is not covered: it records the failure in `ModelState` under the
+JSON path.
+
+Outside ASP.NET Core, `ZodJsonExceptions.TryGetErrors(exception, rootTypeInfo, out errors)` (core package) performs
+the same re-rooting for any exception chain, and `DeserializeAndValidate*` / `ReadFromJsonAndValidateAsync` apply it,
+so they return the re-rooted errors rather than `invalid_json`.
 
 > [!NOTE]
-> `AddZodSharpProblemDetails` only wires up exception handling and ProblemDetails services — it does
-> **not** register `IZodSchemaFactory`. If you also want DI-based validator resolution, register the
+> `AddZodSharpProblemDetails` only wires up exception handling and ProblemDetails services (and, on .NET 11,
+> the pipeline enrichment). It does **not** register `IZodSchemaFactory`. If you also want DI-based validator resolution, register the
 > factory separately with `AddZodSharp` (below) or the core `AddZodSharpFactory`.
 
 ## Mapping error types to status codes
@@ -215,7 +551,7 @@ var error = ConcurrentErrorType.CreateSaveFailed(
     "agg-123",
     "Invoice",
     path: ["order", "items", "[0]"],
-    origin: "collection",
+    origin: "array",
     minimum: 1,
     maximum: 10,
     inclusive: true);
@@ -245,39 +581,49 @@ Produces a `409 Conflict` `HttpValidationProblemDetails` with:
 
 ```json
 {
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  "title": "One or more validation errors occurred.",
   "status": 409,
   "detail": "The aggregate could not be saved.",
   "errors": {
     "": ["Aggregate 'agg-123' (of type Invoice) failed to save"]
   },
-  "traceId": "...",
-  "aggregateId": "agg-123",
   "issues": [
     {
+      "path": "",
+      "segments": [],
       "code": "aggregate_save_failed",
-      "path": [],
+      "category": "invalid_value",
       "message": "Aggregate 'agg-123' (of type Invoice) failed to save",
-      "parameters": { "AggregateId": "agg-123", "AggregateType": "Invoice" }
+      "parameters": { "aggregateId": "agg-123", "aggregateType": "Invoice" }
     }
-  ]
+  ],
+  "aggregateId": "agg-123",
+  "aggregateType": "Invoice",
+  "traceId": "..."
 }
 ```
 
 Mapping rules:
 
-- **Status** — the highest matched `ErrorType.HttpStatus` wins; unmapped codes fall back to the default
-  (`400`). Override with `ZodProblemDetailsOptions.StatusCodeSelector`.
-- **Title / Type / Detail** — taken from the highest-status matched `ErrorType`; otherwise defaulted.
-- **Message** — `MessageFormat` named placeholders (for example `{AggregateId}`) are substituted from
-  `ValidationError.Parameters`. Placeholders without a matching value are left as-is so templating gaps
-  stay visible. The analyzer `ZODSASP001` (shipped with the core package) warns at compile time when a
+- **Status** — the highest matched `ErrorType.HttpStatus` wins; unmapped codes fall back to
+  `DefaultStatusCode` (`400`). `StatusCodeSelector` and then `StatusCodeOverride` run after that computation, and
+  their result wins.
+- **Title / Type / Detail** — taken from the highest-status matched `ErrorType`; otherwise defaulted. `type` is the
+  RFC 9110 URI for the status.
+- **Message** — with `FormatMessages`, the `MessageFormat` replaces the error's message only when **every**
+  placeholder resolves, so a template is never returned with `{placeholders}` left in. Placeholders resolve from
+  `ValidationError.Parameters`, then from the built-ins `path`, `code`, `origin`, `minimum`, `maximum` and
+  `displayName`. The analyzer `ZODSASP001` (shipped with the core package) warns at compile time when a
   `MessageFormat` placeholder is not declared in `Parameters`.
-- **Parameters** — the error's `ValidationError.Parameters` are surfaced both per-issue in the `issues`
-  extension and merged (camel-cased) into the top-level ProblemDetails extensions for client correlation.
+- **Parameters** — the error's `ValidationError.Parameters` are surfaced per issue in `issues[].parameters`
+  (camel-cased, safe scalars only). With `MergeParametersIntoExtensions` they are also merged into the top-level
+  extensions, and reserved names are written as `param_{name}`.
 
-`ToHttpValidationProblemDetails` / `ToValidationProblemDetails` accept an `ErrorTypeRegistry` or a
-`Func<string, ErrorType?>` lookup for on-demand mapping, and the same mapping applies to
-`ValidationResult<T>`.
+For on-demand mapping outside a request, pass `ZodProblemDetailsOptions` with a `Registry` or an
+`ErrorTypeResolver` lookup to `ToHttpValidationProblemDetails` / `ToValidationProblemDetails`; the same mapping
+applies to `ValidationResult<T>`. The 2.x registry and lookup overloads still work but are obsolete (see
+[The option-less overloads](#the-option-less-overloads)).
 
 ## Dependency injection
 
@@ -290,7 +636,16 @@ builder.Services.AddZodSharp(options =>
 });
 ```
 
-`AddZodSharp(Action<ZodSchemaFactoryOptions>? configure)` registers `IZodSchemaFactory` as a singleton, applies `options.ConfigureFactory`, and calls `factory.RegisterFromAssembly(assembly)` for each distinct assembly discovered from the configured assembly sources. This auto-discovers source-generated `[assembly: ZodSchemaGenerated(typeof(...))]` registrations.
+`AddZodSharp(Action<ZodSchemaFactoryOptions>? configure)` registers `IZodSchemaFactory` as a singleton. When the factory is built, it does three things in order:
+
+1. It applies every `ZodSchemaRegistration`, including the trim-safe ones added by the generated
+   `services.AddZodSharp{Assembly}Schemas()` extensions.
+2. It applies `options.ConfigureFactory`.
+3. It calls `factory.RegisterFromAssembly(assembly)` for each distinct assembly discovered from the configured
+   assembly sources, which auto-discovers source-generated `[assembly: ZodSchemaGenerated(typeof(...))]`
+   registrations.
+
+Assembly scanning is not trim-safe. In a trimmed or Native AOT host, use the generated `AddZodSharp{Assembly}Schemas()` (see [Source Generator](Source-Generator.md)).
 
 `ZodSchemaFactoryOptions`:
 
@@ -326,7 +681,10 @@ builder.Services.AddZodSharpLoadedAssemblies();
 | `AddZodSharp(options)` | `Purview.ZodSharp.AspNetCore` | singleton `IZodSchemaFactory` + auto-registers generated validators from configured assembly sources | ASP.NET Core apps that want factory registration plus optional assembly-source configuration. |
 | `AddZodSharpAssembly(...)`, `AddZodSharpAssemblyGraph(...)`, `AddZodSharpLoadedAssemblies()` | `Purview.ZodSharp.AspNetCore` | additive generated-validator assembly source contributions | Modular ASP.NET Core apps where deeper layers or implementation packages contribute their own schema assemblies. |
 | `AddZodSharpFactory(configure)` | core `Purview.ZodSharp` | singleton `IZodSchemaFactory` | Any .NET host where you want manual control — register validators yourself in the `configure` callback. |
-| `AddZodSharpProblemDetails(...)` | `Purview.ZodSharp.AspNetCore` | `ZodExceptionHandler` + ProblemDetails services only — does **not** register the factory | Mapping thrown `ZodException`s to `ProblemDetails`; pair it with `AddZodSharp` when you also need DI validator resolution. |
-| `AddZodSchemaOptionsValidator<T>(...)` | core `Purview.ZodSharp` | singleton `IValidateOptions<T>` | Validating options objects; requires a factory registered first via `AddZodSharp` or `AddZodSharpFactory`. |
+| `AddZodSharp{Assembly}Schemas()` | generated into each assembly with `[ZodSchema]` types | a trim-safe `ZodSchemaRegistration` naming every generated validator | Trimmed or Native AOT hosts, and anywhere assembly scanning is unwanted. |
+| `AddZodSharpProblemDetails(...)` | `Purview.ZodSharp.AspNetCore` | `ZodExceptionHandler`, the ProblemDetails writer and services, and the .NET 11 pipeline enrichment — does **not** register the factory | Mapping thrown `ZodException`s to `ProblemDetails`; pair it with `AddZodSharp` when you also need DI validator resolution. |
+| `AddZodSharpValidation(...)` | `Purview.ZodSharp.Extensions.Validation` (`net11.0`) | the Microsoft.Extensions.Validation resolver | Validating with the .NET 11 pipeline; see [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md). |
+| `AddZodSchemaOptionsValidator<T>(...)` | core `Purview.ZodSharp` | singleton `IValidateOptions<T>` | Validating options objects; requires a factory registered first via `AddZodSharp` or `AddZodSharpFactory`. Validates every options name; on .NET 11 `ValidateOnStart()` runs its asynchronous rules too. |
+| `OptionsBuilder<T>.BindAndValidateWithZod(section)` | `Purview.ZodSharp.AspNetCore` | binds a configuration section and adds the ZodSharp options validator | Options whose failures should name the configuration key (`Smtp:Servers:0:Host`). Uses the reflection-based binder; under Native AOT call `BindConfiguration` and `AddZodSchemaValidator` yourself. |
 
 See [Dependency Injection](Dependency-Injection.md) for the underlying factory and options-validation wiring.

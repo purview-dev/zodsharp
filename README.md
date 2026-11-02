@@ -14,7 +14,7 @@ The library is developed and maintained at [github.com/purview-dev/zodsharp](htt
 - **Fluent API** - Fluent and extensible API similar to original Zod
 - **Type-safe** - Strong typing with advanced C# generics
 - **High performance** - Sub-microsecond validation times; see [the measurements](#performance)
-- **Cross-platform** - Works on .NET 8.0, .NET 9.0, .NET 10.0 and .NET 11.0
+- **Cross-platform** - Works on .NET 10.0 and .NET 11.0
 - **Source Generators** - Compile-time validator generation with `[ZodSchema]` attribute
 - **DataAnnotations Support** - Automatic validation from `[Required]`, `[StringLength]`, `[Length]`, `[MinLength]`, `[MaxLength]`, `[Range]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, etc.  
 
@@ -52,7 +52,9 @@ dotnet add package Purview.ZodSharp.AspNetCore
 - **Purview.ZodSharp** — Core validation library and source generator (`[ZodSchema]`). See its [package README](src/src/ZodSharp/Sdk/README.md).
 - **Purview.ZodSharp.SystemTextJson** — System.Text.Json integration and JSON Schema import. See its [package README](src/src/SystemTextJson/Sdk/README.md).
 - **Purview.ZodSharp.NewtonsoftJson** — Newtonsoft.Json integration and JSON Schema import. See its [package README](src/src/NewtonsoftJson/Sdk/README.md).
+- **Purview.ZodSharp.Http** — `HttpClient` integration: validated request and response bodies, and server validation problems read back into ZodSharp errors; trim-, AOT- and WebAssembly-safe. See its [package README](src/src/Http/Sdk/README.md).
 - **Purview.ZodSharp.AspNetCore** — ASP.NET Core ProblemDetails integration. See its [package README](src/src/AspNetCore/Sdk/README.md).
+- **Purview.ZodSharp.Blazor** — Blazor forms validation for Server, WebAssembly and Auto render mode (`net11.0`). See its [package README](src/src/Blazor/Sdk/README.md).
 
 ## TypeScript and fixture tooling
 
@@ -69,12 +71,28 @@ The fixture generator script is intentionally run via Bun rather than `npx tsx` 
 ## What's new in v2
 
 - **Packages are published under the `Purview.*` IDs.** The core `Purview.ZodSharp` package ships the validator and the source generator, with optional `Purview.ZodSharp.SystemTextJson`, `Purview.ZodSharp.NewtonsoftJson`, and `Purview.ZodSharp.AspNetCore` integration packages.
-- **Targets `net8.0`, `net9.0`, `net10.0`, and `net11.0`.** The source generator remains on `netstandard2.0` so it can run in any compiler host.
+- **Targets `net10.0` and `net11.0`** (3.0.0 dropped `net8.0` and `net9.0`; stay on 2.4.x for those). The source generator remains on `netstandard2.0` so it can run in any compiler host.
 - **System.Text.Json integration.** JSON deserialize-and-validate is available for both major JSON libraries, including validating `JsonConverter<T>` instances.
 - **JSON Schema interoperability.** Schemas can be exported via `Z.ToJsonSchema` and imported via `Z.FromJsonSchema`, enabling cross-language reuse with TypeScript/Zod. The import API lives in the JSON integration package's namespace (`ZodSharp.JsonSchema.SystemTextJson` or `ZodSharp.JsonSchema.NewtonsoftJson`); export stays in the core package.
-- **ASP.NET Core ProblemDetails integration.** Failed validation results convert directly to `HttpValidationProblemDetails` via `result.ToHttpValidationProblemDetails()`.
+- **ASP.NET Core ProblemDetails integration.** Failed validation results convert directly to `HttpValidationProblemDetails` via `result.ToHttpValidationProblemDetails(httpContext)`, which applies the application's `ZodProblemDetailsOptions`.
 - **Expanded DataAnnotations support.** `[Length]`, `[MinLength]`, `[MaxLength]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and more, with structured size failures (`Code`, `Origin`, `Minimum`/`Maximum`, `Inclusive`, `Path`).
 - **Value-first composition methods.** `.ApplyAnd()`, `.ApplyOr()`, and `.ApplyRefine()` are the supported composition surface.
+
+## .NET 11 validation
+
+On `net11.0`, ZodSharp plugs into the platform's own validation (Microsoft.Extensions.Validation), so minimal APIs and
+Blazor validate ZodSharp types with ZodSharp and every host reports the same error contract: Zod-style `Code`/`Category`,
+canonical paths (`Items[0].Name`, `Map[en]`, `Map["0"]`), typed bounds and localizable messages.
+
+| Package | What it adds |
+| --- | --- |
+| `Purview.ZodSharp.Extensions.Validation` | The Microsoft.Extensions.Validation bridge (`AddZodSharpValidation()`); WebAssembly-safe. See [Microsoft.Extensions.Validation](docs/wiki/Microsoft-Extensions-Validation.md) |
+| `Purview.ZodSharp.AspNetCore.OpenApi` | OpenAPI transformers that describe ZodSharp's constraints and validation problem responses (`options.AddZodSharp()`). See [OpenAPI Integration](docs/wiki/OpenAPI-Integration.md) |
+| `Purview.ZodSharp.Blazor` | Blazor Server and WebAssembly form validation. See [Blazor Integration](docs/wiki/Blazor-Integration.md) |
+
+`Purview.ZodSharp.AspNetCore` uses the bridge on `net11.0` to produce full-fidelity ProblemDetails from the built-in
+pipeline ([ASP.NET Core Integration](docs/wiki/AspNetCore-Integration.md)), and messages are localized through
+`IZodMessageFormatter` ([Localization](docs/wiki/Localization.md)).
 
 ## Usage Examples
 
@@ -189,7 +207,7 @@ catch (ZodException ex)
     Console.WriteLine($"Validation failed: {ex.Message}");
     foreach (var error in ex.Errors)
     {
-        Console.WriteLine($"  - {string.Join(".", error.Path)}: {error.Message}");
+        Console.WriteLine($"  - {error.FullPath.ToDottedString()}: {error.Message} ({error.Code})");
     }
 }
 
@@ -322,7 +340,7 @@ src/
 └── tests/                     # TUnit test projects
 ```
 
-The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net8.0`, `net9.0`, `net10.0` and `net11.0`.
+The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net10.0` and `net11.0`.
 
 ## Advanced Features
 
@@ -581,7 +599,7 @@ Other supported DataAnnotations validators:
 Structured size failures expose:
 
 - `Code`: `too_small` or `too_big`
-- `Origin`: `string`, `array`, or `collection`
+- `Origin`: `string`, `array` or `record`
 - `Minimum` / `Maximum`
 - `Inclusive`
 - `Path`
@@ -609,21 +627,21 @@ var result = BasketSchema.Validate(new Basket { Items = ["apple"] });
 Install `Purview.ZodSharp.AspNetCore` to convert failed validation results into standard ASP.NET Core payloads while preserving structured issues:
 
 ```csharp
-using ZodSharp.AspNetCore;
+using ZodSharp;              // ToHttpValidationProblemDetails / ToValidationProblem
+using ZodSharp.AspNetCore;   // ZodTypedResults
 
-var result = BasketSchema.Validate(basket);
-
-if (!result.IsSuccess)
+app.MapPost("/baskets", (Basket basket, HttpContext httpContext) =>
 {
-    var problem = result.ToHttpValidationProblemDetails();
-    return Results.ValidationProblem(
-        problem.Errors,
-        extensions: new Dictionary<string, object?>
-        {
-            ["issues"] = problem.Extensions["issues"]
-        });
-}
+    var result = BasketSchema.Validate(basket);
+    return result.IsSuccess
+        ? Results.Ok(result.Value)
+        : result.ToValidationProblem(httpContext); // errors + issues + traceId, ErrorType status
+});
 ```
+
+Every path - this extension, `ZodTypedResults`, the `WithZodSharpValidation()` endpoint filter, `ZodExceptionHandler`
+and, on .NET 11, the built-in validation pipeline - writes the same body. See
+[ASP.NET Core Integration](docs/wiki/AspNetCore-Integration.md).
 
 ### Span<T> Validation
 

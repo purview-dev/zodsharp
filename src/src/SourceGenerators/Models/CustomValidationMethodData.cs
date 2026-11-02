@@ -36,4 +36,15 @@ readonly record struct CustomValidationMethodData(
 	);
 
 	public bool HasCustomValidation => IsValid && InvocationKind != CustomValidationInvocationKind.None;
-};
+
+	/// <summary>
+	/// Whether the method takes the caller's services: <c>(T value, IServiceProvider services, CancellationToken ct)</c>.
+	/// </summary>
+	public bool RequiresServices { get; init; }
+
+	/// <summary>
+	/// The members declared by <c>[ZodAsyncMember]</c> on the method; member-level async validation runs the method
+	/// only for these.
+	/// </summary>
+	public EquatableArray<string> AsyncMembers { get; init; } = new([]);
+}

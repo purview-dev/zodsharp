@@ -1,12 +1,20 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ZodSharp.AspNetCore;
 using ZodSharp.Core;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
+	const string GraphScanRequirement =
+		"Walks the assembly reference graph, which a trimmer can remove (Assembly.GetReferencedAssemblies). Register "
+		+ "validators with the generated AddZodSharp{AssemblyId}Schemas() extension (or AddZodSharpAssembly) instead.";
+
 	extension(IServiceCollection services)
 	{
 		/// <summary>
@@ -27,11 +35,12 @@ public static class ServiceCollectionExtensions
 				{
 					ConfigureFactory = options.ConfigureFactory,
 					ScanAssemblies = [.. options.ScanAssemblies],
-					ScanAssemblyGraphs = [.. options.ScanAssemblyGraphs],
+					ScanAssemblyGraphs = ReadGraphRoots(options),
 					ScanLoadedAssemblies = options.ScanLoadedAssemblies,
 				}
 			);
 			services.TryAddSingleton<IZodSchemaFactory>(CreateFactory);
+			AddProblemDetailsWriter(services);
 
 			return services;
 		}
@@ -76,6 +85,7 @@ public static class ServiceCollectionExtensions
 		/// validators.</remarks>
 		/// <typeparam name="T">The type whose assembly graph is scanned for generated validators.</typeparam>
 		/// <returns>The <see cref="IServiceCollection"/> instance for chaining.</returns>
+		[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 		public IServiceCollection AddZodSharpAssemblyGraph<T>() =>
 			AddZodSharpAssemblyGraph(services, typeof(T).Assembly);
 
@@ -84,6 +94,7 @@ public static class ServiceCollectionExtensions
 		/// </summary>
 		/// <param name="type">The type whose assembly contains the ZodSharp definitions to register.</param>
 		/// <returns>The service collection for chaining additional registrations.</returns>
+		[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 		public IServiceCollection AddZodSharpAssemblyGraph(Type type)
 		{
 			ArgumentNullException.ThrowIfNull(type);
@@ -94,6 +105,7 @@ public static class ServiceCollectionExtensions
 		/// <summary>
 		/// Registers a root assembly whose referenced assembly graph should be scanned for generated validators.
 		/// </summary>
+		[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 		public IServiceCollection AddZodSharpAssemblyGraph(Assembly rootAssembly)
 		{
 			ArgumentNullException.ThrowIfNull(rootAssembly);
@@ -118,12 +130,25 @@ public static class ServiceCollectionExtensions
 		}
 
 		/// <summary>
-		/// Registers <see cref="ZodExceptionHandler"/> as an <see cref="AspNetCore.Diagnostics.IExceptionHandler"/>
-		/// and configures <see cref="ZodProblemDetailsOptions"/>.
+		/// Registers <see cref="ZodExceptionHandler"/> as an <see cref="AspNetCore.Diagnostics.IExceptionHandler"/>,
+		/// the shared <see cref="ZodProblemDetailsWriter"/> and ASP.NET Core's ProblemDetails service, and configures
+		/// <see cref="ZodProblemDetailsOptions"/>.
 		/// </summary>
 		/// <remarks>
 		/// <para>
 		/// Requires <c>app.UseExceptionHandler()</c> in the request pipeline for the handler to be invoked.
+		/// </para>
+		/// <para>
+		/// Also adds the ZodSharp ProblemDetails JSON metadata to the minimal-API <c>JsonOptions</c> resolver chain,
+		/// so the payload serializes under Native AOT.
+		/// </para>
+		/// <para>
+		/// On .NET 11 it also enriches the built-in Microsoft.Extensions.Validation pipeline (<c>AddZodSharpValidation()</c>):
+		/// it registers a report sink that collects the bridge's full errors on the current request (<c>ZodRequestValidationReport</c>, in <c>HttpContext.Features</c>) and composes a
+		/// <see cref="ProblemDetailsOptions.CustomizeProblemDetails"/> callback that rewrites the pipeline's
+		/// <see cref="HttpValidationProblemDetails"/> with <see cref="ZodProblemDetailsWriter.Apply(HttpValidationProblemDetails, ReadOnlySpan{ValidationError}, HttpContext?)"/> and mirrors the
+		/// status to the response. The ZodSharp callback runs first and any callback the application configures - before
+		/// or after this call - runs after it, so the application keeps the last word.
 		/// </para>
 		/// </remarks>
 		public IServiceCollection AddZodSharpProblemDetails(
@@ -136,23 +161,83 @@ public static class ServiceCollectionExtensions
 			if (configure is not null)
 				services.Configure(configure);
 
+			AddProblemDetailsWriter(services);
 			services.AddExceptionHandler<ZodExceptionHandler>();
+			AddBindingFailureHandling(services);
+#if NET11_0_OR_GREATER
+			AddValidationPipelineEnrichment(services);
+#endif
 
 			return services;
 		}
 	}
 
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "Assembly scanning for generated validators cannot be followed by a trimmer. The "
-			+ "requirement is surfaced on the public AddZodSharp* registration methods, which is where a "
-			+ "host opts into scanning; a trimmed or Native AOT host registers validators explicitly."
-	)]
+#if NET11_0_OR_GREATER
+	/// <summary>
+	/// Enriches the built-in Microsoft.Extensions.Validation pipeline's ProblemDetails with the ZodSharp contract: a
+	/// per-request <see cref="ZodRequestValidationReport"/> (in <c>HttpContext.Features</c>) collects the bridge's full errors, and a
+	/// composed <see cref="ProblemDetailsOptions.CustomizeProblemDetails"/> callback rewrites the response from it.
+	/// </summary>
+	static void AddValidationPipelineEnrichment(IServiceCollection services)
+	{
+		// The sink stores errors on the current HTTP request, not in the DI scope: a Blazor Server circuit is one
+		// long-lived scope, and a scoped collector there would only ever grow.
+		services.AddHttpContextAccessor();
+		services.TryAddSingleton<
+			ZodSharp.Extensions.Validation.IZodValidationReportSink,
+			HttpRequestValidationReportSink
+		>();
+		services.TryAddEnumerable(
+			ServiceDescriptor.Singleton<
+				IPostConfigureOptions<ProblemDetailsOptions>,
+				ZodValidationProblemDetailsCustomizer
+			>()
+		);
+	}
+#endif
+
+	/// <summary>
+	/// Honours <see cref="ZodProblemDetailsOptions.HandleBindingFailures"/>: a post-configuration, so it wins over the
+	/// host's environment-based default whichever order the registrations were made in. Registering it more than once
+	/// only sets the same value again.
+	/// </summary>
+	static void AddBindingFailureHandling(IServiceCollection services) =>
+		services
+			.AddOptions<RouteHandlerOptions>()
+			.PostConfigure<IOptions<ZodProblemDetailsOptions>>(
+				static (routeHandler, zod) =>
+				{
+					if (zod.Value.HandleBindingFailures)
+						routeHandler.ThrowOnBadRequest = true;
+				}
+			);
+
+	static void AddProblemDetailsWriter(IServiceCollection services)
+	{
+		services.AddOptions<ZodProblemDetailsOptions>();
+		services.TryAddSingleton(static sp => new ZodProblemDetailsWriter(
+			sp.GetRequiredService<IOptions<ZodProblemDetailsOptions>>(),
+			sp.GetService<IZodMessageFormatter>(),
+			sp.GetService<ILogger<ZodProblemDetailsWriter>>()
+		));
+
+		if (!services.Any(static descriptor => descriptor.ServiceType == typeof(ZodProblemDetailsJsonMarker)))
+		{
+			services.AddSingleton<ZodProblemDetailsJsonMarker>();
+			services.ConfigureHttpJsonOptions(static options =>
+				options.SerializerOptions.TypeInfoResolverChain.Add(ZodProblemDetailsJsonContext.Default)
+			);
+		}
+	}
+
 	static ZodSchemaFactory CreateFactory(IServiceProvider serviceProvider)
 	{
 		ZodSchemaFactory factory = new();
 		var configuration = serviceProvider.GetService<ZodSchemaFactoryConfiguration>();
+
+		// Trim-safe registrations added by the generated AddZodSharp{Assembly}Schemas() extensions.
+		foreach (var registration in serviceProvider.GetServices<ZodSchemaRegistration>())
+			registration.Register(factory);
 
 		configuration?.ConfigureFactory?.Invoke(factory);
 
@@ -180,18 +265,7 @@ public static class ServiceCollectionExtensions
 			)
 				yield return registration.Assembly;
 
-		foreach (var assembly in GetAssembliesFromGraphs(configuration?.ScanAssemblyGraphs ?? [], seenAssemblyNames))
-			yield return assembly;
-
-		foreach (
-			var assembly in GetAssembliesFromGraphs(
-				serviceProvider
-					.GetServices<ZodSchemaAssemblyRegistration>()
-					.Where(static registration => registration.Kind == ZodSchemaAssemblyRegistrationKind.Graph)
-					.Select(static registration => registration.Assembly),
-				seenAssemblyNames
-			)
-		)
+		foreach (var assembly in GetGraphAssemblies(serviceProvider, configuration, seenAssemblyNames))
 			yield return assembly;
 
 		if (
@@ -203,19 +277,37 @@ public static class ServiceCollectionExtensions
 					yield return assembly;
 	}
 
+	// Graph scanning needs Assembly.GetReferencedAssemblies, which trimming can invalidate. It is opted into only through
+	// [RequiresUnreferencedCode] APIs (AddZodSharpAssemblyGraph, ScanAssemblyGraphs), so the requirement is stated where
+	// the application opts in. The walk is also removed when trimming, because ZodReflectionFeature is a feature guard.
+	static IReadOnlyList<Assembly> ReadGraphRoots(ZodSchemaFactoryOptions options) =>
+		ZodReflectionFeature.IsSupported ? [.. options.ScanAssemblyGraphs] : [];
+
+	static IEnumerable<Assembly> GetGraphAssemblies(
+		IServiceProvider serviceProvider,
+		ZodSchemaFactoryConfiguration? configuration,
+		HashSet<string> seenAssemblyNames
+	) =>
+		ZodReflectionFeature.IsSupported
+			? GetAssembliesFromGraphs(
+				[
+					.. configuration?.ScanAssemblyGraphs ?? [],
+					.. serviceProvider
+						.GetServices<ZodSchemaAssemblyRegistration>()
+						.Where(static registration => registration.Kind == ZodSchemaAssemblyRegistrationKind.Graph)
+						.Select(static registration => registration.Assembly),
+				],
+				seenAssemblyNames
+			)
+			: [];
+
 	/// <remarks>
 	/// Walking an assembly's reference graph cannot be followed by a trimmer, which may also have removed
 	/// the references entirely. Prefer <c>ScanAssemblies</c> with an explicit assembly, or register
 	/// validators directly, in a trimmed or Native AOT host — the graph walk also loads the whole
 	/// transitive closure at container-build time, which is a measurable startup cost in a large solution.
 	/// </remarks>
-	[System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-		"Trimming",
-		"IL2026:RequiresUnreferencedCode",
-		Justification = "Only reached when a host opts into graph scanning via ScanAssemblyGraphs. The "
-			+ "alternative — naming assemblies explicitly, or registering validators directly — is "
-			+ "documented on the option and is what a trimmed or Native AOT host should use."
-	)]
+	[System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode(GraphScanRequirement)]
 	static IEnumerable<Assembly> GetAssembliesFromGraphs(
 		IEnumerable<Assembly> rootAssemblies,
 		HashSet<string> seenAssemblyNames

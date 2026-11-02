@@ -2,6 +2,9 @@
 
 ## Install
 
+The packages target `net10.0` and `net11.0` (the .NET 11 integrations target `net11.0` only). Applications on
+`net8.0` or `net9.0` stay on the 2.4.x line.
+
 ```bash
 dotnet add package Purview.ZodSharp
 ```
@@ -52,7 +55,7 @@ var result = nameSchema.SafeParse("AB"); // non-throwing
 if (!result.IsSuccess)
 {
     foreach (var error in result.Errors)
-        Console.WriteLine($"  - {string.Join(".", error.Path)}: {error.Message}");
+        Console.WriteLine($"  - {error.FullPath.ToDottedString()}: {error.Message}");
 }
 ```
 

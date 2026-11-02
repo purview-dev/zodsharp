@@ -1,0 +1,28 @@
+@* The inputs of one Address. The FieldIdentifiers are (Address, "Street") and so on, which is where the ZodSharp bridge
+   places a nested error such as ShippingAddress.City or AdditionalAddresses[billing].PostCode. *@
+
+<label for="@($"{IdPrefix}-street")">Street</label>
+<InputText id="@($"{IdPrefix}-street")" @bind-Value="Address.Street" />
+<ValidationMessage For="() => Address.Street" />
+
+<label for="@($"{IdPrefix}-city")">City</label>
+<InputText id="@($"{IdPrefix}-city")" @bind-Value="Address.City" />
+<ValidationMessage For="() => Address.City" />
+
+<label for="@($"{IdPrefix}-postcode")">Post code</label>
+<InputText id="@($"{IdPrefix}-postcode")" @bind-Value="Address.PostCode" />
+<ValidationMessage For="() => Address.PostCode" />
+
+@code {
+	/// <summary>
+	/// Gets or sets the address being edited.
+	/// </summary>
+	[Parameter, EditorRequired]
+	public Address Address { get; set; } = default!;
+
+	/// <summary>
+	/// Gets or sets the prefix of the input ids.
+	/// </summary>
+	[Parameter, EditorRequired]
+	public string IdPrefix { get; set; } = default!;
+}

@@ -15,5 +15,5 @@ Keep product, architecture, and general engineering standards centralized in `AG
 
 - Apply the `AGENTS.md` testing bar strictly (TUnit/TUnit.Mocks, AAA comments, naming, cancellation token rule).
 - Treat work as incomplete until relevant tests pass.
-- Consult the repository `.agents/` folder for additional skills/workflows that may improve execution quality.
+- Before specialist work, load the relevant installed skill from `.agents/skills/` (committed, with `skills-lock.json`); `AGENTS.md` ("Installed skills") lists each one, when to load it, and how to add or update them. Install only into `.agents/` (`-a universal`), never into `.claude/` or another per-agent folder.
 - Keep edits minimal, focused, and aligned with existing SDK and repository conventions.

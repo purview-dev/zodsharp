@@ -23,8 +23,6 @@ public class ZodObject(
 	ImmutableHashSet<string>? requiredKeys = null
 ) : ZodType<Dictionary<string, object?>, Dictionary<string, object?>>
 {
-	static readonly string[] EmptyPath = [];
-
 	/// <summary>
 	/// The object shape: a map of field names to their schemas.
 	/// </summary>
@@ -60,19 +58,36 @@ public class ZodObject(
 	{
 		if (value == null)
 		{
-			return ValidationResult<Dictionary<string, object?>>.Failure(
-				new ValidationError("invalid_type", "Expected object, but got null", EmptyPath)
-			);
+			return ValidationResult<Dictionary<string, object?>>.Failure(ZodIssues.NullValue(ZodTypeNames.Object));
 		}
 
 		List<ValidationError>? errors = null;
 		Dictionary<string, object?>? rebuilt = null;
+		List<string>? unrecognizedKeys = null;
 
 		foreach (var (key, schema) in shape)
 			ValidateField(value, key, schema, ref errors, ref rebuilt);
 
 		foreach (var (key, propertyValue) in value)
-			ValidateUnknownKey(value, key, propertyValue, ref errors, ref rebuilt);
+			ValidateUnknownKey(value, key, propertyValue, ref errors, ref rebuilt, ref unrecognizedKeys);
+
+		// Zod reports every unrecognized key in one issue at the object's own path.
+		if (unrecognizedKeys is { Count: > 0 })
+		{
+			(errors ??= []).Add(
+				ZodIssues.Formatted(
+					ZodIssueCodes.UnrecognizedKeys,
+					ZodIssueCategories.UnrecognizedKeys,
+					ZodMessages.UnrecognizedKeys,
+					ZodPath.Root,
+					ZodTypeNames.Object,
+					new Dictionary<string, object?>(StringComparer.Ordinal)
+					{
+						[ZodIssueParameters.Keys] = ImmutableArray.CreateRange(unrecognizedKeys),
+					}
+				)
+			);
+		}
 
 		if (errors is { Count: > 0 })
 			return ValidationResult<Dictionary<string, object?>>.Failure(errors);
@@ -105,7 +120,7 @@ public class ZodObject(
 			if (!allowsMissing)
 			{
 				errors ??= [];
-				errors.Add(new ValidationError("missing_field", $"Required field '{key}' is missing", [key]));
+				errors.Add(ZodIssues.MissingField(key, ZodPath.Member(key)));
 				return;
 			}
 
@@ -124,14 +139,9 @@ public class ZodObject(
 		if (!result.IsSuccess)
 		{
 			errors ??= [];
+			var segment = ZodPathSegment.Member(key);
 			foreach (var error in result.Errors)
-			{
-				var path = new string[error.Path.Length + 1];
-				path[0] = key;
-
-				error.Path.CopyTo(0, path, 1, error.Path.Length);
-				errors.Add(new(error.Code, error.Message, path, error.Parameters));
-			}
+				errors.Add(error.WithPathPrefix(segment));
 
 			return;
 		}
@@ -148,7 +158,8 @@ public class ZodObject(
 		string key,
 		object? propertyValue,
 		ref List<ValidationError>? errors,
-		ref Dictionary<string, object?>? rebuilt
+		ref Dictionary<string, object?>? rebuilt,
+		ref List<string>? unrecognizedKeys
 	)
 	{
 		if (shape.ContainsKey(key))
@@ -160,13 +171,9 @@ public class ZodObject(
 			if (!catchallResult.IsSuccess)
 			{
 				errors ??= [];
+				var segment = ZodPathSegment.Member(key);
 				foreach (var error in catchallResult.Errors)
-				{
-					var path = new string[error.Path.Length + 1];
-					path[0] = key;
-					error.Path.CopyTo(0, path, 1, error.Path.Length);
-					errors.Add(new(error.Code, error.Message, path, error.Parameters));
-				}
+					errors.Add(error.WithPathPrefix(segment));
 			}
 			else
 			{
@@ -182,8 +189,7 @@ public class ZodObject(
 			case UnknownKeyPolicy.Passthrough:
 				break;
 			case UnknownKeyPolicy.Strict:
-				errors ??= [];
-				errors.Add(new ValidationError("unrecognized_key", $"Unrecognized key '{key}'", [key]));
+				(unrecognizedKeys ??= []).Add(key);
 				break;
 			default:
 				// Strip: drop the unknown key by forcing the rebuilt copy.

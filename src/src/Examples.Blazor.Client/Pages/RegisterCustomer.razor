@@ -1,0 +1,20 @@
+@page "/register"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Interactive WebAssembly - ZodValidator</PageTitle>
+
+<h1>Register a customer</h1>
+<p>
+	<strong>Interactive WebAssembly, route 2:</strong> <code>&lt;ZodValidator&gt;</code> validates in the browser as you
+	type (debounced by 300 ms) and keeps every error's code, shown after each message. The email is checked for
+	uniqueness by a service-aware async rule - try <code>@InMemoryCustomerEmailRegistry.SeededEmail</code>.
+</p>
+<p>
+	Registering posts from the browser with <code>Purview.ZodSharp.Http</code>: <code>PostAsJsonValidatedAsync</code>
+	validates again with the browser's services, so an invalid registration is never sent, and the response is read
+	with <code>ReadFromJsonAndValidateAsync</code>. The second button posts without validating, so the server's
+	ProblemDetails are read with <code>TryReadZodValidationProblemAsync</code> and mapped back onto the fields. The
+	<a href="register-server">Interactive Server page</a> renders the same form.
+</p>
+
+<RegisterCustomerForm />

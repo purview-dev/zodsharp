@@ -10,14 +10,11 @@ public class SchemaCacheTests
 		var key = CreateKey();
 		var invocationCount = 0;
 
-		var schema = SchemaCache.GetOrCreate(
-			key,
-			() =>
-			{
-				invocationCount++;
-				return Z.String();
-			}
-		);
+		var schema = SchemaCache.GetOrCreate(key, () =>
+		{
+			invocationCount++;
+			return Z.String();
+		});
 
 		try
 		{
@@ -38,23 +35,17 @@ public class SchemaCacheTests
 
 		try
 		{
-			var first = SchemaCache.GetOrCreate(
-				key,
-				() =>
-				{
-					invocationCount++;
-					return Z.String();
-				}
-			);
+			var first = SchemaCache.GetOrCreate(key, () =>
+			{
+				invocationCount++;
+				return Z.String();
+			});
 
-			var second = SchemaCache.GetOrCreate(
-				key,
-				() =>
-				{
-					invocationCount++;
-					return Z.String().Min(10);
-				}
-			);
+			var second = SchemaCache.GetOrCreate(key, () =>
+			{
+				invocationCount++;
+				return Z.String().Min(10);
+			});
 
 			await Assert.That(ReferenceEquals(first, second)).IsTrue();
 			await Assert.That(invocationCount).IsEqualTo(1);

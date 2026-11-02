@@ -14,10 +14,19 @@ public readonly record struct FiniteRule<T> : Core.IValidationRule<T>, Core.IZod
 	/// <summary>Gets the Zod-compatible error code reported when the rule fails.</summary>
 	public const string ErrorCode = "not_finite";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the offending value.</summary>
-	public const string MessageFormat = "Number must be finite, but got {0}";
+	/// <summary>Gets the message format. The default never contains the input; a custom message may use <c>{0}</c> for the offending value.</summary>
+	public const string MessageFormat = "Number must be finite";
 
-	readonly string _message;
+	static readonly string?[] TemplateNames = [RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
+
+	static readonly IReadOnlyDictionary<string, object?> FiniteParameters = RuleParameters.One(
+		Core.ZodIssueParameters.Expected,
+		Core.ZodTypeNames.Number
+	);
+
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the FiniteRule struct.
@@ -26,7 +35,7 @@ public readonly record struct FiniteRule<T> : Core.IValidationRule<T>, Core.IZod
 	/// <param name="code">Optional error code override. If one is not specified then the <see cref="ErrorCode"/> is used.</param>
 	public FiniteRule(string? message = null, string? code = null)
 	{
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -59,5 +68,12 @@ public readonly record struct FiniteRule<T> : Core.IValidationRule<T>, Core.IZod
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.Number;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidType;
+
+	IReadOnlyDictionary<string, object?>? Core.IZodRule.Parameters => FiniteParameters;
 }

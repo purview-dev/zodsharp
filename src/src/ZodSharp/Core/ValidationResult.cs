@@ -45,7 +45,9 @@ public readonly record struct ValidationResult<T>
 	{
 		var isSuccess = lhs.IsSuccess && rhs.IsSuccess;
 		var value = lhs.Value ?? rhs.Value ?? default;
-		var errors = lhs.Errors.AddRange(rhs.Errors);
+		// A default(ValidationResult<T>) carries a default array; treat it as having no errors.
+		var lhsErrors = lhs.Errors.IsDefault ? [] : lhs.Errors;
+		var errors = rhs.Errors.IsDefaultOrEmpty ? lhsErrors : lhsErrors.AddRange(rhs.Errors);
 
 		return new(isSuccess, value, errors);
 	}

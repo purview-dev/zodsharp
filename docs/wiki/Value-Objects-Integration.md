@@ -143,7 +143,7 @@ public const string MessageFormat = "Value must not be empty.";
 ```
 
 - `ErrorCode` is the rule's canonical code — the value a test compares against (`Assert.That(error.Code).IsEqualTo(NotEmptyRule<AssetId>.ErrorCode)`).
-- `MessageFormat` is a `string.Format` template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments; use it with `string.Format(CultureInfo.CurrentCulture, MessageFormat, …)`.
+- `MessageFormat` is a `string.Format` template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments; format it with `RuleMessage.Format(MessageFormat, …)` (invariant culture, never throws).
 - The constants may be inherited from a base rule class, and **abstract bases are exempt**, so a shared base can host them for its concrete derivations.
 
 A rule that omits either constant is reported as **ZODSGEN042** (a warning).
@@ -290,6 +290,11 @@ if (!assetIdCustomRule0.IsValid(value))
 ```
 
 The reported error keeps the **empty path**, and the error identity (`Code`/`Origin`) is read from the **wrapped** rule, not the adapter.
+
+Whether the wrapped rule has an identity is decided when the schema is generated: a rule that implements `IZodRule` is
+passed with a direct cast, and one that does not is passed as `null`. Generated code never tests a boxed rule at runtime
+(`(object)rule as IZodRule`), which crashed the Mono AOT compiler, so a scalar with a type-level rule publishes for
+Blazor WebAssembly with `RunAOTCompilation=true`.
 
 > [!NOTE]
 > If the type has no value-object contract (a plain class with a `Guid` property), the property-level form still works: map the attribute to an `IValidationRule<Guid>` and put it on `Value`. See [Exposing a rule as a DataAnnotations attribute](Custom-Rules.md#exposing-a-rule-as-a-dataannotations-attribute) and [Generic rules](Custom-Rules.md#generic-rules).

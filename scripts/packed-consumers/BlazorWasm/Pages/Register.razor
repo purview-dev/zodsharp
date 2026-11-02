@@ -1,0 +1,35 @@
+@page "/"
+
+<h1>Register</h1>
+
+<EditForm Model="_model" OnValidSubmit="Submit">
+	<ZodValidator ValidateOn="@(ZodValidationTrigger.Change | ZodValidationTrigger.Input)" DebounceMilliseconds="300" />
+
+	<label for="name">Name</label>
+	<InputText id="name" @bind-Value="_model.Name" />
+	<ZodValidationMessage For="() => _model.Name" ShowCode="true" />
+
+	<label for="email">Email</label>
+	<InputText id="email" @bind-Value="_model.Email" />
+	<ZodValidationMessage For="() => _model.Email" ShowCode="true" />
+
+	<label for="city">City</label>
+	<InputText id="city" @bind-Value="_model.Address.City" />
+	<ZodValidationMessage For="() => _model.Address.City" />
+
+	<ZodValidationSummary />
+
+	<button type="submit">Register</button>
+</EditForm>
+
+@if (_submitted)
+{
+	<p role="status">Registered @_model.Name.</p>
+}
+
+@code {
+	readonly Registration _model = new();
+	bool _submitted;
+
+	void Submit() => _submitted = true;
+}

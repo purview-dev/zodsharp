@@ -3,8 +3,9 @@ name: purview-zodsharp-json
 description: >-
   Use when combining Purview.ZodSharp with JSON - deserialize-and-validate and validating converters
   for System.Text.Json or Newtonsoft.Json, choosing between the two packages, exporting a schema to
-  JSON Schema with Z.ToJsonSchema, importing one with Z.FromJsonSchema, and sharing a contract with
-  TypeScript Zod.
+  JSON Schema with Z.ToJsonSchema, importing one with Z.FromJsonSchema, the invalid_json error and
+  converter exceptions, x-zod vendor extensions for OpenAPI, sharing a contract with TypeScript Zod, and
+  HttpClient bodies and server validation problems with Purview.ZodSharp.Http (WebAssembly-safe).
 license: MIT
 metadata:
   product: Purview.ZodSharp
@@ -26,8 +27,52 @@ Each adds deserialize-and-validate, a validating converter, and JSON Schema **im
 
 Both can be referenced from one project without `extern alias` — the JSON Schema types live in
 `ZodSharp.JsonSchema.SystemTextJson` / `ZodSharp.JsonSchema.NewtonsoftJson` — but the
-deserialize/serialize extension overloads share names, so **import exactly one package namespace per
-file**.
+deserialize/serialize extensions (`SystemTextJsonExtensions`, `NewtonsoftJsonExtensions`) are both in the
+`ZodSharp` namespace with the same names. With both referenced, a call that omits the options argument
+(`schema.DeserializeAndValidate(json)`, `DeserializeAndValidateAsync(stream[, ct])`, `ValidateAndSerialize(value)`,
+`ValidateAndSerializeAsync(value, output[, ct])`) resolves to System.Text.Json; pass a `JsonSerializerSettings`
+for Newtonsoft. `CreateValidatingConverter(schema)` stays ambiguous (CS0121): call the class directly,
+`NewtonsoftJsonExtensions.CreateValidatingConverter(schema)`.
+
+`Purview.ZodSharp.SystemTextJson` is browser-safe (Blazor WebAssembly). For `HttpClient` calls, add
+`Purview.ZodSharp.Http` (also browser-safe, `net10.0`+), which builds on it:
+
+```csharp
+// Validate before sending: an invalid value returns the errors and no request is made.
+var sent = await http.PostAsJsonValidatedAsync("api/orders", order, new OrderSchemaValidator(), AppJsonContext.Default.Order);
+
+// Validate while reading: unreadable JSON is an invalid_json error, never an exception.
+var read = await response.Content.ReadFromJsonAndValidateAsync(new OrderSchemaValidator(), AppJsonContext.Default.Order);
+
+// Read a ZodSharp ProblemDetails response back into ZodSharp errors.
+var errors = await response.TryReadZodValidationProblemAsync() is { } problem
+    ? problem.ToValidationErrors() // or problem.ToValidationResult<Order>()
+    : [];
+```
+
+Every `Purview.ZodSharp.Http` API takes a `JsonTypeInfo<T>`; there are no `JsonSerializerOptions` overloads.
+`ZodJsonContent.Create`/`CreateAsync` build a validated `JsonContent` for any other request. `Put`/`PatchAsJsonValidatedAsync`
+mirror `Post`, each with `string?` and `Uri?` URIs.
+
+**Service-aware rules** (`[ZodAsyncMember]` methods that resolve services) need the caller's `IServiceProvider`. Pass a
+generated `{TypeName}SchemaValidator` plus the services - a Blazor component's injected `IServiceProvider` (the
+browser's or the circuit's), `HttpContext.RequestServices` on a server:
+
+```csharp
+var sent = await http.PostAsJsonValidatedAsync("api/customers", customer,
+    new RegisterCustomerRequestSchemaValidator(), AppJsonContext.Default.RegisterCustomerRequest, services, ct);
+var read = await response.Content.ReadFromJsonAndValidateAsync(
+    new CustomerSchemaValidator(), AppJsonContext.Default.Customer, services, ct);
+```
+
+A generated validator with such a rule throws `InvalidOperationException` through an overload without services, so the
+rule is never skipped silently. `SystemTextJsonExtensions` has the same overload for `DeserializeAndValidateAsync` and
+`ValidateAndSerializeAsync`.
+
+Wrap the calls in one typed client and register it per host: `AddScoped<TClient>()` in a WebAssembly client,
+`AddHttpClient<TClient>(...)` on a server (created in the requesting scope, so its injected `IServiceProvider` is the
+circuit's or request's). In Blazor, `editContext.AddZodErrors(sent.Errors)` puts a rejected-before-sending result on the
+form's fields, and `AddZodProblemDetails(problem)` a server rejection.
 
 ## Deserialize and validate
 
@@ -52,7 +97,23 @@ var json = userSchema.ValidateAndSerialize(user);              // ValidationResu
 await userSchema.ValidateAndSerializeAsync(user, outputStream);
 ```
 
-Failures add `deserialization_failed` and `json_error` codes alongside the schema's own.
+A failure to read the JSON - malformed text, a `null` document, a value the serializer cannot convert, and on
+System.Text.Json a `NotSupportedException`/`InvalidOperationException` - is one error with code `invalid_json`
+(`SystemTextJsonExtensions.InvalidJsonCode` / `NewtonsoftJsonExtensions.InvalidJsonCode`), category
+`invalid_type` and the fixed message `"The JSON value could not be converted to {expected}."` (`expected` is a
+Zod type name). The serializer's path becomes the error's `FullPath` (`$.items[1].age` and Newtonsoft's
+`items[1].age` both become `items[1].age`); line and position become the `line` and `position` parameters. A
+System.Text.Json syntax error between members is located at the element (`items[1]`), and one inside a value read
+by a validating converter at that value, because it is buffered first. The
+serializer's own message is never surfaced, because it names CLR types and can quote the input. Schema failures
+keep the schema's own codes, and the Newtonsoft `DeserializeAndValidateAsync` awaits the schema's
+`ValidateAsync`.
+
+A converter that rejects its value with `new JsonException(message, zodException)` (a Purview.ValueObjects strict
+converter) is not `invalid_json`: System.Text.Json's `DeserializeAndValidate*` and `ReadFromJsonAndValidateAsync`
+return the `ZodException`'s errors under the member that held the value (`CustomerEmail.Value`, JSON names mapped
+back to member names through the `JsonTypeInfo<T>`), named after that member (`Field 'CustomerEmail' ...`).
+`ZodJsonExceptions.TryGetErrors(exception, rootTypeInfo, out errors)` does the same for any exception chain.
 
 ## Validating converters
 
@@ -65,8 +126,11 @@ var value = JsonSerializer.Deserialize<User>(json, options);
 var value2 = JsonConvert.DeserializeObject<User>(json, userSchema.CreateValidatingConverter());
 ```
 
-Invalid JSON **throws** — `JsonException` (STJ) or `JsonSerializationException` (Newtonsoft), with a
-`"Validation failed: …"` message. Each converter removes itself from the options/serializer it uses
+Invalid data **throws** `ZodJsonValidationException : JsonException` (STJ) or
+`ZodNewtonsoftJsonValidationException : JsonSerializationException` (Newtonsoft), both in `ZodSharp.Json`, with a
+`"Validation failed: …"` message (existing `catch (JsonException)` blocks keep working) and the full errors in
+`ImmutableArray<ValidationError> Errors`, located under the converted value's JSON path (`Owner.Name` for a
+failing nested `Owner`, including nested converters). `DeserializeAndValidate` unwraps them into the result. Each converter removes itself from the options/serializer it uses
 internally, to avoid recursing into itself.
 
 ## Which package differs how
@@ -78,7 +142,7 @@ internally, to avoid recursing into itself.
 | Converter return | generic `JsonConverter<T>` | non-generic `JsonConverter` |
 | `JToken` overload | no | yes |
 | Formatting | via options | explicit `Formatting` argument |
-| Invalid-data exception | `JsonException` | `JsonSerializationException` |
+| Invalid-data exception | `ZodJsonValidationException` (a `JsonException`) | `ZodNewtonsoftJsonValidationException` (a `JsonSerializationException`) |
 | Plumbing type | `JsonElement` | `JToken`/`JObject`/`JArray` |
 
 ## JSON Schema export
@@ -95,14 +159,23 @@ var jsonSchema = Z.ToJsonSchema<Dictionary<string, object?>>(userSchema, new ToJ
 
 `ToJsonSchemaOptions`: `IncludeSchema` (default `true`, emits `$schema`), `Id`, `Title`.
 
+`ToJsonSchemaConverter.ConvertUntyped(object schema, options)` (`ZodSharp.JsonSchema`) converts a schema or
+validator known only at runtime, unwrapping the `ZodSchemaValidator<T>`/`ZodUntypedValidator<T>` adapters.
+Rules with no JSON Schema keyword (`CidrRule`, `JWTRule`, an any-family `IPAddressRule`) are listed as
+unsupported and recorded as `x-zod-*` vendor extensions (`x-zod-cidr`, `x-zod-jwt`, `x-zod-ipVersion`) through
+`JsonSchemaDefinition.GetVendorExtensions()`/`SetVendorExtension(name, value)`. They are **not** serialized into
+the JSON Schema; hosts that carry them (the OpenAPI transformers) read them.
+
 `JsonSchemaDefinition` (`ZodSharp.JsonSchema`) is a mutable POCO mirroring the keywords — identity
 (`$schema`/`$id`/`$ref`), type and title, string/number/array/object constraints, composition
 (`anyOf`/`oneOf`/`allOf`), `enum`/`const`, `$defs` and draft-07 `definitions`, and the metadata
 keywords including OpenAPI 3.0 `nullable`.
 
 Covered schema types: `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`,
-`ZodUnion`, `ZodArray`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, `ZodLazy`. Notable
-behaviours:
+`ZodUnion`, `ZodDiscriminatedUnion` (as `oneOf`), `ZodArray`, `ZodLiteral`, `ZodNullable`,
+`ZodNativeEnum`/`ZodEnum`, `ZodLazy`. String formats: `IPAddress` exports `format: ipv4`/`ipv6`, `Duration`
+`format: duration`, `DateString` `format: date`, `DatetimeString` `format: date-time` plus its UTC pattern,
+`TimeString` a local-time pattern, and `Base64String` `contentEncoding: base64`. Notable behaviours:
 
 - objects emit `additionalProperties: false`;
 - literals emit `const` plus `type`;
@@ -183,6 +256,10 @@ Mapped keywords:
 - Objects — `required` and optional fields. Arrays — `items`, `minItems`, `maxItems` (a nullable item
   schema — `anyOf` with a `{"type":"null"}` branch — imports as a nullable element).
 
+Imported schemas report JSON kinds, never CLR types (`"Expected string, but got number"`); `minItems`/`maxItems`
+failures read like `ZodArray`'s (`"Array must have at least 2 elements, but got 1"`, origin `array`, both bounds);
+element and record-value errors use typed index and key segments.
+
 ### Limits
 
 `$ref` resolves **local** references only (`#/…`, for example `#/$defs/Name`). An external target
@@ -217,7 +294,14 @@ re-checks the fixtures under Zod and parses the C# output — closing the loop i
 If the C# output directory is empty, the vitest suite tells you to run the C# cross-platform tests
 first.
 
+## OpenAPI
+
+On ASP.NET Core 11, the `Purview.ZodSharp.AspNetCore.OpenApi` package feeds the same JSON Schema - including
+the `x-zod-*` vendor extensions - into the OpenAPI document (`options.AddZodSharp()` on `OpenApiOptions`), so
+the document describes exactly what ZodSharp enforces. See the `purview-zodsharp-aspnetcore` skill.
+
 ## Related skills
 
-`purview-zodsharp-core` for the schema API, and `purview-zodsharp-source-generator` for the generated
-validators that export through `BuildJsonSchema`.
+`purview-zodsharp-core` for the schema API and the error model, `purview-zodsharp-source-generator` for the
+generated validators that export through `BuildJsonSchema`, and `purview-zodsharp-aspnetcore` for
+ProblemDetails and OpenAPI.

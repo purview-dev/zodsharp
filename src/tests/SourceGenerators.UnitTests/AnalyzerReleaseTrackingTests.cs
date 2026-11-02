@@ -11,7 +11,8 @@ namespace ZodSharp.SourceGenerators;
 /// <remarks>
 /// <para>
 /// <c>ZODSGEN037</c>–<c>ZODSGEN044</c> are recorded under a <c>## Release 2.0.2</c> block,
-/// <c>ZODSGEN045</c> under <c>## Release 2.1.0</c>, and <c>ZODSGEN046</c> under <c>## Release 2.2.0</c>. A
+/// <c>ZODSGEN045</c> under <c>## Release 2.1.0</c>, <c>ZODSGEN046</c> under <c>## Release 2.2.0</c>, and
+/// <c>ZODSGEN047</c>–<c>ZODSGEN054</c> under <c>## Release 3.0.0</c>. A
 /// rule stays recorded under the release that introduced it, so an existing block is never rewritten. The
 /// unshipped file declares no rules; the next diagnostic added goes there and moves across when it ships.
 /// </para>
@@ -19,7 +20,7 @@ namespace ZodSharp.SourceGenerators;
 /// <see cref="RuleIdRegex"/> accepts a rule row with or without a leading pipe, because the two files are
 /// written in different table styles — <c>AnalyzerReleases.Shipped.md</c> delimits rows with pipes and
 /// <c>AnalyzerReleases.Unshipped.md</c> does not. Matching only the pipe-delimited form made
-/// <see cref="UnshippedRelease_GivenEveryRuleHasShipped_DeclaresNoRules"/> vacuous: a rule parked in the
+/// <see cref="UnshippedRelease_GivenUnreleasedRules_DeclaresExactlyThoseRules"/> vacuous: a rule parked in the
 /// unshipped file parsed as no rules at all, so the guard passed while the catalogue was wrong.
 /// </para>
 /// </remarks>
@@ -87,11 +88,20 @@ public partial class AnalyzerReleaseTrackingTests
 		"ZODSGEN045",
 		// Release 2.2.0.
 		"ZODSGEN046",
+		// Release 3.0.0.
+		"ZODSGEN047",
+		"ZODSGEN048",
+		"ZODSGEN049",
+		"ZODSGEN050",
+		"ZODSGEN051",
+		"ZODSGEN052",
+		"ZODSGEN053",
+		"ZODSGEN054",
 	];
 
 	/// <summary>
-	/// Rules added since the last release. Empty: every rule is recorded as shipped. A new or changed
-	/// diagnostic is added here and moves into <c>AnalyzerReleases.Shipped.md</c> when it ships.
+	/// Rules added since the last release. A new or changed diagnostic is added here and moves into
+	/// <c>AnalyzerReleases.Shipped.md</c> when it ships.
 	/// </summary>
 	static readonly string[] ExpectedUnshippedRuleIds = [];
 
@@ -108,11 +118,15 @@ public partial class AnalyzerReleaseTrackingTests
 		await Assert.That(markdown).Contains("## Release 2.0.0");
 		await Assert.That(markdown).Contains("## Release 2.0.2");
 		await Assert.That(markdown).Contains("## Release 2.1.0");
+		await Assert.That(markdown).Contains("## Release 2.2.0");
+		await Assert.That(markdown).Contains("## Release 3.0.0");
 		await Assert.That(SortedRuleIds(ruleIds)).IsEqualTo(SortedRuleIds(ExpectedShippedRuleIds));
 	}
 
 	[Test]
-	public async Task UnshippedRelease_GivenEveryRuleHasShipped_DeclaresNoRules(CancellationToken cancellationToken)
+	public async Task UnshippedRelease_GivenUnreleasedRules_DeclaresExactlyThoseRules(
+		CancellationToken cancellationToken
+	)
 	{
 		// Arrange
 		var markdown = await ReadReleaseFileAsync("AnalyzerReleases.Unshipped.md", cancellationToken);
@@ -120,7 +134,7 @@ public partial class AnalyzerReleaseTrackingTests
 		// Act
 		var ruleIds = ReadRuleIds(markdown);
 
-		// Assert — the header stays so the file keeps its purpose; it just declares nothing right now.
+		// Assert — the header stays so the file keeps its purpose, and it declares exactly the unreleased rules.
 		await Assert.That(markdown).Contains("; Unshipped analyzer release");
 		await Assert.That(SortedRuleIds(ruleIds)).IsEqualTo(SortedRuleIds(ExpectedUnshippedRuleIds));
 	}

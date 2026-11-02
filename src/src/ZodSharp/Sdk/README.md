@@ -8,8 +8,11 @@ A high-performance schema validation library for C#, ported from TypeScript [Zod
 This package is the core library. It also ships the `[ZodSchema]` source generator and JSON Schema **export** (`Z.ToJsonSchema`). JSON Schema **import** (`Z.FromJsonSchema`) and JSON serialization integrations are available in the companion packages:
 
 - [Purview.ZodSharp.SystemTextJson](https://www.nuget.org/packages/Purview.ZodSharp.SystemTextJson) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.SystemTextJson.svg)](https://www.nuget.org/packages/Purview.ZodSharp.SystemTextJson)
+- [Purview.ZodSharp.Http](https://www.nuget.org/packages/Purview.ZodSharp.Http) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.Http.svg)](https://www.nuget.org/packages/Purview.ZodSharp.Http)
 - [Purview.ZodSharp.NewtonsoftJson](https://www.nuget.org/packages/Purview.ZodSharp.NewtonsoftJson) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.NewtonsoftJson.svg)](https://www.nuget.org/packages/Purview.ZodSharp.NewtonsoftJson)
 - [Purview.ZodSharp.AspNetCore](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.AspNetCore.svg)](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore)
+- [Purview.ZodSharp.Extensions.Validation](https://www.nuget.org/packages/Purview.ZodSharp.Extensions.Validation) (.NET 11) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.Extensions.Validation.svg)](https://www.nuget.org/packages/Purview.ZodSharp.Extensions.Validation)
+- [Purview.ZodSharp.AspNetCore.OpenApi](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore.OpenApi) (.NET 11) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.AspNetCore.OpenApi.svg)](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore.OpenApi)
 
 ## Installation
 
@@ -38,6 +41,23 @@ var userSchema = Z.Object()
     .Field("email", Z.String().Email())
     .Build();
 ```
+
+## Errors
+
+A failure is a list of `ValidationError`s, each carrying machine-readable identity rather than just a message:
+
+| Member | Meaning |
+| --- | --- |
+| `Code` | ZodSharp's specific code (`missing_field`, `invalid_length`, a rule's `ErrorCode`, ...) - the same failure reports the same code from every producer |
+| `Category` | the Zod v4 issue code (`invalid_type`, `too_small`, `too_big`, `invalid_format`, `invalid_union`, `custom`, ...; see `ZodIssueCategories`) |
+| `Message` / `MessageFormat` | the message and the named-placeholder template that produced it (`"{displayName} is required"`) |
+| `FullPath` | a typed `ZodPath`; `FullPath.ToDottedString()` renders `Items[0].Name`, `Map[en]`, `Map["0"]` |
+| `Origin`, `Lower`, `Upper` | the value's kind and its bounds, with inclusivity, for numbers, dates and sizes |
+| `Parameters` | values such as `expected`, `received`, `options`, `count`, `pattern`, `displayName` |
+
+Validation is culture-independent and messages never contain the input. Hosts re-render messages in the request
+culture through `IZodMessageFormatter` (`DefaultZodMessageFormatter` is included). `ZodErrorOptions.IncludeReceivedValues`
+(default `false`, development only) adds the raw input to the `received` parameter.
 
 ## Native unions (.NET 11+)
 
@@ -87,15 +107,40 @@ var validated = UserSchema.Parse(user); // throws on failure
 
 // Value-first composition methods (enable via EnableComposition, on by default):
 var adult = UserSchema.ApplyRefine(user, u => u.Age >= 18, "Must be adult");
+
+// Async and service-aware validation, one member at a time, and typed paths:
+var full = await UserSchema.ValidateAsync(user, serviceProvider, cancellationToken);
+var name = UserSchema.ValidateMember(user, nameof(User.Name));
+ZodPath namePath = UserSchema.Paths.Name;
 ```
 
-DataAnnotations attributes such as `[Required]`, `[Length]`, `[StringLength]`, `[MinLength]`, `[MaxLength]`, `[Range]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and `[Compare]` are validated with direct, typed codegen (no reflection).
+Every generated schema also has `IsValidatableMember`, `ValidateMemberAsync`, `TryResolveMember` (walks an error path to the
+object that owns the failing member, without reflection), `JsonNames`/`ToJsonNamedPath` and a compile-time
+`RequiresAsyncValidation`. Each assembly gets a trim- and AOT-safe registration:
+`ZodSharp.Generated.{Assembly}ZodSharpSchemas.Register(factory)`, or `services.AddZodSharp{Assembly}Schemas()` with dependency
+injection.
+
+`IValidatableObject` runs after the member rules; on .NET 11, `IAsyncValidatableObject` and `AsyncValidationAttribute` run in
+`ValidateAsync`. A custom async method may take `(T value, IServiceProvider services, CancellationToken ct)` to use the caller's
+services, and `[ZodAsyncMember(nameof(X))]` runs it for that member's field-level validation.
+
+DataAnnotations attributes such as `[Required]` (with `RequiredAttribute` semantics: `null`, `""` and whitespace fail unless `AllowEmptyStrings = true`), `[Length]`, `[StringLength]`, `[MinLength]`, `[MaxLength]`, `[Range]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, and `[Compare]` are validated with direct, typed codegen (no reflection).
 
 Enum properties are validated automatically: a value that is not a defined member of the enum type is rejected with `invalid_enum_value`. Mark an enum member `[ZodIgnore]` to exclude it everywhere the enum is validated, or list it in a property's `[DeniedValues]` to exclude it for that property only. `[Flags]` enums are skipped, and `[ZodSchema(ValidateEnumValues = false)]` opts the type out.
 
-Collection elements reject `null` by default: a null element reports `invalid_type` at its own path (for example `["Items", 0]`). Opt in per property with `[CollectionBehavior(AllowNulls = true)]`, per element type with `T?` (for example `List<Child?>`), per type with `[ZodSchema(AllowNulls = true)]`, or per assembly with `[assembly: ZodSharpSchemaDefaults(AllowNulls = true)]` or the `ZodSharpAllowNulls` MSBuild property. The most specific statement wins; `[CollectionBehavior]` on a property that cannot hold null elements is reported as `ZODSGEN046`.
+Collection elements reject `null` by default: a null element reports `invalid_type` at its own path (for example `Items[0]`). Opt in per property with `[CollectionBehavior(AllowNulls = true)]`, per element type with `T?` (for example `List<Child?>`), per type with `[ZodSchema(AllowNulls = true)]`, or per assembly with `[assembly: ZodSharpSchemaDefaults(AllowNulls = true)]` or the `ZodSharpAllowNulls` MSBuild property. The most specific statement wins; `[CollectionBehavior]` on a property that cannot hold null elements is reported as `ZODSGEN046`.
 
-A dictionary property (`IDictionary<TKey, TValue>` / `IReadOnlyDictionary<TKey, TValue>`) is validated as a map: every value is checked against the value type's nested schema, a failure is reported at the entry's key (for example `["Variants", "blue"]`), and `AllowNulls` governs null values. It exports as `{ "type": "object", "additionalProperties": … }` rather than as an array.
+Struct collections (including nullable wrappers) are supported. A default `ImmutableArray<T>` is treated
+as missing: `[Required]` reports `missing_field`, a nullable member accepts it unless required, and a
+non-nullable member reports `invalid_type`. To validate it as empty instead, set
+`[CollectionBehavior(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty)]`,
+`[assembly: ZodSharpSchemaDefaults(DefaultImmutableArrayBehavior = DefaultImmutableArrayBehavior.TreatAsEmpty)]`,
+or `<ZodSharpDefaultImmutableArrayBehavior>TreatAsEmpty</ZodSharpDefaultImmutableArrayBehavior>` in MSBuild.
+Precedence is property, assembly, MSBuild, then `ValidationError`. An absent nullable wrapper remains
+missing in either mode; the model is not mutated. A property with this immutable-array option is valid
+even when its elements cannot be null.
+
+A dictionary property (`IDictionary<TKey, TValue>` / `IReadOnlyDictionary<TKey, TValue>`) is validated as a map: every value is checked against the value type's nested schema, a failure is reported at the entry's key (for example `Variants[blue].Sku`), and `AllowNulls` governs null values. It exports as `{ "type": "object", "additionalProperties": … }` rather than as an array.
 
 ## Custom rules
 
@@ -224,7 +269,7 @@ Add `[ZodRule(AllowMultiple = true)]` to emit `AttributeUsage(..., AllowMultiple
 public readonly record struct MultipleOfRule(int Factor = 1, string? Message = null) : IValidationRule<int>
 {
     public const string ErrorCode = "not_multiple_of";
-    public const string MessageFormat = "Number must be a multiple of {0}, but got {1}";
+    public const string MessageFormat = "Number must be a multiple of {0}";
 
     public bool IsValid(in int value) => Factor != 0 && value % Factor == 0;
     public string GetErrorMessage(in int value) =>
@@ -344,6 +389,10 @@ builder.Services.AddZodSchemaOptionsValidator<UserOptions>();
 // Or chain through the options builder, optionally failing at startup:
 builder.Services.AddOptions<UserOptions>().AddZodSchemaValidator().ValidateOnStart();
 ```
+
+On .NET 11 the options validator also implements `IAsyncValidateOptions<T>`, so `ValidateOnStart()` runs asynchronous
+and service-aware rules. Each failure reads `{path}: {message} ({code})`, prefixed with the options name when it is not
+the default.
 
 The `Purview.ZodSharp.AspNetCore` package offers `AddZodSharp` with assembly auto-discovery.
 

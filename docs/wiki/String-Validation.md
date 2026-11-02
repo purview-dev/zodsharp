@@ -1,6 +1,6 @@
 # String Validation
 
-`ZodString` (namespace `ZodSharp.Schemas`) validates `string` values. `ParseInternal` rejects `null` with an `invalid_type` error (`"Expected string, but got null"`); on success the accumulated rules run.
+`ZodString` (namespace `ZodSharp.Schemas`) validates `string` values. `ParseInternal` rejects `null` with an `invalid_type` error (`"Expected string, received null"`); on success the accumulated rules run.
 
 ```csharp
 using ZodSharp;
@@ -75,14 +75,15 @@ var spanResult = Z.String().Min(3).Max(50).Email().ValidateSpan(span);
 
 ## Error messages
 
-Rules produce `ValidationError` entries with an empty path. Size validations emit `too_small` or `too_big`; string-format validations emit `invalid_string`. Many methods accept a custom `message` and `code` parameter. Rule structs live in `ZodSharp.Rules` and can be reused standalone with `IValidationRule<T>`. For the full catalogue — including rules without a fluent method — see [Validation Rules Reference](Validation-Rules-Reference.md).
+Rules produce `ValidationError` entries with an empty path. Size validations emit `too_small` or `too_big` (origin `string`, typed bounds, the length in `count`); string-format validations emit `invalid_string` with category `invalid_format` and a `format` parameter (`email`, `uuid`, `regex`, `starts_with`, …). Default messages never quote the input. Many methods accept a custom `message` and `code` parameter. Rule structs live in `ZodSharp.Rules` and can be reused standalone with `IValidationRule<T>`. For the full catalogue — including rules without a fluent method — see [Validation Rules Reference](Validation-Rules-Reference.md).
 
 Every rule exposes its error identity as public constants — `public const string ErrorCode` and a `public const string MessageFormat` (a `{0}`-style template) — so tests and consumers can assert against the rule instead of duplicating literals:
 
 ```csharp
 var result = Z.String().Email().Validate("not-an-email");
 // result.Errors[0].Code    == EmailRule.ErrorCode        ("invalid_string")
-// result.Errors[0].Message == string.Format(CultureInfo.CurrentCulture, EmailRule.MessageFormat, "not-an-email")
+// result.Errors[0].Message == EmailRule.MessageFormat     ("Invalid email format")
+// result.Errors[0].Category == ZodIssueCategories.InvalidFormat
 ```
 
 ## Span validation

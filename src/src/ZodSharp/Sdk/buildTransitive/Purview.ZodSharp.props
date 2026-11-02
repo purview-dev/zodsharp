@@ -3,6 +3,9 @@
 		<CompilerVisibleProperty Include="DisableZodSharpSourceGenerator">
 			<Description>Specifies whether to disable Purview.ZodSharp source generators.</Description>
 		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="DisableErrorTypeGenerator">
+			<Description>Specifies whether to disable the Purview.ZodSharp [ErrorType] generator.</Description>
+		</CompilerVisibleProperty>
 		<CompilerVisibleProperty Include="ZodSharpAutoGenerateOptionsValidators">
 			<Description>Enables auto-detection of IValidateOptions validators for types with a configured name suffix.</Description>
 		</CompilerVisibleProperty>
@@ -21,8 +24,25 @@
 		<CompilerVisibleProperty Include="ZodSharpAllowNulls">
 			<Description>Assembly-wide default for whether collection properties may contain null elements; false (the default) rejects them.</Description>
 		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="ZodSharpDefaultImmutableArrayBehavior">
+			<Description>How uninitialized ImmutableArray members are validated: ValidationError (default, normal missing-value rules) or TreatAsEmpty.</Description>
+		</CompilerVisibleProperty>
 		<CompilerVisibleProperty Include="ZodSharpDateTimeOffsetSerialization">
 			<Description>Assembly-wide DateTimeOffset wire form assumed by JSON Schema generation; Utc requires a zero offset and makes the non-sentinel mapping exact, PreserveOffset (the default) keeps the value's offset.</Description>
 		</CompilerVisibleProperty>
+	</ItemGroup>
+
+	<!--
+		Read by the ZODSGEN053 analyzer, which suggests the trim-safe [MinCount]/[MaxCount]/[CountRange] over
+		[MinLength]/[MaxLength]/[Length] on collection members only in a trimmed or Native AOT project. The SDK
+		already exposes some of these; declaring them again is harmless.
+	-->
+	<ItemGroup Label="Compiler Visible Trimming Properties">
+		<CompilerVisibleProperty Include="PublishTrimmed" />
+		<CompilerVisibleProperty Include="PublishAot" />
+		<CompilerVisibleProperty Include="IsTrimmable" />
+		<CompilerVisibleProperty Include="IsAotCompatible" />
+		<CompilerVisibleProperty Include="EnableTrimAnalyzer" />
+		<CompilerVisibleProperty Include="EnableAotAnalyzer" />
 	</ItemGroup>
 </Project>

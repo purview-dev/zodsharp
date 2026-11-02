@@ -182,7 +182,7 @@ public partial class ZodSchemaGeneratorTests
 	}
 
 	static string GuidHolderPayload(string plain, string nonEmpty) =>
-		$$"""
+			/*lang=json,strict*/$$"""
 			{
 				"plain": "{{plain}}",
 				"nonEmpty": "{{nonEmpty}}",
@@ -193,7 +193,7 @@ public partial class ZodSchemaGeneratorTests
 			""";
 
 	static string UuidHolderPayload(string any, string v4, string v7) =>
-		$$"""
+			/*lang=json,strict*/$$"""
 			{
 				"any": "{{any}}",
 				"v4": "{{v4}}",

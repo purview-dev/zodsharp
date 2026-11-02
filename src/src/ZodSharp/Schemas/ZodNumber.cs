@@ -9,8 +9,6 @@ namespace ZodSharp.Schemas;
 /// </summary>
 public class ZodNumber : ZodType<double>
 {
-	static readonly string[] EmptyPath = [];
-
 	/// <summary>
 	/// Parses and validates a number value.
 	/// </summary>
@@ -19,7 +17,7 @@ public class ZodNumber : ZodType<double>
 	protected override ValidationResult<double> ParseInternal(double value) =>
 		double.IsNaN(value)
 			? ValidationResult<double>.Failure(
-				new ValidationError("invalid_type", "Expected number, but got NaN", EmptyPath)
+				ZodIssues.InvalidType(ZodTypeNames.Number, value, origin: ZodTypeNames.Number)
 			)
 			: ValidationResult<double>.Success(value);
 

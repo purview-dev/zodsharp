@@ -1,7 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<AssemblyName>Purview.ZodSharp.AspNetCore.UnitTests</AssemblyName>
+		<!-- In-memory host tests touch many framework types by nature. -->
+		<NoWarn>$(NoWarn);CA1506</NoWarn>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.TestHost" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\Examples.CLI\Examples.CLI.csproj" />

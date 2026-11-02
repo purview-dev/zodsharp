@@ -1,0 +1,5 @@
+# Layered over the Purview.BuildSdk-managed root .editorconfig (which must not be edited).
+
+[*.{cs,csx,cake}]
+# Follows the sample's "MinimalApi" spelling (see src/src/Examples.MinimalApi/.editorconfig). Scoped to this project.
+dotnet_analyzer_configuration.pds0004.allowed_words = Api

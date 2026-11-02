@@ -19,7 +19,7 @@ jobs:
       # install`. Before global.json pinned a version the same gap failed later instead, with
       # NETSDK1045 on the net11.0 target, because the 10.0.x SDK cannot build it.
       # Keep in sync with `sdk.version` in global.json.
-      dotnet-version: "11.0.100-rc.2.26504.105"
+      dotnet-version: "11.0.100-rc.3.26522.148"
       run-pack: true
       validate-pack: true
     secrets: inherit
@@ -48,7 +48,7 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # There are THREE producers of the fixtures vitest reads, in different assemblies, namespaces and
+      # There are FOUR producers of the fixtures vitest reads, in different assemblies, namespaces and
       # classes, so they cannot be selected by one treenode filter:
       #
       #   tests/ts/cross-platform.test.ts    <- src/tests/cross-platform/output/
@@ -58,6 +58,8 @@ jobs:
       #                                         ZodSharp.SourceGenerators/ZodSchemaGeneratorTests
       #   tests/ts/temporal-parity.test.ts   <- src/tests/cross-platform/temporal-parity/
       #                                         ZodSharp.SourceGenerators/ZodSchemaGeneratorTests
+      #   tests/ts/client-validators.test.ts <- src/tests/cross-platform/client-rules/
+      #                                         ZodSharp.Blazor.Ssr/ClientRuleParityFixtureTests
       #
       # They run as separate steps rather than one OR-ed filter: `a|b` is not honoured as a top-level
       # alternation by the treenode filter — it silently selects a different, broader set and skips a
@@ -80,8 +82,187 @@ jobs:
           --treenode-filter
           '/*/ZodSharp.SourceGenerators/ZodSchemaGeneratorTests/JsonSchema_GivenGeneratedTemporalSchemas_WritesZodParityArtifacts'
 
+      - name: Run the C# client-validator parity test (writes cross-platform/client-rules)
+        run: >-
+          dotnet test --solution src/ZodSharp.slnx --configuration Debug
+          --treenode-filter
+          '/*/ZodSharp.Blazor.Ssr/ClientRuleParityFixtureTests/ClientRules_GivenEveryMappedRule_WritesParityFixtures'
+
       - name: Run the TypeScript/Zod cross-platform tests
         run: bun run test
+
+  # The only reliable proof that the minimal-API integration is trim- and Native AOT-safe end to end
+  # (generated registration, the Microsoft.Extensions.Validation bridge, ProblemDetails and the OpenAPI
+  # transformers): publish the sample with PublishAot=true, fail on any IL2xxx/IL3xxx warning, then run the
+  # native binary and check one failing request still returns the ProblemDetails contract. The analyzers that
+  # run during the normal build only see each assembly on its own; ILC sees the whole application.
+  aot-sample:
+    name: Native AOT sample (publish and smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Native AOT links with clang and needs the zlib headers; the hosted image may not carry both.
+      - name: Install the Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # -warnaserror turns every warning ILC reports (IL2xxx trim, IL3xxx AOT) into an error, so the publish
+      # itself fails. The grep is a second gate in case a warning is ever logged without failing the step.
+      - name: Publish Examples.MinimalApi with Native AOT (fails on any trim or AOT warning)
+        shell: bash
+        run: |
+          dotnet publish src/src/Examples.MinimalApi/Examples.MinimalApi.csproj \
+            --configuration Release --runtime linux-x64 --output artifacts/aot-sample \
+            -warnaserror 2>&1 | tee publish.log
+          if grep -E 'warning IL[23][0-9]{3}' publish.log; then
+            echo "::error::The Native AOT publish reported trim or AOT warnings."
+            exit 1
+          fi
+          test -x artifacts/aot-sample/ZodSharp.Examples.MinimalApi
+
+      # Compiler-host assemblies (the generator, the code fixes, Purview.SourceGeneratorFramework, Roslyn) must never
+      # reach build or publish output: Purview.SourceGeneratorFramework.dll once did, through analyzer-only references,
+      # and broke Blazor WebAssembly AOT. Scans file names and every deps/runtimeconfig/boot manifest.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/aot-sample, src/src/Examples.MinimalApi/bin/Release
+
+      - name: Run the native binary and check a failing request returns ProblemDetails
+        shell: bash
+        working-directory: artifacts/aot-sample
+        run: |
+          ASPNETCORE_URLS=http://127.0.0.1:5080 ./ZodSharp.Examples.MinimalApi > app.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            curl --silent --fail --output /dev/null http://127.0.0.1:5080/openapi/v1.json && break
+            sleep 1
+          done
+
+          result=$(curl --silent --show-error --output body.json \
+            --write-out '%{http_code} %{content_type}' \
+            --request POST http://127.0.0.1:5080/orders \
+            --header 'Content-Type: application/json' \
+            --data '{"customerEmail":"not-an-email","lines":[{"sku":"abc","quantity":0}]}')
+          echo "$result"
+          cat body.json; echo
+
+          if [[ "$result" != "400 application/problem+json"* ]] || ! grep -q '"issues"' body.json; then
+            echo "::error::Expected a 400 application/problem+json response with ZodSharp issues."
+            cat app.log
+            exit 1
+          fi
+
+  # The only reliable proof that the Blazor integration is trim-safe in the browser: publish the WebAssembly half of
+  # the Blazor sample (Examples.Blazor.Client - ZodValidator, ZodValidationMessage, AddZodProblemDetails, the generated
+  # registration and the service-aware async rule) trimmed, and fail on any IL2xxx/IL3xxx warning. Then hold the
+  # Brotli-compressed size of every Purview.ZodSharp assembly in the output to .config/wasm-size-baseline.json (+10%).
+  # The RunAOTCompilation publish and the browser test are slower and run nightly (wasm-nightly.yml). `just wasm-size`
+  # runs the same publish and check locally.
+  wasm-trimmed:
+    name: Blazor WebAssembly trimmed publish and size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # -warnaserror fails the publish on any trim warning ILLink reports. The grep is a second gate in case a warning
+      # is ever logged without failing the step.
+      - name: Publish Examples.Blazor.Client trimmed (fails on any trim or AOT warning)
+        shell: bash
+        run: |
+          dotnet publish src/src/Examples.Blazor.Client/Examples.Blazor.Client.csproj \
+            --configuration Release --output artifacts/wasm-trimmed \
+            -warnaserror 2>&1 | tee publish.log
+          if grep -E 'warning IL[23][0-9]{3}' publish.log; then
+            echo "::error::The trimmed WebAssembly publish reported trim or AOT warnings."
+            exit 1
+          fi
+
+      - name: Check the Purview.ZodSharp size budget
+        shell: pwsh
+        run: ./scripts/check-wasm-size.ps1 -PublishDirectory artifacts/wasm-trimmed
+
+      # Compiler-host assemblies (the generator, the code fixes, Purview.SourceGeneratorFramework, Roslyn) must never
+      # reach build or publish output: Purview.SourceGeneratorFramework.dll once did, through analyzer-only references,
+      # and broke Blazor WebAssembly AOT. Scans file names and every deps/runtimeconfig/boot manifest.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/wasm-trimmed, src/src/Examples.Blazor.Client/bin/Release
+
+  # Proves the whole trim-safe surface, not just what one sample calls. The harness publishes with PublishAot=true twice:
+  # once with every Purview.ZodSharp assembly except NewtonsoftJson rooted whole, so ILC analyses all of their code, and
+  # once as a plain consumer. Any IL2xxx/IL3xxx warning fails the publish, and each native binary exercises runtime
+  # schemas, generated validators, System.Text.Json, JSON Schema, the validation bridge, ProblemDetails and options
+  # validation, exiting non-zero on any mismatch. See src/tests/TrimSafety.Verification.
+  verify-trim:
+    name: Trim and Native AOT verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Native AOT links with clang and needs the zlib headers; the hosted image may not carry both.
+      - name: Install the Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # -warnaserror and the project's TreatWarningsAsErrors fail the publish on any trim or AOT warning. The grep is a
+      # second gate in case a warning is ever logged without failing the step.
+      - name: Publish and run the harness (every ZodSharp assembly rooted)
+        shell: bash
+        run: |
+          dotnet publish src/tests/TrimSafety.Verification/TrimSafety.Verification.csproj \
+            --configuration Release --runtime linux-x64 --output artifacts/trim-verification/rooted \
+            -p:TrimVerificationMode=Rooted -warnaserror 2>&1 | tee publish-rooted.log
+          if grep -E 'warning IL[23][0-9]{3}' publish-rooted.log; then
+            echo "::error::The rooted Native AOT publish reported trim or AOT warnings."
+            exit 1
+          fi
+          ./artifacts/trim-verification/rooted/ZodSharp.TrimSafety.Verification
+
+      - name: Publish and run the harness (as a consumer)
+        shell: bash
+        run: |
+          dotnet publish src/tests/TrimSafety.Verification/TrimSafety.Verification.csproj \
+            --configuration Release --runtime linux-x64 --output artifacts/trim-verification/consumer \
+            -p:TrimVerificationMode=Consumer -warnaserror 2>&1 | tee publish-consumer.log
+          if grep -E 'warning IL[23][0-9]{3}' publish-consumer.log; then
+            echo "::error::The consumer Native AOT publish reported trim or AOT warnings."
+            exit 1
+          fi
+          ./artifacts/trim-verification/consumer/ZodSharp.TrimSafety.Verification
+
+      # Compiler-host assemblies (the generator, the code fixes, Purview.SourceGeneratorFramework, Roslyn) must never
+      # reach build or publish output: Purview.SourceGeneratorFramework.dll once did, through analyzer-only references,
+      # and broke Blazor WebAssembly AOT. Scans file names and every deps/runtimeconfig/boot manifest.
+      - name: Scan the build and publish output for compiler-host assemblies
+        shell: pwsh
+        run: >-
+          ./scripts/assert-no-compiler-host-assemblies.ps1
+          -Path artifacts/trim-verification/rooted, artifacts/trim-verification/consumer,
+          src/tests/TrimSafety.Verification/bin/Release
+
 
   # Pack validation checks the IL-merged generator is present in the .nupkg; it cannot check that the
   # assembly loads and generates. That merge has regressed twice (#36, #38), both times breaking consumers
@@ -101,3 +282,53 @@ jobs:
       - name: Build and run a consumer against the packed generator
         shell: pwsh
         run: ./scripts/test-packed-generator.ps1 -Configuration Release
+
+  # Every other publish job builds against ProjectReferences; this one builds what ships. It packs every shipping
+  # package to an isolated feed and package cache, then publishes and runs throwaway consumers that reference the
+  # packages only - a Native AOT console, a Blazor WebAssembly app (trimmed and RunAOTCompilation) and a Native AOT
+  # minimal API - and leak-scans every bin and publish folder for compiler-host assemblies. It then proves every
+  # PackValidation ForbiddenContent rule rejects a package, against the packages the consumers used.
+  # `just smoke-packed-consumers` and `just verify-pack-rules` run the same locally. See docs/wiki/Release-Flow.md.
+  packed-consumers:
+    name: Packed consumers (Native AOT, Blazor WebAssembly, minimal API)
+    runs-on: ubuntu-latest
+    env:
+      # An extra feed for Purview.SourceGeneratorFramework only, for a version that is not on nuget.org yet. Unset, the
+      # gate restores it from nuget.org alone.
+      ZODSHARP_SGF_FEED: ${{ vars.ZODSHARP_SGF_FEED }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # First, before any toolchain is installed: the generator is built against the Purview.SourceGeneratorFramework
+      # version Directory.Packages.props pins, so nothing can be packed until that version restores. This fails with
+      # what to do (publish it to nuget.org, or set the ZODSHARP_SGF_FEED repository variable) rather than skipping.
+      - name: Check Purview.SourceGeneratorFramework restores
+        shell: pwsh
+        run: ./scripts/test-packed-consumers.ps1 -PreflightOnly
+
+      # Native AOT links with clang and needs the zlib headers; the hosted image may not carry both.
+      - name: Install the Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # RunAOTCompilation needs the Emscripten toolchain and the Mono AOT cross compiler. -WasmAot Require below makes a
+      # missing workload an error instead of a skipped step.
+      - name: Install the wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Pack, then publish, run and leak-scan consumers of the packages
+        shell: pwsh
+        run: >-
+          ./scripts/test-packed-consumers.ps1 -RuntimeIdentifier linux-x64 -WasmAot Require
+          -PackOutput artifacts/packed
+
+      - name: Prove every pack-validation forbidden-content rule rejects a package
+        shell: pwsh
+        run: |
+          dotnet tool restore
+          ./scripts/test-pack-validation-rules.ps1 -PackagesFolder artifacts/packed

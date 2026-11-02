@@ -15,12 +15,16 @@ public readonly record struct CompareRule : Core.IValidationRule<string>, Core.I
 	/// <summary>Gets the error code reported when the rule fails.</summary>
 	public const string ErrorCode = "mismatch";
 
-	/// <summary>Gets the message format; <c>{0}</c> is the expected value and <c>{1}</c> the actual value.</summary>
-	public const string MessageFormat = "Value must match '{0}', but got '{1}'";
+	/// <summary>Gets the default message format, which contains neither value; a custom message may use <c>{0}</c> for the expected value and <c>{1}</c> for the actual value.</summary>
+	public const string MessageFormat = "Value does not match the expected value";
+
+	static readonly string?[] TemplateNames = [null, RuleMessage.Received];
+
+	static readonly string DefaultTemplate = RuleMessage.Template(MessageFormat, TemplateNames);
 
 	readonly string _other;
 	readonly StringComparison _comparison;
-	readonly string _message;
+	readonly string? _message;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="CompareRule"/> struct.
@@ -38,7 +42,7 @@ public readonly record struct CompareRule : Core.IValidationRule<string>, Core.I
 	{
 		_other = other.OrNull() ?? throw new ArgumentNullException(nameof(other));
 		_comparison = comparison;
-		_message = message.Or(MessageFormat);
+		_message = message.OrNull();
 		Code = code.Or(ErrorCode);
 	}
 
@@ -76,5 +80,10 @@ public readonly record struct CompareRule : Core.IValidationRule<string>, Core.I
 
 	string? Core.IZodRule.Code => Code;
 
-	string? Core.IZodRule.Origin => null;
+	string? Core.IZodRule.MessageFormat =>
+		_message is null ? DefaultTemplate : RuleMessage.Template(_message, TemplateNames);
+
+	string? Core.IZodRule.Origin => Core.ZodTypeNames.String;
+
+	string? Core.IZodRule.Category => Core.ZodIssueCategories.InvalidValue;
 }

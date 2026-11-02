@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<!-- Single-targeted on purpose, against the repository's 'All' set. These tests assert something
+		<!-- Single-targeted on purpose, against the repository's 'Supported' set. These tests assert something
 		     about the repository itself - its skills/ folder - not about the runtime's reach, so running
 		     them once is the whole job, and Purview.Skills.Testing ships net10.0 only. -->
 		<TargetFramework>net10.0</TargetFramework>

@@ -65,6 +65,13 @@ public sealed record ErrorType(
 )
 {
 	/// <summary>
+	/// Gets the default <see cref="ValidationError.Origin"/> of errors created for this type (for example
+	/// <c>string</c> or <c>number</c>). The generated <c>Create*</c> helper uses it when the caller passes no
+	/// origin.
+	/// </summary>
+	public string? Origin { get; init; }
+
+	/// <summary>
 	/// Creates an error type parameter with the specified name and type.
 	/// </summary>
 	/// <typeparam name="T">The type represented by the parameter.</typeparam>
