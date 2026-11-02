@@ -287,6 +287,47 @@ public sealed class ZodProblemDetailsWriter
 			.ConfigureAwait(false);
 	}
 
+	/// <summary>
+	/// Writes a standard ProblemDetails for <paramref name="status"/> - no errors, no issues, nothing from the
+	/// exception's message - through the registered <see cref="IProblemDetailsService"/>, falling back to
+	/// <c>application/problem+json</c>. Used for the bad requests that carry no ZodSharp errors.
+	/// </summary>
+	internal static async ValueTask WriteStatusAsync(HttpContext httpContext, int status, Exception exception)
+	{
+		httpContext.Response.StatusCode = status;
+		Microsoft.AspNetCore.Mvc.ProblemDetails problemDetails = new()
+		{
+			Status = status,
+			Type = GetDefaultType(status),
+		};
+
+		if (httpContext.RequestServices?.GetService<IProblemDetailsService>() is { } service)
+		{
+			ProblemDetailsContext context = new()
+			{
+				HttpContext = httpContext,
+				ProblemDetails = problemDetails,
+				Exception = exception,
+			};
+
+			if (await service.TryWriteAsync(context).ConfigureAwait(false))
+				return;
+		}
+
+		var traceId = Activity.Current?.Id ?? httpContext.TraceIdentifier;
+		if (traceId is not null)
+			problemDetails.Extensions["traceId"] = traceId;
+
+		await httpContext
+			.Response.WriteAsJsonAsync(
+				problemDetails,
+				ZodProblemDetailsJsonContext.Default.ProblemDetails,
+				"application/problem+json",
+				httpContext.RequestAborted
+			)
+			.ConfigureAwait(false);
+	}
+
 	void Populate(
 		HttpValidationProblemDetails target,
 		ReadOnlySpan<ValidationError> errors,

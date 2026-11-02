@@ -108,6 +108,25 @@ var error = result.Errors[0];
 // error.Parameters["line"], ["position"] - where the serializer stopped
 ```
 
+### Values rejected by a strict converter
+
+A converter that rejects a value with ZodSharp errors - a Purview.ValueObjects strict converter throws
+`new JsonException(message, zodException)` - is not a failure to read JSON. `DeserializeAndValidate*` (and the Http
+package's `ReadFromJsonAndValidateAsync`) return those errors under the member that held the value, with JSON names
+mapped back to member names through the supplied `JsonTypeInfo<T>`, and an error at the value object's own `Value`
+named after that member:
+
+```csharp
+// {"customerEmail":"not-an-email","quantity":5}
+var result = await validator.DeserializeAndValidateAsync(stream, AppJsonContext.Default.PlaceOrderRequest);
+// result.Errors[0].FullPath  -> CustomerEmail.Value
+// result.Errors[0].Message   -> "Field 'CustomerEmail' must be a valid email address."
+```
+
+The errors are exactly those validating the hydrated model reports. `ZodJsonExceptions` (core package) exposes the
+same re-rooting for any exception (`TryGetErrors`, `TryReroot`, `Reroot`, `ToMemberPath`). A bare `ZodException`
+thrown from a converter still propagates unchanged.
+
 These are the same errors ASP.NET Core hosts project into ProblemDetails (see [ASP.NET Core Integration](AspNetCore-Integration.md)); OpenAPI documents describe the response shape (see [OpenAPI Integration](OpenAPI-Integration.md)).
 
 ## JSON Schema import

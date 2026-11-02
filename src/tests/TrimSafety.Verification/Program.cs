@@ -15,5 +15,10 @@ await harness.RunAsync("HttpClient with validated bodies and validation problems
 await harness.RunAsync("Microsoft.Extensions.Validation bridge", IntegrationChecks.ValidationBridge);
 await harness.RunAsync("ZodProblemDetailsWriter without a host", IntegrationChecks.ProblemDetails);
 harness.Run("options validation with ValidateWithZod", IntegrationChecks.OptionsValidation);
+await harness.RunAsync("strict value object deserialization in a minimal API", StrictDeserializationChecks.MinimalAPI);
+await harness.RunAsync(
+	"strict value object deserialization through the JSON integrations",
+	StrictDeserializationChecks.JsonIntegrations
+);
 
 return harness.Complete();

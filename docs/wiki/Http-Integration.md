@@ -68,8 +68,10 @@ var result = await response.Content.ReadFromJsonAndValidateAsync(
 
 `ReadFromJsonAndValidateAsync` deserializes and validates in one pass, exactly like `DeserializeAndValidateAsync` in
 [System.Text.Json Integration](SystemTextJson-Integration.md): malformed JSON, a `null` document or an unconvertible
-value is one `invalid_json` error with the serializer's path, never an exception. The body is read as UTF-8, the
-encoding RFC 8259 requires for JSON exchanged over a network.
+value is one `invalid_json` error with the serializer's path, never an exception. A value a strict value object
+converter rejects (`JsonException(inner: ZodException)`) is reported as that `ZodException`'s errors under the member
+that held it (`CustomerEmail.Value`), not as `invalid_json`. The body is read as UTF-8, the encoding RFC 8259 requires
+for JSON exchanged over a network.
 
 ## Validation problems
 

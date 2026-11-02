@@ -85,6 +85,36 @@ public class ZodHttpContentExtensionsTests
 	}
 
 	[Test]
+	public async Task ReadFromJsonAndValidateAsync_GivenStrictValueObjectRejection_ReturnsTheRerootedErrors(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange: a strict value object converter throws JsonException(inner: ZodException) while reading.
+		using StringContent content = new(
+			/*lang=json,strict*/"""{"customerEmail":"not-an-email","quantity":5}""",
+			Encoding.UTF8,
+			"application/json"
+		);
+
+		// Act
+		var result = await content.ReadFromJsonAndValidateAsync(
+			new PlaceOrderRequestSchemaValidator(),
+			StrictValueObjectJsonContext.Default.PlaceOrderRequest,
+			cancellationToken
+		);
+
+		// Assert: the errors validating the hydrated model would report, not invalid_json.
+		await Assert.That(result.IsSuccess).IsFalse();
+		var expected = PlaceOrderRequestSchema
+			.Validate(new PlaceOrderRequest(new EmailAddress("not-an-email"), 5))
+			.Errors.Single();
+		var error = result.Errors.Single();
+		await Assert.That(error).IsEqualTo(expected);
+		await Assert.That(error.FullPath.ToDottedString()).IsEqualTo("CustomerEmail.Value");
+		await Assert.That(error.Message).IsEqualTo("Field 'CustomerEmail' must be a valid email address.");
+	}
+
+	[Test]
 	public async Task Create_GivenValidValue_ReturnsJsonContent(CancellationToken cancellationToken)
 	{
 		// Arrange

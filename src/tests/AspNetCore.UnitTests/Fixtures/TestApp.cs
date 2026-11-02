@@ -24,10 +24,11 @@ public sealed partial class TestApp : IAsyncDisposable
 	public static async Task<TestApp> StartAsync(
 		Action<WebApplicationBuilder> configure,
 		Action<WebApplication> map,
-		CancellationToken cancellationToken
+		CancellationToken cancellationToken,
+		string? environment = null
 	)
 	{
-		var builder = WebApplication.CreateSlimBuilder();
+		var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = environment });
 		builder.WebHost.UseTestServer();
 		builder.Logging.ClearProviders();
 		configure(builder);

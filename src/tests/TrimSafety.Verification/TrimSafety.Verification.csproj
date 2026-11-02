@@ -53,6 +53,11 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<!-- Direct, so the request delegate generator (enabled by PublishAot) compiles the minimal-API check's endpoint. -->
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\..\src\ZodSharp\ZodSharp.csproj" />
 		<ProjectReference Include="..\..\src\SystemTextJson\SystemTextJson.csproj" />
 		<ProjectReference Include="..\..\src\Http\Http.csproj" />

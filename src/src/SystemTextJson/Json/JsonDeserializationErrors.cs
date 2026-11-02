@@ -20,6 +20,11 @@ namespace ZodSharp.Json;
 /// The message is fixed and generic. The serializer's own message names CLR types and can quote the input, so
 /// it is never passed to a client; the expected type is described with Zod's type names instead.
 /// </para>
+/// <para>
+/// A converter that rejects its value with ZodSharp errors - a <see cref="JsonException"/> whose inner exceptions
+/// contain a <see cref="ZodException"/>, as a strict value object converter throws - is not a failure to read JSON:
+/// its errors are the result, located under the member that held the value (see <see cref="ZodJsonExceptions"/>).
+/// </para>
 /// </remarks>
 static class JsonDeserializationErrors
 {
@@ -48,10 +53,21 @@ static class JsonDeserializationErrors
 				errors = validation.Errors;
 				return true;
 
+			// A value inside a validating converter's value failed its own validation (a strict value object
+			// converter wrapping a ZodException): its errors, under the full location.
+			case ZodJsonReadException read when FindZodException(read.InnerException) is { } nested:
+				errors = ZodJsonExceptions.Reroot(nested.Errors, read.FullPath, typeInfo);
+				return true;
+
 			// A validating converter could not read its value: the location joins the converted value's path
 			// with the position inside it.
 			case ZodJsonReadException read:
 				errors = [Create(read.FullPath, typeInfo, read.LineNumber, read.BytePositionInLine)];
+				return true;
+
+			// A converter rejected its value with ZodSharp errors (a strict value object converter throws
+			// JsonException(inner: ZodException)): those errors, under the member that held the value.
+			case JsonException when ZodJsonExceptions.TryGetErrors(exception, typeInfo, out errors):
 				return true;
 
 			case JsonException json:
@@ -78,6 +94,17 @@ static class JsonDeserializationErrors
 	/// <returns>The error.</returns>
 	public static ValidationError NullValue(JsonTypeInfo? typeInfo) =>
 		Create(ZodPath.Root, typeInfo, line: null, position: null, received: "null");
+
+	static ZodException? FindZodException(Exception? exception)
+	{
+		for (var depth = 0; exception is not null && depth < 16; depth++, exception = exception.InnerException)
+		{
+			if (exception is ZodException zodException)
+				return zodException;
+		}
+
+		return null;
+	}
 
 	static ValidationError FromJsonException(JsonException exception, JsonTypeInfo? typeInfo) =>
 		Create(ZodPath.ParseJsonPath(exception.Path), typeInfo, exception.LineNumber, exception.BytePositionInLine);

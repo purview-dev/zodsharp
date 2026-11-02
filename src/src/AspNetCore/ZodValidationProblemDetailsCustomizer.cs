@@ -1,6 +1,7 @@
 #if NET11_0_OR_GREATER
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using ZodSharp.Core;
 
 namespace ZodSharp.AspNetCore;
 
@@ -42,6 +43,28 @@ sealed class ZodValidationProblemDetailsCustomizer : IPostConfigureOptions<Probl
 			return;
 
 		var writer = ZodProblemDetailsWriter.GetOrCreate(services);
+
+		// Minimal-API binding writes a body it could not deserialize as a validation problem, keyed by the JSON path and
+		// quoting the exception's message. When a converter rejected a value with ZodSharp errors (a strict value object
+		// converter throwing JsonException(inner: ZodException)), those errors replace it, under the member that held
+		// the value - the body validating the bound model would produce.
+		if (
+			context.Exception is { } exception
+			&& ZodJsonExceptions.TryGetErrors(
+				exception,
+				ZodExceptionHandler.ResolveBodyTypeInfo(httpContext),
+				out var rejected
+			)
+		)
+		{
+			problem.Errors.Clear();
+			writer.Apply(problem, rejected.AsSpan(), httpContext);
+			if (problem.Status is { } rejectedStatus)
+				httpContext.Response.StatusCode = rejectedStatus;
+
+			return;
+		}
+
 		if (ZodRequestValidationReport.Get(httpContext) is { HasErrors: true } report)
 		{
 			writer.Apply(problem, report.Errors.AsSpan(), httpContext);

@@ -242,6 +242,24 @@ Released versions correspond to `v<version>` GitHub releases.
   generated and core validator adapters, and the fluent schemas. An async method can call the cheap synchronous path
   without a warning, and the suppression is by call target rather than by rule, so `Task.Wait`, `Thread.Sleep` and
   another library's `Validate`/`ValidateAsync` pair still report CA1849.
+- **Strict deserialization reports the member path.** A converter that rejects a value with
+  `new JsonException(message, zodException)` - the contract Purview.ValueObjects' strict converters adopt - now
+  surfaces the `ZodException`'s errors under the member that held the value, exactly as validating the hydrated model
+  does: `CustomerEmail.Value` and `"Field 'CustomerEmail' ..."` instead of `Value` and `"Field 'Value' ..."`. JSON names
+  in System.Text.Json's `JsonException.Path` are mapped back to member names through the root contract's metadata
+  (no reflection); collections keep their indexes and dictionary entries become key segments.
+  - **`ZodJsonExceptions`** (core, `ZodSharp.Core`): `TryGetErrors`, `TryReroot`, `Reroot` and `ToMemberPath`.
+  - **`DeserializeAndValidate*`** (SystemTextJson) and **`ReadFromJsonAndValidateAsync`** (Http) return those errors
+    rather than `invalid_json`.
+  - **`ZodExceptionHandler`** also handles a `BadHttpRequestException`/`JsonException` chain carrying a
+    `ZodException`, mapping names through the endpoint's body contract (`IAcceptsMetadata`); any other bad request is
+    still left to the next handler.
+  - **.NET 11:** minimal-API binding writes its own validation problem for an unreadable body (keyed by `$.customerEmail`,
+    quoting the converter's message); `AddZodSharpProblemDetails` now rewrites it with the ZodSharp errors when the
+    exception carries a `ZodException`. Other binding problems are unchanged.
+  - **`ZodProblemDetailsOptions.HandleBindingFailures`** (default `false`): sets `RouteHandlerOptions.ThrowOnBadRequest`
+    so .NET 10 Production binding failures reach the handler; non-ZodSharp ones are answered with their own status and
+    a standard ProblemDetails body. A bare `ZodException` is handled exactly as before.
 ### Breaking behaviour changes
 
 - **Dropped net8.0 and net9.0; supported target frameworks are net10.0 and net11.0.** Every package ships

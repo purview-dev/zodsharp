@@ -89,6 +89,35 @@ public sealed class ZodProblemDetailsOptions
 	public Func<ImmutableArray<ValidationError>, int, int>? StatusCodeOverride { get; set; }
 
 	/// <summary>
+	/// When <c>true</c>, <c>AddZodSharpProblemDetails</c> sets <see cref="Microsoft.AspNetCore.Routing.RouteHandlerOptions.ThrowOnBadRequest"/>,
+	/// so a minimal-API request body that fails validation while it is deserialized - a strict value object converter
+	/// throwing <c>JsonException(inner: ZodException)</c> - reaches <see cref="ZodExceptionHandler"/> and is answered
+	/// with the ZodSharp ProblemDetails contract in every environment. Every other bad request that binding throws
+	/// (malformed JSON, a missing body, ...) is then answered by the handler too, with its own status code
+	/// (<see cref="Microsoft.AspNetCore.Http.BadHttpRequestException.StatusCode"/>) and a standard ProblemDetails body.
+	/// Defaults to <c>false</c>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Needed on .NET 10 only. There, without it, binding answers a body it cannot deserialize itself, with a bare
+	/// <c>400</c> and no body, unless the application is running in the Development environment (where ASP.NET Core
+	/// already throws); the handler still answers whatever does reach it. On .NET 11, binding writes its own validation
+	/// problem through the ProblemDetails service with the exception attached, and <c>AddZodSharpProblemDetails</c>
+	/// rewrites it with the ZodSharp errors whether or not this is set. An unsupported content type (<c>415</c>) is
+	/// always answered by binding itself.
+	/// </para>
+	/// <para>
+	/// The trade-off: <see cref="Microsoft.AspNetCore.Routing.RouteHandlerOptions.ThrowOnBadRequest"/> is
+	/// application-wide, so every minimal-API binding failure becomes an exception that travels through the exception
+	/// handler middleware (<c>app.UseExceptionHandler()</c> is required) instead of a status code set in place. That
+	/// costs an exception per bad request, and the middleware's diagnostics follow
+	/// <c>ExceptionHandlerOptions.SuppressDiagnosticsCallback</c>. The handler never writes the exception's message,
+	/// which can quote the request.
+	/// </para>
+	/// </remarks>
+	public bool HandleBindingFailures { get; set; }
+
+	/// <summary>
 	/// Registers an <see cref="ErrorType"/> with the configured <see cref="Registry"/>.
 	/// </summary>
 	public ZodProblemDetailsOptions MapErrorType(ErrorType errorType)
@@ -110,5 +139,6 @@ public sealed class ZodProblemDetailsOptions
 			DefaultStatusCode = DefaultStatusCode,
 			StatusCodeSelector = StatusCodeSelector,
 			StatusCodeOverride = StatusCodeOverride,
+			HandleBindingFailures = HandleBindingFailures,
 		};
 }

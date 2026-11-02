@@ -109,6 +109,12 @@ serializer's own message is never surfaced, because it names CLR types and can q
 keep the schema's own codes, and the Newtonsoft `DeserializeAndValidateAsync` awaits the schema's
 `ValidateAsync`.
 
+A converter that rejects its value with `new JsonException(message, zodException)` (a Purview.ValueObjects strict
+converter) is not `invalid_json`: System.Text.Json's `DeserializeAndValidate*` and `ReadFromJsonAndValidateAsync`
+return the `ZodException`'s errors under the member that held the value (`CustomerEmail.Value`, JSON names mapped
+back to member names through the `JsonTypeInfo<T>`), named after that member (`Field 'CustomerEmail' ...`).
+`ZodJsonExceptions.TryGetErrors(exception, rootTypeInfo, out errors)` does the same for any exception chain.
+
 ## Validating converters
 
 ```csharp

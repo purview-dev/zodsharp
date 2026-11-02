@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -162,6 +163,7 @@ public static class ServiceCollectionExtensions
 
 			AddProblemDetailsWriter(services);
 			services.AddExceptionHandler<ZodExceptionHandler>();
+			AddBindingFailureHandling(services);
 #if NET11_0_OR_GREATER
 			AddValidationPipelineEnrichment(services);
 #endif
@@ -193,6 +195,22 @@ public static class ServiceCollectionExtensions
 		);
 	}
 #endif
+
+	/// <summary>
+	/// Honours <see cref="ZodProblemDetailsOptions.HandleBindingFailures"/>: a post-configuration, so it wins over the
+	/// host's environment-based default whichever order the registrations were made in. Registering it more than once
+	/// only sets the same value again.
+	/// </summary>
+	static void AddBindingFailureHandling(IServiceCollection services) =>
+		services
+			.AddOptions<RouteHandlerOptions>()
+			.PostConfigure<IOptions<ZodProblemDetailsOptions>>(
+				static (routeHandler, zod) =>
+				{
+					if (zod.Value.HandleBindingFailures)
+						routeHandler.ThrowOnBadRequest = true;
+				}
+			);
 
 	static void AddProblemDetailsWriter(IServiceCollection services)
 	{

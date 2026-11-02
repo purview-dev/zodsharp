@@ -390,8 +390,68 @@ does the following:
 | `DefaultStatusCode` | `400` | The status when no matched `ErrorType` supplies one. |
 | `StatusCodeSelector` | `null` | `Func<ImmutableArray<ValidationError>, int>`: takes complete control of the status. It runs after the highest `ErrorType.HttpStatus` is computed, and its result wins. |
 | `StatusCodeOverride` | `null` | `Func<ImmutableArray<ValidationError>, int, int>`: like `StatusCodeSelector`, but also receives the computed status. It runs last and wins. |
+| `HandleBindingFailures` | `false` | Sets `RouteHandlerOptions.ThrowOnBadRequest`, so a body rejected during deserialization reaches `ZodExceptionHandler` in every environment. See [Strict deserialization](#strict-deserialization-value-objects-rejected-while-reading). |
 
 `MapErrorType(ErrorType)` registers an `ErrorType` with the configured `Registry`.
+
+### Strict deserialization: value objects rejected while reading
+
+A value object read by a strict converter (Purview.ValueObjects' `ValueObjectDeserializationMode.Strict`) is
+validated while the body is deserialized. A converter cannot know which member of the document it is reading, so it
+wraps the `ZodException` in a `JsonException` (`new JsonException(message, zodException)`), and System.Text.Json
+records the location in `JsonException.Path` (`$.customerEmail`). ZodSharp joins the two: the errors are reported under
+the member that held the value, exactly as validating the bound model reports them.
+
+```http
+POST /orders
+{"customerEmail":"not-an-email","quantity":5}
+```
+
+```json
+{
+  "status": 400,
+  "errors": { "CustomerEmail.Value": ["Field 'CustomerEmail' must be a valid email address."] },
+  "issues": [{ "path": "CustomerEmail.Value", "segments": ["CustomerEmail", "Value"], "code": "invalid_string", "origin": "string", ... }]
+}
+```
+
+- **Member names.** The serializer's path uses JSON names. The endpoint's body type (its `IAcceptsMetadata`) is
+  resolved from the minimal-API `JsonOptions`, and each JSON name is mapped back to its member name through that
+  contract's metadata - no reflection. `PathNaming` then applies as it does everywhere, so the keys match the
+  `WithZodSharpValidation()` body for the same model under either setting. When the body type cannot be resolved,
+  the JSON names are kept. Collections keep their indexes (`$.lines[0].quantity` -> `Lines[0].Quantity.Value`).
+- **Display name.** An error at the value object's own member (`Value`) is named after the member holding it, as nested
+  validation does: `Field 'CustomerEmail' ...`, never `Field 'Value' ...`.
+- **A bare `ZodException`** (older value object releases, or any other caller) is unchanged: its own path.
+- **Any other bad request** (malformed JSON, a `JsonException` without ZodSharp errors) is left as ASP.NET Core
+  answers it, unless `HandleBindingFailures` is set (below).
+
+Whether the failure reaches ZodSharp depends on the framework:
+
+| | Development | Production |
+|---|---|---|
+| **.NET 11** | Rewritten | Rewritten: binding writes its own validation problem through the ProblemDetails service, with the exception attached, and `AddZodSharpProblemDetails` rewrites it. No opt-in needed. |
+| **.NET 10** | Rewritten (`ThrowOnBadRequest` is on in Development) | A bare `400` with no body, unless `HandleBindingFailures = true`. |
+
+```csharp
+builder.Services.AddZodSharpProblemDetails(options => options.HandleBindingFailures = true);
+
+var app = builder.Build();
+app.UseExceptionHandler();
+```
+
+`HandleBindingFailures` sets `RouteHandlerOptions.ThrowOnBadRequest`, which is application-wide: **every**
+minimal-API binding failure becomes a `BadHttpRequestException` that travels through the exception handler middleware
+instead of a status code set in place. `ZodExceptionHandler` then answers the ones without ZodSharp errors with their
+own status (`BadHttpRequestException.StatusCode`) and a standard ProblemDetails body that never includes the exception's message (it can
+quote the request). The costs are an exception per bad request and the middleware's diagnostics, which follow
+`ExceptionHandlerOptions.SuppressDiagnosticsCallback`. An unsupported content type (`415`) is always answered by
+binding itself. MVC (`SystemTextJsonInputFormatter`) is not covered: it records the failure in `ModelState` under the
+JSON path.
+
+Outside ASP.NET Core, `ZodJsonExceptions.TryGetErrors(exception, rootTypeInfo, out errors)` (core package) performs
+the same re-rooting for any exception chain, and `DeserializeAndValidate*` / `ReadFromJsonAndValidateAsync` apply it,
+so they return the re-rooted errors rather than `invalid_json`.
 
 > [!NOTE]
 > `AddZodSharpProblemDetails` only wires up exception handling and ProblemDetails services (and, on .NET 11,

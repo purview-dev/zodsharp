@@ -206,6 +206,14 @@ app.MapPost("/users", Results<Ok<UserDto>, ValidationProblem> (UserDto dto, Http
 The result-based members **throw `InvalidOperationException` for a successful result**. A `ZodException`
 thrown from `Parse` inside a handler is mapped by `ZodExceptionHandler` to the identical body.
 
+A body rejected by a strict value object converter while it is deserialized (`JsonException(inner: ZodException)`,
+wrapped in a `BadHttpRequestException` by binding) gets the same body too: errors under the member that held the value
+(`CustomerEmail.Value`, mapped from the endpoint's body contract), named after it. On .NET 11 this needs nothing more
+than `AddZodSharpProblemDetails()`. On .NET 10, Production binding answers a bare `400` unless
+`options.HandleBindingFailures = true`, which sets `RouteHandlerOptions.ThrowOnBadRequest` app-wide (every binding
+failure then goes through `UseExceptionHandler()`; non-ZodSharp ones get a standard ProblemDetails with their own
+status).
+
 ## The writer and its options
 
 ```csharp

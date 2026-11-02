@@ -17,6 +17,7 @@ namespace ZodSharp.AspNetCore;
 /// </remarks>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(HttpValidationProblemDetails))]
+[JsonSerializable(typeof(Microsoft.AspNetCore.Mvc.ProblemDetails))]
 [JsonSerializable(typeof(ValidationIssue[]))]
 [JsonSerializable(typeof(ValidationIssue[][]))]
 [JsonSerializable(typeof(Dictionary<string, object?>))]

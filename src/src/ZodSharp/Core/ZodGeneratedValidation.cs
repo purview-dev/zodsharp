@@ -366,7 +366,7 @@ public static class ZodGeneratedValidation
 		return resolved;
 	}
 
-	static ValidationError NameAfterOwner(in ValidationError error, string displayName)
+	internal static ValidationError NameAfterOwner(in ValidationError error, string displayName)
 	{
 		var parameters = error.Parameters;
 		if (
