@@ -11,7 +11,7 @@ Microsoft.Extensions.Validation source generator.
 - References the `Microsoft.Extensions.Validation` package, never the ASP.NET Core shared framework, so it works in
   a Blazor WebAssembly client and in worker or console hosts.
 - `Purview.ZodSharp.AspNetCore` depends on it on `net11.0`. That package turns the pipeline's response into the full
-  ZodSharp ProblemDetails contract (see [ASP.NET Core Integration](AspNetCore-Integration.md)).
+  ZodSharp ProblemDetails contract (see [ASP.NET Core Integration](../AspNetCore-Integration.md)).
 
 ## Install
 
@@ -36,7 +36,7 @@ builder.Services.AddValidation();
 
 - Registers `IZodSchemaFactory` when none is registered yet, as `AddZodSharpFactory()` does. Any registration
   works: `AddZodSharpFactory`, `AddZodSharp` from the ASP.NET Core package, or the generated
-  `AddZodSharp{Assembly}Schemas()` (see [Source Generator](Source-Generator.md)).
+  `AddZodSharp{Assembly}Schemas()` (see [Source Generator](../generator/Source-Generator.md)).
 - Calls `AddValidation()`.
 - Registers `ZodValidatableInfoResolver` as a singleton.
 - Places the resolver in `ValidationOptions.Resolvers` from a post-configure step. The generated
@@ -110,7 +110,7 @@ Each ZodSharp error becomes one `Microsoft.Extensions.Validation.ValidationError
 
 | `ValidationError` | Value |
 |---|---|
-| `Path` | The canonical ZodSharp path prefixed with `ValidateContext.CurrentValidationPath`: `Customer.Address.Street`, `Lines[0].Sku`, `ByCode[abc].Sku`. See [Core Concepts](Core-Concepts.md#paths). |
+| `Path` | The canonical ZodSharp path prefixed with `ValidateContext.CurrentValidationPath`: `Customer.Address.Street`, `Lines[0].Sku`, `ByCode[abc].Sku`. See [Core Concepts](../concepts/Core-Concepts.md#paths). |
 | `Name` | The failing member's name (`Street`); empty for a model-level error. |
 | `Container` | The object that owns the member (`order.Customer.Address`). Blazor uses it to place the message on the right field. Never a struct: an error inside a struct member (`Email.Value`) is attributed to the nearest reference-type owner and its member (`signUp`, `Email`), because a value type cannot be a `FieldIdentifier` model. |
 | `ErrorMessage` | The ZodSharp message, formatted by `MessageFormatter` or localized (see [Localization](Localization.md)). |
@@ -192,7 +192,7 @@ The bridge behaves like the platform's own type info:
   Blazor use `EditContext.ValidateAsync()`. A type has asynchronous rules when its `RequiresAsyncValidation` is
   `true`.
 - **Async rules can use services.** Asynchronous validation passes `ValidateContext.ServiceProvider` through to
-  service-aware rules (see [Source Generator](Source-Generator.md)).
+  service-aware rules (see [Source Generator](../generator/Source-Generator.md)).
 - **Field-level validation does not recurse.** It runs only the changed member's own rules (`ValidateMember`).
   Nested schemas, type-level rules and refinements are not run, because Blazor attributes every error of a field
   run to the changed field. Members without rules are not offered for field-level validation
@@ -211,7 +211,7 @@ A C# union that has no validator of its own is validated through its active case
 Microsoft.Extensions.Validation does. The case is reported under `Value` (`Value.Name`, `Value[0].Name`) and
 validated by whichever resolver knows the case type. For a union minimal-API parameter, the runtime parameter
 resolver that the application's own `AddValidation()` call adds claims the parameter. See
-[Unions and Discriminated Unions](Unions-and-Discriminated-Unions.md).
+[Unions and Discriminated Unions](../schemas/Unions-and-Discriminated-Unions.md).
 
 ## Trim-safe sources
 
@@ -245,13 +245,13 @@ registration (`AddZodSharp{Assembly}Schemas()`) is also trim-safe. Assembly scan
 - **Models declared in `.razor` files are not generated.** The Razor compiler generates C# from `@code` blocks
   after source generators run, so the ZodSharp generator never sees a `[ZodSchema]` type declared there. The
   generator reports `ZODSGEN051`; move the type to a `.cs` file (see
-  [Source Generator Diagnostics](Source-Generator-Diagnostics.md)).
+  [Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md)).
 - **Lookups are cached.** Register validators before the first validation (see above).
 
 ## See also
 
-- [ASP.NET Core Integration](AspNetCore-Integration.md): the minimal-API pipeline and the ProblemDetails contract.
+- [ASP.NET Core Integration](../AspNetCore-Integration.md): the minimal-API pipeline and the ProblemDetails contract.
 - [Blazor Integration](Blazor-Integration.md): forms, field placement and `<ZodValidator />`.
 - [OpenAPI Integration](OpenAPI-Integration.md)
 - [Localization](Localization.md)
-- [Core Concepts](Core-Concepts.md#error-fields): the error fields and the canonical path format.
+- [Core Concepts](../concepts/Core-Concepts.md#error-fields): the error fields and the canonical path format.

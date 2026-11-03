@@ -43,7 +43,7 @@ Validity is not the only thing that lines up. Every built-in ZodSharp error repo
 while `Code` keeps ZodSharp's more specific identity, and `FullPath.ToZodPath()` returns the path in Zod's issue
 shape (strings for members and keys, integers for indexes). Messages use Zod's type names (`"Expected number,
 received string"`), never CLR names. A client can therefore handle ZodSharp and Zod issues with the same code;
-see [Core Concepts](Core-Concepts.md#error-fields).
+see [Core Concepts](../concepts/Core-Concepts.md#error-fields).
 
 | Zod issue | ZodSharp error |
 |---|---|
@@ -60,14 +60,14 @@ The same interop goal is available without fixtures via JSON Schema:
 - Export: `Z.ToJsonSchema` (core package) → JSON Schema, or `z.toJSONSchema` on the TypeScript side (Zod v4+).
 - Import: `Z.FromJsonSchema` (in the System.Text.Json or Newtonsoft.Json package — namespace `ZodSharp.JsonSchema.SystemTextJson` / `ZodSharp.JsonSchema.NewtonsoftJson`).
 
-A generated collection maps to Zod's array element type: `T[]` / `List<T>` ↔ `z.array(T)`, and a nullable element (`T?[]`, `List<T?>`, or a property that allows nulls via `[CollectionBehavior(AllowNulls = true)]`) ↔ `z.array(T.nullable())`. A collection whose elements may be null exports `items.anyOf: [ …, { "type": "null" } ]`, and both `z.fromJSONSchema` and `Z.FromJsonSchema` read that shape back. Null elements are rejected by default, so a generated `T[]` matches `z.array(T)` exactly — see [Collection null items](Source-Generator.md#collection-null-items).
+A generated collection maps to Zod's array element type: `T[]` / `List<T>` ↔ `z.array(T)`, and a nullable element (`T?[]`, `List<T?>`, or a property that allows nulls via `[CollectionBehavior(AllowNulls = true)]`) ↔ `z.array(T.nullable())`. A collection whose elements may be null exports `items.anyOf: [ …, { "type": "null" } ]`, and both `z.fromJSONSchema` and `Z.FromJsonSchema` read that shape back. Null elements are rejected by default, so a generated `T[]` matches `z.array(T)` exactly — see [Collection null items](../generator/Source-Generator.md#collection-null-items).
 
 A dictionary property (`IDictionary<TKey, TValue>` / `IReadOnlyDictionary<TKey, TValue>`) is a map:
 `Dictionary<string, V>` ↔ `z.record(z.string(), V)`. The generated schema exports
 `{ "type": "object", "additionalProperties": … }` (with `minProperties`/`maxProperties` for size constraints),
 and its failures use the same key-prefixed paths as `z.record`. Both `z.fromJSONSchema` and
 `Z.FromJsonSchema` read that shape back as a record — see
-[JSON Schema Export](JsonSchema-Export.md#dictionaries).
+[JSON Schema Export](../serialization/JsonSchema-Export.md#dictionaries).
 
 The temporal parity suite (`tests/ts/temporal-parity.test.ts`) proves the same loop for `[NonSentinel]` on
 `DateOnly`, `TimeOnly`, `DateTime`, and `DateTimeOffset` under the default preserve-offset contract, including
@@ -75,7 +75,7 @@ the offset-equivalent bounds. The C# producer
 (`JsonSchema_GivenGeneratedTemporalSchemas_WritesZodParityArtifacts`) writes to
 `src/tests/cross-platform/temporal-parity/`; the UTC contract has its own generator tests.
 
-See [JSON Schema Export](JsonSchema-Export.md) and [JSON Schema Import](JsonSchema-Import.md).
+See [JSON Schema Export](../serialization/JsonSchema-Export.md) and [JSON Schema Import](../serialization/JsonSchema-Import.md).
 
 ## Directory layout
 

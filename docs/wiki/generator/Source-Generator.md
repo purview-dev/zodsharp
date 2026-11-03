@@ -39,7 +39,7 @@ For a `[ZodSchema]` target type `{TypeName}`, the generator emits:
 
 `BuildJsonSchema` returns a `ZodSharp.JsonSchema.JsonSchemaDefinition` built from the same metadata as
 `Validate`, so a generated `[ZodSchema]` schema can be exported through `Z.ToJsonSchema` without rebuilding its
-rules by hand. See [JSON Schema Export](JsonSchema-Export.md#export-a-generated-zodschema).
+rules by hand. See [JSON Schema Export](../serialization/JsonSchema-Export.md#export-a-generated-zodschema).
 
 ```csharp
 // Value-first composition methods (EnableComposition, default true):
@@ -93,7 +93,7 @@ foreach (var error in result.Errors)
 Generated validators locate collection and dictionary errors with typed index and key segments, so
 `ToDottedString()` renders `Lines[0].Sku` and `ByCode[abc].Sku` (an all-digit or punctuated key is quoted:
 `ByCode["0"]`, `ByCode["a.b"]`). Keys are rendered with the invariant culture. See
-[Core Concepts](Core-Concepts.md) for the path format.
+[Core Concepts](../concepts/Core-Concepts.md) for the path format.
 
 ### Validating a single member
 
@@ -353,7 +353,7 @@ A type that also has a hand-authored `[OptionsValidator]` class (Microsoft.Exten
 would get two validators for the same options (SYSLIB1205), so the ZodSharp validator is not generated and
 `ZODSGEN050` is reported. Keep one: remove `[OptionsValidator]`, or set
 `[ZodSchema(SuppressIValidateOptions = true)]`. For options validated through the factory instead, see
-[Dependency Injection](Dependency-Injection.md#validating-options-objects).
+[Dependency Injection](../hosting/Dependency-Injection.md#validating-options-objects).
 
 ## Trim-safe registration
 
@@ -378,7 +378,7 @@ builder.Services.AddZodSharpContosoOrdersSchemas();
 extension adds a `ZodSchemaRegistration` and ensures `AddZodSharpFactory()` has registered the factory, which
 applies every registration when it is first resolved — so calls from several model assemblies compose. Prefer
 it to `RegisterFromAssembly`, which discovers validators through metadata and is not trim-safe. See
-[Dependency Injection](Dependency-Injection.md#registering-source-generated-validators).
+[Dependency Injection](../hosting/Dependency-Injection.md#registering-source-generated-validators).
 
 ## Unions and closed hierarchies (C# 15)
 
@@ -472,7 +472,7 @@ public class RepositoryInventoryResponse
 > [!NOTE]
 > `[CollectionBehavior]` and `[ZodSchema(AllowNulls = ...)]` only take effect when the named argument is present; an attribute that leaves it out defers to the next level. `[CollectionBehavior]` with options that cannot affect the property is reported as `ZODSGEN046`.
 
-A collection whose elements may be null exports its `items` schema with a `null` branch, mirroring how a nullable property is exported. A dictionary exports `{ "type": "object", "additionalProperties": … }` — see [JSON Schema Export](JsonSchema-Export.md#dictionaries).
+A collection whose elements may be null exports its `items` schema with a `null` branch, mirroring how a nullable property is exported. A dictionary exports `{ "type": "object", "additionalProperties": … }` — see [JSON Schema Export](../serialization/JsonSchema-Export.md#dictionaries).
 
 ### Struct collections and default immutable arrays
 
@@ -542,11 +542,11 @@ property, then `PreserveOffset`. The attribute shapes the schema only; pair `Utc
 package's `UtcDateTimeOffsetConverter` (and `PreserveOffset` under a global UTC converter with
 `PreserveOffsetDateTimeOffsetConverter`). Both modes export an exact sentinel pattern; `Utc` additionally
 narrows the accepted wire form to a zero offset. See
-[JSON Schema Export](JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
+[JSON Schema Export](../serialization/JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
 
 ## Automatic enum validation
 
-Every non-flags enum property is validated automatically: the generated validator rejects a value that is not a defined member of the enum type. The check is emitted as an `EnumRule<TEnum>` (see [Validation Rules Reference](Validation-Rules-Reference.md#enum-rules)) and reports `invalid_enum_value`.
+Every non-flags enum property is validated automatically: the generated validator rejects a value that is not a defined member of the enum type. The check is emitted as an `EnumRule<TEnum>` (see [Validation Rules Reference](../schemas/Validation-Rules-Reference.md#enum-rules)) and reports `invalid_enum_value`.
 
 A member that is defined but never a valid value can be excluded globally by marking it `[ZodIgnore]`, and excluded for a single property with `[DeniedValues]`:
 
@@ -593,7 +593,7 @@ A nullable enum property is validated only when it is not `null`.
 - Nullable properties are null-guarded before value-set/type validation; a nullable target rejects `null` with `invalid_type`.
 - A target implementing `IValidatableObject` is validated by it after the members and type rules pass, as DataAnnotations and Microsoft.Extensions.Validation do. On .NET 11, `IAsyncValidatableObject` and `AsyncValidationAttribute` members run in `ValidateAsync`; a synchronous `Validate` of such a type throws `InvalidOperationException` (`ZODSGEN048` warns at build time). See [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md#ivalidatableobject-and-asynchronous-dataannotations).
 
-- A `Purview.ValueObjects` scalar marked with `[Scalar]` can carry `[ZodSchema]` on the same type; the generated validator validates the scalar as a unit and reports an empty path. A rule written against the scalar's underlying value is adapted automatically, or resolved against the unwrapped value and null-guarded when the underlying value is a `Nullable<T>` — see [Value Objects Integration](Value-Objects-Integration.md).
-- A rule marked with the parameterless `[ZodRule]` generates a matching validation attribute. Every built-in rule ships its attribute inside `Purview.ZodSharp` (in the `ZodSharp.Rules` namespace — `[Email]`, `[E164]`, `[Regex]`, `[NonSentinel]`, `[MinValue]`, `[Even]`, …; names that collide with `System.ComponentModel.DataAnnotations` use a `Zod` suffix such as `[MinLengthZod]`), so they can annotate a member or a scalar value object directly — see [Built-in attributes](Custom-Rules.md#built-in-attributes-shipped-with-purviewzodsharp).
+- A `Purview.ValueObjects` scalar marked with `[Scalar]` can carry `[ZodSchema]` on the same type; the generated validator validates the scalar as a unit and reports an empty path. A rule written against the scalar's underlying value is adapted automatically, or resolved against the unwrapped value and null-guarded when the underlying value is a `Nullable<T>` — see [Value Objects Integration](../schemas/Value-Objects-Integration.md).
+- A rule marked with the parameterless `[ZodRule]` generates a matching validation attribute. Every built-in rule ships its attribute inside `Purview.ZodSharp` (in the `ZodSharp.Rules` namespace — `[Email]`, `[E164]`, `[Regex]`, `[NonSentinel]`, `[MinValue]`, `[Even]`, …; names that collide with `System.ComponentModel.DataAnnotations` use a `Zod` suffix such as `[MinLengthZod]`), so they can annotate a member or a scalar value object directly — see [Built-in attributes](../schemas/Custom-Rules.md#built-in-attributes-shipped-with-purviewzodsharp).
 
-See [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md) for the attribute coverage and structured issue shape, [Custom Rules](Custom-Rules.md) for extending validation with your own rules and attributes, and [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the `ZODSGEN*` diagnostics.
+See [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md) for the attribute coverage and structured issue shape, [Custom Rules](../schemas/Custom-Rules.md) for extending validation with your own rules and attributes, and [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the `ZODSGEN*` diagnostics.

@@ -201,7 +201,7 @@ if (await response.TryReadZodValidationProblemAsync() is { } problem)
 ```
 
 - `TryReadZodValidationProblemAsync` reads an unsuccessful JSON response with `errors` or `issues` - the contract
-  [ASP.NET Core Integration](AspNetCore-Integration.md) writes - using source-generated JSON metadata. It and
+  [ASP.NET Core Integration](../AspNetCore-Integration.md) writes - using source-generated JSON metadata. It and
   `ZodValidationProblemDetails` (namespace `ZodSharp.Http`) come from `Purview.ZodSharp.Http`, which this package
   references; see [HttpClient Integration](Http-Integration.md) for validating request and response bodies too.
 - `AddZodProblemDetails` places issues by their typed `segments`, so `Lines[0].Quantity` lands on

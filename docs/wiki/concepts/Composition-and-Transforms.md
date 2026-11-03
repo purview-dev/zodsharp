@@ -102,7 +102,7 @@ var schema = Z.Number().Prefault(1);
 
 ## And / Or
 
-- `.And(other)` → `ZodIntersection<T>` — both must succeed; an issue raised identically by both sides is reported once (see [Unions and Discriminated Unions](Unions-and-Discriminated-Unions.md)).
+- `.And(other)` → `ZodIntersection<T>` — both must succeed; an issue raised identically by both sides is reported once (see [Unions and Discriminated Unions](../schemas/Unions-and-Discriminated-Unions.md)).
 - `.Or<TOther>(other)` → `ZodTypedUnion<T, TOther>` — either may succeed.
 
 ## Example: layered validation

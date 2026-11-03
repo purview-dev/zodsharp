@@ -104,7 +104,7 @@ var result = UserSchema.Validate(user);
 var validated = UserSchema.Parse(user); // throws on failure
 ```
 
-See the [Source Generator](Source-Generator.md) and [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md) pages for the full feature set.
+See the [Source Generator](generator/Source-Generator.md) and [Source Generator DataAnnotations](generator/Source-Generator-DataAnnotations.md) pages for the full feature set.
 
 ## JSON integration
 
@@ -123,13 +123,16 @@ var jsonSchema = Z.ToJsonSchema(userSchema, new ToJsonSchemaOptions { Title = "U
 var imported = Z.FromJsonSchema(jsonSchemaString);
 ```
 
-See [System.Text.Json Integration](SystemTextJson-Integration.md), [Newtonsoft.Json Integration](NewtonsoftJson-Integration.md), [JSON Schema Export](JsonSchema-Export.md), and [JSON Schema Import](JsonSchema-Import.md).
+See [System.Text.Json Integration](serialization/SystemTextJson-Integration.md), [Newtonsoft.Json Integration](serialization/NewtonsoftJson-Integration.md), [JSON Schema Export](serialization/JsonSchema-Export.md), and [JSON Schema Import](serialization/JsonSchema-Import.md).
 
-## Next pages
+## Where to go next
 
-- [Core Concepts](Core-Concepts.md)
-- [Fluent Schema API](Fluent-Schema-API.md)
-- [Source Generator](Source-Generator.md)
-- [Dependency Injection](Dependency-Injection.md)
-- [Cross-Platform Interop](Cross-Platform-Interop.md)
-- [Performance](Performance.md)
+This page is the entry point of the wiki, so the rest of it is grouped by what you are trying to do. Each group below is a section of the sidebar, in reading order; [Home](Home.md) lists every page in all seven sections.
+
+- **Learn the model** — [Core Concepts](concepts/Core-Concepts.md) explains the pipeline, the result and the error model; [Fluent Schema API](Fluent-Schema-API.md) is the surface every schema type shares.
+- **Pick a schema or a rule** — [Validation Rules Reference](schemas/Validation-Rules-Reference.md) lists every built-in rule, and each schema type has its own page: [String Validation](schemas/String-Validation.md), [Number Validation](schemas/Number-Validation.md), [Object Validation](schemas/Object-Validation.md), [Arrays and Other Schemas](schemas/Arrays-and-Other-Schemas.md), [Unions and Discriminated Unions](schemas/Unions-and-Discriminated-Unions.md), [Composition and Transforms](concepts/Composition-and-Transforms.md). Write your own in [Custom Rules](schemas/Custom-Rules.md).
+- **Generate validators** — [Source Generator](generator/Source-Generator.md), then [Source Generator DataAnnotations](generator/Source-Generator-DataAnnotations.md), with [Source Generator Diagnostics](generator/Source-Generator-Diagnostics.md) for the codes the build reports.
+- **Move data across a boundary** — [JSON Schema Export](serialization/JsonSchema-Export.md) and [JSON Schema Import](serialization/JsonSchema-Import.md) for interoperability, [System.Text.Json Integration](serialization/SystemTextJson-Integration.md) and [Newtonsoft.Json Integration](serialization/NewtonsoftJson-Integration.md) for deserialize-and-validate.
+- **Host it** — [ASP.NET Core Integration](AspNetCore-Integration.md), [Blazor Integration](hosting/Blazor-Integration.md), [HttpClient Integration](hosting/Http-Integration.md), [Dependency Injection](hosting/Dependency-Injection.md), and [Localization](hosting/Localization.md) for messages. On .NET 11, [Microsoft.Extensions.Validation](hosting/Microsoft-Extensions-Validation.md) and [OpenAPI Integration](hosting/OpenAPI-Integration.md) cover the platform pipeline.
+- **Ship it** — [Guarantees and Limitations](quality/Guarantees-and-Limitations.md) states what is promised, [Performance](quality/Performance.md) what it costs, and [Trimming and Native AOT](quality/Trimming-and-AOT.md) what the publish gates check. [Cross-Platform Interop](quality/Cross-Platform-Interop.md) covers the Zod parity fixtures.
+- **Work on it** — [Contributing](development/Contributing.md) and [Release Flow](development/Release-Flow.md).

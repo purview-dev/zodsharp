@@ -81,7 +81,7 @@ rules that resolve services run:
 | `ValidateAndSerializeAsync<T>` | `ValueTask<ValidationResult<string>> ValidateAndSerializeAsync<T>(this IZodSchemaValidator<T> validator, T value, Stream output, JsonTypeInfo<T> jsonTypeInfo, IServiceProvider? services, CancellationToken cancellationToken = default)` |
 
 The package is browser-safe (Blazor WebAssembly). For `HttpClient` bodies and server validation problems, see
-[HttpClient Integration](Http-Integration.md).
+[HttpClient Integration](../hosting/Http-Integration.md).
 
 ## Failure codes
 
@@ -127,7 +127,7 @@ The errors are exactly those validating the hydrated model reports. `ZodJsonExce
 same re-rooting for any exception (`TryGetErrors`, `TryReroot`, `Reroot`, `ToMemberPath`). A bare `ZodException`
 thrown from a converter still propagates unchanged.
 
-These are the same errors ASP.NET Core hosts project into ProblemDetails (see [ASP.NET Core Integration](AspNetCore-Integration.md)); OpenAPI documents describe the response shape (see [OpenAPI Integration](OpenAPI-Integration.md)).
+These are the same errors ASP.NET Core hosts project into ProblemDetails (see [ASP.NET Core Integration](../AspNetCore-Integration.md)); OpenAPI documents describe the response shape (see [OpenAPI Integration](../hosting/OpenAPI-Integration.md)).
 
 ## JSON Schema import
 

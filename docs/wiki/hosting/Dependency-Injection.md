@@ -81,7 +81,7 @@ builder.Services.AddZodSchemaRegistration(factory => factory.Register(new ZodSch
 
 The `Purview.ZodSharp.AspNetCore` package offers the richer `AddZodSharp` with exact assembly scans,
 assembly-graph scans, loaded-assembly scans, and additive assembly-contribution helpers — see
-[ASP.NET Core Integration](AspNetCore-Integration.md).
+[ASP.NET Core Integration](../AspNetCore-Integration.md).
 
 ### Choosing a registration method
 
@@ -177,7 +177,7 @@ validation in its own service scope. Synchronous options access (`IOptions<T>.Va
 runs the synchronous rules only — that is the platform's contract. On earlier frameworks only the synchronous path
 exists.
 
-The source generator also auto-generates `IValidateOptions<T>` validators for types whose names end in configurable suffixes — see [Source Generator](Source-Generator.md#ivalidateoptions-support). Their failures read `{path}: {message} ({code})`.
+The source generator also auto-generates `IValidateOptions<T>` validators for types whose names end in configurable suffixes — see [Source Generator](../generator/Source-Generator.md#ivalidateoptions-support). Their failures read `{path}: {message} ({code})`.
 
 ## Example: consuming a factory
 

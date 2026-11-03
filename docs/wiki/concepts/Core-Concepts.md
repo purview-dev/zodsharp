@@ -5,7 +5,7 @@
 Every schema derives from `ZodType<TOutput, TInput>` (namespace `ZodSharp.Core`). Validation is a two-phase pipeline:
 
 1. **ParseInternal** — each schema overrides this hook to perform its type check and traversal (rejecting `null` where not allowed, coercing types, walking objects/arrays/tuples/unions, producing structured failures).
-2. **Rules** — on success, the accumulated `IValidationRule<TOutput>` structs are evaluated. A failing rule emits a `ValidationError` carrying the rule's code (`too_small`, `too_big`, `not_multiple_of`, `not_finite`, `invalid_string`, `invalid_type`, `invalid_value`, …; `validation_failed` for custom rules without a code) and its structured identity: the Zod issue code as `Category`, an `Origin`, typed `Lower`/`Upper` bounds and parameters (see [Error fields](#error-fields)). Each rule exposes its reported code and message as public `const string ErrorCode` / `MessageFormat` constants, so tests can assert against the rule instead of duplicating literals (a rule that omits them is reported as `ZODSGEN042` — see [Custom Rules](Custom-Rules.md)).
+2. **Rules** — on success, the accumulated `IValidationRule<TOutput>` structs are evaluated. A failing rule emits a `ValidationError` carrying the rule's code (`too_small`, `too_big`, `not_multiple_of`, `not_finite`, `invalid_string`, `invalid_type`, `invalid_value`, …; `validation_failed` for custom rules without a code) and its structured identity: the Zod issue code as `Category`, an `Origin`, typed `Lower`/`Upper` bounds and parameters (see [Error fields](#error-fields)). Each rule exposes its reported code and message as public `const string ErrorCode` / `MessageFormat` constants, so tests can assert against the rule instead of duplicating literals (a rule that omits them is reported as `ZODSGEN042` — see [Custom Rules](../schemas/Custom-Rules.md)).
 
 ```csharp
 ValidationResult<TOutput> result = schema.Validate(value);
@@ -45,7 +45,7 @@ compares every field, including the path segments and parameters by value, so tw
 | `Code` | ZodSharp's specific identity: a rule's `ErrorCode` (`too_small`, `invalid_string`, `invalid_length`, …) or a schema code from `ZodIssueCodes` (`invalid_type`, `missing_field`, `invalid_union`, `unrecognized_keys`, `refinement_failed`, `transform_error`, …). The same failure reports the same code whichever producer reports it (runtime schema, generated validator, JSON Schema import). |
 | `Category` | The Zod v4 issue code (`ZodIssueCategories`): `invalid_type`, `too_small`, `too_big`, `invalid_format`, `not_multiple_of`, `unrecognized_keys`, `invalid_union`, `invalid_key`, `invalid_element`, `invalid_value`, `custom`. Every built-in error sets it, so a client can treat ZodSharp and Zod issues alike. |
 | `Message` | The rendered message, formatted with the invariant culture. Built-in messages never quote string input (see [PII](#pii)). |
-| `MessageFormat` | The template that produced `Message`, with named placeholders (`"{displayName} is required"`), or `null` when the message was supplied literally. Hosts re-format it in the request culture (see [Localization](Localization.md)). |
+| `MessageFormat` | The template that produced `Message`, with named placeholders (`"{displayName} is required"`), or `null` when the message was supplied literally. Hosts re-format it in the request culture (see [Localization](../hosting/Localization.md)). |
 | `FullPath` | The authoritative, typed location (`ZodPath`); see [Paths](#paths). |
 | `Path` | The legacy `ImmutableArray<string>` projection of `FullPath`: members and keys as-is, indexes as digits (`["Items", "0", "Name"]`). Derived from `FullPath`, so the two never disagree. |
 | `Origin` | The kind of value that failed: `string`, `number`, `bigint`, `date`, `array`, `object`, `enum`, … |
@@ -73,7 +73,7 @@ The shared identities live in `ZodSharp.Core`, so every producer reports a failu
 
 A failed union reports one `invalid_union` error whose per-option issues are available through
 `error.GetUnionErrors()` (an `ImmutableArray<ImmutableArray<ValidationError>>`, stored under the `unionErrors`
-parameter); see [Unions and Discriminated Unions](Unions-and-Discriminated-Unions.md).
+parameter); see [Unions and Discriminated Unions](../schemas/Unions-and-Discriminated-Unions.md).
 
 Create custom issues with `ValidationError.Create(code, message, path, parameters, origin, minimum, maximum, inclusive, category)`;
 `path` may be a `ZodPath`, an `ImmutableArray<string>` or (through the constructor) a `string[]`. Fields not in
@@ -166,7 +166,7 @@ re-formats `MessageFormat` when every placeholder resolves and otherwise returns
 literally, `{{`/`}}` escape braces, and named placeholders resolve from the parameters and then the built-in
 fields (`displayName`, `member`, `path`, `code`, `category`, `origin`, `minimum`, `maximum`, `inclusive`; `displayName` is the last member of the path, or `Value` at the root). A
 sequence parameter (an options or keys list) renders as its elements joined by `, `. See
-[Localization](Localization.md).
+[Localization](../hosting/Localization.md).
 
 ## PII
 
@@ -215,7 +215,7 @@ catch (ZodException ex)
 
 - Schemas are classes deriving from `ZodType<TOutput, TInput>`; the fluent methods return `this` (or a wrapping schema) so chains read naturally.
 - Rules are `readonly record struct` implementations of `IValidationRule<T>` (`bool IsValid(in T value)`, `string GetErrorMessage(in T value)`) — zero allocation.
-- Custom rules can be attached with the public `AddRule`/`Rule` methods and surfaced as DataAnnotations-style attributes; see [Custom Rules](Custom-Rules.md).
+- Custom rules can be attached with the public `AddRule`/`Rule` methods and surfaced as DataAnnotations-style attributes; see [Custom Rules](../schemas/Custom-Rules.md).
 - `ValidateSpan(ReadOnlySpan<char> value)` is available on `ZodString` for span-based validation; use `IsValidSpan(value, out errors)` for an allocation-free check.
 - A schema's `Description` is set with `.Describe("...")`.
 
@@ -254,4 +254,4 @@ Object fields and union options wrap typed schemas so boxed values from a `Dicti
 
 ## Dependency injection
 
-`IZodSchemaFactory` is the registry that resolves validators by type. See [Dependency Injection](Dependency-Injection.md).
+`IZodSchemaFactory` is the registry that resolves validators by type. See [Dependency Injection](../hosting/Dependency-Injection.md).

@@ -72,7 +72,7 @@ if (factory.TryGetUntypedValidator(typeof(Order), out var validator))
 }
 ```
 
-This is the entry point the OpenAPI transformers use; see [OpenAPI Integration](OpenAPI-Integration.md).
+This is the entry point the OpenAPI transformers use; see [OpenAPI Integration](../hosting/OpenAPI-Integration.md).
 
 ## Export a generated `[ZodSchema]`
 
@@ -106,7 +106,7 @@ apart: property names, nested objects, native enums, nullable fields, required f
   for null. A rule that rejects an absent value (for example `[RequiredZod]`) makes the field non-null even
   when its annotation is nullable.
 - **Collection items** follow the null-items setting (see
-  [Collection null items](Source-Generator.md#collection-null-items)): a collection whose elements may be null
+  [Collection null items](../generator/Source-Generator.md#collection-null-items)): a collection whose elements may be null
   exports `items` wrapped in `anyOf: [ …, { "type": "null" } ]`; otherwise `items` is the element's own schema.
 - **Scalar value objects** (`[Scalar<TValue>]`) export as their underlying value's schema — a `Guid` scalar is
   a canonical 8-4-4-4-12 hexadecimal string (a `pattern`, not Zod's RFC `uuid` format, because C# `Guid`
@@ -235,7 +235,7 @@ definition.SetVendorExtension("x-zod-note", "custom"); // the name must start wi
 They are exposed through methods rather than a property on purpose: the JSON Schema serializers write
 properties only, so the exported JSON Schema is unchanged. Hosts whose format carries vendor extensions read
 them - the OpenAPI transformers write them into the document when `ZodOpenApiOptions.EmitVendorExtensions` is
-on (see [OpenAPI Integration](OpenAPI-Integration.md)).
+on (see [OpenAPI Integration](../hosting/OpenAPI-Integration.md)).
 
 ## Temporal sentinels and the DateTimeOffset wire form
 

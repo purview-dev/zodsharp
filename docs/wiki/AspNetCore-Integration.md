@@ -196,7 +196,7 @@ The contract:
 
 - **Keys.** `errors` keys and `issues[].path` are `ValidationError.FullPath.ToDottedString()`: members joined with
   `.`, indexes as `[0]`, and keys as `[en]` or, when ambiguous, quoted (`Map["0"]`, `Map["a.b"]`). The root is `""`.
-  See [Core Concepts](Core-Concepts.md#paths). By default member names are the C# names, matching
+  See [Core Concepts](concepts/Core-Concepts.md#paths). By default member names are the C# names, matching
   Microsoft.Extensions.Validation and MVC model state. `PathNaming = ZodPathNaming.Json` applies the minimal-API
   `JsonOptions` naming policy.
 - **`code` and `category`.** `code` is ZodSharp's specific identity (`invalid_range`). `category` is the Zod issue
@@ -210,11 +210,11 @@ The contract:
   issue's `path` already names the member. `displayName` is kept. Set `IncludeDiagnosticParameters = true` to send them.
 - **`traceId`.** It is present on every path: `Activity.Current?.Id`, else `HttpContext.TraceIdentifier`.
 - **No input values.** Messages and parameters never contain the input unless `ZodErrorOptions.IncludeReceivedValues`
-  is enabled. See [Core Concepts](Core-Concepts.md#pii).
+  is enabled. See [Core Concepts](concepts/Core-Concepts.md#pii).
 - **Messages.** They come from the registered `IZodMessageFormatter` in `CultureInfo.CurrentUICulture`. See
-  [Localization](Localization.md).
+  [Localization](hosting/Localization.md).
 - **OpenAPI.** The body is described by the `ZodValidationProblemDetails` and `ZodValidationIssue` component schemas
-  (see [OpenAPI Integration](OpenAPI-Integration.md)).
+  (see [OpenAPI Integration](hosting/OpenAPI-Integration.md)).
 
 ## Minimal API validation
 
@@ -317,9 +317,9 @@ Notes:
 - **Localization**: register `AddLocalization()` and an `IZodMessageFormatter`, for example
   `new StringLocalizerZodMessageFormatter(factory, sharedResourceType: typeof(ValidationMessages))`. Messages
   follow `Accept-Language` (with `UseRequestLocalization`); codes and paths are unchanged. See
-  [Localization](Localization.md).
+  [Localization](hosting/Localization.md).
 - **The bridge**: resolver placement, `ZodReport` and non-HTTP validation are covered in
-  [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md).
+  [Microsoft.Extensions.Validation](hosting/Microsoft-Extensions-Validation.md).
 - **Unions**: a union parameter is claimed by the runtime parameter resolver, which the application's
   `AddValidation()` call adds. The active case is reported under `Value` (`Value.Email`).
 - **Double validation**: `WithZodSharpValidation()` on an endpoint the pipeline validates skips the parameters
@@ -327,7 +327,7 @@ Notes:
   it validates as usual.
 - **OpenAPI**: the `Purview.ZodSharp.AspNetCore.OpenApi` operation transformer adds the validation problem
   response for endpoints with a ZodSharp-known parameter. No endpoint metadata is added by the pipeline path. See
-  [OpenAPI Integration](OpenAPI-Integration.md).
+  [OpenAPI Integration](hosting/OpenAPI-Integration.md).
 
 | | `WithZodSharpValidation()` filter | Built-in pipeline |
 |---|---|---|
@@ -645,7 +645,7 @@ builder.Services.AddZodSharp(options =>
    assembly sources, which auto-discovers source-generated `[assembly: ZodSchemaGenerated(typeof(...))]`
    registrations.
 
-Assembly scanning is not trim-safe. In a trimmed or Native AOT host, use the generated `AddZodSharp{Assembly}Schemas()` (see [Source Generator](Source-Generator.md)).
+Assembly scanning is not trim-safe. In a trimmed or Native AOT host, use the generated `AddZodSharp{Assembly}Schemas()` (see [Source Generator](generator/Source-Generator.md)).
 
 `ZodSchemaFactoryOptions`:
 
@@ -683,8 +683,8 @@ builder.Services.AddZodSharpLoadedAssemblies();
 | `AddZodSharpFactory(configure)` | core `Purview.ZodSharp` | singleton `IZodSchemaFactory` | Any .NET host where you want manual control — register validators yourself in the `configure` callback. |
 | `AddZodSharp{Assembly}Schemas()` | generated into each assembly with `[ZodSchema]` types | a trim-safe `ZodSchemaRegistration` naming every generated validator | Trimmed or Native AOT hosts, and anywhere assembly scanning is unwanted. |
 | `AddZodSharpProblemDetails(...)` | `Purview.ZodSharp.AspNetCore` | `ZodExceptionHandler`, the ProblemDetails writer and services, and the .NET 11 pipeline enrichment — does **not** register the factory | Mapping thrown `ZodException`s to `ProblemDetails`; pair it with `AddZodSharp` when you also need DI validator resolution. |
-| `AddZodSharpValidation(...)` | `Purview.ZodSharp.Extensions.Validation` (`net11.0`) | the Microsoft.Extensions.Validation resolver | Validating with the .NET 11 pipeline; see [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md). |
+| `AddZodSharpValidation(...)` | `Purview.ZodSharp.Extensions.Validation` (`net11.0`) | the Microsoft.Extensions.Validation resolver | Validating with the .NET 11 pipeline; see [Microsoft.Extensions.Validation](hosting/Microsoft-Extensions-Validation.md). |
 | `AddZodSchemaOptionsValidator<T>(...)` | core `Purview.ZodSharp` | singleton `IValidateOptions<T>` | Validating options objects; requires a factory registered first via `AddZodSharp` or `AddZodSharpFactory`. Validates every options name; on .NET 11 `ValidateOnStart()` runs its asynchronous rules too. |
 | `OptionsBuilder<T>.BindAndValidateWithZod(section)` | `Purview.ZodSharp.AspNetCore` | binds a configuration section and adds the ZodSharp options validator | Options whose failures should name the configuration key (`Smtp:Servers:0:Host`). Uses the reflection-based binder; under Native AOT call `BindConfiguration` and `AddZodSchemaValidator` yourself. |
 
-See [Dependency Injection](Dependency-Injection.md) for the underlying factory and options-validation wiring.
+See [Dependency Injection](hosting/Dependency-Injection.md) for the underlying factory and options-validation wiring.

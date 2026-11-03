@@ -58,7 +58,7 @@ var schema = SchemaCache.GetOrCreate("user", () =>
 
 A **fully built** schema is safe to cache and share across threads: validation only reads the rule set and
 the description. But building a schema is **not** immutable — the fluent rule methods mutate the receiver
-in place (see [Guarantees and Limitations](Guarantees-and-Limitations.md#fluent-rule-methods-mutate-the-receiver)).
+in place (see [Guarantees and Limitations](../quality/Guarantees-and-Limitations.md#fluent-rule-methods-mutate-the-receiver)).
 So finish configuring a schema *before* putting it in the cache, and never apply a fluent rule method to a
 schema you retrieved from it: that mutates the instance every other caller is sharing.
 
@@ -77,4 +77,4 @@ when you genuinely need lookup by name.
 ## The source generator alternative
 
 For the highest performance, prefer the compile-time source generator: `[ZodSchema]` emits a static
-validator with no runtime compilation or dispatch overhead. See [Source Generator](Source-Generator.md).
+validator with no runtime compilation or dispatch overhead. See [Source Generator](../generator/Source-Generator.md).
