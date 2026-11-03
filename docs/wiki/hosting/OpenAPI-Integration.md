@@ -62,7 +62,7 @@ The component ids and the media type are constants: `ZodOpenApiOptions.Validatio
 
 ## Source of truth
 
-For each type, the transformer uses ZodSharp's own JSON Schema (see [JSON Schema Export](JsonSchema-Export.md)):
+For each type, the transformer uses ZodSharp's own JSON Schema (see [JSON Schema Export](../serialization/JsonSchema-Export.md)):
 
 - the generated `BuildJsonSchema()` of a `[ZodSchema]` type (no reflection), or
 - a runtime schema registered in `IZodSchemaFactory`, converted with `ToJsonSchemaConverter`.
@@ -130,7 +130,7 @@ rejects when absent are added to `required`: non-nullable references, `[Required
 | A runtime `ZodDiscriminatedUnion` | `oneOf` with a `discriminator` whose `propertyName` is the union's discriminator. |
 
 With `DiscriminatedUnionsAsOneOf = false`, all three keep `anyOf`. See
-[Unions and Discriminated Unions](Unions-and-Discriminated-Unions.md).
+[Unions and Discriminated Unions](../schemas/Unions-and-Discriminated-Unions.md).
 
 ## Validation problem responses
 
@@ -146,7 +146,7 @@ container, or a C# union whose cases ZodSharp knows. It also lists `422` when an
   duplicated. Its description is kept, and its `application/problem+json` schema is replaced with the ZodSharp
   contract.
 
-The two component schemas describe the body that [ASP.NET Core Integration](AspNetCore-Integration.md#the-error-contract)
+The two component schemas describe the body that [ASP.NET Core Integration](../AspNetCore-Integration.md#the-error-contract)
 documents:
 
 - `ZodValidationProblemDetails` is RFC 9457 `HttpValidationProblemDetails` plus `issues` (an array of
@@ -194,10 +194,10 @@ With `EmitVendorExtensions` on, rules that no standard keyword captures are reco
 | `x-zodsharp-unsupported` | the names of rules that have no JSON Schema representation (`CidrRule`, `JWTRule`, ...) |
 
 The same extensions are available outside OpenAPI from `JsonSchemaDefinition.GetVendorExtensions()`. They never
-change the serialized JSON Schema (see [JSON Schema Export](JsonSchema-Export.md)).
+change the serialized JSON Schema (see [JSON Schema Export](../serialization/JsonSchema-Export.md)).
 
 ## See also
 
-- [ASP.NET Core Integration](AspNetCore-Integration.md)
+- [ASP.NET Core Integration](../AspNetCore-Integration.md)
 - [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md)
-- [JSON Schema Export](JsonSchema-Export.md)
+- [JSON Schema Export](../serialization/JsonSchema-Export.md)

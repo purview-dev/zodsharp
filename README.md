@@ -86,13 +86,13 @@ canonical paths (`Items[0].Name`, `Map[en]`, `Map["0"]`), typed bounds and local
 
 | Package | What it adds |
 | --- | --- |
-| `Purview.ZodSharp.Extensions.Validation` | The Microsoft.Extensions.Validation bridge (`AddZodSharpValidation()`); WebAssembly-safe. See [Microsoft.Extensions.Validation](docs/wiki/Microsoft-Extensions-Validation.md) |
-| `Purview.ZodSharp.AspNetCore.OpenApi` | OpenAPI transformers that describe ZodSharp's constraints and validation problem responses (`options.AddZodSharp()`). See [OpenAPI Integration](docs/wiki/OpenAPI-Integration.md) |
-| `Purview.ZodSharp.Blazor` | Blazor Server and WebAssembly form validation. See [Blazor Integration](docs/wiki/Blazor-Integration.md) |
+| `Purview.ZodSharp.Extensions.Validation` | The Microsoft.Extensions.Validation bridge (`AddZodSharpValidation()`); WebAssembly-safe. See [Microsoft.Extensions.Validation](docs/wiki/hosting/Microsoft-Extensions-Validation.md) |
+| `Purview.ZodSharp.AspNetCore.OpenApi` | OpenAPI transformers that describe ZodSharp's constraints and validation problem responses (`options.AddZodSharp()`). See [OpenAPI Integration](docs/wiki/hosting/OpenAPI-Integration.md) |
+| `Purview.ZodSharp.Blazor` | Blazor Server and WebAssembly form validation. See [Blazor Integration](docs/wiki/hosting/Blazor-Integration.md) |
 
 `Purview.ZodSharp.AspNetCore` uses the bridge on `net11.0` to produce full-fidelity ProblemDetails from the built-in
 pipeline ([ASP.NET Core Integration](docs/wiki/AspNetCore-Integration.md)), and messages are localized through
-`IZodMessageFormatter` ([Localization](docs/wiki/Localization.md)).
+`IZodMessageFormatter` ([Localization](docs/wiki/hosting/Localization.md)).
 
 ## Usage Examples
 
@@ -275,7 +275,7 @@ public readonly struct MinLengthRule : IValidationRule<string>
 }
 ```
 
-Every rule exposes its reported code and message template as public `ErrorCode`/`MessageFormat` constants so tests can assert against the rule instead of duplicating literals (`ZODSGEN042` enforces this convention — see the [Validation Rules Reference](docs/wiki/Validation-Rules-Reference.md) for the catalogue of built-in rules, [Custom Rules](docs/wiki/Custom-Rules.md) for the rule contract and [Value Objects Integration](docs/wiki/Value-Objects-Integration.md) for scalar value objects).
+Every rule exposes its reported code and message template as public `ErrorCode`/`MessageFormat` constants so tests can assert against the rule instead of duplicating literals (`ZODSGEN042` enforces this convention — see the [Validation Rules Reference](docs/wiki/schemas/Validation-Rules-Reference.md) for the catalogue of built-in rules, [Custom Rules](docs/wiki/schemas/Custom-Rules.md) for the rule contract and [Value Objects Integration](docs/wiki/schemas/Value-Objects-Integration.md) for scalar value objects).
 
 #### 3. Compiled Validators
 
@@ -575,7 +575,7 @@ var either = UserSchema.ApplyOr(user, u => u.Age < 18, "Must be an adult or a mi
 - Zero-reflection, zero-allocation validators
 - Value-first composition methods (`.ApplyAnd()`, `.ApplyOr()`, `.ApplyRefine()`) plus instance schema-composing composition (`.Refine()`, `.SuperRefine()`, `.Pipe()`, `.Catch()`, `.Prefault()`, `.Default()`)
 - Supports classes, structs, and records
-- Validates `Purview.ValueObjects` `[Scalar]` types as a unit, adapting a rule written against the underlying value automatically ([Value Objects Integration](docs/wiki/Value-Objects-Integration.md))
+- Validates `Purview.ValueObjects` `[Scalar]` types as a unit, adapting a rule written against the underlying value automatically ([Value Objects Integration](docs/wiki/schemas/Value-Objects-Integration.md))
 
 #### Supported DataAnnotations size validators
 

@@ -105,4 +105,4 @@ var userSchema = Z.FromJsonSchema(jsonSchemaString);
 var result = userSchema.Validate(incomingData);
 ```
 
-See [Cross-Platform Interop](Cross-Platform-Interop.md) for the repository's fixture-based verification of this loop.
+See [Cross-Platform Interop](../quality/Cross-Platform-Interop.md) for the repository's fixture-based verification of this loop.

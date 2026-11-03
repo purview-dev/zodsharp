@@ -155,7 +155,7 @@ it. Revisit it in the next major version, where the type shape can change.
 
 ## Related
 
-- [Source Generator](Source-Generator.md) — generated registration and validators.
-- [Source Generator Diagnostics](Source-Generator-Diagnostics.md) — `ZODSGEN053`.
-- [System.Text.Json Integration](SystemTextJson-Integration.md) — the `JsonTypeInfo<T>` overloads.
+- [Source Generator](../generator/Source-Generator.md) — generated registration and validators.
+- [Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md) — `ZODSGEN053`.
+- [System.Text.Json Integration](../serialization/SystemTextJson-Integration.md) — the `JsonTypeInfo<T>` overloads.
 - [Guarantees and Limitations](Guarantees-and-Limitations.md).

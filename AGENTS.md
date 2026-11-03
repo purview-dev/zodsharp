@@ -119,6 +119,17 @@ Each package ships its own `README.md`, placed in the project's `Sdk/` folder (f
 
 Keep `purview-build.json`'s `PackValidation` requirements in sync with any packaging change.
 
+## Documentation (`docs/wiki`)
+
+`docs/wiki` is the source of the [purview.dev](https://purview.dev) documentation for this project: the site's `github-path` sync reads the folder for both the `live` (latest stable tag) and `prerelease` (`main`) channels.
+
+- **One folder per topic area.** A page is published at `/docs/zodsharp/<folder>/<slug>/`, so the folder is part of its URL, and a link inside a page resolves relative to that page (`../concepts/Core-Concepts.md`). The tree, the seven sections and the conventions are in `docs/wiki/development/Contributing.md`.
+- **Three pages stay at the wiki root.** `Getting-Started.md` is the site's landing page (`docs.rootPage`), and `Fluent-Schema-API.md` and `AspNetCore-Integration.md` are deep-linked by the site catalogue (`docsPage`), whose slug must be a single path segment and must exist in both documentation channels.
+- **Adding a page is three edits** - the page in its folder, its `_Sidebar.md` entry inside the right section (path relative to the wiki root), and its `Home.md` row.
+- **Renaming or moving a page changes a published URL.** Add the old slug to `docs.redirects` in the site repository's `src/src/data/projects/zodsharp.yml`; that is a cross-repository change.
+
+`src/tests/Repository.UnitTests/DocumentationWikiTests.cs` enforces that every page is listed exactly once in the sidebar and is reachable from `Home.md`, that both sets of links resolve to existing files, that every sidebar section has a matching `## ` heading in `Home.md`, that every folder's pages are all in the sidebar, and that every page opens with a single `# ` title.
+
 ## Cross-platform fixtures
 
 Schemas and fixtures shared between TypeScript/Zod and C#/Purview.ZodSharp live under `src/ts/`. The fixture generator (`bun run generate-fixtures`) writes JSON fixtures and a `manifest.json` that the C# tests consume. Keep the TS `UserSchema` and the C# `CrossPlatformUserSchema` in sync.
@@ -159,7 +170,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 - Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`, and no `ForbiddenContent`: compiler-host assemblies outside `analyzers/`, generator or code-fix assemblies under `lib/`). After changing `PackValidation`, `just verify-pack-rules` proves every forbidden-content rule still rejects a package.
 - No build or publish output carries a compiler-host assembly (`Purview.SourceGeneratorFramework*`, `Microsoft.CodeAnalysis*`, `Purview.ZodSharp.SourceGenerators*`, `Purview.ZodSharp.CodeFixes*`): every publish recipe and CI publish job runs `scripts/assert-no-compiler-host-assemblies.ps1`, and `ReleaseGateTests` fails a workflow job that publishes without it.
 - Changes that affect what ships (packaging, `buildTransitive/`, package dependencies, the generator, trimming or AOT) also pass the gates that consume the real `.nupkg`: `just smoke-packed-generator` and `just smoke-packed-consumers` (Native AOT console, Blazor WebAssembly trimmed and AOT, Native AOT minimal API), plus `just wasm-size`, `just verify-trim <rid>` and `just publish-aot-sample`.
-- Before a release, run the pre-release checklist in `docs/wiki/Release-Flow.md` ("Release gates"): `just scrub`, `just pipeline-local-release ...`, then every gate above.
+- Before a release, run the pre-release checklist in `docs/wiki/development/Release-Flow.md` ("Release gates"): `just scrub`, `just pipeline-local-release ...`, then every gate above.
 
 ## Installed skills (`.agents/skills/`)
 

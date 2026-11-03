@@ -367,5 +367,5 @@ Common causes:
 ## Related
 
 - [Custom Rules](Custom-Rules.md) — the rule contract, the public `AddRule`/`Rule` API, rule families, and attribute generation.
-- [Source Generator](Source-Generator.md) — the `[ZodSchema]` generator, generated types, and the refinement hook.
-- [Source Generator Diagnostics](Source-Generator-Diagnostics.md) — the full `ZODSGEN*` catalog.
+- [Source Generator](../generator/Source-Generator.md) — the `[ZodSchema]` generator, generated types, and the refinement hook.
+- [Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md) — the full `ZODSGEN*` catalog.

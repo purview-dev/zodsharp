@@ -25,7 +25,7 @@ jobs:
     secrets: inherit
 
   # The shared pipeline runs the C# suite only, so the TypeScript/Zod side of the cross-platform
-  # parity guarantee (docs/wiki/Guarantees-and-Limitations.md) would otherwise never run in CI.
+  # parity guarantee (docs/wiki/quality/Guarantees-and-Limitations.md) would otherwise never run in CI.
   # The vitest suite validates the JSON the C# cross-platform tests write, so the C# tests must run
   # first, in this same workspace — hence running them here rather than relying on the `build` job.
   cross-platform:
@@ -288,7 +288,7 @@ jobs:
   # packages only - a Native AOT console, a Blazor WebAssembly app (trimmed and RunAOTCompilation) and a Native AOT
   # minimal API - and leak-scans every bin and publish folder for compiler-host assemblies. It then proves every
   # PackValidation ForbiddenContent rule rejects a package, against the packages the consumers used.
-  # `just smoke-packed-consumers` and `just verify-pack-rules` run the same locally. See docs/wiki/Release-Flow.md.
+  # `just smoke-packed-consumers` and `just verify-pack-rules` run the same locally. See docs/wiki/development/Release-Flow.md.
   packed-consumers:
     name: Packed consumers (Native AOT, Blazor WebAssembly, minimal API)
     runs-on: ubuntu-latest

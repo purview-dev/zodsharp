@@ -31,7 +31,7 @@ var result = userSchema.Validate(new Dictionary<string, object?>
 
 Object errors use member segments for field keys, so `FullPath.ToDottedString()` renders `address.street`, and a
 nested array element `items[0].name`. An object key that contains `.`, brackets, quotes or whitespace is quoted
-(`["a.b"]`). See [Core Concepts: Paths](Core-Concepts.md#paths) and [Error fields](Core-Concepts.md#error-fields).
+(`["a.b"]`). See [Core Concepts: Paths](../concepts/Core-Concepts.md#paths) and [Error fields](../concepts/Core-Concepts.md#error-fields).
 
 ## Unknown key policies
 
@@ -85,4 +85,4 @@ These return a **new** `ZodObject` instance:
 
 ## Builder
 
-`ZodObjectBuilder` validates its arguments: a null/whitespace field name or a null schema throws `ArgumentNullException`. Typed fields are wrapped so boxed values coerce correctly (see [Core Concepts](Core-Concepts.md)).
+`ZodObjectBuilder` validates its arguments: a null/whitespace field name or a null schema throws `ArgumentNullException`. Typed fields are wrapped so boxed values coerce correctly (see [Core Concepts](../concepts/Core-Concepts.md)).

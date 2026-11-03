@@ -31,7 +31,7 @@ option in declaration order, with paths relative to the union. It is stored unde
 errors). ProblemDetails projects the union error at its own path, with `unionErrors` as nested issues.
 
 > [!NOTE]
-> On the failure path the accumulated option errors are collected, which allocates. Matching a later option (e.g. number or boolean after a string option) also allocates while the earlier options are attempted — see [Performance](Performance.md).
+> On the failure path the accumulated option errors are collected, which allocates. Matching a later option (e.g. number or boolean after a string option) also allocates while the earlier options are attempted — see [Performance](../quality/Performance.md).
 
 ## Typed union
 
@@ -111,7 +111,7 @@ Failures are reported at the discriminator's path, with category `invalid_union`
 | `null` input | `invalid_type` | `Expected object, received null` (at the root) |
 
 Once an option is selected, its own errors are reported unchanged (for example `invalid_type` at `level`).
-Discriminated unions export to JSON Schema as `oneOf` (see [JSON Schema Export](JsonSchema-Export.md)).
+Discriminated unions export to JSON Schema as `oneOf` (see [JSON Schema Export](../serialization/JsonSchema-Export.md)).
 
 The builder (`ZodDiscriminatedUnionBuilder`) accepts untyped `IZodSchema<object, object>` options via `Option(string value, IZodSchema<object, object> schema)` and typed options via `Option<T>(string value, IZodSchema<T, T> schema)`, which wrap the schema for coercion and `null` handling.
 
@@ -122,20 +122,20 @@ dispatching to the active case's schema, and a member typed as a C# 15 `closed` 
 derived type's schema. Paths do not include the union's `Value`: an error in the `Cat` case of a member
 `public Pet Pet { get; set; }` is reported at `Pet.Name`, not `Pet.Value.Name`. Every derived type of a closed hierarchy needs its own
 `[ZodSchema]`; one without is reported as `ZODSGEN049` (see
-[Source Generator Diagnostics](Source-Generator-Diagnostics.md)).
+[Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md)).
 
 On .NET 11 the hosts understand unions too:
 
 - **Minimal APIs.** A JSON-body parameter typed as a union is validated through its active case, both by the
   Microsoft.Extensions.Validation pipeline (`AddZodSharpValidation()` claims union parameters without an
   application `AddValidation()` call) and by `WithZodSharpValidation()`. See
-  [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md) and
-  [ASP.NET Core Integration](AspNetCore-Integration.md).
+  [Microsoft.Extensions.Validation](../hosting/Microsoft-Extensions-Validation.md) and
+  [ASP.NET Core Integration](../AspNetCore-Integration.md).
 - **Blazor.** A form model property of union type resolves its field through the case object, so messages
-  land next to the right input. See [Blazor Integration](Blazor-Integration.md).
+  land next to the right input. See [Blazor Integration](../hosting/Blazor-Integration.md).
 - **OpenAPI.** A C# union keeps the platform's `anyOf` shape and gets each case constrained; polymorphic
   (`[JsonPolymorphic]`) types are described with `oneOf` and a `discriminator`. See
-  [OpenAPI Integration](OpenAPI-Integration.md).
+  [OpenAPI Integration](../hosting/OpenAPI-Integration.md).
 
 ## Intersection
 

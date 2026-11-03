@@ -39,11 +39,11 @@ public readonly record struct EmailRule : IValidationRule<string>
 ```
 
 - **`ErrorCode`** is the rule's canonical code — the value a test compares against when no per-usage override is supplied. The interface member `IValidationRule<T>.Code` defaults to `"validation_failed"`; a rule that accepts a per-usage `code` override returns it (falling back to `ErrorCode`) from both `Code` and `IZodRule.Code`, so every route reports the same effective value.
-- **`MessageFormat`** is a positional template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments. Format it with `ZodSharp.Rules.RuleMessage.Format(format, …)`, which uses the invariant culture (messages are culture-independent; hosts localize at the boundary - see [Localization](Localization.md)), caches the parsed format and **never throws**: a custom message with a stray brace or an index you do not supply is written out literally instead of raising `FormatException` at validation time.
-- **Keep the input out of the default message.** Errors leave the process (ProblemDetails, logs, UI), so a default `MessageFormat` should describe what was expected rather than quote the value (`"Invalid email format"`, not `"Invalid email format: {0}"`). The built-in rules follow this; see [Core Concepts: PII](Core-Concepts.md#pii).
+- **`MessageFormat`** is a positional template. `{0}` (and `{1}`, …) are the offending value and any rule-specific arguments. Format it with `ZodSharp.Rules.RuleMessage.Format(format, …)`, which uses the invariant culture (messages are culture-independent; hosts localize at the boundary - see [Localization](../hosting/Localization.md)), caches the parsed format and **never throws**: a custom message with a stray brace or an index you do not supply is written out literally instead of raising `FormatException` at validation time.
+- **Keep the input out of the default message.** Errors leave the process (ProblemDetails, logs, UI), so a default `MessageFormat` should describe what was expected rather than quote the value (`"Invalid email format"`, not `"Invalid email format: {0}"`). The built-in rules follow this; see [Core Concepts: PII](../concepts/Core-Concepts.md#pii).
 - The constants may be inherited from a base rule class, and **abstract bases are exempt**, so a shared base can host them for its concrete derivations.
 
-The convention is enforced by an analyzer: a source-declared rule that does not expose a public `const string ErrorCode` **and** a public `const string MessageFormat` is reported as **ZODSGEN042**. See [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the full list.
+The convention is enforced by an analyzer: a source-declared rule that does not expose a public `const string ErrorCode` **and** a public `const string MessageFormat` is reported as **ZODSGEN042**. See [Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md) for the full list.
 
 A `[Test]` can therefore assert without duplicating strings:
 
@@ -199,7 +199,7 @@ var result = schema.Validate("John Doe");
 // result.Errors[0].Path    is empty
 ```
 
-Both methods mutate the receiver and return it for chaining; see [Guarantees and Limitations](Guarantees-and-Limitations.md#fluent-rule-methods-mutate-the-receiver).
+Both methods mutate the receiver and return it for chaining; see [Guarantees and Limitations](../quality/Guarantees-and-Limitations.md#fluent-rule-methods-mutate-the-receiver).
 
 ## Extending the fluent interface
 
@@ -644,13 +644,13 @@ See [Value Objects Integration](Value-Objects-Integration.md) for the full walkt
 | ZODSGEN042 | Warning | A validation rule does not expose public `const string ErrorCode` / `MessageFormat` constants, so its error identity cannot be asserted in tests without duplicating literals. |
 | ZODSGEN043 | Info | A built-in rule marked `[ZodRule]` does not generate a validation attribute (its name is taken by a `System.ComponentModel.DataAnnotations` attribute, or a constructor parameter cannot be represented as an attribute property). |
 
-See [Source Generator Diagnostics](Source-Generator-Diagnostics.md) for the full list.
+See [Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md) for the full list.
 
 ## Related
 
 - [Validation Rules Reference](Validation-Rules-Reference.md) — the catalogue of built-in rules.
-- [Fluent Schema API](Fluent-Schema-API.md) — `AddRule`/`Rule` live on `ZodType`.
+- [Fluent Schema API](../Fluent-Schema-API.md) — `AddRule`/`Rule` live on `ZodType`.
 - [Value Objects Integration](Value-Objects-Integration.md) — `[Scalar]` value objects and the `ScalarRuleAdapter`.
-- [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md) — built-in attribute coverage.
-- [Guarantees and Limitations](Guarantees-and-Limitations.md) — allocation and mutation semantics.
+- [Source Generator DataAnnotations](../generator/Source-Generator-DataAnnotations.md) — built-in attribute coverage.
+- [Guarantees and Limitations](../quality/Guarantees-and-Limitations.md) — allocation and mutation semantics.
 

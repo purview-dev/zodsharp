@@ -28,7 +28,7 @@ templates, exactly as for a generated validator. A rule built with a custom mess
 positional placeholders renamed (`"At least {0}"` becomes `"At least {minimum}"`).
 
 Placeholders resolve from the error's `Parameters`, then from its built-in fields. See
-[Core Concepts](Core-Concepts.md#error-fields) for the full list of error fields.
+[Core Concepts](../concepts/Core-Concepts.md#error-fields) for the full list of error fields.
 
 ## `ZodMessageFormat`
 
@@ -166,7 +166,7 @@ Generated validators put the member's display name in the `displayName` paramete
 - `ErrorMessageResourceType`/`ErrorMessageResourceName` on a DataAnnotations attribute are honoured for the
   message template.
 
-See [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md).
+See [Source Generator DataAnnotations](../generator/Source-Generator-DataAnnotations.md).
 
 ## Culture policy
 
@@ -177,7 +177,7 @@ See [Source Generator DataAnnotations](Source-Generator-DataAnnotations.md).
 | A message rendered by an `IZodMessageFormatter` at a host boundary | `CultureInfo.CurrentUICulture` |
 
 Dictionary keys in paths are rendered with the invariant culture (`ZodPathSegment.Key<TKey>`), so a path never
-depends on the thread's culture. See [Core Concepts](Core-Concepts.md#culture).
+depends on the thread's culture. See [Core Concepts](../concepts/Core-Concepts.md#culture).
 
 ## PII
 
@@ -192,10 +192,10 @@ token or another secret, so:
   It never serializes raw objects or nested errors.
 
 A custom message can still opt in to the value through positional placeholders. See
-[Core Concepts](Core-Concepts.md#pii).
+[Core Concepts](../concepts/Core-Concepts.md#pii).
 
 ## See also
 
-- [ASP.NET Core Integration](AspNetCore-Integration.md)
+- [ASP.NET Core Integration](../AspNetCore-Integration.md)
 - [Microsoft.Extensions.Validation](Microsoft-Extensions-Validation.md)
-- [Custom Rules](Custom-Rules.md)
+- [Custom Rules](../schemas/Custom-Rules.md)

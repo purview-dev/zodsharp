@@ -4,7 +4,7 @@
 ZodSharp API returns back into ZodSharp errors. It targets `net10.0` and `net11.0`, references only the base framework
 (no ASP.NET Core shared framework), and is browser-safe: it is the package a Blazor WebAssembly client, a Blazor Server
 component, a MAUI app or a service-to-service client uses to talk to an API built with
-[ASP.NET Core Integration](AspNetCore-Integration.md).
+[ASP.NET Core Integration](../AspNetCore-Integration.md).
 
 ```bash
 dotnet add package Purview.ZodSharp.Http
@@ -12,7 +12,7 @@ dotnet add package Purview.ZodSharp.Http
 
 Every API takes a `JsonTypeInfo<T>`, typically from a source-generated `JsonSerializerContext`. There are deliberately
 no `JsonSerializerOptions` overloads, so nothing resolves a contract reflectively; see
-[Trimming and Native AOT](Trimming-and-AOT.md).
+[Trimming and Native AOT](../quality/Trimming-and-AOT.md).
 
 ## Sending
 
@@ -67,7 +67,7 @@ var result = await response.Content.ReadFromJsonAndValidateAsync(
 ```
 
 `ReadFromJsonAndValidateAsync` deserializes and validates in one pass, exactly like `DeserializeAndValidateAsync` in
-[System.Text.Json Integration](SystemTextJson-Integration.md): malformed JSON, a `null` document or an unconvertible
+[System.Text.Json Integration](../serialization/SystemTextJson-Integration.md): malformed JSON, a `null` document or an unconvertible
 value is one `invalid_json` error with the serializer's path, never an exception. A value a strict value object
 converter rejects (`JsonException(inner: ZodException)`) is reported as that `ZodException`'s errors under the member
 that held it (`CustomerEmail.Value`), not as `invalid_json`. The body is read as UTF-8, the encoding RFC 8259 requires
