@@ -269,10 +269,12 @@ public class ZodValidationPipelineTests
 		// Arrange
 		await using var app = await TestApp.StartAsync(
 			services =>
-				AddServices(services, configure: static options =>
-					options.MapErrorType(
-						new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
-					)
+				AddServices(
+					services,
+					configure: static options =>
+						options.MapErrorType(
+							new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
+						)
 				),
 			app => app.MapPost("/orders", (OrderRequest order) => TypedResults.Ok()),
 			cancellationToken
@@ -293,15 +295,23 @@ public class ZodValidationPipelineTests
 	public async Task Pipeline_GivenStatusCodeSelectorAndOverride_OverrideWinsLast(CancellationToken cancellationToken)
 	{
 		// Arrange
-		await using var app = await TestApp.StartAsync(services => AddServices(services, configure: static options =>
-				{
-					options.MapErrorType(
-						new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
-					);
-					options.StatusCodeSelector = static _ => StatusCodes.Status409Conflict;
-					options.StatusCodeOverride = static (_, computed) =>
-						computed == StatusCodes.Status409Conflict ? StatusCodes.Status418ImATeapot : computed;
-				}), app => app.MapPost("/orders", (OrderRequest order) => TypedResults.Ok()), cancellationToken);
+		await using var app = await TestApp.StartAsync(
+			services =>
+				AddServices(
+					services,
+					configure: static options =>
+					{
+						options.MapErrorType(
+							new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
+						);
+						options.StatusCodeSelector = static _ => StatusCodes.Status409Conflict;
+						options.StatusCodeOverride = static (_, computed) =>
+							computed == StatusCodes.Status409Conflict ? StatusCodes.Status418ImATeapot : computed;
+					}
+				),
+			app => app.MapPost("/orders", (OrderRequest order) => TypedResults.Ok()),
+			cancellationToken
+		);
 
 		// Act
 		var (status, mediaType, root) = await PostAsync(app, "/orders", InvalidOrder, cancellationToken);
@@ -457,6 +467,39 @@ public class ZodValidationPipelineTests
 		await Assert.That(root.GetProperty("issues")[0].GetProperty("path").GetString()).IsEqualTo("Value.Email");
 		await Assert.That(root.GetProperty("errors").TryGetProperty("Value.Email", out _)).IsTrue();
 		await Assert.That(root.GetProperty("errors").TryGetProperty("Value.Items[0].Quantity", out _)).IsTrue();
+	}
+
+	[Test]
+	public async Task Pipeline_GivenUnionTargetBodyWithAsyncCase_AwaitsTheCaseValidation(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - AsyncPet is a [ZodSchema] union target; its active case's rule only runs asynchronously.
+		await using var app = await TestApp.StartAsync(
+			services =>
+			{
+				services.AddZodSharp(options =>
+					options.ConfigureFactory = factory => factory.Register(new AsyncPetSchemaValidator())
+				);
+				services.AddZodSharpValidation();
+				services.AddZodSharpProblemDetails(options => options.Registry = new ErrorTypeRegistry());
+				services.AddValidation();
+			},
+			app => app.MapPost("/pets", (AsyncPet body) => TypedResults.Ok()),
+			cancellationToken
+		);
+		using StringContent content = new("""{"name":"taken"}""", System.Text.Encoding.UTF8, "application/json");
+
+		// Act
+		using var response = await app.Client.PostAsync(new Uri("/pets", UriKind.Relative), content, cancellationToken);
+		var json = await response.Content.ReadAsStringAsync(cancellationToken);
+		using var document = JsonDocument.Parse(json);
+
+		// Assert
+		await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+		await Assert.That(json).Contains("Name is taken");
+		var errors = document.RootElement.GetProperty("errors");
+		await Assert.That(errors.GetRawText()).Contains("Name");
 	}
 
 	[Test]

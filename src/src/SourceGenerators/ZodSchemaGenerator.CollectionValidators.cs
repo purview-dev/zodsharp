@@ -11,6 +11,9 @@ partial class ZodSchemaGenerator
 
 	static string MissingValueCondition(ZodPropertyDescriptor property)
 	{
+		if (property.DispatchKind == DispatchKind.Union)
+			return EmptyUnionCondition(property);
+
 		var value = $"value.{property.Name}";
 		if (!RejectsDefaultArray(property))
 			return $"{value} is null";
@@ -18,6 +21,19 @@ partial class ZodSchemaGenerator
 		return property.IsNullableValueType
 			? $"({value} is null || {value}.GetValueOrDefault().IsDefault)"
 			: $"{value}.IsDefault";
+	}
+
+	/// <summary>
+	/// The condition that an optional union has no value: its non-boxing <c>HasValue</c> is false when the union
+	/// exposes the access pattern, otherwise its <c>Value</c> is null. A nullable union is absent when the
+	/// wrapper has no value or the wrapped union is empty.
+	/// </summary>
+	static string EmptyUnionCondition(ZodPropertyDescriptor property)
+	{
+		var value = property.IsNullableValueType ? $"value.{property.Name}.Value" : $"value.{property.Name}";
+		var empty = property.UnionHasValue ? $"!{value}.HasValue" : $"{value}.Value is null";
+
+		return property.IsNullableValueType ? $"(!value.{property.Name}.HasValue || {empty})" : empty;
 	}
 
 	static string CollectionValueExpression(ZodPropertyDescriptor property)

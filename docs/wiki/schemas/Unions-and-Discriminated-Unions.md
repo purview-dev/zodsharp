@@ -52,10 +52,10 @@ if (result.IsSuccess)
 The `Union<...>` value type (namespace `ZodSharp.Unions`) is the result of a typed union:
 
 - `Create(T1)` / `Create(T2)` (and a three-case variant) — tagged construction.
-- Implicit conversions from the case types.
-- `int Tag` and `object Value` (`Value` throws if uninitialized).
+- Implicit conversions from the case types (a `null` reference produces an empty union).
+- `int Tag` (`0` empty, `1` `T1`, `2` `T2`, and `3` for the three-case `T3`) and `object? Value` (`null` when empty).
 - `TryGetValue(out T1)` / `TryGetValue(out T2)`.
-- `Match(Func<T1, TResult>, Func<T2, TResult>)` and `Switch(Action<T1>, Action<T2>)`.
+- `Match(Func<T1, TResult>, Func<T2, TResult>)` and `Switch(Action<T1>, Action<T2>)` (they throw on an empty union).
 - `==` / `!=`, `Equals`, `GetHashCode`, `ToString`.
 
 ## Native unions (.NET 11+)
@@ -64,25 +64,60 @@ When targeting `net11.0` or later, `Z.NativeUnion<T1, T2>` returns a native C# 1
 (`ZodSharp.Unions.NativeUnion<T1, T2>`) instead of `Union<T1, T2>`:
 
 ```csharp
-var schema = Z.NativeUnion(Z.String().Min(1), Z.Object().Build());
-var result = schema.Validate("hello");
+var schema = Z.NativeUnion(Z.Number(), Z.Boolean());
+var result = schema.Validate(3d);
 
 if (result.IsSuccess)
 {
-    var length = result.Value switch
+    var described = result.Value switch
     {
-        string s => s.Length,
-        Dictionary<string, object?> o => o.Count,
-        _ => -1,
+        double n => n,
+        bool b => b ? 1d : 0d,
+        // No discard arm: both case types are handled, so the switch is exhaustive.
     };
 }
 ```
 
-Prefer this when **both option types are reference types**: the native union is allocation-free and
-supports exhaustive pattern matching. Value-type cases box, so keep using `Z.Union<T1, T2>` (the
-hand-rolled `Union<T1, T2>`) when a case is a value type, or when you need
-`Tag`/`Match`/`Switch`/`TryGetValue`/equality. The analyzer reports `ZODSGEN041` (Info) and offers a
-code fix when a reference-type-only `Z.Union` can be switched to `Z.NativeUnion`.
+The type is declared by hand with `[Union]` rather than with the `union` keyword, so it implements the
+language's **non-boxing access pattern**. Each case is stored in its own typed field, and `TryGetValue(out T1)`
+/ `TryGetValue(out T2)` / `HasValue` let pattern matching read a value-type case without boxing; the compiler
+still treats it as a union (implicit conversions from each case type, and exhaustive `switch` expressions).
+`Value` is only the boxing view the union contract requires, and `Tag` identifies the active case.
+
+Use it whenever you need a two-option union on .NET 11+: reference-type and value-type cases are both
+allocation-free. Use the hand-rolled `Union<T1, T2>` on .NET 10, or when you need `Match`/`Switch`/equality.
+The analyzer reports `ZODSGEN041` (Info) and offers a code fix for any `Z.Union<T1, T2>` built on .NET 11+.
+
+## Unions as schema targets
+
+A union type can itself carry `[ZodSchema]`, for either the `union` keyword or a hand-written `[Union]` struct:
+
+```csharp
+[ZodSchema]
+public readonly union Pet(Cat, Dog);
+```
+
+`PetSchema.Validate(pet)` dispatches on the union's active case and validates it with that case type's schema, so the
+error paths are the case's own (`Name`, `Weight`) without a synthetic `Value` segment. Both forms of the language's
+access pattern are understood:
+
+- A case with `TryGetValue(out TCase)` (the non-boxing access pattern: `NativeUnion`, hand-written unions) is matched
+  without boxing.
+- A case without it (a `union` declaration) is matched through `Value`.
+
+An empty union, or a case type with no validator, fails as `invalid_union` with one `invalid_type` per option instead
+of passing silently. A case type with no validator is also reported at build time as **ZODSGEN055** (warning): add
+`[ZodSchema]` to that case, or reference the assembly that generated its schema.
+
+A union member of a class target works the same way and needs no `[ZodSchema]` on the union: the member dispatches
+directly to the case schemas. `[Required]`, `[RequiredZod]` and `[NonSentinel]` treat an empty union as the member's
+absent/default value — `missing_field`, the rule's own error, or `invalid_type` respectively — using `HasValue` when the
+union provides it and `Value` otherwise. An empty union is never silently accepted.
+
+Async rules work end to end: a union whose active case has an `AsyncValidationAttribute` (or an
+`IAsyncValidatableObject`) reports `RequiresAsyncValidation = true`, `ValidateAsync` awaits the case schema,
+`Validate` throws, and the ASP.NET Core pipeline, Blazor forms, Microsoft.Extensions.Validation and options
+validation all await it through the same generated entry points.
 
 ## Discriminated union
 

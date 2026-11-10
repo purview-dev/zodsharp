@@ -131,7 +131,10 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   synchronous `Validate` of such a type throws `InvalidOperationException` (`ZODSGEN048`).
 - **C# 15:** a member typed as a union dispatches to the active case's schema, and a member typed as a
   closed class to the derived type's schema (`ZODSGEN049` when a derived type has no `[ZodSchema]`).
-  Paths never include the union's `Value`.
+  Paths never include the union's `Value`. `[ZodSchema]` on a union itself emits a schema that dispatches to
+  the active case, matching a case with `TryGetValue` when the union implements the non-boxing access pattern;
+  an empty union or a case with no validator fails as `invalid_union` (`ZODSGEN055` when a case has no
+  validator). `[Required]`/`[RequiredZod]`/`[NonSentinel]` treat an empty union as absent/default.
 - Nested validation is depth-guarded: `ZodValidationDepth.MaxDepth` (32) throws
   `InvalidOperationException` instead of overflowing the stack on a cycle.
 - Paths are typed: `Items[0].Name`, `Map[en].Value`, `Map["0"].Value` from `FullPath.ToDottedString()`.

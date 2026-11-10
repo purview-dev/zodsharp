@@ -43,7 +43,16 @@ enum DispatchKind
 /// <param name="CaseType">The case (or derived) type.</param>
 /// <param name="SchemaType">The generated schema of <paramref name="CaseType"/>.</param>
 /// <param name="IsModern">Whether the schema exposes the depth-aware and member-resolution entry points.</param>
-readonly record struct DispatchCase(TypeIdentity CaseType, TypeIdentity SchemaType, bool IsModern);
+/// <param name="NonBoxing">
+/// Whether the union exposes <c>TryGetValue(out CaseType)</c>, so the case can be tested without boxing a
+/// value-type case. Always false for a closed hierarchy.
+/// </param>
+readonly record struct DispatchCase(
+	TypeIdentity CaseType,
+	TypeIdentity SchemaType,
+	bool IsModern,
+	bool NonBoxing = false
+);
 
 readonly record struct SchemaSet(EquatableArray<ZodSchemaDescriptor> Schemas);
 
@@ -179,6 +188,21 @@ readonly record struct ZodSchemaDescriptor(
 	/// options validator is skipped (SYSLIB1205).
 	/// </summary>
 	public bool HasOptionsValidatorConflict { get; init; }
+
+	/// <summary>
+	/// Whether the <c>[ZodSchema]</c> target is itself a C# 15 union (the <c>union</c> keyword or a hand-written
+	/// <c>[Union]</c> type). Its validation dispatches to the schemas of its case types rather than to members.
+	/// </summary>
+	public bool IsUnionTarget { get; init; }
+
+	/// <summary>The case types a union target dispatches to, in declaration order.</summary>
+	public EquatableArray<DispatchCase> UnionCases { get; init; } = new([]);
+
+	/// <summary>
+	/// Whether the union target exposes a public <c>HasValue</c> property (the non-boxing access pattern), so an
+	/// empty union is detected without boxing. When false, an empty union is detected through <c>Value is null</c>.
+	/// </summary>
+	public bool UnionHasValue { get; init; }
 }
 
 /// <param name="PropertyType">The declared type of the property, with a nullable wrapper removed.</param>
@@ -308,6 +332,12 @@ readonly record struct ZodPropertyDescriptor(
 
 	/// <summary>The cases dispatched to when <see cref="DispatchKind"/> is not <see cref="DispatchKind.None"/>.</summary>
 	public EquatableArray<DispatchCase> DispatchCases { get; init; } = new([]);
+
+	/// <summary>
+	/// Whether a union-typed member exposes a public <c>HasValue</c> property, so an empty union is detected
+	/// without boxing. When false, it is detected through <c>Value is null</c>.
+	/// </summary>
+	public bool UnionHasValue { get; init; }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(

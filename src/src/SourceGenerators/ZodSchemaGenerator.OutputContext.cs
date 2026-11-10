@@ -70,6 +70,18 @@ partial class ZodSchemaGenerator
 				}
 			}
 
+			if (!requiresAsync && schema.IsUnionTarget)
+			{
+				foreach (var unionCase in schema.UnionCases)
+				{
+					if (unionCase.IsModern && RequiresAsync(unionCase.SchemaType))
+					{
+						requiresAsync = true;
+						break;
+					}
+				}
+			}
+
 			_visiting.Remove(schemaType);
 
 			// Only a top-level answer is cached: an answer computed while another schema is still being visited

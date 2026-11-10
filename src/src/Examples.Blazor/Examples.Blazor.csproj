@@ -13,9 +13,7 @@
 		<!-- Kept off: the sample localizes validation messages into French, which needs culture data. -->
 		<InvariantGlobalization>false</InvariantGlobalization>
 		<PublishDocumentationFile>false</PublishDocumentationFile>
-		<!-- NU5104: the .NET 11 WebAssembly server package is prerelease until .NET 11 GA. -->
-		<NoWarn>$(NoWarn);NU5104</NoWarn>
-		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
 	</PropertyGroup>
 
 	<ItemGroup>

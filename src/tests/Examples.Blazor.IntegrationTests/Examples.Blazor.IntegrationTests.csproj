@@ -9,10 +9,10 @@
 			Directory.Packages.props picks package lines by $(TargetFramework), which a single-targeted project has not
 			set yet when that file is evaluated; the .NET 11 host packages need the 11.x lines.
 		-->
-		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
-		<AspNetCoreTestHostVersion>11.0.0-rc.3.26522.148</AspNetCoreTestHostVersion>
+		<MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
+		<AspNetCoreTestHostVersion>11.0.0</AspNetCoreTestHostVersion>
 		<!-- In-memory host tests touch many framework types by nature. -->
-		<NoWarn>$(NoWarn);CA1506;NU5104</NoWarn>
+		<NoWarn>$(NoWarn);CA1506</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

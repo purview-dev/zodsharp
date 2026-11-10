@@ -3,6 +3,7 @@ using static ZodSharp.SourceGenerators.Infra.GeneratedSchemaRuntime;
 #if NET11_0_OR_GREATER
 using Microsoft.CodeAnalysis.CSharp;
 using ZodSharp.Core;
+using ZodSharp.Rules;
 #endif
 
 namespace ZodSharp.SourceGenerators;
@@ -358,6 +359,318 @@ partial class ZodSchemaGeneratorTests
 		// Assert
 		await Assert.That(errors.Length).IsEqualTo(1);
 		await Assert.That(errors[0].FullPath.ToDottedString()).IsEqualTo("Shape.Radius");
+	}
+
+	[Test]
+	public async Task UnionTarget_GivenZodSchemaOnUnion_DispatchesToTheActiveCaseSchema(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			using System.ComponentModel.DataAnnotations;
+			using ZodSharp;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Cat
+				{
+					[MinLength(2)]
+					public string? Name { get; set; }
+				}
+
+				[ZodSchema]
+				public class Dog
+				{
+					[Range(1, 100)]
+					public int Weight { get; set; } = 1;
+				}
+
+				[ZodSchema]
+				public readonly union Pet(Cat, Dog);
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var petType = assembly.GetType("Testing.Pet")!;
+		var invalidCat = Activator.CreateInstance(petType, Create(assembly, "Testing.Cat", ("Name", "A")))!;
+		var validDog = Activator.CreateInstance(petType, Create(assembly, "Testing.Dog", ("Weight", 5)))!;
+
+		// Act
+		var invalidErrors = RunValidate(assembly, "Testing.PetSchema", invalidCat);
+		var validErrors = RunValidate(assembly, "Testing.PetSchema", validDog);
+
+		// Assert — the case's error is reported under its own path, without a synthetic union member.
+		await Assert.That(invalidErrors.Length).IsEqualTo(1);
+		await Assert.That(invalidErrors[0].Code).IsEqualTo("too_small");
+		await Assert.That(invalidErrors[0].FullPath.ToDottedString()).IsEqualTo("Name");
+		await Assert.That(validErrors.IsDefaultOrEmpty).IsTrue();
+	}
+
+	[Test]
+	public async Task UnionTarget_GivenEmptyUnion_ReportsInvalidUnion(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source = """
+			using ZodSharp;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Cat
+				{
+					public string? Name { get; set; }
+				}
+
+				[ZodSchema]
+				public class Dog
+				{
+					public int Weight { get; set; }
+				}
+
+				[ZodSchema]
+				public readonly union Pet(Cat, Dog);
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var empty = Activator.CreateInstance(assembly.GetType("Testing.Pet")!)!;
+
+		// Act
+		var errors = RunValidate(assembly, "Testing.PetSchema", empty);
+
+		// Assert
+		await Assert.That(errors.Length).IsEqualTo(1);
+		await Assert.That(errors[0].Code).IsEqualTo("invalid_union");
+		await Assert.That(errors[0].GetUnionErrors().Length).IsEqualTo(2);
+	}
+
+	[Test]
+	public async Task UnionTarget_GivenAsyncCase_RequiresAsyncValidationAndAwaitsIt(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source = """
+			using System.ComponentModel.DataAnnotations;
+			using System.Threading;
+			using System.Threading.Tasks;
+			using ZodSharp;
+
+			namespace Testing
+			{
+				public sealed class TakenAttribute : AsyncValidationAttribute
+				{
+					protected override ValidationResult? IsValid(object? value, ValidationContext validationContext) =>
+						throw new System.NotSupportedException("Validated asynchronously.");
+
+					protected override Task<ValidationResult?> IsValidAsync(
+						object? value,
+						ValidationContext validationContext,
+						CancellationToken cancellationToken
+					) => Task.FromResult<ValidationResult?>(new ValidationResult("Name is taken"));
+				}
+
+				[ZodSchema]
+				public class Cat
+				{
+					[Taken]
+					public string? Name { get; set; }
+				}
+
+				[ZodSchema]
+				public class Dog
+				{
+					public int Weight { get; set; }
+				}
+
+				[ZodSchema]
+				public readonly union Pet(Cat, Dog);
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var cat = Activator.CreateInstance(assembly.GetType("Testing.Pet")!, Create(assembly, "Testing.Cat"))!;
+		var requiresAsync = (bool)GetStaticField(assembly, "Testing.PetSchema", "RequiresAsyncValidation")!;
+
+		// Act
+		var asyncErrors = await RunValidationAsync(assembly, "Testing.PetSchema", cat, null, cancellationToken);
+		var syncException = Unwrap(() => RunValidate(assembly, "Testing.PetSchema", cat));
+
+		// Assert
+		await Assert.That(requiresAsync).IsTrue();
+		await Assert.That(asyncErrors.Length).IsEqualTo(1);
+		await Assert.That(asyncErrors[0].Message).IsEqualTo("Name is taken");
+		await Assert.That(asyncErrors[0].FullPath.ToDottedString()).IsEqualTo("Name");
+		await Assert.That(syncException).IsTypeOf<InvalidOperationException>();
+	}
+
+	[Test]
+	public async Task UnionMember_GivenRequiredAndEmptyUnion_ReportsMissingField(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source = """
+			using System.ComponentModel.DataAnnotations;
+			using ZodSharp;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Cat
+				{
+					public string? Name { get; set; }
+				}
+
+				[ZodSchema]
+				public class Dog
+				{
+					public int Weight { get; set; }
+				}
+
+				public readonly union Pet(Cat, Dog);
+
+				[ZodSchema]
+				public class Owner
+				{
+					[Required]
+					public Pet Pet { get; set; }
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var owner = Create(assembly, "Testing.Owner");
+
+		// Act
+		var errors = RunValidate(assembly, "Testing.OwnerSchema", owner);
+
+		// Assert — an empty union is the member's absent value even though the union is a struct.
+		await Assert.That(errors.Length).IsEqualTo(1);
+		await Assert.That(errors[0].Code).IsEqualTo("missing_field");
+		await Assert.That(errors[0].FullPath.ToDottedString()).IsEqualTo("Pet");
+	}
+
+	[Test]
+	public async Task UnionMember_GivenNonSentinelAndEmptyUnion_ReportsTheSentinelRule(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			using ZodSharp;
+			using ZodSharp.Rules;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Cat
+				{
+					public string? Name { get; set; }
+				}
+
+				[ZodSchema]
+				public class Dog
+				{
+					public int Weight { get; set; }
+				}
+
+				public readonly union Pet(Cat, Dog);
+
+				[ZodSchema]
+				public class Owner
+				{
+					[NonSentinel]
+					public Pet Pet { get; set; }
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var owner = Create(assembly, "Testing.Owner");
+
+		// Act
+		var errors = RunValidate(assembly, "Testing.OwnerSchema", owner);
+
+		// Assert
+		await Assert.That(errors.Length).IsEqualTo(1);
+		await Assert.That(errors[0].Code).IsEqualTo(NonSentinelRule<object>.ErrorCode);
+		await Assert.That(errors[0].FullPath.ToDottedString()).IsEqualTo("Pet");
+	}
+
+	[Test]
+	public async Task UnionTarget_GivenHandWrittenUnionWithTryGetValue_DispatchesWithoutBoxing(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - a [Union] struct that implements the non-boxing access pattern.
+		const string source = """
+			using System.ComponentModel.DataAnnotations;
+			using System.Runtime.CompilerServices;
+			using ZodSharp;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Cat
+				{
+					[MinLength(2)]
+					public string? Name { get; set; }
+				}
+
+				[ZodSchema]
+				[Union]
+				public struct Pet
+				{
+					readonly object? _value;
+
+					public Pet(Cat value) => _value = value;
+
+					public object? Value => _value;
+
+					public bool HasValue => _value is not null;
+
+					public bool TryGetValue(out Cat value)
+					{
+						if (_value is Cat cat)
+						{
+							value = cat;
+							return true;
+						}
+
+						value = null!;
+						return false;
+					}
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var generated = string.Join(
+			"\n",
+			result
+				.DriverResult.Results.SelectMany(static run => run.GeneratedSources)
+				.Select(static source => source.SourceText.ToString())
+		);
+		var assembly = result.CompilationResult.Assembly!;
+		var petType = assembly.GetType("Testing.Pet")!;
+		var invalidCat = Activator.CreateInstance(petType, Create(assembly, "Testing.Cat", ("Name", "A")))!;
+		var empty = Activator.CreateInstance(petType)!;
+
+		// Act
+		var errors = RunValidate(assembly, "Testing.PetSchema", invalidCat);
+		var emptyErrors = RunValidate(assembly, "Testing.PetSchema", empty);
+
+		// Assert — the generated dispatch uses TryGetValue (no boxing) and still reports the case's error.
+		await Assert.That(generated).Contains("TryGetValue(out global::Testing.Cat");
+		await Assert.That(generated).DoesNotContain(".Value is global::Testing.Cat");
+		await Assert.That(errors.Length).IsEqualTo(1);
+		await Assert.That(errors[0].Code).IsEqualTo("too_small");
+		await Assert.That(errors[0].FullPath.ToDottedString()).IsEqualTo("Name");
+		await Assert.That(emptyErrors[0].Code).IsEqualTo("invalid_union");
 	}
 #endif
 }

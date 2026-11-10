@@ -93,3 +93,9 @@ has asynchronous rules, so `ValidateOnStart()` runs them.
 A member typed as a C# union validates the active case with that case's schema; a member typed as a
 closed class validates with the runtime derived type's schema. Error paths are those of the case (no
 `Value` segment). Each derived type of a closed class needs `[ZodSchema]` (`ZODSGEN049`).
+
+`[ZodSchema]` on the union itself emits a schema that dispatches to the active case; a case with
+`TryGetValue` is matched without boxing (the non-boxing access pattern), otherwise through `Value`. An
+empty union or an active case with no validator fails as `invalid_union` (`ZODSGEN055` when a case type has
+no validator). A union member's `[Required]`, `[RequiredZod]` and `[NonSentinel]` treat an empty union as
+absent/default.

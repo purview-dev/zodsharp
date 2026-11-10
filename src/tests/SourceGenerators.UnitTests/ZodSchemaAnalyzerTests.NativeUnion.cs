@@ -29,7 +29,7 @@ public partial class ZodSchemaAnalyzerTests
 	}
 
 	[Test]
-	public async Task NativeUnion_GivenAValueTypeCase_DoesNotProduceZODSGEN041(CancellationToken cancellationToken)
+	public async Task NativeUnion_GivenAValueTypeCase_AlsoProducesZODSGEN041(CancellationToken cancellationToken)
 	{
 		const string source = """
 			using ZodSharp;
@@ -48,7 +48,7 @@ public partial class ZodSchemaAnalyzerTests
 
 		var result = await AnalyzeAsync(source, cancellationToken);
 
-		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.NativeUnionRecommended);
+		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.NativeUnionRecommended);
 	}
 }
 #endif

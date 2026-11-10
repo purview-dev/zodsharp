@@ -126,6 +126,17 @@ static partial class SourceGenLibrary
 				typeDateTimeOffsetSerialization
 			);
 
+			// A union target is not an object: its synthesized Value/HasValue/Tag members are not validatable
+			// members, and validation dispatches to each case type's schema instead.
+			EquatableArray<DispatchCase> unionCases;
+			bool isUnionTarget;
+			bool unionHasValue;
+			(properties, isUnionTarget, unionCases, unionHasValue) = ResolveUnionTargetShape(
+				symbol,
+				properties,
+				externalSchemas
+			);
+
 			// Type-level rules ([ZodRule]-mapped attributes on the target itself) validate the whole value
 			// rather than a property, which is what makes a scalar value object validatable as a unit. The
 			// generator only needs the descriptors: ZodSchemaAnalyzer resolves the same attributes and
@@ -200,6 +211,9 @@ static partial class SourceGenLibrary
 					ImplementsValidatableObject = implementsValidatableObject,
 					ImplementsAsyncValidatableObject = implementsAsyncValidatableObject,
 					HasOptionsValidatorConflict = ValidationInputsResolver.HasOptionsValidatorConflict(symbol),
+					IsUnionTarget = isUnionTarget,
+					UnionCases = unionCases,
+					UnionHasValue = unionHasValue,
 				}
 			);
 
@@ -229,9 +243,32 @@ static partial class SourceGenLibrary
 	}
 
 	/// <summary>
+	/// Drops the member descriptors of a union target and resolves its case schemas. A union's synthesized
+	/// <c>Value</c>/<c>HasValue</c>/<c>Tag</c> members are not validatable members: validation dispatches to the
+	/// case types' schemas.
+	/// </summary>
+	static (
+		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> Properties,
+		bool IsUnionTarget,
+		EquatableArray<DispatchCase> UnionCases,
+		bool UnionHasValue
+	) ResolveUnionTargetShape(
+		INamedTypeSymbol symbol,
+		EquatableArray<GeneratorResult<ZodPropertyDescriptor>> properties,
+		ExternalSchemaResolver externalSchemas
+	)
+	{
+		if (!ValidationInputsResolver.RoslynFeatures.IsUnion(symbol))
+			return (properties, false, new([]), false);
+
+		var (cases, hasValue) = ValidationInputsResolver.ResolveUnionTarget(symbol, externalSchemas);
+		return (new([]), true, cases, hasValue);
+	}
+
+	/// <summary>
 	/// Queues the case types of a type's C# 15 union members, so they get schemas like nested types do and
-	/// the member can dispatch to them (Change 7). A closed hierarchy's derived types need their own
-	/// <c>[ZodSchema]</c>.
+	/// the member can dispatch to them (Change 7). A union that is itself a schema target queues its own case
+	/// types. A closed hierarchy's derived types need their own <c>[ZodSchema]</c>.
 	/// </summary>
 	static void EnqueueUnionCaseTypes(
 		INamedTypeSymbol symbol,
@@ -239,6 +276,15 @@ static partial class SourceGenLibrary
 		Queue<(INamedTypeSymbol Symbol, bool IsPrimary)> queue
 	)
 	{
+		if (ValidationInputsResolver.RoslynFeatures.IsUnion(symbol))
+		{
+			foreach (var caseType in ValidationInputsResolver.GetUnionCaseTypes(symbol))
+			{
+				if (externalSchemas.IsSchemaOwnedByThisCompilation(caseType))
+					queue.Enqueue((caseType, false));
+			}
+		}
+
 		foreach (var member in symbol.GetMembers())
 		{
 			if (
@@ -677,6 +723,10 @@ static partial class SourceGenLibrary
 		var (dispatchKind, dispatchCases) = nestedSchemaType is null
 			? ValidationInputsResolver.ResolveDispatch(originalPropertyType, externalSchemas)
 			: (DispatchKind.None, new EquatableArray<DispatchCase>([]));
+		var unionHasValue =
+			dispatchKind == DispatchKind.Union
+			&& TypeHelpers.UnwrapNullableType(originalPropertyType) is INamedTypeSymbol unionMember
+			&& ValidationInputsResolver.HasHasValue(unionMember);
 		var (nestedIsModern, nestedRequiresAsync) = GetNestedSchemaFeatures(property, validationKind, externalSchemas);
 
 		var compareViaCompareTo =
@@ -745,6 +795,7 @@ static partial class SourceGenLibrary
 				AsyncValidationAttributes = ValidationInputsResolver.GetAsyncValidationAttributes(validationAttributes),
 				DispatchKind = dispatchKind,
 				DispatchCases = dispatchCases,
+				UnionHasValue = unionHasValue,
 			},
 			diagnostics.ToImmutable()
 		);

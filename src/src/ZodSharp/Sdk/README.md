@@ -64,21 +64,31 @@ culture through `IZodMessageFormatter` (`DefaultZodMessageFormatter` is included
 When targeting `net11.0` or later, `Z.NativeUnion` returns a native C# 15 union instead of the hand-rolled `ZodSharp.Unions.Union<T1, T2>`:
 
 ```csharp
-var schema = Z.NativeUnion(Z.String().Min(1), Z.Object().Build());
-var result = schema.Validate("hello");
+var schema = Z.NativeUnion(Z.Number(), Z.Boolean());
+var result = schema.Validate(3d);
 
 if (result.IsSuccess)
 {
-    var length = result.Value switch
+    var described = result.Value switch
     {
-        string s => s.Length,
-        Dictionary<string, object?> o => o.Count,
-        _ => -1,
+        double number => number,
+        bool flag => flag ? 1d : 0d,
+        // no discard arm: every case type is handled
     };
 }
 ```
 
-Use it when **both option types are reference types**: the native union is allocation-free and supports exhaustive pattern matching. Value-type cases box, so keep `Z.Union` when a case is a value type, or when you need `Tag`/`Match`/`Switch`/`TryGetValue`/equality. The analyzer reports `ZODSGEN041` and offers a code fix when a reference-type-only `Z.Union` can be switched to `Z.NativeUnion`.
+The native union is declared by hand with `[Union]` and implements the language's **non-boxing access pattern**:
+each case is stored in a typed field, and `TryGetValue`/`HasValue` let pattern matching read a value-type case without
+boxing. Reference- and value-type cases are both allocation-free, and an exhaustive `switch` needs no discard arm. Use
+the hand-rolled `Union<T1, T2>` on .NET 10, or when you need `Match`/`Switch`/equality. The analyzer reports
+`ZODSGEN041` and offers a code fix for any `Z.Union<T1, T2>` on .NET 11+.
+
+A union can itself be a `[ZodSchema]` target: `PetSchema.Validate(pet)` dispatches to the active case's schema,
+matches a case with `TryGetValue` without boxing, and reports `invalid_union` for an empty union. A case type with no
+validator is reported as `ZODSGEN055`, and `[Required]`/`[RequiredZod]`/`[NonSentinel]` treat an empty union as the
+member's absent value. Asynchronous rules on a case run through `ValidateAsync` everywhere (ASP.NET Core, Blazor,
+Microsoft.Extensions.Validation and options).
 
 ## Source generator
 

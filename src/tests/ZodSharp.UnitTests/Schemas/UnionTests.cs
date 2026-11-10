@@ -15,7 +15,7 @@ public class UnionTests
 		var isInt = union.TryGetValue(out int _);
 
 		// Assert
-		await Assert.That(union.Tag).IsEqualTo(0);
+		await Assert.That(union.Tag).IsEqualTo(1);
 		await Assert.That(isString).IsTrue();
 		await Assert.That(s).IsEqualTo("hello");
 		await Assert.That(isInt).IsFalse();
@@ -32,7 +32,7 @@ public class UnionTests
 		var isInt = union.TryGetValue(out int i);
 
 		// Assert
-		await Assert.That(union.Tag).IsEqualTo(1);
+		await Assert.That(union.Tag).IsEqualTo(2);
 		await Assert.That(isInt).IsTrue();
 		await Assert.That(i).IsEqualTo(42);
 		await Assert.That(isString).IsFalse();
@@ -45,7 +45,7 @@ public class UnionTests
 		Union<string, int> union = "world";
 
 		// Act & Assert
-		await Assert.That(union.Tag).IsEqualTo(0);
+		await Assert.That(union.Tag).IsEqualTo(1);
 		await Assert.That(union.TryGetValue(out string? s)).IsTrue();
 		await Assert.That(s).IsEqualTo("world");
 	}
@@ -57,7 +57,7 @@ public class UnionTests
 		Union<string, int> union = 99;
 
 		// Act & Assert
-		await Assert.That(union.Tag).IsEqualTo(1);
+		await Assert.That(union.Tag).IsEqualTo(2);
 		await Assert.That(union.TryGetValue(out int i)).IsTrue();
 		await Assert.That(i).IsEqualTo(99);
 	}
@@ -143,7 +143,7 @@ public class UnionTests
 		var union = Union<string, int, bool>.Create(true);
 
 		// Act & Assert
-		await Assert.That(union.Tag).IsEqualTo(2);
+		await Assert.That(union.Tag).IsEqualTo(3);
 		await Assert.That(union.TryGetValue(out bool b)).IsTrue();
 		await Assert.That(b).IsTrue();
 	}
@@ -170,7 +170,7 @@ public class UnionTests
 #pragma warning restore CA1859 // Use concrete types when possible for improved performance
 
 		// Act & Assert
-		await Assert.That(sut.Tag).IsEqualTo(0);
+		await Assert.That(sut.Tag).IsEqualTo(1);
 		await Assert.That(sut.Value).IsEqualTo("hello");
 	}
 }

@@ -152,29 +152,51 @@ partial class ZodSchemaGenerator
 			if (schema.TargetCanBeNull)
 				writer.IfBlock("value is null", body => body.Return("false"));
 
-			writer.IfBlock("offset >= path.Length", body => body.Return("true"));
-			writer.Assignment("var", "segment", "path[offset]");
-			writer.IfBlock($"segment.Kind != {SegmentKindType}.Member", body => body.Return("false"));
-			writer.Assignment("memberName", "segment.Name!");
-			writer.Assignment("var", "last", "offset + 1 >= path.Length");
-
-			if (walked.Count > 0)
+			if (schema.IsUnionTarget)
 			{
-				using (writer.OpenBlockScope("switch (memberName)"))
+				// A union target owns no members of its own: the path is relative to the active case, whose
+				// schema resolves it (so a Blazor field or an API container is the case object, not the union).
+				for (var i = 0; i < schema.UnionCases.Count; i++)
 				{
-					foreach (var property in walked)
+					var unionCase = schema.UnionCases[i];
+					var caseName = CodeGenHelpers.GetLocalIdentifier(unionCase.CaseType.Name, $"Case{i}");
+					var condition = UnionCaseCondition(unionCase, "value", caseName);
+					using (i == 0 ? writer.IfBlockScope(condition) : writer.ElseIfScope(condition))
 					{
-						writer.Line($"case {property.Name.StringLiteral()}:");
-						using (writer.OpenBlockScope())
+						writer.Return(
+							$"{unionCase.SchemaType.StaticMember("TryResolveMember")}({caseName}, path, offset, out container, out memberName)"
+						);
+					}
+				}
+
+				writer.Return("false");
+			}
+			else
+			{
+				writer.IfBlock("offset >= path.Length", body => body.Return("true"));
+				writer.Assignment("var", "segment", "path[offset]");
+				writer.IfBlock($"segment.Kind != {SegmentKindType}.Member", body => body.Return("false"));
+				writer.Assignment("memberName", "segment.Name!");
+				writer.Assignment("var", "last", "offset + 1 >= path.Length");
+
+				if (walked.Count > 0)
+				{
+					using (writer.OpenBlockScope("switch (memberName)"))
+					{
+						foreach (var property in walked)
 						{
-							writer.IfBlock("last", body => body.Return("true"));
-							WriteResolveMember(writer, property);
+							writer.Line($"case {property.Name.StringLiteral()}:");
+							using (writer.OpenBlockScope())
+							{
+								writer.IfBlock("last", body => body.Return("true"));
+								WriteResolveMember(writer, property);
+							}
 						}
 					}
 				}
-			}
 
-			writer.Return("last");
+				writer.Return("last");
+			}
 		}
 
 		writer.NewLine();
@@ -220,11 +242,20 @@ partial class ZodSchemaGenerator
 		{
 			writer.IfBlock("offset >= path.Length", body => body.Return());
 			writer.Assignment("var", "segment", "path[offset]");
-			writer.IfBlock($"segment.Kind != {SegmentKindType}.Member", body =>
-			{
-				body.MethodCall($"{GeneratedValidation}.AppendRemaining", "path", "offset", "namingPolicy", "segments");
-				body.Return();
-			});
+			writer.IfBlock(
+				$"segment.Kind != {SegmentKindType}.Member",
+				body =>
+				{
+					body.MethodCall(
+						$"{GeneratedValidation}.AppendRemaining",
+						"path",
+						"offset",
+						"namingPolicy",
+						"segments"
+					);
+					body.Return();
+				}
+			);
 			writer.Assignment("var", "name", "segment.Name!");
 			writer.MethodCallOn(
 				"segments",
@@ -341,8 +372,9 @@ partial class ZodSchemaGenerator
 		if (property.ValidationKind == PropertyValidationKind.Collection)
 		{
 			// An error on an element itself (a null element) belongs to the collection member.
-			writer.IfBlock("offset + 2 >= path.Length", body =>
-				body.Return($"path[offset + 1].Kind != {SegmentKindType}.Member")
+			writer.IfBlock(
+				"offset + 2 >= path.Length",
+				body => body.Return($"path[offset + 1].Kind != {SegmentKindType}.Member")
 			);
 
 			if (property.NestedSchemaType is not { } elementSchema || !property.NestedSchemaIsModern)

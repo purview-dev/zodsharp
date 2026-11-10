@@ -77,7 +77,12 @@ public readonly record struct RequiredRule<T>
 	{
 		if (typeof(T) == typeof(string))
 		{
-			var text = Unsafe.As<T, string?>(ref Unsafe.AsRef(in value));
+			string? text;
+			unsafe
+			{
+				text = Unsafe.As<T, string?>(ref Unsafe.AsRef(in value));
+			}
+
 			if (text is null)
 				return false;
 

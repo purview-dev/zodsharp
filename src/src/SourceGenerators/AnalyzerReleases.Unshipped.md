@@ -8,3 +8,4 @@
 
 ; ZODSGEN046 now recognizes the default ImmutableArray behavior option, including value-element
 ; collections. Its message describes option applicability; its category and severity are unchanged.
+; The rule stays recorded under the release that introduced it (2.2.0), so it is not re-listed below.

@@ -8,9 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
-## 3.0.0-prerelease.1
+## 3.0.0-prerelease.5
 
 ### Added
+
+- **`[ZodSchema]` on a union type.** A `union` declaration (or a hand-written `[Union]` type) can carry the
+  attribute: the generated `{Type}Schema.Validate` dispatches on the active case to that case type's schema, so error
+  paths are the case's own with no synthetic `Value` segment. A case with `TryGetValue` (the non-boxing access
+  pattern) is matched without boxing; a `union` declaration without it is matched through `Value`. An empty union, or
+  an active case with no validator, fails as `invalid_union`. **`ZODSGEN055`** (warning) reports a case type with no
+  `[ZodSchema]` in this compilation or a referenced assembly. Union members gain the same behaviour without an
+  attribute on the union, and `[Required]`, `[RequiredZod]` and `[NonSentinel]` treat an empty union as the member's
+  absent/default value. Async rules on a case propagate: `RequiresAsyncValidation` is true, `ValidateAsync` awaits it,
+  and ASP.NET Core, Blazor, Microsoft.Extensions.Validation and options validation all await it.
 
 - **Trimming and Native AOT across every package.** Every shipping package is `IsTrimmable`/`IsAotCompatible` on
   every target framework and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
@@ -266,6 +276,14 @@ Released versions correspond to `v<version>` GitHub releases.
   `lib/net10.0` and `lib/net11.0` only (the .NET 11 integrations stay `net11.0`-only); the source generator and
   analyzers stay on `netstandard2.0`. The `Microsoft.Extensions.*` dependency lines for 8.x and 9.x are gone, and
   the net8.0-only trim suppressions were replaced by the feature guards every remaining target understands.
+- **`Union<T1, T2>` / `Union<T1, T2, T3>` tags and empty values.** `Tag` now uses the native union's numbering
+  (`0` empty, `1`–`3` for the cases) instead of starting at `0` for `T1`, and `Value` returns `null` for an empty
+  union (a default value, or an implicit conversion from `null`) instead of throwing; `IUnion.Value` is `object?`.
+  `Match`/`Switch` still throw for an empty union. The hand-rolled and net11 native unions now share one contract.
+- **An empty union member no longer validates successfully.** A union member whose value is empty (the default
+  value, or a `null`-converted union) now fails: `missing_field` for `[Required]`, the rule's own error for
+  `[RequiredZod]`/`[NonSentinel]`, and `invalid_type` otherwise. A union target's `Validate` reports `invalid_union`
+  for an empty union. Previously the member dispatch skipped the value silently.
 - **Newly annotated APIs (not binary breaks; trimmed and AOT applications now get IL2026/IL3050 at the call site).**
   `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` were added to: every `Purview.ZodSharp.NewtonsoftJson` API
   that reaches Newtonsoft serialization (`NewtonsoftJsonExtensions.DeserializeAndValidate`,
@@ -571,6 +589,12 @@ Each note names the old form, the new form, and the edit to make.
 
 - **Target frameworks.** `net8.0`/`net9.0` → `net10.0`/`net11.0` only. Retarget the consuming project to `net10.0` or
   later, or stay on 2.4.x.
+- **Union tags.** Code that read `Union<...>.Tag` must add one (`0`→`1`, `1`→`2`, and `2`→`3` on the three-case type)
+  and treat `0` as empty; code that relied on `Value` throwing for an uninitialized union should test `Tag == 0` or use
+  `TryGetValue` instead.
+- **Empty union members.** An empty union is now the member's absent value. If a member may be absent, declare it
+  nullable (`Pet?`); a non-nullable union member must always hold a case. A union target (`[ZodSchema]` on the union)
+  reports `invalid_union` for an empty union.
 - **Trim/AOT annotations.** The APIs listed under *Breaking behaviour changes* now raise IL2026/IL3050 in a trimmed
   or AOT build. Move to the named alternative: `Purview.ZodSharp.SystemTextJson` with a `JsonTypeInfo<T>` instead of
   Newtonsoft; the generated `AddZodSharp{Assembly}Schemas()` or `AddZodSharpAssembly` instead of

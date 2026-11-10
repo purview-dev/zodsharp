@@ -140,6 +140,7 @@ See [references/error-model.md](references/error-model.md) for the error contrac
 | `Z.Optional<T>(schema)` (`T : class`) / `Z.Nullable<T>(schema)` (`T : struct`) | `ZodOptional<T>` / `ZodNullable<T>` |
 | `Z.Object()` | `ZodObjectBuilder` |
 | `Z.Union(params ...)` / `Z.Union<T1, T2>(...)` | `ZodUnion` / `ZodTypedUnion<T1, T2>` |
+| `Z.NativeUnion<T1, T2>(...)` (net11.0+) | `ZodTypedNativeUnion<T1, T2>`, yielding the non-boxing `NativeUnion<T1, T2>` |
 | `Z.DiscriminatedUnion(discriminator)` | `ZodDiscriminatedUnionBuilder` |
 | `Z.Intersection<T>(left, right)` | `ZodIntersection<T>` |
 | `Z.Literal<T>(value)` (`T : IEquatable<T>`) | `ZodLiteral<T>` |
@@ -151,6 +152,11 @@ See [references/error-model.md](references/error-model.md) for the error contrac
 
 `Enum` and `Union` are overloaded — `Enum(params string[])` versus `Enum<TEnum>()`, and
 `Union(params …)` versus `Union<T1, T2>(…)`.
+
+On `net11.0` and later, prefer `Z.NativeUnion<T1, T2>`: its result is a C# 15 union declared with the
+non-boxing access pattern, so reference-type **and** value-type cases stay allocation-free and an exhaustive
+`switch` needs no discard arm. `Z.Union<T1, T2>` remains the choice on `net10.0`, or when `Match`/`Switch`/
+equality is needed.
 
 ```csharp
 var userSchema = Z.Object()

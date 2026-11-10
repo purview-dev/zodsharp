@@ -49,6 +49,12 @@ partial class ZodSchemaGenerator
 			},
 			body =>
 			{
+				if (schema.IsUnionTarget)
+				{
+					EmitUnionJsonSchema(body, schema);
+					return;
+				}
+
 				if (schema.ScalarUnderlyingType is { } underlying)
 				{
 					EmitScalarJsonSchema(body, schema, underlying);
@@ -77,6 +83,28 @@ partial class ZodSchemaGenerator
 		);
 
 		writer.NewLine();
+	}
+
+	/// <summary>
+	/// Emits the JSON Schema for a union target: <c>oneOf</c> the case schemas, because exactly one case is
+	/// active. A case whose schema does not export JSON Schema is represented by an empty schema, which is the
+	/// same fallback the object exporter uses for a nested schema that cannot be referenced.
+	/// </summary>
+	static void EmitUnionJsonSchema(CodeWriter body, ZodSchemaDescriptor schema)
+	{
+		if (schema.UnionCases.Count == 0)
+		{
+			body.Return($"new {JsonSchemaDefinitionTypeName}()");
+			return;
+		}
+
+		var cases = string.Join(
+			", ",
+			schema.UnionCases.Select(static unionCase => unionCase.SchemaType.StaticMember("BuildJsonSchema()"))
+		);
+		body.Return(
+			$"new {JsonSchemaDefinitionTypeName} {{ OneOf = new global::System.Collections.Generic.List<{JsonSchemaDefinitionTypeName}> {{ {cases} }} }}"
+		);
 	}
 
 	/// <summary>

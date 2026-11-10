@@ -20,7 +20,7 @@ Two families, both enabled by default:
   package and need no ASP.NET Core dependency.
 
 `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`,
-`ZODSGEN051`, `ZODSGEN052` and `ZODSGEN053` are warnings; `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are
+`ZODSGEN051`, `ZODSGEN052`, `ZODSGEN053` and `ZODSGEN055` are warnings; `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are
 informational; the rest are errors.
 
 IDs `ZODSGEN002` and `ZODSGEN022`–`ZODSGEN026` are intentionally unused. Rule identifiers are never
@@ -53,6 +53,7 @@ All of these mean the method the generator was told to call cannot be called:
 | `ZODSGEN010` | First parameter is not the model type. |
 | `ZODSGEN011` | The last parameter is not `CancellationToken`. |
 | `ZODSGEN054` | A three-parameter (service-aware) method's second parameter is not `IServiceProvider`. |
+| `ZODSGEN055` | *(warning)* A union (`union` declaration or `[Union]` type) has a case type with no `[ZodSchema]` validator in this compilation or a referenced assembly. The case is omitted from dispatch and values of that case fail as `invalid_union`; add a validator to the case type. |
 | `ZODSGEN012` | The method is generic. |
 | `ZODSGEN013` | Declared on the model type but not `static`. |
 | `ZODSGEN014` | Inaccessible from the generated validator (private/protected). |
@@ -111,7 +112,7 @@ All of these mean the method the generator was told to call cannot be called:
 
 | ID | Meaning |
 | --- | --- |
-| `ZODSGEN041` | *(info)* A typed `Z.Union` whose option types are all reference types can use the allocation-free native C# 15 union from `Z.NativeUnion` on .NET 11+. A code fix is offered. |
+| `ZODSGEN041` | *(info)* A typed `Z.Union` can use the non-boxing native C# 15 union from `Z.NativeUnion` on .NET 11+ (reference- and value-type cases are both allocation-free). A code fix is offered. |
 | `ZODSGEN044` | A `[ZodSchema]` type using an automatic `[Scalar]` form (`[Scalar<TValue>]` / `[Scalar(typeof(TValue))]`) cannot produce a usable schema, so the value-object generator's `Create` would reference a `{Type}Schema` that does not exist or cannot validate. Reported when `GenerateValidateMethod = false` suppresses the `Validate` it calls, or the declared underlying type cannot be represented. |
 | `ZODSGEN045` | A type referenced by an exported type has `GenerateJsonSchema = false`, so the cross-platform contract surface is incomplete. |
 | `ZODSGEN049` | *(warning)* A member is typed as a C# 15 closed class whose derived type has no `[ZodSchema]`, so a value of that derived type is not validated. Add `[ZodSchema]` to the derived type. |

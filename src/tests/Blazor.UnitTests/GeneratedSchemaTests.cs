@@ -225,6 +225,26 @@ public class GeneratedSchemaTests
 		await Assert.That(valid).IsTrue();
 	}
 
+	[Test]
+	public async Task ZodValidator_GivenUnionMemberWithAsyncCase_AwaitsItAndPlacesTheErrorOnTheCase()
+	{
+		// Arrange - the owner's Pet member is a union target whose active case has an async-only rule.
+		GeneratedCat cat = new() { Name = "taken" };
+		GeneratedOwner owner = new() { Pet = cat };
+		await using var context = CreateContext();
+		EditContext editContext = new(owner);
+		var form = context.Render(editContext, FormHost.Zod());
+
+		// Act
+		var valid = await form.ValidateAsync(editContext);
+
+		// Assert
+		await Assert.That(valid).IsFalse();
+		await Assert.That(editContext.IsValidationFaulted()).IsFalse();
+		FieldIdentifier field = new(cat, nameof(GeneratedCat.Name));
+		await Assert.That(editContext.GetValidationMessages(field)).IsEquivalentTo(["Name is taken"]);
+	}
+
 	static BunitContext CreateContext() =>
 		FormHost.CreateContext(static factory =>
 			Generated.PurviewZodSharpBlazorUnitTestsZodSharpSchemas.Register(factory)

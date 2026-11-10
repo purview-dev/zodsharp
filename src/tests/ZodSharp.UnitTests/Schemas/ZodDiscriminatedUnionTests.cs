@@ -105,6 +105,37 @@ public class ZodDiscriminatedUnionTests
 		await Assert.That(second.IsSuccess).IsTrue();
 	}
 
+	[Test]
+	[NotInParallel]
+	public async Task DiscriminatedUnion_GivenReflectionEnabled_ReadsAnUnregisteredPocoDiscriminator(
+		CancellationToken cancellationToken
+	)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+
+		// Arrange - the fallback for a POCO the union was not told about sits behind the
+		// ZodSharp.Reflection.IsSupported feature switch, which a trimmed or AOT application turns off.
+		const string reflectionSwitch = "ZodSharp.Reflection.IsSupported";
+		var hadSwitch = AppContext.TryGetSwitch(reflectionSwitch, out var previous);
+		AppContext.SetSwitch(reflectionSwitch, true);
+
+		try
+		{
+			var union = Z.DiscriminatedUnion("kind").Option("circle", new ObjectPassThroughSchema()).Build();
+
+			// Act
+			var result = union.Validate(new UnregisteredWitness());
+
+			// Assert
+			await Assert.That(result.IsSuccess).IsTrue();
+		}
+		finally
+		{
+			// AppContext cannot unset a switch: restore the value, or leave the effective default (enabled).
+			AppContext.SetSwitch(reflectionSwitch, hadSwitch ? previous : true);
+		}
+	}
+
 	static ZodDiscriminatedUnion CreateUnion()
 	{
 		ObjectPassThroughSchema userSchema = new();
@@ -116,6 +147,12 @@ public class ZodDiscriminatedUnionTests
 	sealed record UnionUser(string Type, string Name);
 
 	sealed record UnionAdmin(string Type, string Name, string[] Permissions);
+
+	/// <summary>A POCO the union is not told about, so its discriminator is read by the reflection fallback.</summary>
+	sealed class UnregisteredWitness
+	{
+		public string Kind { get; set; } = "circle";
+	}
 
 	sealed class ObjectPassThroughSchema : IZodSchema<object, object>
 	{

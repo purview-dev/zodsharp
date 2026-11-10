@@ -12,8 +12,8 @@
 			Directory.Packages.props picks package lines by $(TargetFramework), which a single-targeted project has not
 			set yet when that file is evaluated; the .NET 11 component and host packages need the 11.x lines.
 		-->
-		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
-		<AspNetCoreTestHostVersion>11.0.0-rc.3.26522.148</AspNetCoreTestHostVersion>
+		<MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
+		<AspNetCoreTestHostVersion>11.0.0</AspNetCoreTestHostVersion>
 		<!-- CA1506: a component test couples bUnit, the form types, the validators and TUnit's generic assertion
 		     builders in a single method by design. -->
 		<NoWarn>$(NoWarn);CA1506</NoWarn>

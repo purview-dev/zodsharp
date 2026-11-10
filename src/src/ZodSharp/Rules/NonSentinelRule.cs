@@ -304,35 +304,65 @@ static class SentinelValues<T>
 	public static bool IsSentinel(in T value)
 	{
 		if (typeof(T) == typeof(Guid))
-			return Unsafe.As<T, Guid>(ref Unsafe.AsRef(in value)) == Guid.Empty;
+		{
+			unsafe
+			{
+				return Unsafe.As<T, Guid>(ref Unsafe.AsRef(in value)) == Guid.Empty;
+			}
+		}
 
 		if (typeof(T) == typeof(DateTime))
 		{
-			var typed = Unsafe.As<T, DateTime>(ref Unsafe.AsRef(in value));
+			DateTime typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, DateTime>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == DateTime.MinValue || typed == DateTime.MaxValue;
 		}
 
 		if (typeof(T) == typeof(DateTimeOffset))
 		{
-			var typed = Unsafe.As<T, DateTimeOffset>(ref Unsafe.AsRef(in value));
+			DateTimeOffset typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, DateTimeOffset>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == DateTimeOffset.MinValue || typed == DateTimeOffset.MaxValue;
 		}
 
 		if (typeof(T) == typeof(DateOnly))
 		{
-			var typed = Unsafe.As<T, DateOnly>(ref Unsafe.AsRef(in value));
+			DateOnly typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, DateOnly>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == DateOnly.MinValue || typed == DateOnly.MaxValue;
 		}
 
 		if (typeof(T) == typeof(TimeOnly))
 		{
-			var typed = Unsafe.As<T, TimeOnly>(ref Unsafe.AsRef(in value));
+			TimeOnly typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, TimeOnly>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == TimeOnly.MinValue || typed == TimeOnly.MaxValue;
 		}
 
 		if (typeof(T) == typeof(string))
 		{
-			var typed = Unsafe.As<T, string?>(ref Unsafe.AsRef(in value));
+			string? typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, string?>(ref Unsafe.AsRef(in value));
+			}
+
 			return string.IsNullOrWhiteSpace(typed);
 		}
 
@@ -349,11 +379,24 @@ static class SentinelValues<T>
 	public static string Describe(in T value)
 	{
 		if (typeof(T) == typeof(Guid))
-			return Unsafe.As<T, Guid>(ref Unsafe.AsRef(in value)) == Guid.Empty ? "an empty GUID" : Raw(in value);
+		{
+			Guid typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, Guid>(ref Unsafe.AsRef(in value));
+			}
+
+			return typed == Guid.Empty ? "an empty GUID" : Raw(in value);
+		}
 
 		if (typeof(T) == typeof(DateTime))
 		{
-			var typed = Unsafe.As<T, DateTime>(ref Unsafe.AsRef(in value));
+			DateTime typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, DateTime>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == DateTime.MinValue ? "DateTime.MinValue"
 				: typed == DateTime.MaxValue ? "DateTime.MaxValue"
 				: Raw(in value);
@@ -361,7 +404,12 @@ static class SentinelValues<T>
 
 		if (typeof(T) == typeof(DateTimeOffset))
 		{
-			var typed = Unsafe.As<T, DateTimeOffset>(ref Unsafe.AsRef(in value));
+			DateTimeOffset typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, DateTimeOffset>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == DateTimeOffset.MinValue ? "DateTimeOffset.MinValue"
 				: typed == DateTimeOffset.MaxValue ? "DateTimeOffset.MaxValue"
 				: Raw(in value);
@@ -369,7 +417,12 @@ static class SentinelValues<T>
 
 		if (typeof(T) == typeof(DateOnly))
 		{
-			var typed = Unsafe.As<T, DateOnly>(ref Unsafe.AsRef(in value));
+			DateOnly typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, DateOnly>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == DateOnly.MinValue ? "DateOnly.MinValue"
 				: typed == DateOnly.MaxValue ? "DateOnly.MaxValue"
 				: Raw(in value);
@@ -377,7 +430,12 @@ static class SentinelValues<T>
 
 		if (typeof(T) == typeof(TimeOnly))
 		{
-			var typed = Unsafe.As<T, TimeOnly>(ref Unsafe.AsRef(in value));
+			TimeOnly typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, TimeOnly>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed == TimeOnly.MinValue ? "TimeOnly.MinValue"
 				: typed == TimeOnly.MaxValue ? "TimeOnly.MaxValue"
 				: Raw(in value);
@@ -385,7 +443,12 @@ static class SentinelValues<T>
 
 		if (typeof(T) == typeof(string))
 		{
-			var typed = Unsafe.As<T, string?>(ref Unsafe.AsRef(in value));
+			string? typed;
+			unsafe
+			{
+				typed = Unsafe.As<T, string?>(ref Unsafe.AsRef(in value));
+			}
+
 			return typed switch
 			{
 				null => "null",

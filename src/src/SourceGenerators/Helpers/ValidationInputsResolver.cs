@@ -155,7 +155,12 @@ static class ValidationInputsResolver
 
 		if (RoslynFeatures.IsUnion(namedType))
 		{
-			var cases = ResolveCases(GetUnionCaseTypes(namedType), externalSchemas, requireSchemaAttribute: false);
+			var cases = ResolveCases(
+				GetUnionCaseTypes(namedType),
+				externalSchemas,
+				requireSchemaAttribute: false,
+				unionType: namedType
+			);
 			return cases.Count == 0 ? (DispatchKind.None, cases) : (DispatchKind.Union, cases);
 		}
 
@@ -170,6 +175,97 @@ static class ValidationInputsResolver
 		}
 
 		return (DispatchKind.None, new([]));
+	}
+
+	/// <summary>
+	/// Resolves the case types of a union that is itself a <c>[ZodSchema]</c> target, so its schema dispatches to
+	/// each case's schema. Also reports whether the union exposes <c>HasValue</c> (the non-boxing access pattern).
+	/// </summary>
+	/// <param name="union">The union type.</param>
+	/// <param name="externalSchemas">The resolver deciding schema ownership.</param>
+	/// <returns>The dispatch cases, in declaration order, and whether the union has a <c>HasValue</c> property.</returns>
+	public static (EquatableArray<DispatchCase> Cases, bool HasValue) ResolveUnionTarget(
+		INamedTypeSymbol union,
+		ExternalSchemaResolver externalSchemas
+	)
+	{
+		var cases = ResolveCases(
+			GetUnionCaseTypes(union),
+			externalSchemas,
+			requireSchemaAttribute: false,
+			unionType: union
+		);
+		return (cases, HasHasValue(union));
+	}
+
+	/// <summary>
+	/// Gets the case types of a union that neither this compilation generates a schema for nor a referenced
+	/// assembly exposes a validator for, so the analyzer can warn that values of that case are not validated.
+	/// </summary>
+	/// <param name="union">The union type.</param>
+	/// <param name="externalSchemas">The resolver deciding schema ownership.</param>
+	/// <returns>The unresolvable case types, in declaration order.</returns>
+	public static ImmutableArray<INamedTypeSymbol> GetUnionCasesWithoutSchema(
+		INamedTypeSymbol union,
+		ExternalSchemaResolver externalSchemas
+	)
+	{
+		var builder = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
+		HashSet<TypeIdentity> seen = [];
+		foreach (var caseType in GetUnionCaseTypes(union))
+		{
+			if (!TypeIdentity.TryCreate(caseType, out var identity) || !seen.Add(identity))
+				continue;
+
+			if (externalSchemas.IsSchemaOwnedByThisCompilation(caseType))
+				continue;
+
+			if (externalSchemas.TryGetExistingSchema(caseType, out _))
+				continue;
+
+			builder.Add(caseType);
+		}
+
+		return builder.ToImmutable();
+	}
+
+	/// <summary>
+	/// Whether <paramref name="union"/> exposes a <c>TryGetValue</c> overload that reads
+	/// <paramref name="caseType"/> without boxing (the language's non-boxing access pattern).
+	/// </summary>
+	public static bool HasTryGetValue(INamedTypeSymbol union, INamedTypeSymbol caseType)
+	{
+		foreach (var member in union.GetMembers("TryGetValue"))
+		{
+			if (
+				member is IMethodSymbol { IsStatic: false, Parameters.Length: 1 } method
+				&& method.Parameters[0].RefKind == RefKind.Out
+				&& SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, caseType)
+			)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/// <summary>Whether <paramref name="union"/> exposes a public <c>HasValue</c> property.</summary>
+	public static bool HasHasValue(INamedTypeSymbol union)
+	{
+		foreach (var member in union.GetMembers("HasValue"))
+		{
+			if (
+				member is IPropertySymbol { IsStatic: false, DeclaredAccessibility: Accessibility.Public } property
+				&& property.Type.SpecialType == SpecialType.System_Boolean
+				&& property.GetMethod is not null
+			)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/// <summary>
@@ -257,7 +353,8 @@ static class ValidationInputsResolver
 	static EquatableArray<DispatchCase> ResolveCases(
 		ImmutableArray<INamedTypeSymbol> caseTypes,
 		ExternalSchemaResolver? externalSchemas,
-		bool requireSchemaAttribute
+		bool requireSchemaAttribute,
+		INamedTypeSymbol? unionType = null
 	)
 	{
 		var builder = ImmutableArray.CreateBuilder<DispatchCase>();
@@ -267,20 +364,23 @@ static class ValidationInputsResolver
 			if (!TypeIdentity.TryCreate(caseType, out var caseIdentity) || !seen.Add(caseIdentity))
 				continue;
 
+			var nonBoxing = unionType is not null && HasTryGetValue(unionType, caseType);
 			var owned = externalSchemas?.IsSchemaOwnedByThisCompilation(caseType) ?? IsInSource(caseType);
 			if (owned)
 			{
 				if (requireSchemaAttribute && !ZodSchemaAttributeData.FromAttributeData(caseType, out _).Exists)
 					continue;
 
-				builder.Add(new(caseIdentity, caseIdentity with { Name = $"{caseIdentity.Name}Schema" }, true));
+				builder.Add(
+					new(caseIdentity, caseIdentity with { Name = $"{caseIdentity.Name}Schema" }, true, nonBoxing)
+				);
 				continue;
 			}
 
 			if (externalSchemas is not null && externalSchemas.TryGetExistingSchema(caseType, out var existing))
 			{
 				var (isModern, _) = externalSchemas.GetExistingSchemaFeatures(caseType);
-				builder.Add(new(caseIdentity, existing, isModern));
+				builder.Add(new(caseIdentity, existing, isModern, nonBoxing));
 			}
 		}
 

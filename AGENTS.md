@@ -48,6 +48,8 @@ The build is driven by `Purview.BuildSdk`, imported via `src/Directory.Build.pro
 - Package versions are managed centrally in `Directory.Packages.props` (Central Package Management).
 - `global.json` pins the `Purview.BuildSdk` MSBuild SDK version.
 - Pack layout for all packages is validated by `purview-build.json` (`PackValidation.RequiredContent`).
+- **.NET 11 opt-ins.** `Purview.BuildSdk` 2.0 compiles every `net11.0` target with Runtime Async (`runtime-async=on`) and the C# 15 updated memory-safety rules (`MemorySafetyRules=2`). The GA compiler still classifies the latter as a preview feature, so `LangVersion` is `preview`, and `AllowUnsafeBlocks` is on: the STJ generator emits unsafe fast paths, and the two `Unsafe.As` boundaries in the sentinel/required rules use `unsafe` blocks so the audit boundary is visible at the call site. Do not remove either without removing the tier-2 opt-in.
+- **Multithreaded MSBuild is off** (`PurviewMultiThreadedBuild=false`). The .NET 11 GA WebAssembly SDK declares `ReadWasmProps` with a custom `TaskFactory`, which `-mt` refuses to execute out of process, so `Examples.Blazor.Client` cannot build in that mode. Re-enable it once `dotnet/runtime` annotates the task as multithreadable.
 
 Before changing build/SDK configuration or adding/moving projects, consult the SDK's own skills, which are committed under `.agents/skills/` (see [Installed skills](#installed-skills-agentsskills)): `purview-buildsdk-configuration`, `purview-buildsdk-project-detection`, `purview-buildsdk-project-layout`.
 
@@ -112,6 +114,21 @@ The numeric rules are split by the constraint each family needs — pick the con
 - Any code that matches a rule by name (for example the JSON Schema converter) must tolerate the generic arity suffix: a generic rule's `Type.Name` is `IntRule\`1`, so match with `StartsWith` rather than equality.
 
 Generated rule attributes carry the rule's **value** parameters as a constructor: a parameter declared without a default is a required constructor argument (so it cannot be silently omitted), a parameter with a default keeps it, and `message`/`code`/`origin` stay properties. Attribute usages for required values are positional (`[MinValue(3)]`, `[Regex("^[a-z]+$")]`); defaulted values may still be set by property name. When changing rule constructor parameters, update the affected generator tests and the wiki attribute tables.
+
+## Native unions (.NET 11)
+
+`Z.NativeUnion<T1, T2>` returns `ZodSharp.Unions.NativeUnion<T1, T2>`, a hand-written `[Union]` type rather than a `union` declaration. That is deliberate: a declared union always boxes a value-type case through its single `object?` field, while a hand-written union can implement the language's *non-boxing access pattern* — typed per-case fields, `HasValue`, and one `TryGetValue(out T)` per case — which the compiler uses for type and null patterns. Keep all four parts of the contract:
+
+- `[System.Runtime.CompilerServices.Union]` on the type, and an implicit constructor per case type (the compiler synthesizes the union conversions from them).
+- A public `object? Value` property (the boxing view the contract requires; hot paths must never call it).
+- `HasValue` that is equivalent to `Value is not null`, and `TryGetValue` overloads that return `true` only for their own non-null case.
+- `default` must mean "no value": the constructors leave a null reference/nullable case empty instead of tagging it.
+
+`ZodSharp.Unions.IUnion` is the resolver's own contract (it adds `Tag`); the net11 type also implements the BCL `System.Runtime.CompilerServices.IUnion`. The hand-rolled `Union<T1,T2>`/`Union<T1,T2,T3>` use the same tag numbering (`0` empty, `1..3` for the cases) and return `null` from `Value` when empty, so the two union types are interchangeable at the contract level. `ZODSGEN041` and its code fix suggest the native union for every `Z.Union<T1, T2>` on .NET 11+, reference- or value-type cases alike.
+
+No shipped type is declared `closed`. The modifier is net11-only (`IsClosedTypeAttribute`), so a shared multi-target declaration would behave differently on net10.0 and net11.0, and the only non-sealed hierarchy (`ZodType<TOutput, TInput>`) is the extension point custom schemas derive from. `closed` is supported where it belongs: a consumer's own closed hierarchy, which the generator validates by dispatch (`DispatchKind.ClosedHierarchy`, `ZODSGEN049` when a derived type has no `[ZodSchema]`).
+
+A union can itself be a `[ZodSchema]` target. Its descriptor carries `IsUnionTarget`/`UnionCases`/`UnionHasValue` instead of properties; validation emits an `if`/`else if` chain in `EmitUnionDispatchChain` (non-boxing `TryGetValue` per case when available), an empty or unmatched union reports `invalid_union`, and `TryResolveMember` delegates to the active case's schema so a Blazor field or API container is the case object. A case with no validator is omitted and reported as `ZODSGEN055`; the union fails closed rather than passing. Async propagates through `AsyncSchemaIndex`, which must consider `UnionCases` as well as properties.
 
 ## Packing and package READMEs
 

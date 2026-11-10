@@ -77,9 +77,27 @@ partial class ZodSchemaGenerator
 			arguments
 		);
 
-		if (requiredRule.GuardedScalarPropertyName is { Length: > 0 } scalarPropertyName)
+		if (property.DispatchKind == DispatchKind.Union)
 		{
-			// The rule is closed over the scalar's unwrapped underlying value, so both an absent property and a
+			// A union is a struct, so the rule's own null test can never fail. An empty union is the absent
+			// value for the member, and the rule is reported against it directly (the same identity it would
+			// report for a present but rejected value).
+			WriteRuleFailure(
+				writer,
+				requiredRule,
+				ruleVariable,
+				identityVariable,
+				$"value.{propertyName}",
+				PathOf(property),
+				MemberOf(property),
+				GetFallbackOrigin(property),
+				invalidCondition: MissingValueCondition(property)
+			);
+			return;
+		}
+
+		if (requiredRule.GuardedScalarPropertyName is { Length: > 0 } scalarPropertyName)
+		{ // The rule is closed over the scalar's unwrapped underlying value, so both an absent property and a
 			// present scalar with an absent underlying value are missing.
 			var scalarExpression = property.IsNullableValueType
 				? $"value.{propertyName}.Value"
@@ -288,20 +306,23 @@ partial class ZodSchemaGenerator
 			return;
 		}
 
-		writer.IfBlock($"{underlyingExpression} is {{ }} scalarValue", body =>
-		{
-			var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
-			WriteRuleFailure(
-				body,
-				rule,
-				ruleVariable,
-				identity,
-				"scalarValue",
-				pathExpression,
-				memberExpression,
-				fallbackOrigin
-			);
-		});
+		writer.IfBlock(
+			$"{underlyingExpression} is {{ }} scalarValue",
+			body =>
+			{
+				var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
+				WriteRuleFailure(
+					body,
+					rule,
+					ruleVariable,
+					identity,
+					"scalarValue",
+					pathExpression,
+					memberExpression,
+					fallbackOrigin
+				);
+			}
+		);
 
 		writer.NewLine();
 	}
@@ -412,8 +433,9 @@ partial class ZodSchemaGenerator
 				)
 				: $"{GeneratedValidation}.ForMember({ruleError}, {memberExpression}, fallbackCategory: {Category("Custom")})";
 
-		writer.IfBlock(invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})", ifBody =>
-			WriteAddError(ifBody, errorExpression)
+		writer.IfBlock(
+			invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})",
+			ifBody => WriteAddError(ifBody, errorExpression)
 		);
 	}
 
