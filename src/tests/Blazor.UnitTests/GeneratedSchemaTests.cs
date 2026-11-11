@@ -236,9 +236,14 @@ public class GeneratedSchemaTests
 		var form = context.Render(editContext, FormHost.DataAnnotations());
 		FieldIdentifier field = new(cat, nameof(GeneratedCat.Name));
 
-		// Act
-		await form.ChangeAsync(editContext, field);
-		var pending = editContext.IsValidationPending(field);
+		// Act - read the pending state inside the renderer's dispatch operation. The validation suspends at its
+		// first await, and its continuation is queued on that same dispatcher, so sampling after the call returns
+		// races the completion (a Release run on a busy Linux runner resolves before the test thread resumes).
+		var pending = await form.InvokeAsync(() =>
+		{
+			editContext.NotifyFieldChanged(field);
+			return editContext.IsValidationPending(field);
+		});
 		await FormHost.WaitUntilAsync(() => !editContext.IsValidationPending(field), "resolved");
 
 		// Assert

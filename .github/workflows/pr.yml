@@ -13,6 +13,9 @@ jobs:
     name: Build and test
     uses: purview-dev/build/.github/workflows/purview-build.yml@main
     with:
+      # Pinned to the version in .config/dotnet-tools.json, so CI runs exactly what `just` runs locally
+      # instead of whichever Purview.Build was latest when the job started (which warns on every run).
+      build-version: "0.9.0"
       # The shared workflow defaults to the 10.0.x SDK, but this repository targets net11.0 and pins
       # the .NET 11 SDK in global.json. Without the matching SDK the runner cannot resolve global.json
       # ("A compatible .NET SDK was not found") and every step fails, starting with `dotnet tool
@@ -20,9 +23,44 @@ jobs:
       # NETSDK1045 on the net11.0 target, because the 10.0.x SDK cannot build it.
       # Keep in sync with `sdk.version` in global.json.
       dotnet-version: "11.0.100"
+      # Explicit, so PrWorkflow_GivenTheTestGates_RunsEveryTestInBothConfigurations can prove the
+      # Release gate still runs tests; the workflow default is true, but a default is invisible here.
+      run-tests: true
       run-pack: true
       validate-pack: true
     secrets: inherit
+
+  # The shared pipeline runs a single configuration (Release, the tool's default). A failure that only
+  # reproduces in Debug would therefore reach a developer's `just test` (which defaults to Debug) and
+  # never CI. The cross-platform job below also runs Debug, but filters to the parity producers; this
+  # job builds the whole solution and runs every test in Debug.
+  debug:
+    name: Build and test (Debug)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same reason as the cross-platform job: the SDK comes from global.json, not a floating
+      # version plus a feed quality.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Repository.UnitTests drives the vitest suites from the .NET test run, so the JavaScript
+      # dependencies have to be installed first.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the solution (Debug)
+        run: dotnet build src/ZodSharp.slnx --configuration Debug
+
+      - name: Run every test (Debug)
+        run: >-
+          dotnet test --solution src/ZodSharp.slnx --configuration Debug
+          --no-restore --no-build --treenode-filter '/*/*/*/*'
 
   # The shared pipeline runs the C# suite only, so the TypeScript/Zod side of the cross-platform
   # parity guarantee (docs/wiki/quality/Guarantees-and-Limitations.md) would otherwise never run in CI.
