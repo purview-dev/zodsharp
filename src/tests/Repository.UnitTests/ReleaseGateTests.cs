@@ -266,6 +266,34 @@ public sealed partial class ReleaseGateTests
 	}
 
 	/// <summary>
+	/// The shared pipeline runs a single configuration, so without the Debug job CI would only ever exercise
+	/// Release while `just test` runs Debug locally. A test that fails only in Debug would reach a developer and
+	/// never the pull request. Both configurations must build the solution and run every test.
+	/// </summary>
+	[Test]
+	public async Task PrWorkflow_GivenTheTestGates_RunsEveryTestInBothConfigurations(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		var text = await File.ReadAllTextAsync(
+			Path.Combine(RepositoryRoot.Value, ".github", "workflows", "pr.yml"),
+			cancellationToken
+		);
+
+		// Act
+		var jobs = Jobs(text).ToArray();
+		var release = jobs.SingleOrDefault(static j => j.Name == "build").Body ?? string.Empty;
+		var debug = jobs.SingleOrDefault(static j => j.Name == "debug").Body ?? string.Empty;
+
+		// Assert
+		await Assert.That(release).Contains("run-tests: true");
+		await Assert.That(debug).Contains("dotnet build src/ZodSharp.slnx --configuration Debug");
+		await Assert.That(debug).Contains("dotnet test --solution src/ZodSharp.slnx --configuration Debug");
+		await Assert.That(debug).Contains("--treenode-filter '/*/*/*/*'");
+	}
+
+	/// <summary>
 	/// Compiler-host assemblies must stay forbidden everywhere NuGet hands files to an application, and the generator
 	/// and code fixes everywhere an application loads assemblies from. <c>scripts/test-pack-validation-rules.ps1</c>
 	/// proves each rule rejects a package; this proves nobody removes one.

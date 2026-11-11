@@ -28,6 +28,9 @@ jobs:
       # file name the policy is registered against.
       - uses: purview-dev/build/actions/purview-release@main
         with:
+          # Pinned to the version in .config/dotnet-tools.json, so the release runs exactly what the
+          # pull request validated instead of whichever Purview.Build was latest when the job started.
+          build-version: "0.9.0"
           release-mode: NuGet
           trusted-publishing: true
           # The nuget.org profile name, not the sign-in email.

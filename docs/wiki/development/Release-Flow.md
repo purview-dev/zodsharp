@@ -27,7 +27,7 @@ rather than passing.
 
 | Gate | What it proves | Local | CI |
 |---|---|---|---|
-| Build, lint and tests | The solution builds warning-free, CSharpier reports no change, and every test project passes (including the cross-platform vitest suites, through `Repository.UnitTests`). | `just build`, `just lint-check`, `just test` | `pr.yml` `build` |
+| Build, lint and tests | The solution builds warning-free, CSharpier reports no change, and every test project passes (including the cross-platform vitest suites, through `Repository.UnitTests`). | `just build`, `just lint-check`, `just test` | `pr.yml` `build` (Release, with lint and pack) and `pr.yml` `debug` (the whole solution and every test in Debug) |
 | Pack and pack validation | Every package packs; package validation holds the public API to the 2.4.2 baseline; `.config/purview-build.json` `PackValidation` finds exactly the declared content (`RequiredContent`, `RequireExplicitContent`) and none of the `ForbiddenContent`. | `just pipeline-pack-validate` | `pr.yml` `build` (`run-pack`, `validate-pack`) |
 | Forbidden-content rule proof | Every `ForbiddenContent` rule rejects a package: a matching file is injected into scratch copies of each package and the real `purview-build` validation must fail, per package and per rule. | `just verify-pack-rules` | `pr.yml` `packed-consumers` |
 | Packed generator | The IL-merged generator in the `.nupkg` loads and generates in a net10.0 consumer (it has regressed twice while the in-repo tests, which use the unmerged generator, stayed green). | `just smoke-packed-generator` | `pr.yml` `packed-generator` |
@@ -74,7 +74,7 @@ just publish-aot-sample                       # Native AOT minimal API sample an
 
 | Workflow | Trigger | Pipeline mode |
 |---|---|---|
-| `pr.yml` | pull requests against `main` | `purview-build.yml` with `run-pack: true`, `validate-pack: true` |
+| `pr.yml` | pull requests against `main` | `purview-build.yml` with `run-pack: true`, `validate-pack: true` (Release), plus a Debug build and full test run |
 | `release.yml` | pushes to `main` | `purview-release.yml` with `release-mode: NuGet` |
 
 Both consume `.config/purview-build.json`:
