@@ -22,8 +22,28 @@ The `[ZodSchema]` generator reads `System.ComponentModel.DataAnnotations` attrib
 | `[Base64String]` | reuses `Base64StringRule` | `invalid_string` |
 | `[Compare(otherProperty)]` | typed equality between two properties | `mismatch` |
 | `[Display(Name=...)]` | not validated; `Name` used as the display name in messages and `{0}` placeholders. With `ResourceType`, the localized name is read from the resource property at runtime | — |
+| `[DisplayName(...)]` | fallback display name when `[Display]` is absent, matching .NET 11's Blazor `DisplayName` component | — |
 
 `[Length]` follows DataAnnotations null semantics: `null` is valid unless `[Required]` is also present.
+
+## Attributes without a dedicated rule
+
+Every other `ValidationAttribute` still runs. A `[CustomValidation]` (on a property or the class),
+`[FileExtensions]`, `[EnumDataType]`, or a consumer's own `ValidationAttribute` is constructed once in a generated
+field and called through its own `GetValidationResult` (synchronous) or `GetValidationResultAsync` (the .NET 11
+`AsyncValidationAttribute`). The attributes in the table above are already emitted as Zod rules and are never run
+twice.
+
+Class-level attributes run as object-level rules, in the platform's order: members, type rules, class-level
+attributes, then `IValidatableObject`/`IAsyncValidatableObject` when the earlier rules passed. Because
+`ValidationAttribute` is inherited, class-level attributes are collected from the base chain as well; a
+non-multiple attribute is taken from its most derived declaration, while a multiple one (for example
+`[CustomValidation]`) keeps every declaration.
+
+`[SkipValidation]` (`Microsoft.Extensions.Validation`, .NET 11; it targets classes, properties and parameters)
+removes a property from generated validation, `Paths`/`JsonNames` and the exported JSON Schema, and makes a class
+not claimed by the Microsoft.Extensions.Validation resolver. On a minimal-API parameter it is honored by both the
+ZodSharp endpoint filter and the Microsoft.Extensions.Validation resolver.
 
 Every generated error reports a `Category` (the Zod issue code: `invalid_type`, `too_small`, `too_big`,
 `invalid_format`, `invalid_value`, `custom`), an `Origin` (`string`, `number`, `array`, `enum`, …), and

@@ -49,6 +49,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		DiagnosticLibrary.ValidatableTypeRedundant,
 		DiagnosticLibrary.AsyncOnlyRulesWithSyncValidate,
 		DiagnosticLibrary.ClosedHierarchyDerivedTypeWithoutSchema,
+		DiagnosticLibrary.UnionCaseTypeWithoutSchema,
 		DiagnosticLibrary.OptionsValidatorConflict,
 		DiagnosticLibrary.UnresolvableMessagePlaceholder,
 	];
@@ -137,7 +138,14 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 
 		ReportCollectionBehaviorDiagnostics(context, type, typeLocation);
 
-		ReportValidationInputDiagnostics(context, type, zodSchemaData, hasIValidateOptions, typeLocation);
+		ReportValidationInputDiagnostics(
+			context,
+			type,
+			zodSchemaData,
+			hasIValidateOptions,
+			typeLocation,
+			externalSchemas
+		);
 
 		if (!hasDataAnnotations)
 		{
@@ -190,21 +198,14 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			}
 		}
 
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
 			// A positional record property inherits the attributes of the primary-constructor parameter it is
 			// synthesized from, so the analyzer resolves the same effective set the generator validates with.
 			var validationAttributes = SourceGenLibrary.GetValidationAttributes(property, context.Compilation);
 
-			if (
-				property.DeclaredAccessibility != Accessibility.Public
-				|| property.IsStatic
-				|| property.IsIndexer
-				|| !TypeHelpers.HasDataAnnotationAttribute(validationAttributes)
-			)
-			{
+			if (!TypeHelpers.HasDataAnnotationAttribute(validationAttributes))
 				continue;
-			}
 
 			_ = ZodSchemaAttributeData.FromAttributeData(type, out var schemaAttributeData);
 			var propertyResult = SourceGenLibrary.GetValidatablePropertyDescriptor(
@@ -314,6 +315,48 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 	}
 
 	/// <summary>
+	/// Reports ZODSGEN055 for a <c>[ZodSchema]</c> union target and for any union-typed member whose case type has
+	/// no validator: the case is omitted from dispatch, so a value of that case fails as <c>invalid_union</c>
+	/// instead of validating.
+	/// </summary>
+	static void ReportUnionCaseDiagnostics(
+		SymbolAnalysisContext context,
+		INamedTypeSymbol type,
+		Location typeLocation,
+		ExternalSchemaResolver externalSchemas
+	)
+	{
+		if (ValidationInputsResolver.RoslynFeatures.IsUnion(type))
+			ReportUnionCases(context, type, typeLocation, externalSchemas);
+
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
+		{
+			if (
+				TypeHelpers.UnwrapNullableType(property.Type) is INamedTypeSymbol memberType
+				&& ValidationInputsResolver.RoslynFeatures.IsUnion(memberType)
+			)
+			{
+				ReportUnionCases(context, memberType, GetMemberLocation(property), externalSchemas);
+			}
+		}
+	}
+
+	static void ReportUnionCases(
+		SymbolAnalysisContext context,
+		INamedTypeSymbol union,
+		Location location,
+		ExternalSchemaResolver externalSchemas
+	)
+	{
+		foreach (var caseType in ValidationInputsResolver.GetUnionCasesWithoutSchema(union, externalSchemas))
+		{
+			context.ReportDiagnostic(
+				Diagnostic.Create(DiagnosticLibrary.UnionCaseTypeWithoutSchema, location, union.Name, caseType.Name)
+			);
+		}
+	}
+
+	/// <summary>
 	/// Reports the diagnostics for the validation inputs the generator reads besides DataAnnotations values:
 	/// a redundant <c>[ValidatableType]</c> (ZODSGEN047), async-only rules behind a synchronous
 	/// <c>Validate</c> (ZODSGEN048), a closed-hierarchy member whose derived type has no schema (ZODSGEN049),
@@ -324,9 +367,12 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		INamedTypeSymbol type,
 		ZodSchemaAttributeData zodSchemaData,
 		bool hasIValidateOptions,
-		Location typeLocation
+		Location typeLocation,
+		ExternalSchemaResolver externalSchemas
 	)
 	{
+		ReportUnionCaseDiagnostics(context, type, typeLocation, externalSchemas);
+
 		foreach (var attribute in type.GetAttributes())
 		{
 			if (
@@ -334,8 +380,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				&& attributeClass.ContainingNamespace?.ToDisplayString() == "Microsoft.Extensions.Validation"
 			)
 			{
-				var location =
-					attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
+				var location = attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
 					?? typeLocation;
 				context.ReportDiagnostic(
 					Diagnostic.Create(DiagnosticLibrary.ValidatableTypeRedundant, location, type.Name)
@@ -347,11 +392,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		if (ValidationInputsResolver.GetValidatableObjectKinds(type).Async)
 			asyncOnlyRules.Add("IAsyncValidatableObject");
 
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
-			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-				continue;
-
 			foreach (var attribute in SourceGenLibrary.GetValidationAttributes(property, context.Compilation))
 			{
 				if (
@@ -492,11 +534,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		Location typeLocation
 	)
 	{
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
-			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-				continue;
-
 			if (!SourceGenLibrary.TryGetNestedSchemaType(property, externalSchemas, out var nested))
 				continue;
 
@@ -544,11 +583,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			if (!reachable.Add(new TypeIdentity(symbol)))
 				continue;
 
-			foreach (var property in symbol.GetMembers().OfType<IPropertySymbol>())
+			foreach (var property in SourceGenLibrary.GetValidatableProperties(symbol))
 			{
-				if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-					continue;
-
 				if (SourceGenLibrary.TryGetNestedSchemaType(property, externalSchemas, out var nested))
 					queue.Enqueue(nested);
 			}
@@ -570,11 +606,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		Location typeLocation
 	)
 	{
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
-			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-				continue;
-
 			var hasAttribute = SourceGenLibrary
 				.GetValidationAttributes(property, context.Compilation)
 				.Any(attribute => TypeLibrary.ZodSharp.CollectionBehaviorAttribute.Equals(attribute.AttributeClass));
@@ -672,8 +705,9 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 	}
 
 	/// <summary>
-	/// Reports <c>ZODSGEN041</c> when a typed union is constructed whose option types are all
-	/// reference types, so the allocation-free native union is a viable alternative on net11+.
+	/// Reports <c>ZODSGEN041</c> when a typed union is constructed, so the native union (which implements the
+	/// non-boxing access pattern and therefore allocates for neither reference- nor value-type cases) is a
+	/// viable alternative on net11+.
 	/// </summary>
 	static void AnalyzeTypedUnionConstruction(OperationAnalysisContext context, INamedTypeSymbol zodTypedUnion)
 	{
@@ -688,7 +722,6 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			resultType is not INamedTypeSymbol named
 			|| named.TypeArguments.Length != 2
 			|| !SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, zodTypedUnion)
-			|| !named.TypeArguments.All(static argument => argument.IsReferenceType)
 		)
 		{
 			return;

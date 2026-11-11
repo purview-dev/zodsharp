@@ -136,7 +136,7 @@ rejection on the form's fields: `editContext.AddZodErrors(errors)`, or `editCont
 
 ## Documentation
 
-- [HttpClient Integration](https://purview.dev/docs/zodsharp/http-integration/)
+- [HttpClient Integration](https://purview.dev/docs/zodsharp/hosting/http-integration/)
 - [Homepage](https://purview.dev/projects/zodsharp/)
 - [Documentation](https://purview.dev/docs/zodsharp/)
 

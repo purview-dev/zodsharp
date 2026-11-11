@@ -99,12 +99,25 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 	{
 		List<(string, IReadOnlyList<ZodClientRule>)> fields = [];
 		var formType = editContext.Model.GetType();
+		if (formType.IsDefined(typeof(Microsoft.Extensions.Validation.SkipValidationAttribute), inherit: true))
+			return fields;
+
 		foreach (var (field, renderedName) in renderedFields)
 		{
 			if (string.IsNullOrEmpty(field.FieldName) || string.IsNullOrEmpty(renderedName))
 				continue;
 
 			var containerType = field.Model.GetType();
+			if (containerType.IsDefined(typeof(Microsoft.Extensions.Validation.SkipValidationAttribute), inherit: true))
+				continue;
+
+			var propertyInfo = containerType.GetProperty(field.FieldName, BindingFlags.Public | BindingFlags.Instance);
+			if (
+				propertyInfo?.IsDefined(typeof(Microsoft.Extensions.Validation.SkipValidationAttribute), inherit: true)
+				== true
+			)
+				continue;
+
 			List<ZodClientRule> rules = [];
 
 			if (_options.Schemas.TryGetValue(containerType, out var schema))
@@ -140,7 +153,10 @@ public sealed class ZodClientValidationProvider : ClientValidationProvider
 	static List<ZodClientRule> BuildRules(Type containerType, string fieldName)
 	{
 		var property = containerType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance);
-		if (property is null)
+		if (
+			property is null
+			|| property.IsDefined(typeof(Microsoft.Extensions.Validation.SkipValidationAttribute), inherit: true)
+		)
 			return [];
 
 		List<ZodClientRule> rules = [];

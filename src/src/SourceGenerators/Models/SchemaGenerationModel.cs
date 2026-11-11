@@ -43,7 +43,33 @@ enum DispatchKind
 /// <param name="CaseType">The case (or derived) type.</param>
 /// <param name="SchemaType">The generated schema of <paramref name="CaseType"/>.</param>
 /// <param name="IsModern">Whether the schema exposes the depth-aware and member-resolution entry points.</param>
-readonly record struct DispatchCase(TypeIdentity CaseType, TypeIdentity SchemaType, bool IsModern);
+/// <param name="NonBoxing">
+/// Whether the union exposes <c>TryGetValue(out CaseType)</c>, so the case can be tested without boxing a
+/// value-type case. Always false for a closed hierarchy.
+/// </param>
+/// <param name="ExportsJsonSchema">
+/// Whether the case's schema emits <c>BuildJsonSchema</c>; a schema can opt out with
+/// <c>[ZodSchema(GenerateJsonSchema = false)]</c>, in which case the member exports an empty branch.
+/// </param>
+/// <param name="DiscriminatorPropertyName">
+/// The JSON property that identifies the case for a polymorphic closed hierarchy, or <see langword="null"/>
+/// for a union (which carries no discriminator) or a hierarchy that has not opted into polymorphism.
+/// </param>
+/// <param name="DiscriminatorValue">The discriminator value for this case, or <see langword="null"/>.</param>
+/// <param name="DiscriminatorValueIsNumber">
+/// Whether System.Text.Json writes <paramref name="DiscriminatorValue"/> as a JSON number (an
+/// <c>[JsonDerivedType]</c> registered with an integer discriminator) rather than a string.
+/// </param>
+readonly record struct DispatchCase(
+	TypeIdentity CaseType,
+	TypeIdentity SchemaType,
+	bool IsModern,
+	bool NonBoxing = false,
+	bool ExportsJsonSchema = true,
+	string? DiscriminatorPropertyName = null,
+	string? DiscriminatorValue = null,
+	bool DiscriminatorValueIsNumber = false
+);
 
 readonly record struct SchemaSet(EquatableArray<ZodSchemaDescriptor> Schemas);
 
@@ -175,10 +201,37 @@ readonly record struct ZodSchemaDescriptor(
 	public bool ImplementsAsyncValidatableObject { get; init; }
 
 	/// <summary>
+	/// The construction expressions of synchronous DataAnnotations validation attributes declared on the type
+	/// itself that the generator has no dedicated type rule for, in declaration order.
+	/// </summary>
+	public EquatableArray<string> TypeSyncValidationAttributes { get; init; } = new([]);
+
+	/// <summary>
+	/// The construction expressions of class-level <c>AsyncValidationAttribute</c>s (.NET 11) declared on the
+	/// type itself, in declaration order.
+	/// </summary>
+	public EquatableArray<string> TypeAsyncValidationAttributes { get; init; } = new([]);
+
+	/// <summary>
 	/// Whether a hand-authored <c>[OptionsValidator]</c> class named <c>{Type}Validator</c> exists, so the generated
 	/// options validator is skipped (SYSLIB1205).
 	/// </summary>
 	public bool HasOptionsValidatorConflict { get; init; }
+
+	/// <summary>
+	/// Whether the <c>[ZodSchema]</c> target is itself a C# 15 union (the <c>union</c> keyword or a hand-written
+	/// <c>[Union]</c> type). Its validation dispatches to the schemas of its case types rather than to members.
+	/// </summary>
+	public bool IsUnionTarget { get; init; }
+
+	/// <summary>The case types a union target dispatches to, in declaration order.</summary>
+	public EquatableArray<DispatchCase> UnionCases { get; init; } = new([]);
+
+	/// <summary>
+	/// Whether the union target exposes a public <c>HasValue</c> property (the non-boxing access pattern), so an
+	/// empty union is detected without boxing. When false, an empty union is detected through <c>Value is null</c>.
+	/// </summary>
+	public bool UnionHasValue { get; init; }
 }
 
 /// <param name="PropertyType">The declared type of the property, with a nullable wrapper removed.</param>
@@ -303,11 +356,24 @@ readonly record struct ZodPropertyDescriptor(
 	/// </summary>
 	public EquatableArray<string> AsyncValidationAttributes { get; init; } = new([]);
 
+	/// <summary>
+	/// The construction expressions of synchronous DataAnnotations validation attributes declared on the member
+	/// that the generator has no dedicated rule for (for example <c>[CustomValidation]</c>,
+	/// <c>[FileExtensions]</c> or a consumer's own <c>ValidationAttribute</c>), in declaration order.
+	/// </summary>
+	public EquatableArray<string> SyncValidationAttributes { get; init; } = new([]);
+
 	/// <summary>How the member dispatches to a case or derived type's schema, when it does.</summary>
 	public DispatchKind DispatchKind { get; init; }
 
 	/// <summary>The cases dispatched to when <see cref="DispatchKind"/> is not <see cref="DispatchKind.None"/>.</summary>
 	public EquatableArray<DispatchCase> DispatchCases { get; init; } = new([]);
+
+	/// <summary>
+	/// Whether a union-typed member exposes a public <c>HasValue</c> property, so an empty union is detected
+	/// without boxing. When false, it is detected through <c>Value is null</c>.
+	/// </summary>
+	public bool UnionHasValue { get; init; }
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(

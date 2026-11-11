@@ -4,19 +4,57 @@ All notable changes to this repository are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). `package.json` is the authoritative version; see
-[Release Flow](docs/wiki/Release-Flow.md).
+[Release Flow](docs/wiki/development/Release-Flow.md).
 
 Released versions correspond to `v<version>` GitHub releases.
 
-## 3.0.0-prerelease.1
+## 3.0.0-prerelease.5
 
 ### Added
+
+- **`[ZodSchema]` on a union type.** A `union` declaration (or a hand-written `[Union]` type) can carry the
+  attribute: the generated `{Type}Schema.Validate` dispatches on the active case to that case type's schema, so error
+  paths are the case's own with no synthetic `Value` segment. A case with `TryGetValue` (the non-boxing access
+  pattern) is matched without boxing; a `union` declaration without it is matched through `Value`. An empty union, or
+  an active case with no validator, fails as `invalid_union`. **`ZODSGEN055`** (warning) reports a case type with no
+  `[ZodSchema]` in this compilation or a referenced assembly. Union members gain the same behaviour without an
+  attribute on the union, and `[Required]`, `[RequiredZod]` and `[NonSentinel]` treat an empty union as the member's
+  absent/default value. Async rules on a case propagate: `RequiresAsyncValidation` is true, `ValidateAsync` awaits it,
+  and ASP.NET Core, Blazor, Microsoft.Extensions.Validation and options validation all await it.
+
+- **Native union JSON round-trip.** `NativeUnion<T1, T2>` now carries `[JsonUnion]`, and the new
+  `NativeUnionTypeClassifierFactory` resolves the payloads .NET 11's token classifier cannot: a string token
+  under `JsonSerializerDefaults.Web` (where a number may also be read from a string) and two object-shaped cases.
+  `System.Text.Json` writes the active case with no wrapper or discriminator and reads it back on both the
+  reflection and source-generated paths, so a minimal-API union parameter works without a custom converter.
+  A genuinely ambiguous payload still fails as `JsonException`. See
+  [Unions and Discriminated Unions](docs/wiki/schemas/Unions-and-Discriminated-Unions.md#json-serialization).
+- **Union and closed-hierarchy members export their case schemas.** A generated `BuildJsonSchema` now emits
+  `oneOf` for a member typed as a C# 15 union or a closed class instead of the empty schema; a hierarchy that
+  opts into `[JsonPolymorphic(InferClosedTypePolymorphism = true)]` (or registers `[JsonDerivedType]`) also
+  constrains the discriminator (`$type` by default) on every branch. See
+  [JSON Schema Export](docs/wiki/serialization/JsonSchema-Export.md#export-a-generated-zodschema).
+- **The full DataAnnotations validation surface.** Every `ValidationAttribute` the generator has no dedicated
+  rule for now runs: `[CustomValidation]` (property or class), `[FileExtensions]`, `[EnumDataType]`, and a
+  consumer's own attribute are constructed in generated fields and called through
+  `GetValidationResult`/`GetValidationResultAsync`. Class-level sync and async attributes run as object-level
+  rules and are collected from the base chain; a non-multiple attribute is taken from its most derived
+  declaration. Attributes already mapped to a Zod rule are never run twice. See
+  [Source Generator DataAnnotations](docs/wiki/generator/Source-Generator-DataAnnotations.md#attributes-without-a-dedicated-rule).
+- **`[DisplayName]` as a display-name fallback.** When `[Display(Name=...)]` is absent, `[DisplayName]` supplies the
+  display name used in generated messages, matching .NET 11's Blazor `DisplayName` component.
+- **`[SkipValidation]` throughout the .NET 11 validation stack.** A class marked `[SkipValidation]` is not claimed
+  by the resolver (even with a registered validator); a property is omitted from generated validation,
+  `Paths`/`JsonNames`, JSON Schema, client rules and field-level validation; a parameter or its type is skipped by
+  the ZodSharp endpoint filter and the Microsoft.Extensions.Validation resolver. The endpoint filter now matches
+  the real .NET 11 `SkipValidationAttribute` rather than any attribute with that name. See
+  [Microsoft.Extensions.Validation](docs/wiki/hosting/Microsoft-Extensions-Validation.md#skipvalidation).
 
 - **Trimming and Native AOT across every package.** Every shipping package is `IsTrimmable`/`IsAotCompatible` on
   every target framework and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
   suppressed. `src/tests/TrimSafety.Verification` publishes with `PublishAot=true` (every ZodSharp assembly except
   NewtonsoftJson rooted, then as a plain consumer), fails on any IL warning and runs the native binary
-  (`just verify-trim`, CI job `verify-trim`). See [Trimming and Native AOT](docs/wiki/Trimming-and-AOT.md).
+  (`just verify-trim`, CI job `verify-trim`). See [Trimming and Native AOT](docs/wiki/quality/Trimming-and-AOT.md).
 - **`[MinCount]`, `[MaxCount]` and `[CountRange]`** (`ZodSharp.Rules`, generated from the new `MinCountRule`,
   `MaxCountRule` and `CountRangeRule`): trim-safe collection/dictionary count attributes. The generator validates
   them exactly like `[MinLength]`/`[MaxLength]`/`[Length]` on a collection (same code, origin, bounds, `count`
@@ -266,6 +304,20 @@ Released versions correspond to `v<version>` GitHub releases.
   `lib/net10.0` and `lib/net11.0` only (the .NET 11 integrations stay `net11.0`-only); the source generator and
   analyzers stay on `netstandard2.0`. The `Microsoft.Extensions.*` dependency lines for 8.x and 9.x are gone, and
   the net8.0-only trim suppressions were replaced by the feature guards every remaining target understands.
+- **`Union<T1, T2>` / `Union<T1, T2, T3>` tags and empty values.** `Tag` now uses the native union's numbering
+  (`0` empty, `1`–`3` for the cases) instead of starting at `0` for `T1`, and `Value` returns `null` for an empty
+  union (a default value, or an implicit conversion from `null`) instead of throwing; `IUnion.Value` is `object?`.
+  `Match`/`Switch` still throw for an empty union. The hand-rolled and net11 native unions now share one contract.
+- **An empty union member no longer validates successfully.** A union member whose value is empty (the default
+  value, or a `null`-converted union) now fails: `missing_field` for `[Required]`, the rule's own error for
+  `[RequiredZod]`/`[NonSentinel]`, and `invalid_type` otherwise. A union target's `Validate` reports `invalid_union`
+  for an empty union. Previously the member dispatch skipped the value silently.
+- **A `[ZodSchema]` derived type now validates inherited members.** The generator reads the whole base chain, so
+  public properties inherited from a base class are validated, exported, given `Paths`/`JsonNames` entries and
+  resolved by `TryResolveMember`. A model that derives from a base with a non-nullable reference-type property
+  therefore reports that property as required; make the property nullable, or use a request DTO that does not
+  inherit the infrastructure base. An overridden or hidden property is taken once, from the most derived
+  declaration.
 - **Newly annotated APIs (not binary breaks; trimmed and AOT applications now get IL2026/IL3050 at the call site).**
   `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` were added to: every `Purview.ZodSharp.NewtonsoftJson` API
   that reaches Newtonsoft serialization (`NewtonsoftJsonExtensions.DeserializeAndValidate`,
@@ -416,6 +468,22 @@ Released versions correspond to `v<version>` GitHub releases.
   Nothing changes at runtime. See the upgrade note.
 ### Fixed
 
+- **`AlsoRunDataAnnotations` field-level fallthrough.** A field change on a property ZodSharp does not own (a
+  DataAnnotations-only property) now finds the next resolver's property info instead of returning no member, so
+  the platform's field-level validation runs for it.
+- **A member covered only by `[ZodAsyncMember]` is individually validatable.** `IsValidatableMember` listed only
+  members with synchronous rules, so a Blazor field change on a member whose sole rule is the custom asynchronous
+  method fell back to validating the whole form (and re-ran the method for unrelated fields). It now lists the
+  `[ZodAsyncMember]` names too, so `ValidateMemberAsync` runs the method for that field alone.
+- **Inherited members are validated.** The generator read only the properties declared on the `[ZodSchema]` type,
+  so a derived type never validated a public property inherited from its base class, and its JSON Schema never
+  described one. It now reads the whole base chain, taking an overridden or hidden property once from the most
+  derived declaration. A closed-hierarchy case therefore validates its base members too, and `Paths`, `JsonNames`,
+  `TryResolveMember`, JSON Schema export and the analyzer diagnostics follow the same member list.
+- **System.Text.Json error paths map through a union's active case.** `ZodJsonExceptions.ToMemberPath` treated a
+  union contract as a scalar, so every segment below a union member kept its JSON name (`Pet.name` instead of
+  `Pet.Name`). It now resolves a member, index or key through the case contracts, including a collection case,
+  and keeps the JSON name only when several cases name the segment differently.
 - **Generated validators compile for member types with their own equality operators.** The generator tested for null
   with `value.Member == null` (and `!= null`), which binds a user-defined operator when the member type declares
   one. A `[Required]` `Nullable<T>` member whose type defines `==(string?, T)` and an implicit conversion to `string`
@@ -571,6 +639,12 @@ Each note names the old form, the new form, and the edit to make.
 
 - **Target frameworks.** `net8.0`/`net9.0` → `net10.0`/`net11.0` only. Retarget the consuming project to `net10.0` or
   later, or stay on 2.4.x.
+- **Union tags.** Code that read `Union<...>.Tag` must add one (`0`→`1`, `1`→`2`, and `2`→`3` on the three-case type)
+  and treat `0` as empty; code that relied on `Value` throwing for an uninitialized union should test `Tag == 0` or use
+  `TryGetValue` instead.
+- **Empty union members.** An empty union is now the member's absent value. If a member may be absent, declare it
+  nullable (`Pet?`); a non-nullable union member must always hold a case. A union target (`[ZodSchema]` on the union)
+  reports `invalid_union` for an empty union.
 - **Trim/AOT annotations.** The APIs listed under *Breaking behaviour changes* now raise IL2026/IL3050 in a trimmed
   or AOT build. Move to the named alternative: `Purview.ZodSharp.SystemTextJson` with a `JsonTypeInfo<T>` instead of
   Newtonsoft; the generated `AddZodSharp{Assembly}Schemas()` or `AddZodSharpAssembly` instead of
@@ -703,8 +777,8 @@ Each note names the old form, the new form, and the edit to make.
 - **Record JSON Schema export and import.** `Z.ToJsonSchema(Z.Record(valueSchema))` now exports the same
   object/`additionalProperties` shape, and `Z.FromJsonSchema` imports an object with `additionalProperties`
   as a record in both JSON integration packages (`additionalProperties: true` treats every member as `any`).
-  See [JSON Schema Export](docs/wiki/JsonSchema-Export.md#dictionaries) and
-  [JSON Schema Import](docs/wiki/JsonSchema-Import.md#records).
+  See [JSON Schema Export](docs/wiki/serialization/JsonSchema-Export.md#dictionaries) and
+  [JSON Schema Import](docs/wiki/serialization/JsonSchema-Import.md#records).
 - **`IEnumerable<T>` properties validate their elements.** A property declared as the enumerable interface
   itself now resolves its element type, validates elements and exports its `items` schema, like `T[]`.
 
@@ -742,7 +816,7 @@ Each note names the old form, the new form, and the edit to make.
   correlates the local time with the offset and rejects every RFC 3339 representation of both instant bounds.
   `Z.Date().NonSentinel()` also exports `type: "string"`, `format: "date-time"` (previously it fell back to
   the empty schema). See
-  [JSON Schema Export](docs/wiki/JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
+  [JSON Schema Export](docs/wiki/serialization/JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
 - **Optional exact UTC `DateTimeOffset` contract.** `DateTimeOffsetSerialization.Utc` narrows
   `[NonSentinel] DateTimeOffset` to a zero-offset wire form. Configure it per project with
   `<ZodSharpDateTimeOffsetSerialization>Utc</ZodSharpDateTimeOffsetSerialization>` (for example in
@@ -863,7 +937,7 @@ release that introduced it, so `AnalyzerReleases.Shipped.md` shows `ZODSGEN037`�
 - A new `enum` rule, applied automatically on generated schemas, plus additional explicit rules.
 - `IZodRule` organisation with a supporting analyzer, and `RuleMessage` is now public.
 - Eight new diagnostics: `ZODSGEN037`–`ZODSGEN044`, recorded in `AnalyzerReleases.Shipped.md` under
-  `## Release 2.0.2`. See [Source Generator Diagnostics](docs/wiki/Source-Generator-Diagnostics.md).
+  `## Release 2.0.2`. See [Source Generator Diagnostics](docs/wiki/generator/Source-Generator-Diagnostics.md).
 - **Automatic scalar value-object support.** `[ZodSchema]` now works with the automatic scalar forms
   `[Scalar<TValue>]` and `[Scalar(typeof(TValue))]` (Purview.ValueObjects 1.0.1+), where the value-object
   generator declares the underlying property. ZodSharp resolves the underlying type and property name from

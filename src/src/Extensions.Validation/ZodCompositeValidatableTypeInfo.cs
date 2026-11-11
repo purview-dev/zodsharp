@@ -25,7 +25,17 @@ sealed class ZodCompositeValidatableTypeInfo(ZodValidatableTypeInfo zod, ZodVali
 		string propertyName,
 		ValidationOptions validationOptions,
 		[NotNullWhen(true)] out IValidatablePropertyInfo? validatablePropertyInfo
-	) => zod.TryFindProperty(propertyName, validationOptions, out validatablePropertyInfo);
+	)
+	{
+		if (zod.TryFindProperty(propertyName, validationOptions, out validatablePropertyInfo))
+			return true;
+
+		// The next resolver (usually the generated DataAnnotations one) owns the property when ZodSharp does
+		// not: it has no ZodSharp rule, or it is marked [SkipValidation] for ZodSharp. Field-level validation
+		// then runs that resolver's property info, exactly as the whole-type pass already runs it.
+		var next = owner.FindNextTypeInfo(zod.ValidatedType, validationOptions);
+		return next is not null && next.TryFindProperty(propertyName, validationOptions, out validatablePropertyInfo);
+	}
 
 	public void Validate(object? value, ValidateContext context)
 	{

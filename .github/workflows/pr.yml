@@ -19,7 +19,7 @@ jobs:
       # install`. Before global.json pinned a version the same gap failed later instead, with
       # NETSDK1045 on the net11.0 target, because the 10.0.x SDK cannot build it.
       # Keep in sync with `sdk.version` in global.json.
-      dotnet-version: "11.0.100-rc.3.26522.148"
+      dotnet-version: "11.0.100"
       run-pack: true
       validate-pack: true
     secrets: inherit
@@ -37,7 +37,7 @@ jobs:
       # Installs exactly the SDK global.json pins, which is the only thing the first dotnet command
       # in the job can resolve against. Naming a floating version and a feed quality instead does
       # not work: `11.0.x` with quality `preview` resolves the latest *preview*-channel build, and a
-      # preview sorts below the pinned rc, so global.json is left unsatisfiable.
+      # preview sorts below the pinned GA, so global.json is left unsatisfiable.
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json

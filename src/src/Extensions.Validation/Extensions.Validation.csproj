@@ -24,8 +24,6 @@
 		<PackageTags>zod;validation;schema;blazor;minimalapi</PackageTags>
 		<!-- First release: there is no previous version to validate the public API against. -->
 		<ZodSharpNoPackageValidationBaseline>true</ZodSharpNoPackageValidationBaseline>
-		<!-- NU5104: Microsoft.Extensions.Validation 11 is prerelease until .NET 11 GA. Remove with the GA bump. -->
-		<NoWarn>$(NoWarn);NU5104</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

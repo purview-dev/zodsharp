@@ -223,8 +223,7 @@ static class GenerationSettingsResolver
 
 			// Precedence, highest first: the type-level [DateTimeOffsetBehavior], the assembly-level
 			// ZodSharpSchemaDefaults, the MSBuild property, then PreserveOffset.
-			var dateTimeOffsetSerialization =
-				schema.DateTimeOffsetSerialization
+			var dateTimeOffsetSerialization = schema.DateTimeOffsetSerialization
 				?? assemblyDefaults.DateTimeOffsetSerialization
 				?? settings.DateTimeOffsetSerialization;
 
@@ -301,8 +300,7 @@ static class GenerationSettingsResolver
 
 			var property = propertyResult.Value;
 			var resolved = property.AllowNulls ?? assemblyDefaults.AllowNulls ?? settings.AllowNulls;
-			var arrayBehavior =
-				property.DefaultImmutableArrayBehavior
+			var arrayBehavior = property.DefaultImmutableArrayBehavior
 				?? assemblyDefaults.DefaultImmutableArrayBehavior
 				?? settings.DefaultImmutableArrayBehavior;
 			if (property.AllowNulls == resolved && property.DefaultImmutableArrayBehavior == arrayBehavior)

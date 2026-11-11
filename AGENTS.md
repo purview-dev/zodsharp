@@ -22,15 +22,22 @@ src/
   src/
     ZodSharp/          Core validation library + JSON Schema export (Z.ToJsonSchema)
     SourceGenerators/  Compile-time [ZodSchema] generator (netstandard2.0, Roslyn)
+    CodeFixes/         Code fixes shipped beside the generator (netstandard2.0)
     SystemTextJson/    System.Text.Json integration + JSON Schema import (Z.FromJsonSchema); browser-safe
     Http/              HttpClient integration (browser-safe): validated bodies, ZodValidationProblemDetails reading
     NewtonsoftJson/    Newtonsoft.Json integration + JSON Schema import
     AspNetCore/        ASP.NET Core ProblemDetails integration (+ static-SSR client rules on net11)
+    Extensions.Validation/  Microsoft.Extensions.Validation bridge (net11)
+    AspNetCore.OpenApi/     OpenAPI transformers (net11)
     Blazor/            Blazor forms integration (net11): ZodValidator, message components, zodsharp-validation.js
     Examples.CLI/      Usage examples
-    Benchmarks/        BenchmarkDotNet performance suite
+    Examples.MinimalApi/    Minimal-API sample host
+    Examples.Blazor/   Blazor sample host, plus Examples.Blazor.Client for its WebAssembly client
+    Examples.Shared/   Models shared by the samples
+    Benchmarks/        BenchmarkDotNet performance suite (net10/net11)
   tests/
-    *.UnitTests/       TUnit test projects (ZodSharp, SystemTextJson, NewtonsoftJson, AspNetCore, SourceGenerators)
+    *.UnitTests/       TUnit test projects (ZodSharp, SystemTextJson, NewtonsoftJson, Http, AspNetCore,
+                       Extensions.Validation, Blazor, SourceGenerators, Repository)
     cross-platform/    Output directory shared between the C# and TS cross-platform tests
 src/ts/                TypeScript (Zod) schema + fixture generation; consumed by C# and vitest tests
 tests/ts/              Vitest cross-platform tests
@@ -47,7 +54,9 @@ The build is driven by `Purview.BuildSdk`, imported via `src/Directory.Build.pro
 - Package identities are `Purview.ZodSharp.*`; the SDK derives `AssemblyName`/`PackageId` from `RootNamespace` unless overridden explicitly.
 - Package versions are managed centrally in `Directory.Packages.props` (Central Package Management).
 - `global.json` pins the `Purview.BuildSdk` MSBuild SDK version.
-- Pack layout for all packages is validated by `purview-build.json` (`PackValidation.RequiredContent`).
+- Pack layout for all packages is validated by `.config/purview-build.json` (`PackValidation.RequiredContent`).
+- **.NET 11 opt-ins.** `Purview.BuildSdk` 2.0 compiles every `net11.0` target with Runtime Async (`runtime-async=on`) and the C# 15 updated memory-safety rules (`MemorySafetyRules=2`). The GA compiler still classifies the latter as a preview feature, so `LangVersion` is `preview`, and `AllowUnsafeBlocks` is on: the STJ generator emits unsafe fast paths, and the two `Unsafe.As` boundaries in the sentinel/required rules use `unsafe` blocks so the audit boundary is visible at the call site. Do not remove either without removing the tier-2 opt-in.
+- **Multithreaded MSBuild is off** (`PurviewMultiThreadedBuild=false`). The .NET 11 GA WebAssembly SDK declares `ReadWasmProps` with a custom `TaskFactory`, which `-mt` refuses to execute out of process, so `Examples.Blazor.Client` cannot build in that mode. Re-enable it once `dotnet/runtime` annotates the task as multithreadable.
 
 Before changing build/SDK configuration or adding/moving projects, consult the SDK's own skills, which are committed under `.agents/skills/` (see [Installed skills](#installed-skills-agentsskills)): `purview-buildsdk-configuration`, `purview-buildsdk-project-detection`, `purview-buildsdk-project-layout`.
 
@@ -101,6 +110,8 @@ The generator and analyzer are built with `Purview.SourceGeneratorFramework`:
 
 Validation rules follow a conventions analyzer (`ValidationRuleConventionsAnalyzer`, diagnostic `ZODSGEN042`): a source-declared rule (a type implementing `ZodSharp.Core.IValidationRule<T>`) must expose its error identity as public `const string ErrorCode` and `const string MessageFormat` constants, so tests can assert against the rule rather than duplicating literals. New built-in rules must follow the same convention; keep `AnalyzerReleases.Shipped.md`/`AnalyzerReleases.Unshipped.md` in sync when a diagnostic is added or changed.
 
+DataAnnotations attributes without a dedicated Zod rule are never silently dropped: `[CustomValidation]`, `[FileExtensions]`, `[EnumDataType]` and a consumer's own `ValidationAttribute` are constructed in generated fields and run through `GetValidationResult`/`GetValidationResultAsync`. Class-level attributes — including the .NET 11 `AsyncValidationAttribute` — run as object-level rules and are collected from the base chain. `[SkipValidation]` (`Microsoft.Extensions.Validation`; class, property, parameter) is honored by the generator (a property is omitted), the endpoint filter, the bridge (a class is not claimed) and client validation; on .NET 11 match the real type, not just the attribute name. `IsValidatableMember` includes `[ZodAsyncMember]`-only members so field-level validation uses `ValidateMemberAsync`.
+
 ## Numeric rules
 
 The numeric rules are split by the constraint each family needs — pick the constraint that matches the operations, never widen a rule unnecessarily:
@@ -113,11 +124,28 @@ The numeric rules are split by the constraint each family needs — pick the con
 
 Generated rule attributes carry the rule's **value** parameters as a constructor: a parameter declared without a default is a required constructor argument (so it cannot be silently omitted), a parameter with a default keeps it, and `message`/`code`/`origin` stay properties. Attribute usages for required values are positional (`[MinValue(3)]`, `[Regex("^[a-z]+$")]`); defaulted values may still be set by property name. When changing rule constructor parameters, update the affected generator tests and the wiki attribute tables.
 
+## Native unions (.NET 11)
+
+`Z.NativeUnion<T1, T2>` returns `ZodSharp.Unions.NativeUnion<T1, T2>`, a hand-written `[Union]` type rather than a `union` declaration. That is deliberate: a declared union always boxes a value-type case through its single `object?` field, while a hand-written union can implement the language's *non-boxing access pattern* — typed per-case fields, `HasValue`, and one `TryGetValue(out T)` per case — which the compiler uses for type and null patterns. Keep all four parts of the contract:
+
+- `[System.Runtime.CompilerServices.Union]` on the type, and an implicit constructor per case type (the compiler synthesizes the union conversions from them).
+- A public `object? Value` property (the boxing view the contract requires; hot paths must never call it).
+- `HasValue` that is equivalent to `Value is not null`, and `TryGetValue` overloads that return `true` only for their own non-null case.
+- `default` must mean "no value": the constructors leave a null reference/nullable case empty instead of tagging it.
+
+`ZodSharp.Unions.IUnion` is the resolver's own contract (it adds `Tag`); the net11 type also implements the BCL `System.Runtime.CompilerServices.IUnion`. The hand-rolled `Union<T1,T2>`/`Union<T1,T2,T3>` use the same tag numbering (`0` empty, `1..3` for the cases) and return `null` from `Value` when empty, so the two union types are interchangeable at the contract level. `ZODSGEN041` and its code fix suggest the native union for every `Z.Union<T1, T2>` on .NET 11+, reference- or value-type cases alike.
+
+On the wire, `NativeUnion<T1,T2>` carries `[JsonUnion(TypeClassifier = typeof(NativeUnionTypeClassifierFactory))]`. Keep the classifier and its two guarantees: a string token under `JsonSerializerDefaults.Web` resolves to the case whose natural shape matches (not a number read from a string), and two object-shaped cases resolve through the platform's structural classifier. `ZodJsonExceptions` maps a System.Text.Json path through the active case's contract, and a generated schema exports a union member (and a closed-hierarchy member) as `oneOf`; a closed hierarchy that opts into `[JsonPolymorphic(InferClosedTypePolymorphism = true)]` also constrains `$type`.
+
+No shipped type is declared `closed`. The modifier is net11-only (`IsClosedTypeAttribute`), so a shared multi-target declaration would behave differently on net10.0 and net11.0, and the only non-sealed hierarchy (`ZodType<TOutput, TInput>`) is the extension point custom schemas derive from. `closed` is supported where it belongs: a consumer's own closed hierarchy, which the generator validates by dispatch (`DispatchKind.ClosedHierarchy`, `ZODSGEN049` when a derived type has no `[ZodSchema]`). A generated schema reads the target's whole base chain, so a case's schema validates the inherited base members as well as its own.
+
+A union can itself be a `[ZodSchema]` target. Its descriptor carries `IsUnionTarget`/`UnionCases`/`UnionHasValue` instead of properties; validation emits an `if`/`else if` chain in `EmitUnionDispatchChain` (non-boxing `TryGetValue` per case when available), an empty or unmatched union reports `invalid_union`, and `TryResolveMember` delegates to the active case's schema so a Blazor field or API container is the case object. A case with no validator is omitted and reported as `ZODSGEN055`; the union fails closed rather than passing. Async propagates through `AsyncSchemaIndex`, which must consider `UnionCases` as well as properties.
+
 ## Packing and package READMEs
 
 Each package ships its own `README.md`, placed in the project's `Sdk/` folder (for example `src/src/ZodSharp/Sdk/README.md`). The SDK's `PurviewAutoSdkPack` automatically maps `Sdk/*.md` to the package root and `Sdk/buildTransitive/**` to `buildTransitive/`, and the repo-root `README.md` is skipped when a package already packs its own README. Packages also ship `purview-logo-light.png` (linked via `src/Directory.Build.props`) and the core package ships `buildTransitive/Purview.ZodSharp.props`.
 
-Keep `purview-build.json`'s `PackValidation` requirements in sync with any packaging change.
+Keep `.config/purview-build.json`'s `PackValidation` requirements in sync with any packaging change.
 
 ## Documentation (`docs/wiki`)
 
@@ -167,7 +195,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 - Relevant tests pass.
 - `just lint-check` (CSharpier) reports no formatting changes.
 - Generated code is deterministic and reviewable; no scope leaks in `CodeWriter` output.
-- Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`, and no `ForbiddenContent`: compiler-host assemblies outside `analyzers/`, generator or code-fix assemblies under `lib/`). After changing `PackValidation`, `just verify-pack-rules` proves every forbidden-content rule still rejects a package.
+- Packed packages match `.config/purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`, and no `ForbiddenContent`: compiler-host assemblies outside `analyzers/`, generator or code-fix assemblies under `lib/`). After changing `PackValidation`, `just verify-pack-rules` proves every forbidden-content rule still rejects a package.
 - No build or publish output carries a compiler-host assembly (`Purview.SourceGeneratorFramework*`, `Microsoft.CodeAnalysis*`, `Purview.ZodSharp.SourceGenerators*`, `Purview.ZodSharp.CodeFixes*`): every publish recipe and CI publish job runs `scripts/assert-no-compiler-host-assemblies.ps1`, and `ReleaseGateTests` fails a workflow job that publishes without it.
 - Changes that affect what ships (packaging, `buildTransitive/`, package dependencies, the generator, trimming or AOT) also pass the gates that consume the real `.nupkg`: `just smoke-packed-generator` and `just smoke-packed-consumers` (Native AOT console, Blazor WebAssembly trimmed and AOT, Native AOT minimal API), plus `just wasm-size`, `just verify-trim <rid>` and `just publish-aot-sample`.
 - Before a release, run the pre-release checklist in `docs/wiki/development/Release-Flow.md` ("Release gates"): `just scrub`, `just pipeline-local-release ...`, then every gate above.

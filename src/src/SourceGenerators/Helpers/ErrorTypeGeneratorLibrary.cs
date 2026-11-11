@@ -96,8 +96,7 @@ static class ErrorTypeGeneratorLibrary
 
 		// `Parameters` may be supplied as a constructor argument (the canonical form) or assigned
 		// in an object initializer.
-		var parametersExpression =
-			FindParametersArgument(creation, context, cancellationToken)?.Expression
+		var parametersExpression = FindParametersArgument(creation, context, cancellationToken)?.Expression
 			?? FindParametersExpression(creation.Initializer);
 		if (parametersExpression is null)
 			return [];

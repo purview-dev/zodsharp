@@ -74,6 +74,34 @@ public partial class ZodSchemaAnalyzerTests
 	}
 
 	[Test]
+	public async Task Union_GivenCaseTypeWithoutSchema_ProducesZODSGEN055(CancellationToken cancellationToken)
+	{
+		// Arrange — int and string come from a referenced assembly and have no ZodSharp validator.
+		const string source = """
+			namespace Testing
+			{
+				public union IdOrName(int, string);
+
+				[ZodSchema]
+				public class Holder
+				{
+					public IdOrName Value { get; set; }
+				}
+			}
+			""";
+
+		// Act
+		var result = await AnalyzeAsync(
+			source,
+			new ZodAnalyzerTestOptions { LanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview },
+			cancellationToken
+		);
+
+		// Assert — one warning for each case that cannot be validated.
+		await Assert.That(result).HasDiagnostics(DiagnosticLibrary.UnionCaseTypeWithoutSchema, 2);
+	}
+
+	[Test]
 	public async Task OptionsValidator_GivenHandAuthoredOptionsValidator_ProducesZODSGEN050(
 		CancellationToken cancellationToken
 	)

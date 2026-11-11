@@ -5,13 +5,13 @@ Purview.ZodSharp is designed for maximum performance: validation rules are `read
 ## Running the benchmarks
 
 ```bash
-# All suites
-dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release
+# All suites (the project multi-targets; pick a framework)
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net10.0
 # or
 just perf-tests
 
 # A specific suite (the `--` passes the filter to BenchmarkDotNet)
-dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -- --filter "*ObjectPerformanceTests*"
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net10.0 -- --filter "*ObjectPerformanceTests*"
 ```
 
 Results are written to `BenchmarkDotNet.Artifacts/` (HTML, Markdown, logs) in the project directory. Use `-c Release`; the suite uses `[MemoryDiagnoser]` and a `[SimpleJob]` profile.
@@ -105,18 +105,22 @@ All valid-input paths for the core schema types are zero-allocation:
 > [!NOTE]
 > The string transforms, `ZodString.ValidateSpan` (its result carries a string), and non-first union options are the allocation exceptions. Use `ZodString.IsValidSpan` for an allocation-free span check. See [Guarantees and Limitations](Guarantees-and-Limitations.md).
 
-## Generated validators and ProblemDetails mapping
+## Generated validators, unions and ProblemDetails mapping
 
-Two suites cover the .NET 11 validation work. They have no committed results yet; run them locally:
+Three suites cover the .NET 11 validation work. They have no committed results yet; run them locally:
 
 ```bash
-dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -- --filter "*GeneratedValidationPerformanceTests*"
-dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -- --filter "*ProblemDetailsMappingPerformanceTests*"
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net11.0 -- --filter "*GeneratedValidationPerformanceTests*"
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net11.0 -- --filter "*NativeUnionPerformanceTests*"
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net10.0 -- --filter "*ProblemDetailsMappingPerformanceTests*"
 ```
 
 - **`GeneratedValidationPerformanceTests`** - a `[ZodSchema]` model's `Validate` on valid and invalid input
   (baseline), field-level `ValidateMember` on valid and invalid input, and `TryResolveMember` on a nested
   path.
+- **`NativeUnionPerformanceTests`** (`net11.0` only) - the hand-rolled `Union<T1, T2>` against the native
+  `NativeUnion<T1, T2>` when the case type is a value type. Both stay allocation-free; a regression in the
+  non-boxing access pattern shows up as an allocation.
 - **`ProblemDetailsMappingPerformanceTests`** - converting a `ZodException` to `HttpValidationProblemDetails`
   without a registry, with an `ErrorTypeRegistry` lookup, and with registry formatting.
 

@@ -30,9 +30,7 @@
 			Directory.Packages.props picks the Microsoft.Extensions line by $(TargetFramework), which a single-targeted
 			project has not set yet when that file is evaluated; the WebAssembly packages need the 11.x line.
 		-->
-		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
-		<!-- NU5104: the .NET 11 WebAssembly packages are prerelease until .NET 11 GA. -->
-		<NoWarn>$(NoWarn);NU5104</NoWarn>
+		<MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
 	</PropertyGroup>
 
 	<ItemGroup>

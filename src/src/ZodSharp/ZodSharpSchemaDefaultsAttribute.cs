@@ -23,7 +23,7 @@ public sealed class ZodSharpSchemaDefaultsAttribute : Attribute
 	/// <remarks>
 	/// Overrides <c>ZodSharpDefaultImmutableArrayBehavior</c> in MSBuild; a property's
 	/// <see cref="CollectionBehaviorAttribute"/> takes precedence. The built-in default is
-	/// <see cref="ZodSharp.DefaultImmutableArrayBehavior.ValidationError"/>.
+	/// <see cref="DefaultImmutableArrayBehavior.ValidationError"/>.
 	/// </remarks>
 	public DefaultImmutableArrayBehavior DefaultImmutableArrayBehavior { get; set; }
 

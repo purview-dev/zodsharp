@@ -188,6 +188,8 @@ No default number message contains the input. Each rule still passes the value t
 
 `NullOrNonWhiteSpaceRule` is the null-tolerant counterpart: it accepts `null` but rejects an empty or whitespace-only string. It exists for nullable scalar value objects, which round-trip JSON `null`, so their schema must accept `null` while still rejecting whitespace — `[RequiredZod]` always rejects `null` and so cannot express it. Apply it to a nullable scalar type with `[NullOrNonWhiteSpace]`; a rule written against the underlying `string?` value is adapted to the value object automatically.
 
+On a **union-typed member**, an empty union is the absent/default value: the generated validator rejects it with `missing_field` for `[Required]`, the rule's own error for `[RequiredZod]`/`[NonSentinel]`, and `invalid_type` for a non-nullable union without an explicit rule. The check is emitted by the generator using the union's `HasValue` (or `TryGetValue`), so it stays allocation-free; `NonSentinelRule<T>` itself only knows the primitive sentinels above. Declare the member `Pet?` when an absent case is allowed. See [Unions and Discriminated Unions](Unions-and-Discriminated-Unions.md#unions-as-schema-targets).
+
 The fluent `NonSentinel()` method is declared on `ZodType<TOutput, TInput>`, so it is available on every schema and closes the rule with the schema's output type. `ZodString`, `ZodDate`, and `ZodDateTimeOffset` override it with a covariant return type so the fluent chain keeps the concrete schema:
 
 ```csharp

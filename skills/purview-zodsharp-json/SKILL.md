@@ -115,6 +115,15 @@ return the `ZodException`'s errors under the member that held the value (`Custom
 back to member names through the `JsonTypeInfo<T>`), named after that member (`Field 'CustomerEmail' ...`).
 `ZodJsonExceptions.TryGetErrors(exception, rootTypeInfo, out errors)` does the same for any exception chain.
 
+### Native unions (.NET 11)
+
+`Z.NativeUnion<T1, T2>` returns `ZodSharp.Unions.NativeUnion<T1, T2>`. System.Text.Json writes the active case
+with no wrapper or discriminator, and the type's `[JsonUnion]` classifier reads it back on both the reflection and
+source-generated paths. It resolves a string token under `JsonSerializerDefaults.Web` (where a number may also be
+read from a string) and two object-shaped cases, with no converter registration. A genuinely ambiguous shape (two
+object types with the same property names, or two numeric types) fails as `JsonException`; give it a distinct
+shape or use a closed hierarchy with `[JsonPolymorphic(InferClosedTypePolymorphism = true)]`.
+
 ## Validating converters
 
 ```csharp
@@ -171,9 +180,10 @@ the JSON Schema; hosts that carry them (the OpenAPI transformers) read them.
 (`anyOf`/`oneOf`/`allOf`), `enum`/`const`, `$defs` and draft-07 `definitions`, and the metadata
 keywords including OpenAPI 3.0 `nullable`.
 
-Covered schema types: `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`,
-`ZodUnion`, `ZodDiscriminatedUnion` (as `oneOf`), `ZodArray`, `ZodLiteral`, `ZodNullable`,
-`ZodNativeEnum`/`ZodEnum`, `ZodLazy`. String formats: `IPAddress` exports `format: ipv4`/`ipv6`, `Duration`
+Covered schema types: `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodDate`, `ZodDateTimeOffset`,
+`ZodObject`, `ZodOptional`, `ZodUnion`, `ZodDiscriminatedUnion` (as `oneOf`), `ZodArray`, `ZodLiteral`,
+`ZodNullable`, `ZodRecord` (as an object with `additionalProperties`), `ZodNativeEnum`/`ZodEnum`,
+`ZodLazy`. String formats: `IPAddress` exports `format: ipv4`/`ipv6`, `Duration`
 `format: duration`, `DateString` `format: date`, `DatetimeString` `format: date-time` plus its UTC pattern,
 `TimeString` a local-time pattern, and `Base64String` `contentEncoding: base64`. Notable behaviours:
 
@@ -225,6 +235,10 @@ Things worth knowing:
   wraps that value schema in a `null` branch), and its size constraints use `minProperties`/`maxProperties`.
   `Z.Record(schema)` exports the same shape, and `Z.FromJsonSchema` reads an object with
   `additionalProperties` back as a record in both JSON integrations.
+- **Union and closed-hierarchy members** export `oneOf`: a C# 15 union member exports its case schemas, and a
+  `closed` hierarchy member exports its derived schemas. A hierarchy that opts into
+  `[JsonPolymorphic(InferClosedTypePolymorphism = true)]` (or registers `[JsonDerivedType]`) also constrains
+  `$type` on each branch to that derived type's name.
 
 ## JSON Schema import
 

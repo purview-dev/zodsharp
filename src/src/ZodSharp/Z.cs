@@ -94,7 +94,7 @@ public static class Z
 	/// <summary>
 	/// Creates a typed union schema of two options that yields a native C# 15
 	/// <see cref="Unions.NativeUnion{T1,T2}"/> on success. Equivalent to <see cref="Union{T1,T2}"/>
-	/// but allocation-free for reference-type cases and pattern-matchable. Only available on
+	/// but allocation-free for both reference- and value-type cases, and pattern-matchable. Only available on
 	/// <c>net11.0</c> and later.
 	/// </summary>
 	/// <typeparam name="T1">The first option's type.</typeparam>

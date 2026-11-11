@@ -49,6 +49,12 @@ partial class ZodSchemaGenerator
 			},
 			body =>
 			{
+				if (schema.IsUnionTarget)
+				{
+					EmitUnionJsonSchema(body, schema);
+					return;
+				}
+
 				if (schema.ScalarUnderlyingType is { } underlying)
 				{
 					EmitScalarJsonSchema(body, schema, underlying);
@@ -77,6 +83,28 @@ partial class ZodSchemaGenerator
 		);
 
 		writer.NewLine();
+	}
+
+	/// <summary>
+	/// Emits the JSON Schema for a union target: <c>oneOf</c> the case schemas, because exactly one case is
+	/// active. A case whose schema does not export JSON Schema is represented by an empty schema, which is the
+	/// same fallback the object exporter uses for a nested schema that cannot be referenced.
+	/// </summary>
+	static void EmitUnionJsonSchema(CodeWriter body, ZodSchemaDescriptor schema)
+	{
+		if (schema.UnionCases.Count == 0)
+		{
+			body.Return($"new {JsonSchemaDefinitionTypeName}()");
+			return;
+		}
+
+		var cases = string.Join(
+			", ",
+			schema.UnionCases.Select(static unionCase => unionCase.SchemaType.StaticMember("BuildJsonSchema()"))
+		);
+		body.Return(
+			$"new {JsonSchemaDefinitionTypeName} {{ OneOf = new global::System.Collections.Generic.List<{JsonSchemaDefinitionTypeName}> {{ {cases} }} }}"
+		);
 	}
 
 	/// <summary>
@@ -124,7 +152,10 @@ partial class ZodSchemaGenerator
 		var isRequired = hasRequiredAttribute || !property.IsDeclaredNullable;
 		var isNullable = property.IsDeclaredNullable && !hasRequiredAttribute && !hasRequiredRule;
 
-		body.Assignment("var", localName, BuildPropertySchemaExpression(property, schema));
+		if (property.DispatchKind != DispatchKind.None)
+			EmitDispatchJsonSchema(body, localName, property);
+		else
+			body.Assignment("var", localName, BuildPropertySchemaExpression(property, schema));
 
 		EmitAttributeConstraints(body, property, localName);
 
@@ -145,6 +176,55 @@ partial class ZodSchemaGenerator
 
 		if (isRequired)
 			body.MethodCallOn("schema.Required", "Add", nameLiteral);
+	}
+
+	/// <summary>
+	/// Emits the JSON Schema of a member that dispatches to a case or derived type's schema: <c>oneOf</c>
+	/// the case schemas, because exactly one case is active. A polymorphic closed hierarchy also constrains
+	/// the <c>$type</c> discriminator each branch carries, so the schema describes the wire form System.Text.Json
+	/// writes when the hierarchy opts into inferred polymorphism.
+	/// </summary>
+	static void EmitDispatchJsonSchema(CodeWriter body, string localName, ZodPropertyDescriptor property)
+	{
+		body.Assignment("var", localName, $"new {JsonSchemaDefinitionTypeName} {{ OneOf = new() }}");
+		for (var i = 0; i < property.DispatchCases.Count; i++)
+		{
+			var dispatchCase = property.DispatchCases[i];
+			var caseExpression = dispatchCase.ExportsJsonSchema
+				? $"{dispatchCase.SchemaType.AsTypeReference().RenderFullName}.BuildJsonSchema()"
+				: $"new {JsonSchemaDefinitionTypeName}()";
+
+			if (
+				dispatchCase.DiscriminatorPropertyName is not { } discriminatorName
+				|| dispatchCase.DiscriminatorValue is null
+			)
+			{
+				body.MethodCallOn($"{localName}.OneOf", "Add", caseExpression);
+				continue;
+			}
+
+			var caseName = $"{localName}Case{i}";
+			var nameLiteral = discriminatorName.StringLiteral();
+			var valueExpression = dispatchCase.DiscriminatorValueIsNumber
+				? dispatchCase.DiscriminatorValue
+				: dispatchCase.DiscriminatorValue.StringLiteral();
+			body.Assignment("var", caseName, caseExpression);
+			body.IfBlock($"{caseName}.Properties is null", block =>
+				block.Assignment(
+					$"{caseName}.Properties",
+					$"new global::System.Collections.Generic.Dictionary<string, {JsonSchemaDefinitionTypeName}>(global::System.StringComparer.Ordinal)"
+				)
+			);
+			body.IfBlock($"{caseName}.Required is null", block =>
+				block.Assignment($"{caseName}.Required", "new global::System.Collections.Generic.List<string>()")
+			);
+			body.Assignment(
+				$"{caseName}.Properties[{nameLiteral}]",
+				$"new {JsonSchemaDefinitionTypeName} {{ Enum = new() {{ {valueExpression} }} }}"
+			);
+			body.MethodCallOn($"{caseName}.Required", "Add", nameLiteral);
+			body.MethodCallOn($"{localName}.OneOf", "Add", caseName);
+		}
 	}
 
 	/// <summary>

@@ -63,7 +63,7 @@ Besides `Validate`, `Parse` and `BuildJsonSchema`, every `{TypeName}Schema` expo
 | `RequiresAsyncValidation` | A `const bool`: `true` when some rule in the graph only runs asynchronously (a custom async method, an `AsyncValidationAttribute`, an `IAsyncValidatableObject` target, or a nested schema that has one). |
 | `ValidateAsync(value, services, cancellationToken)` | Validates the whole graph asynchronously. Nested schemas are awaited and receive the same `services`; completes synchronously when `RequiresAsyncValidation` is `false`. |
 | `ValidateMember(value, memberName)` / `ValidateMemberAsync(value, memberName, services, cancellationToken)` | Validates one member — see [Validating a single member](#validating-a-single-member). |
-| `IsValidatableMember(memberName)` | `true` when the member has rules `ValidateMember` runs. |
+| `IsValidatableMember(memberName)` | `true` when the member has rules `ValidateMember` or `ValidateMemberAsync` runs, including a member covered only by `[ZodAsyncMember]`. |
 | `TryResolveMember(value, path, out container, out memberName)` | Walks `value` along an error path to the object that owns the failing member — see [Resolving the owning object](#resolving-the-owning-object). |
 
 `ValidateCore`, `ValidateCoreAsync`, `AppendJsonNamedPath` and the `TryResolveMember` overload with an
@@ -587,6 +587,14 @@ A nullable enum property is validated only when it is not `null`.
 ## What is validated
 
 - Properties must be public, non-static, non-indexer.
+- Properties are read from the target and its base chain, so an inherited public property is validated, exported,
+  given a `Paths`/`JsonNames` entry and resolved by `TryResolveMember` like a declared one. A property the target
+  overrides or hides is taken once, from the most derived declaration, because that is what `value.Member` binds.
+- A `ValidationAttribute` without a dedicated Zod rule still runs: `[CustomValidation]`, `[FileExtensions]`,
+  `[EnumDataType]` and a consumer's own attribute are constructed in a generated field and called through
+  `GetValidationResult`/`GetValidationResultAsync`. Class-level attributes run as object-level rules and are
+  collected from the base chain. `[SkipValidation]` removes a property from generated validation and schema
+  export, and makes a class not claimed by the host resolver.
 - Validation is emitted for a property when it carries any DataAnnotations attribute, its type is a source-defined complex type with a nested schema, or its type is an enum (see [Automatic enum validation](#automatic-enum-validation)).
 - Classes, structs, and records are supported; structs do not receive `IValidateOptions` (ZODSGEN028 if requested).
 - Nested complex types are discovered recursively and get their own generated `{TypeName}Schema`, even when the nested type does not itself carry `[ZodSchema]`.

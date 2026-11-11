@@ -225,7 +225,7 @@ public sealed partial class DocumentationWikiTests
 	{
 		// Arrange
 		var wikiFiles = PageFiles().Append(SidebarFile).Append(HomeFile).ToArray();
-		List<string> broken = new();
+		List<string> broken = [];
 
 		// Act
 		foreach (var file in wikiFiles)
@@ -266,7 +266,7 @@ public sealed partial class DocumentationWikiTests
 	public async Task Pages_GivenEveryPage_OpenWithASingleH1Title(CancellationToken cancellationToken)
 	{
 		// Arrange
-		List<string> problems = new();
+		List<string> problems = [];
 
 		// Act
 		foreach (var page in PageFiles())
@@ -292,12 +292,13 @@ public sealed partial class DocumentationWikiTests
 
 	/// <summary>Every page in the wiki, as a path relative to <c>docs/wiki</c> with <c>/</c> separators.</summary>
 	static string[] PageFiles() =>
-		Directory
-			.GetFiles(WikiFolder.Value, "*.md", SearchOption.AllDirectories)
-			.Select(RelativeToWiki)
-			.Where(path => path is not SidebarFile and not HomeFile)
-			.Order(StringComparer.Ordinal)
-			.ToArray();
+		[
+			.. Directory
+				.GetFiles(WikiFolder.Value, "*.md", SearchOption.AllDirectories)
+				.Select(RelativeToWiki)
+				.Where(path => path is not SidebarFile and not HomeFile)
+				.Order(StringComparer.Ordinal),
+		];
 
 	static string RelativeToWiki(string absolutePath) =>
 		Path.GetRelativePath(WikiFolder.Value, absolutePath).Replace('\\', '/');
@@ -308,12 +309,13 @@ public sealed partial class DocumentationWikiTests
 	/// is a repository path and is dropped.
 	/// </summary>
 	static string[] PageTargets(string markdown, string fromPath) =>
-		MarkdownLinkTargets(StripCode(markdown))
-			.Select(target => target.Split('#', 2)[0].Split('?', 2)[0])
-			.Where(IsRelativeMarkdownLink)
-			.Select(target => ResolveRelative(fromPath, target))
-			.OfType<string>()
-			.ToArray();
+		[
+			.. MarkdownLinkTargets(StripCode(markdown))
+				.Select(target => target.Split('#', 2)[0].Split('?', 2)[0])
+				.Where(IsRelativeMarkdownLink)
+				.Select(target => ResolveRelative(fromPath, target))
+				.OfType<string>(),
+		];
 
 	/// <summary>Resolves a link the way a browser does, or null when it points outside the wiki folder.</summary>
 	static string? ResolveRelative(string fromPath, string target)
@@ -323,7 +325,7 @@ public sealed partial class DocumentationWikiTests
 			return null;
 		}
 
-		List<string> segments = new();
+		List<string> segments = [];
 		var fromSegments = fromPath.Split('/');
 		foreach (var segment in fromSegments[..^1])
 		{
@@ -389,7 +391,7 @@ public sealed partial class DocumentationWikiTests
 	}
 
 	static string[] MarkdownLinkTargets(string markdown) =>
-		LinkPattern().Matches(markdown).Select(match => match.Groups[1].Value.Trim()).ToArray();
+		[.. LinkPattern().Matches(markdown).Select(match => match.Groups[1].Value.Trim())];
 
 	/// <summary>
 	/// Whether a link target names a page: relative, not anchored, and neither an external URL nor a repository

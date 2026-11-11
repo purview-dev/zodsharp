@@ -131,4 +131,60 @@ public class ZodSchemaGeneratorCacheTests : ZodSharpSourceGeneratorTestBase<ZodS
 		await Assert.That(second[AttributeStage]).Contains(StepReason.Modified);
 		await Assert.That(second[AttributeStage].Count(IsCachedOrUnchanged)).IsEqualTo(1);
 	}
+
+	const string EntityBaseSource = """
+		using System.ComponentModel.DataAnnotations;
+
+		namespace Testing;
+
+		public class Entity
+		{
+			[Required]
+			public string? Id { get; set; }
+		}
+		""";
+
+	const string EntityBaseWithExtraRuleSource = """
+		using System.ComponentModel.DataAnnotations;
+
+		namespace Testing;
+
+		public class Entity
+		{
+			[Required]
+			public string? Id { get; set; }
+
+			[Range(1, 10)]
+			public int Version { get; set; }
+		}
+		""";
+
+	const string DerivedEntitySource = """
+		using ZodSharp;
+
+		namespace Testing;
+
+		[ZodSchema]
+		public sealed class Order : Entity
+		{
+		}
+		""";
+
+	[Test]
+	public async Task BaseTypeChange_GivenNewInheritedRule_ReRunsTheDerivedType(CancellationToken cancellationToken)
+	{
+		// Arrange — the derived declaration is untouched, but the members it validates changed.
+		IncrementalRunInput[] inputs =
+		[
+			new([EntityBaseSource, DerivedEntitySource]),
+			new([EntityBaseWithExtraRuleSource, DerivedEntitySource]),
+		];
+
+		// Act
+		var result = await GenerateIncrementalAsync(inputs, cancellationToken: cancellationToken);
+
+		// Assert
+		var second = StepReasons(result.Runs[1]);
+		await Assert.That(second[AttributeStage]).Contains(StepReason.Modified);
+	}
 }

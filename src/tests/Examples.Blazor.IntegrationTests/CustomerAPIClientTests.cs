@@ -183,7 +183,9 @@ public class CustomerAPIClientTests
 		readonly SampleAppFactory _factory = new();
 		readonly WebApplicationFactory<App> _configured;
 		readonly AsyncServiceScope _scope;
+#pragma warning disable IDE0032 // Use auto property
 		int _posts;
+#pragma warning restore IDE0032 // Use auto property
 
 		public ClientHost()
 		{

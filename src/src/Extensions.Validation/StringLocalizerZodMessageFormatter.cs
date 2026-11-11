@@ -85,8 +85,7 @@ public sealed class StringLocalizerZodMessageFormatter : IZodMessageFormatter
 
 		try
 		{
-			var localizer =
-				_localizerProvider(resourceType, _factory)
+			var localizer = _localizerProvider(resourceType, _factory)
 				?? throw new InvalidOperationException(
 					$"The localizer provider returned null for type '{resourceType.FullName}'."
 				);

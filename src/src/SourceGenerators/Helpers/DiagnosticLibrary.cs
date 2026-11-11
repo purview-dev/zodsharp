@@ -105,6 +105,20 @@ static class DiagnosticLibrary
 		isEnabledByDefault: true
 	);
 
+	/// <summary>
+	/// ZODSGEN055: a union case type has no validator, so a value of that case cannot be validated. The case is
+	/// omitted from the union's dispatch, and an active value of that type fails as <c>invalid_union</c> rather
+	/// than passing unvalidated.
+	/// </summary>
+	public static readonly DiagnosticDescriptor UnionCaseTypeWithoutSchema = new(
+		id: "ZODSGEN055",
+		title: "Union case type has no validator",
+		messageFormat: "Union '{0}' has case type '{1}' with no [ZodSchema] validator in this compilation or a referenced assembly, so values of that case cannot be validated",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
+
 	public static readonly DiagnosticDescriptor CustomValidationGenericMethod = new(
 		id: "ZODSGEN012",
 		title: "Generic custom validation method unsupported",
@@ -401,14 +415,14 @@ static class DiagnosticLibrary
 	);
 
 	/// <summary>
-	/// ZODSGEN041: a typed union whose case types are all reference types can use the native C# 15
-	/// union returned by <c>Z.NativeUnion</c> on net11+, which is allocation-free and supports
-	/// exhaustive pattern matching. Value-type cases are excluded because they box.
+	/// ZODSGEN041: a typed union can use the native C# 15 union returned by <c>Z.NativeUnion</c> on net11+.
+	/// The native union implements the language's non-boxing access pattern, so neither reference-type nor
+	/// value-type cases allocate, and an exhaustive <c>switch</c> needs no discard arm.
 	/// </summary>
 	public static readonly DiagnosticDescriptor NativeUnionRecommended = new(
 		id: "ZODSGEN041",
 		title: "Consider a native C# 15 union",
-		messageFormat: "'{0}' has only reference-type cases ({1}); on .NET 11+ 'Z.NativeUnion' returns a native union that is allocation-free and supports exhaustive pattern matching",
+		messageFormat: "'{0}' with case types ({1}) can be a native union on .NET 11+; 'Z.NativeUnion' stores each case in a typed field and supports exhaustive pattern matching without boxing",
 		category: Category,
 		defaultSeverity: DiagnosticSeverity.Info,
 		isEnabledByDefault: true

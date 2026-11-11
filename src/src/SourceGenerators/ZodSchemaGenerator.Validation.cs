@@ -149,6 +149,54 @@ partial class ZodSchemaGenerator
 					}
 				);
 			}
+
+			for (var i = 0; i < property.SyncValidationAttributes.Count; i++)
+			{
+				writer.Field(
+					new FieldDeclarationOptions(
+						SyncValidationAttributeFieldName(property.Name, i),
+						new TypeIdentity("ValidationAttribute", "System.ComponentModel.DataAnnotations")
+					)
+					{
+						Accessibility = TypeDeclarationAccessibility.Private,
+						IsStatic = true,
+						IsReadOnly = true,
+						Initializer = property.SyncValidationAttributes[i],
+					}
+				);
+			}
+		}
+
+		for (var i = 0; i < schema.TypeSyncValidationAttributes.Count; i++)
+		{
+			writer.Field(
+				new FieldDeclarationOptions(
+					TypeValidationAttributeFieldName(i),
+					new TypeIdentity("ValidationAttribute", "System.ComponentModel.DataAnnotations")
+				)
+				{
+					Accessibility = TypeDeclarationAccessibility.Private,
+					IsStatic = true,
+					IsReadOnly = true,
+					Initializer = schema.TypeSyncValidationAttributes[i],
+				}
+			);
+		}
+
+		for (var i = 0; i < schema.TypeAsyncValidationAttributes.Count; i++)
+		{
+			writer.Field(
+				new FieldDeclarationOptions(
+					TypeAsyncValidationAttributeFieldName(i),
+					new TypeIdentity("AsyncValidationAttribute", "System.ComponentModel.DataAnnotations")
+				)
+				{
+					Accessibility = TypeDeclarationAccessibility.Private,
+					IsStatic = true,
+					IsReadOnly = true,
+					Initializer = schema.TypeAsyncValidationAttributes[i],
+				}
+			);
 		}
 
 		if (
@@ -168,6 +216,12 @@ partial class ZodSchemaGenerator
 
 		writer.NewLine();
 	}
+
+	static string SyncValidationAttributeFieldName(string member, int index) => $"ValidationAttribute_{member}_{index}";
+
+	static string TypeValidationAttributeFieldName(int index) => $"TypeValidationAttribute_{index}";
+
+	static string TypeAsyncValidationAttributeFieldName(int index) => $"TypeAsyncValidationAttribute_{index}";
 
 	static string GetDeclaringTypeName(ZodSchemaDescriptor schema)
 	{
@@ -200,6 +254,7 @@ partial class ZodSchemaGenerator
 			|| Exists(attributes.DeniedValues, static values => values.Exists)
 			|| Exists(attributes.Compare, static compare => compare.Exists)
 			|| property.CustomRules.Count > 0
+			|| property.SyncValidationAttributes.Count > 0
 			|| property.AsyncValidationAttributes.Count > 0
 			|| HasNestedValidation(property)
 		)
@@ -275,10 +330,12 @@ partial class ZodSchemaGenerator
 	/// <summary>Whether the synchronous <c>Validate</c> cannot run: the type has async-only rules (defect G23).</summary>
 	static bool HasAsyncOnlyRules(ZodSchemaDescriptor schema) =>
 		schema.ImplementsAsyncValidatableObject
+		|| schema.TypeAsyncValidationAttributes.Count > 0
 		|| GetValidatedMembers(schema).Any(static property => property.AsyncValidationAttributes.Count > 0);
 
 	static bool HasTypeValidation(ZodSchemaDescriptor schema) =>
 		schema.TypeRules.Count > 0
+		|| schema.TypeSyncValidationAttributes.Count > 0
 		|| (schema.ImplementsValidatableObject && !schema.ImplementsAsyncValidatableObject)
 		|| schema.RefinementHook.Value.IsImplemented;
 
@@ -365,11 +422,21 @@ partial class ZodSchemaGenerator
 
 			writer.Assignment(ErrorsListReference(writer), "errors", "null");
 
-			foreach (var property in GetValidatedMembers(schema))
-				writer.MethodCall(CodeGenHelpers.GetMemberMethodName(property.Name), MemberArguments(property, "true"));
+			if (schema.IsUnionTarget)
+			{
+				GenerateUnionTargetDispatch(writer, schema, async: false, outputContext: null);
+			}
+			else
+			{
+				foreach (var property in GetValidatedMembers(schema))
+					writer.MethodCall(
+						CodeGenHelpers.GetMemberMethodName(property.Name),
+						MemberArguments(property, "true")
+					);
 
-			if (HasTypeValidation(schema))
-				writer.MethodCall("ValidateType", "value", "ref errors", "services: null");
+				if (HasTypeValidation(schema))
+					writer.MethodCall("ValidateType", "value", "ref errors", "services: null");
+			}
 
 			writer.Return($"{GeneratedValidation}.ToResult(value, errors)");
 		}
@@ -482,25 +549,34 @@ partial class ZodSchemaGenerator
 				writer.MethodCall("cancellationToken.ThrowIfCancellationRequested");
 				writer.Assignment(ErrorsListReference(writer), "errors", "null");
 
-				foreach (var property in GetValidatedMembers(schema))
+				if (schema.IsUnionTarget)
 				{
-					var nestedAsync = outputContext.NestedRequiresAsync(property);
-					writer.MethodCall(
-						CodeGenHelpers.GetMemberMethodName(property.Name),
-						MemberArguments(property, nestedAsync ? "false" : "true")
-					);
-
-					if (nestedAsync || property.AsyncValidationAttributes.Count > 0)
+					GenerateUnionTargetDispatch(writer, schema, async: true, outputContext);
+				}
+				else
+				{
+					foreach (var property in GetValidatedMembers(schema))
 					{
-						writer.Assignment(
-							"errors",
-							$"await {CodeGenHelpers.GetMemberAsyncMethodName(property.Name)}(value, errors, services, depth, {(nestedAsync ? "true" : "false")}, cancellationToken).ConfigureAwait(false)"
+						var nestedAsync = outputContext.NestedRequiresAsync(property);
+						writer.MethodCall(
+							CodeGenHelpers.GetMemberMethodName(property.Name),
+							MemberArguments(property, nestedAsync ? "false" : "true")
 						);
+
+						if (nestedAsync || property.AsyncValidationAttributes.Count > 0)
+						{
+							writer.Assignment(
+								"errors",
+								$"await {CodeGenHelpers.GetMemberAsyncMethodName(property.Name)}(value, errors, services, depth, {(nestedAsync ? "true" : "false")}, cancellationToken).ConfigureAwait(false)"
+							);
+						}
 					}
 				}
 
 				if (HasTypeValidation(schema))
 					writer.MethodCall("ValidateType", "value", "ref errors", "services");
+
+				WriteTypeAsyncValidationAttributes(writer, schema);
 
 				if (schema.ImplementsAsyncValidatableObject)
 					WriteAsyncValidatableObject(writer, schema);
@@ -612,6 +688,7 @@ partial class ZodSchemaGenerator
 		)
 		{
 			GenerateTypeRuleValidations(writer, schema);
+			WriteTypeSyncValidationAttributes(writer, schema);
 
 			if (schema.ImplementsValidatableObject && !schema.ImplementsAsyncValidatableObject)
 			{
@@ -640,6 +717,64 @@ partial class ZodSchemaGenerator
 		}
 
 		writer.NewLine();
+	}
+
+	/// <summary>
+	/// Emits the class-level synchronous DataAnnotations validation attributes the generator has no type rule
+	/// for (for example a class-level <c>[CustomValidation]</c> or a consumer's own <c>ValidationAttribute</c>).
+	/// </summary>
+	static void WriteTypeSyncValidationAttributes(CodeWriter writer, ZodSchemaDescriptor schema)
+	{
+		if (schema.TypeSyncValidationAttributes.Count == 0)
+			return;
+
+		writer.Assignment(
+			"var",
+			"validationContext",
+			$"{GeneratedValidation}.CreateValidationContext(value, {schema.TargetType.Name.StringLiteral()}, services)"
+		);
+		for (var i = 0; i < schema.TypeSyncValidationAttributes.Count; i++)
+		{
+			var resultName = $"TypeAttributeResult{i}";
+			writer.Assignment(
+				"var",
+				resultName,
+				$"{TypeValidationAttributeFieldName(i)}.GetValidationResult(value, validationContext)"
+			);
+			writer.Assignment(
+				"errors",
+				$"{GeneratedValidation}.WithDataAnnotationsResult(errors, {resultName}, EmptyPath, {TypeMemberFieldName})"
+			);
+		}
+	}
+
+	/// <summary>
+	/// Emits the class-level <c>AsyncValidationAttribute</c>s, awaited after the synchronous type validation and
+	/// before <c>IAsyncValidatableObject</c>, in the platform's order.
+	/// </summary>
+	static void WriteTypeAsyncValidationAttributes(CodeWriter writer, ZodSchemaDescriptor schema)
+	{
+		if (schema.TypeAsyncValidationAttributes.Count == 0)
+			return;
+
+		writer.Assignment(
+			"var",
+			"validationContext",
+			$"{GeneratedValidation}.CreateValidationContext(value, {schema.TargetType.Name.StringLiteral()}, services)"
+		);
+		for (var i = 0; i < schema.TypeAsyncValidationAttributes.Count; i++)
+		{
+			var resultName = $"TypeAsyncAttributeResult{i}";
+			writer.Assignment(
+				"var",
+				resultName,
+				$"await {TypeAsyncValidationAttributeFieldName(i)}.GetValidationResultAsync(value, validationContext, cancellationToken).ConfigureAwait(false)"
+			);
+			writer.Assignment(
+				"errors",
+				$"{GeneratedValidation}.WithDataAnnotationsResult(errors, {resultName}, EmptyPath, {TypeMemberFieldName})"
+			);
+		}
 	}
 
 	static void GenerateZodRefinement(ZodSchemaDescriptor schema, CodeWriter method)
@@ -690,6 +825,11 @@ partial class ZodSchemaGenerator
 		var asyncMembers = schema.CustomValidationMethod.Value.HasCustomValidation
 			? schema.CustomValidationMethod.Value.AsyncMembers
 			: new([]);
+		var validatableMemberNames = members
+			.Select(static member => member.Name)
+			.Concat(asyncMembers)
+			.Distinct(StringComparer.Ordinal)
+			.ToArray();
 
 		foreach (var property in members)
 		{
@@ -702,14 +842,14 @@ partial class ZodSchemaGenerator
 		}
 
 		writer.XmlSummary(
-			"Gets whether a member has rules that ValidateMember runs. Matching is ordinal, on the C# member name."
+			"Gets whether a member has rules that ValidateMember or ValidateMemberAsync runs. Matching is ordinal, on the C# member name."
 		);
 		writer.XmlParam("memberName", "The C# member name.");
 		writer.XmlReturn("True when the member is individually validatable.");
 		writer.Line(
-			members.Count == 0
+			validatableMemberNames.Length == 0
 				? "public static bool IsValidatableMember(string memberName) => false;"
-				: $"public static bool IsValidatableMember(string memberName) => memberName is {string.Join(" or ", members.Select(static member => member.Name.StringLiteral()))};"
+				: $"public static bool IsValidatableMember(string memberName) => memberName is {string.Join(" or ", validatableMemberNames.Select(static name => name.StringLiteral()))};"
 		);
 		writer.NewLine();
 
@@ -935,9 +1075,12 @@ partial class ZodSchemaGenerator
 		// A rule that rejects an absent value (IRequiredRule) stands in for [Required]: it is emitted outside
 		// the non-null guard, so a missing value fails instead of being skipped.
 		var hasRequiredRule = TryGetRequiredRule(property, out var requiredRule);
+		CustomRuleDescriptor nonSentinelRule = default;
+		var nonSentinelOnUnion =
+			property.DispatchKind == DispatchKind.Union && TryGetNonSentinelRule(property, out nonSentinelRule);
 
 		if (
-			(property.CanBeNull || RejectsDefaultArray(property))
+			(property.CanBeNull || RejectsDefaultArray(property) || property.DispatchKind == DispatchKind.Union)
 			&& attributes.Required.ShouldProcess
 			&& attributes.Required.Value.Exists
 		)
@@ -976,7 +1119,16 @@ partial class ZodSchemaGenerator
 			block = writer.ElseScope();
 			GenerateValueSetValidations(writer, property, emitEnumRule);
 		}
-		else if (!property.IsDeclaredNullable && (property.CanBeNull || RejectsDefaultArray(property)))
+		else if (nonSentinelOnUnion)
+		{
+			GenerateNonSentinelUnionValidation(writer, property, nonSentinelRule);
+			block = writer.ElseScope();
+			GenerateValueSetValidations(writer, property, emitEnumRule);
+		}
+		else if (
+			!property.IsDeclaredNullable
+			&& (property.CanBeNull || RejectsDefaultArray(property) || property.DispatchKind == DispatchKind.Union)
+		)
 		{
 			// A non-nullable reference type rejects null — the exported JSON Schema marks it required — so
 			// the rules below run only for a present value. This keeps null acceptance consistent with the
@@ -1000,7 +1152,7 @@ partial class ZodSchemaGenerator
 			GenerateValueSetValidations(writer, property, emitEnumRule);
 			if (property.IsDeclaredNullable)
 				block = writer.IfBlockScope(
-					RejectsDefaultArray(property)
+					RejectsDefaultArray(property) || property.DispatchKind == DispatchKind.Union
 						? $"!({MissingValueCondition(property)})"
 						: $"value.{propertyName} is not null"
 				);
@@ -1010,6 +1162,37 @@ partial class ZodSchemaGenerator
 		block?.Dispose();
 
 		GenerateCompareValidation(writer, property);
+		GenerateFallbackValidationAttributes(writer, property);
+	}
+
+	/// <summary>
+	/// Emits the synchronous DataAnnotations validation attributes the generator has no dedicated rule for, so
+	/// a <c>[CustomValidation]</c>, <c>[FileExtensions]</c>, <c>[EnumDataType]</c> or a consumer's own
+	/// <c>ValidationAttribute</c> runs exactly as the platform's <c>Validator</c> would run it.
+	/// </summary>
+	static void GenerateFallbackValidationAttributes(CodeWriter writer, ZodPropertyDescriptor property)
+	{
+		if (property.SyncValidationAttributes.Count == 0)
+			return;
+
+		writer.Assignment(
+			"var",
+			"validationContext",
+			$"{GeneratedValidation}.CreateValidationContext(value, {MemberOf(property)}.DisplayName, null, {property.Name.StringLiteral()})"
+		);
+		for (var i = 0; i < property.SyncValidationAttributes.Count; i++)
+		{
+			var resultName = CodeGenHelpers.GetLocalIdentifier(property.Name, $"AttributeResult{i}");
+			writer.Assignment(
+				"var",
+				resultName,
+				$"{SyncValidationAttributeFieldName(property.Name, i)}.GetValidationResult(value.{property.Name}, validationContext)"
+			);
+			writer.Assignment(
+				"errors",
+				$"{GeneratedValidation}.WithDataAnnotationsResult(errors, {resultName}, {PathOf(property)}, {MemberOf(property)})"
+			);
+		}
 	}
 
 	static string ForMemberMessage(string errorExpression, string memberExpression, MessageTemplate message) =>
@@ -1035,6 +1218,59 @@ partial class ZodSchemaGenerator
 		};
 
 	/// <summary>
+	/// Finds a <c>NonSentinelRule&lt;T&gt;</c> among a union member's custom rules. An empty union is the default
+	/// value of a union, so the rule must reject it explicitly: the rule itself cannot see an empty union
+	/// through <c>SentinelValues&lt;T&gt;</c>.
+	/// </summary>
+	static bool TryGetNonSentinelRule(ZodPropertyDescriptor property, out CustomRuleDescriptor sentinelRule)
+	{
+		foreach (var rule in property.CustomRules)
+		{
+			if ((rule.AdaptedFrom ?? rule.RuleType) is { Name: "NonSentinelRule", Namespace: "ZodSharp.Rules" })
+			{
+				sentinelRule = rule;
+				return true;
+			}
+		}
+
+		sentinelRule = default;
+		return false;
+	}
+
+	/// <summary>
+	/// Emits the failure of a <c>NonSentinelRule&lt;T&gt;</c> bound to a union member when the union is empty,
+	/// using the rule's own error identity. The rest of the member's rules run only for a non-empty union, so
+	/// the rule is not evaluated a second time.
+	/// </summary>
+	static void GenerateNonSentinelUnionValidation(
+		CodeWriter writer,
+		ZodPropertyDescriptor property,
+		CustomRuleDescriptor sentinelRule
+	)
+	{
+		var ruleVariable = CodeGenHelpers.GetLocalIdentifier(property.Name, "UnionSentinelRule");
+		var identityVariable = EmitRuleInstance(
+			writer,
+			sentinelRule,
+			CodeGenHelpers.GetLocalIdentifier(property.Name, "UnionSentinelRuleInner"),
+			ruleVariable,
+			$"({string.Join(", ", sentinelRule.Arguments)})"
+		);
+
+		WriteRuleFailure(
+			writer,
+			sentinelRule,
+			ruleVariable,
+			identityVariable,
+			$"value.{property.Name}",
+			PathOf(property),
+			MemberOf(property),
+			GetFallbackOrigin(property),
+			invalidCondition: MissingValueCondition(property)
+		);
+	}
+
+	/// <summary>
 	/// Finds the rule that rejects an absent value (<c>IRequiredRule</c>) among the property's custom rules,
 	/// when the property can be null.
 	/// </summary>
@@ -1045,7 +1281,7 @@ partial class ZodSchemaGenerator
 	{
 		requiredRule = default;
 
-		if (!property.CanBeNull && !RejectsDefaultArray(property))
+		if (!property.CanBeNull && !RejectsDefaultArray(property) && property.DispatchKind != DispatchKind.Union)
 			return false;
 
 		foreach (var rule in property.CustomRules)
@@ -1198,10 +1434,23 @@ partial class ZodSchemaGenerator
 	/// </summary>
 	static void GenerateDispatchValidation(CodeWriter writer, ZodPropertyDescriptor property)
 	{
-		var dispatched = DispatchValueExpression(property);
 		using (writer.IfBlockScope("recurse"))
 		{
-			using (writer.OpenBlockScope($"switch ({dispatched})"))
+			if (property.DispatchKind == DispatchKind.Union)
+			{
+				EmitUnionDispatchChain(
+					writer,
+					property.DispatchCases,
+					UnionAccessExpression(property),
+					PathOf(property),
+					MemberOf(property),
+					async: false,
+					outputContext: null
+				);
+				return;
+			}
+
+			using (writer.OpenBlockScope($"switch ({DispatchValueExpression(property)})"))
 			{
 				for (var i = 0; i < property.DispatchCases.Count; i++)
 				{
@@ -1227,6 +1476,148 @@ partial class ZodSchemaGenerator
 				}
 			}
 		}
+	}
+
+	/// <summary>
+	/// Emits the case dispatch for a schema whose target is itself a union (the <c>union</c> keyword or a
+	/// hand-written <c>[Union]</c> type): the active case is validated by that case type's schema, and an empty
+	/// or unmatched union reports <c>invalid_union</c>.
+	/// </summary>
+	static void GenerateUnionTargetDispatch(
+		CodeWriter writer,
+		ZodSchemaDescriptor schema,
+		bool async,
+		SchemaGenerationOutputContext? outputContext
+	)
+	{
+		if (schema.UnionCases.Count == 0)
+		{
+			EmitUnionEmptyError(writer, schema.UnionCases, "EmptyPath", TypeMemberFieldName);
+			return;
+		}
+
+		EmitUnionDispatchChain(
+			writer,
+			schema.UnionCases,
+			"value",
+			"EmptyPath",
+			TypeMemberFieldName,
+			async,
+			outputContext
+		);
+	}
+
+	/// <summary>
+	/// The expression that reads the union a member holds: a nullable value type is unwrapped first, so the
+	/// <c>Value</c>/<c>TryGetValue</c> members are reachable.
+	/// </summary>
+	static string UnionAccessExpression(ZodPropertyDescriptor property) =>
+		property.IsNullableValueType ? $"value.{property.Name}.Value" : $"value.{property.Name}";
+
+	/// <summary>
+	/// The condition that matches a union's active case: <c>TryGetValue</c> when the union implements the
+	/// non-boxing access pattern, otherwise a type test on <c>Value</c>.
+	/// </summary>
+	static string UnionCaseCondition(DispatchCase unionCase, string accessExpression, string caseName) =>
+		unionCase.NonBoxing
+			? $"{accessExpression}.TryGetValue(out {unionCase.CaseType.AsTypeReference()} {caseName})"
+			: $"{accessExpression}.Value is {unionCase.CaseType.AsTypeReference()} {caseName}";
+
+	/// <summary>
+	/// Emits an <c>if</c>/<c>else if</c> chain that dispatches a union's active case to that case's schema.
+	/// A case with the non-boxing access pattern is tested with <c>TryGetValue</c>; otherwise the case is
+	/// tested through <c>Value</c>. An empty or unmatched union reports <c>invalid_union</c>, so a union with a
+	/// case that has no validator fails closed rather than passing silently.
+	/// </summary>
+	static void EmitUnionDispatchChain(
+		CodeWriter writer,
+		EquatableArray<DispatchCase> cases,
+		string accessExpression,
+		string pathExpression,
+		string memberExpression,
+		bool async,
+		SchemaGenerationOutputContext? outputContext
+	)
+	{
+		for (var i = 0; i < cases.Count; i++)
+		{
+			var unionCase = cases[i];
+			var caseName = CodeGenHelpers.GetLocalIdentifier(unionCase.CaseType.Name, $"Case{i}");
+			var condition = UnionCaseCondition(unionCase, accessExpression, caseName);
+
+			using (i == 0 ? writer.IfBlockScope(condition) : writer.ElseIfScope(condition))
+			{
+				var resultName = CodeGenHelpers.GetLocalIdentifier(unionCase.CaseType.Name, $"Case{i}Result");
+				var caseIsAsync =
+					async && unionCase.IsModern && outputContext!.AsyncIndex.RequiresAsync(unionCase.SchemaType);
+
+				if (caseIsAsync)
+				{
+					writer.Assignment("var", resultName, NestedValidateAsyncCall(unionCase.SchemaType, caseName));
+					writer.Assignment(
+						"errors",
+						$"{GeneratedValidation}.WithNested(errors, {resultName}, {pathExpression})"
+					);
+				}
+				else
+				{
+					writer.Assignment(
+						"var",
+						resultName,
+						NestedValidateCall(unionCase.SchemaType, unionCase.IsModern, caseName)
+					);
+					if (async)
+					{
+						writer.Assignment(
+							"errors",
+							$"{GeneratedValidation}.WithNested(errors, {resultName}, {pathExpression})"
+						);
+					}
+					else
+					{
+						writer.MethodCall($"{GeneratedValidation}.AddNested", "ref errors", resultName, pathExpression);
+					}
+				}
+			}
+		}
+
+		using (writer.ElseScope())
+			EmitUnionEmptyError(writer, cases, pathExpression, memberExpression);
+	}
+
+	/// <summary>
+	/// Emits the <c>invalid_union</c> error for a union whose contents are empty or match no case that has a
+	/// validator. Each option's error is an <c>invalid_type</c> for its case type, matching the runtime union
+	/// schema's failure.
+	/// </summary>
+	static void EmitUnionEmptyError(
+		CodeWriter writer,
+		EquatableArray<DispatchCase> cases,
+		string pathExpression,
+		string memberExpression
+	)
+	{
+		const string immutableArrayType = "global::System.Collections.Immutable.ImmutableArray";
+		const string validationErrorType = "global::ZodSharp.Core.ValidationError";
+		const string zodIssuesType = "global::ZodSharp.Core.ZodIssues";
+
+		var unionErrors =
+			cases.Count == 0
+				? $"{immutableArrayType}<{immutableArrayType}<{validationErrorType}>>.Empty"
+				: $"{immutableArrayType}.Create({string.Join(", ", cases.Select(static unionCase =>
+					$"{immutableArrayType}.Create({zodIssuesType}.InvalidType({unionCase.CaseType.Name.StringLiteral()}, null))"
+				))})";
+		var options =
+			cases.Count == 0
+				? "null"
+				: $"new string[] {{ {string.Join(", ", cases.Select(static unionCase => unionCase.CaseType.Name.StringLiteral()))} }}";
+		var error = $"{zodIssuesType}.InvalidUnion({unionErrors}, {options}, {pathExpression})";
+
+		writer.MethodCall(
+			$"{GeneratedValidation}.Add",
+			"ref errors",
+			$"{GeneratedValidation}.ForMember({error}, {memberExpression})"
+		);
 	}
 
 	/// <summary>
@@ -1393,6 +1784,20 @@ partial class ZodSchemaGenerator
 		ZodPropertyDescriptor property
 	)
 	{
+		if (property.DispatchKind == DispatchKind.Union)
+		{
+			EmitUnionDispatchChain(
+				writer,
+				property.DispatchCases,
+				UnionAccessExpression(property),
+				PathOf(property),
+				MemberOf(property),
+				async: true,
+				outputContext
+			);
+			return;
+		}
+
 		using (writer.OpenBlockScope($"switch ({DispatchValueExpression(property)})"))
 		{
 			for (var i = 0; i < property.DispatchCases.Count; i++)

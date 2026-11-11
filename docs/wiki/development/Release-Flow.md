@@ -6,7 +6,7 @@ Purview.ZodSharp releases are driven by the shared [purview-dev/build](https://g
 
 The package version comes from `package.json` (`version` field). The current stable line is `2.4.2`, and `3.0.0` (which drops `net8.0` and `net9.0`) is in prerelease; bump `package.json` to release a new version (prerelease builds use a `MAJOR.MINOR.PATCH-prerelease.N` suffix).
 
-Package identities are `Purview.ZodSharp.*` (core, SystemTextJson, NewtonsoftJson, AspNetCore). Central package management lives in `Directory.Packages.props`; package versions there are minimum requirements, not exact pins, so the resolved graph can drift.
+Package identities are `Purview.ZodSharp.*` (core; SystemTextJson, NewtonsoftJson, Http and AspNetCore; and on `net11.0` Extensions.Validation, AspNetCore.OpenApi and Blazor). Central package management lives in `Directory.Packages.props`; package versions there are minimum requirements, not exact pins, so the resolved graph can drift.
 
 ## Releasing a version
 
@@ -28,7 +28,7 @@ rather than passing.
 | Gate | What it proves | Local | CI |
 |---|---|---|---|
 | Build, lint and tests | The solution builds warning-free, CSharpier reports no change, and every test project passes (including the cross-platform vitest suites, through `Repository.UnitTests`). | `just build`, `just lint-check`, `just test` | `pr.yml` `build` |
-| Pack and pack validation | Every package packs; package validation holds the public API to the 2.4.2 baseline; `purview-build.json` `PackValidation` finds exactly the declared content (`RequiredContent`, `RequireExplicitContent`) and none of the `ForbiddenContent`. | `just pipeline-pack-validate` | `pr.yml` `build` (`run-pack`, `validate-pack`) |
+| Pack and pack validation | Every package packs; package validation holds the public API to the 2.4.2 baseline; `.config/purview-build.json` `PackValidation` finds exactly the declared content (`RequiredContent`, `RequireExplicitContent`) and none of the `ForbiddenContent`. | `just pipeline-pack-validate` | `pr.yml` `build` (`run-pack`, `validate-pack`) |
 | Forbidden-content rule proof | Every `ForbiddenContent` rule rejects a package: a matching file is injected into scratch copies of each package and the real `purview-build` validation must fail, per package and per rule. | `just verify-pack-rules` | `pr.yml` `packed-consumers` |
 | Packed generator | The IL-merged generator in the `.nupkg` loads and generates in a net10.0 consumer (it has regressed twice while the in-repo tests, which use the unmerged generator, stayed green). | `just smoke-packed-generator` | `pr.yml` `packed-generator` |
 | Packed consumers | Every shipping package, packed to an isolated feed and cache, works for consumers that reference packages only: a Native AOT console (generated validation, member resolution, count attributes, JSON Schema export, the validation bridge, ProblemDetails, OpenAPI options), a Blazor WebAssembly app with `<ZodValidator>` and a scalar value object carrying a type-level rule (trimmed, and `RunAOTCompilation` when `wasm-tools` is installed; `_framework` holds the ZodSharp assemblies, `_content` the static web assets) and a Native AOT minimal API (an invalid POST returns 400 `application/problem+json` with `issues`; the OpenAPI document carries `ZodValidationProblemDetails`), and a multi-project API - a `[ZodSchema]`/`[ErrorType]` class library referenced by a minimal API that references `Microsoft.AspNetCore.OpenApi` with XML documentation on (the OpenAPI document is served with both projects' schemas and XML-comment descriptions, and no documentation ID is duplicated). Every bin and publish folder is leak-scanned. | `just smoke-packed-consumers` | `pr.yml` `packed-consumers` (linux-x64, `-WasmAot Require`) |
@@ -77,10 +77,10 @@ just publish-aot-sample                       # Native AOT minimal API sample an
 | `pr.yml` | pull requests against `main` | `purview-build.yml` with `run-pack: true`, `validate-pack: true` |
 | `release.yml` | pushes to `main` | `purview-release.yml` with `release-mode: NuGet` |
 
-Both consume `purview-build.json`:
+Both consume `.config/purview-build.json`:
 
 - `Build` — solution (`src/ZodSharp.slnx`), test root (`src/tests`), patterns (`*Tests.csproj`), filter (`/*/*/*/*`).
-- `PackValidation` — requires symbol packages/files and validates `RequiredContent` per package (per-TFM DLL + XML, analyzer assemblies and `buildTransitive/Purview.ZodSharp.props` for the core package, `README.md` and `purview-logo-light.png` for every package). `ForbiddenContent` rejects, in every package, a compiler-host assembly (`Purview.SourceGeneratorFramework*`, `Microsoft.CodeAnalysis*`) anywhere NuGet hands files to an application (the root, `lib/`, `ref/`, `runtimes/`, `build*/`, `tools/`, `content*/`, `staticwebassets/`), a loose copy of either under `analyzers/`, and the generator or code fixes under `lib/`, `ref/` or `runtimes/`.
+- `PackValidation` — requires symbol packages/files and validates `RequiredContent` per package (per-TFM DLL + XML, analyzer assemblies and `buildTransitive/Purview.ZodSharp.props` and `.targets` for the core package, the Blazor static web assets and JS module initializer plus its `build`/`buildTransitive` targets, the OpenAPI `buildTransitive` targets, `README.md` and `purview-logo-light.png` for every package). `ForbiddenContent` rejects, in every package, a compiler-host assembly (`Purview.SourceGeneratorFramework*`, `Microsoft.CodeAnalysis*`) anywhere NuGet hands files to an application (the root, `lib/`, `ref/`, `runtimes/`, `build*/`, `tools/`, `content*/`, `staticwebassets/`), a loose copy of either under `analyzers/`, and the generator or code fixes under `lib/`, `ref/` or `runtimes/`.
 - `Release.Mode` — `None` for PR/local runs.
 
 ## Pipeline commands
@@ -104,7 +104,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 - `just build` succeeds with no new warnings/errors.
 - Relevant tests pass (`just test`).
 - `just lint-check` (CSharpier) reports no formatting changes.
-- Packed packages match `purview-build.json` `PackValidation`.
+- Packed packages match `.config/purview-build.json` `PackValidation`.
 - Generated code is deterministic and reviewable.
 - Before a release, every gate in [Release gates](#release-gates) passes, through the
   [pre-release checklist](#pre-release-checklist).

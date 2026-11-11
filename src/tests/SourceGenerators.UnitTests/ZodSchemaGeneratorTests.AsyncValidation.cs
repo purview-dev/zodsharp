@@ -53,6 +53,50 @@ partial class ZodSchemaGeneratorTests
 		""";
 
 	[Test]
+	public async Task IsValidatableMember_GivenOnlyAZodAsyncMember_ReturnsTrue(CancellationToken cancellationToken)
+	{
+		// Arrange — the member has no synchronous rules, but ValidateMemberAsync runs the custom method that
+		// [ZodAsyncMember] ties to it, so a host's field-level validation must offer it.
+		const string source = """
+			using System;
+			using System.Threading;
+			using System.Threading.Tasks;
+			using ZodSharp;
+			using ZodSharp.Core;
+
+			namespace Testing
+			{
+				[ZodSchema]
+				public class Audit
+				{
+					public string? Handle { get; set; }
+
+					[ZodAsyncMember(nameof(Handle))]
+					internal static ValueTask<ValidationResult<Audit>> CustomValidationAsync(
+						Audit value,
+						IServiceProvider services,
+						CancellationToken ct
+					) => ValueTask.FromResult(ValidationResult<Audit>.Success(value));
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(
+			source,
+			new ZodSourceGeneratorTestOptions().Compile(),
+			cancellationToken
+		);
+		var assembly = result.CompilationResult.Assembly!;
+		var schemaType = assembly.GetType("Testing.AuditSchema")!;
+
+		// Act
+		var isValidatable = schemaType.GetMethod("IsValidatableMember")!.Invoke(null, ["Handle"]);
+
+		// Assert
+		await Assert.That((bool)isValidatable!).IsTrue();
+	}
+
+	[Test]
 	public async Task ValidateAsync_GivenServiceAwareMethod_HandsTheCallersServicesToIt(
 		CancellationToken cancellationToken
 	)

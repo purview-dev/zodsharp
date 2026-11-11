@@ -60,3 +60,57 @@ public class GeneratedLine
 	[Range(1, 100)]
 	public int Quantity { get; set; } = 1;
 }
+
+/// <summary>Rejects the value <c>taken</c> only asynchronously.</summary>
+public sealed class AsyncTakenAttribute : AsyncValidationAttribute
+{
+	/// <inheritdoc/>
+	protected override System.ComponentModel.DataAnnotations.ValidationResult? IsValid(
+		object? value,
+		ValidationContext validationContext
+	) => throw new InvalidOperationException("Validated asynchronously.");
+
+	/// <inheritdoc/>
+	protected override async Task<System.ComponentModel.DataAnnotations.ValidationResult?> IsValidAsync(
+		object? value,
+		ValidationContext validationContext,
+		CancellationToken cancellationToken
+	)
+	{
+		await Task.Yield();
+		cancellationToken.ThrowIfCancellationRequested();
+
+		return value is "taken"
+			? new System.ComponentModel.DataAnnotations.ValidationResult("Name is taken")
+			: System.ComponentModel.DataAnnotations.ValidationResult.Success;
+	}
+}
+
+/// <summary>A union case whose rule runs only asynchronously.</summary>
+#pragma warning disable ZODSGEN048 // The form validates asynchronously; the diagnostic is expected for the fixture.
+[ZodSchema]
+public class GeneratedCat
+{
+	[AsyncTaken]
+	public string? Name { get; set; }
+}
+#pragma warning restore ZODSGEN048
+
+/// <summary>A synchronous union case.</summary>
+[ZodSchema]
+public class GeneratedDog
+{
+	[Range(1, 100)]
+	public int Weight { get; set; } = 1;
+}
+
+/// <summary>A union target: validation dispatches to the active case's schema.</summary>
+[ZodSchema]
+public readonly union GeneratedPet(GeneratedCat, GeneratedDog);
+
+/// <summary>A form model holding a union target member.</summary>
+[ZodSchema]
+public class GeneratedOwner
+{
+	public GeneratedPet Pet { get; set; }
+}

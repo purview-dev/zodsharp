@@ -18,14 +18,26 @@ dotnet add package Purview.ZodSharp.SystemTextJson
 # Newtonsoft.Json integration + JSON Schema import
 dotnet add package Purview.ZodSharp.NewtonsoftJson
 
+# HttpClient integration: validated request and response bodies (WebAssembly-safe)
+dotnet add package Purview.ZodSharp.Http
+
 # ASP.NET Core ProblemDetails integration
 dotnet add package Purview.ZodSharp.AspNetCore
+
+# .NET 11 only: the platform validation bridge, OpenAPI transformers and Blazor forms
+dotnet add package Purview.ZodSharp.Extensions.Validation
+dotnet add package Purview.ZodSharp.AspNetCore.OpenApi
+dotnet add package Purview.ZodSharp.Blazor
 ```
 
 - `Purview.ZodSharp` — core library, source generator, and JSON Schema **export**.
 - `Purview.ZodSharp.SystemTextJson` — System.Text.Json deserialize-and-validate, validating converters, and JSON Schema **import**.
 - `Purview.ZodSharp.NewtonsoftJson` — Newtonsoft.Json deserialize-and-validate, validating converters, and JSON Schema **import**.
+- `Purview.ZodSharp.Http` — `HttpClient` integration: validates request and response bodies, and reads a server's validation problem back as ZodSharp errors; trim-, AOT- and WebAssembly-safe.
 - `Purview.ZodSharp.AspNetCore` — failed validation results converted to standard `ProblemDetails` / `HttpValidationProblemDetails` payloads.
+- `Purview.ZodSharp.Extensions.Validation` (`net11.0`) — registers ZodSharp as the first `Microsoft.Extensions.Validation` resolver, so minimal APIs, Blazor Server and Blazor WebAssembly validate with ZodSharp.
+- `Purview.ZodSharp.AspNetCore.OpenApi` (`net11.0`) — OpenAPI transformers that describe the constraints, formats, unions and validation error contract ZodSharp enforces.
+- `Purview.ZodSharp.Blazor` (`net11.0`) — `ZodValidator`, message components and static-SSR client rules for Blazor Server, WebAssembly and Auto render mode.
 
 > [!TIP]
 > JSON Schema import (`Z.FromJsonSchema`) is provided by whichever JSON integration package you reference, so pick one, and import its JSON Schema namespace (`ZodSharp.JsonSchema.SystemTextJson` or `ZodSharp.JsonSchema.NewtonsoftJson`). Export (`Z.ToJsonSchema`) lives in the core package.

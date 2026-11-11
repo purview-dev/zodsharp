@@ -70,6 +70,18 @@ partial class ZodSchemaGenerator
 				}
 			}
 
+			if (!requiresAsync && schema.IsUnionTarget)
+			{
+				foreach (var unionCase in schema.UnionCases)
+				{
+					if (unionCase.IsModern && RequiresAsync(unionCase.SchemaType))
+					{
+						requiresAsync = true;
+						break;
+					}
+				}
+			}
+
 			_visiting.Remove(schemaType);
 
 			// Only a top-level answer is cached: an answer computed while another schema is still being visited
@@ -101,6 +113,8 @@ partial class ZodSchemaGenerator
 			property.AsyncValidationAttributes.Count > 0 || NestedRequiresAsync(property);
 
 		static bool HasOwnAsyncRules(ZodSchemaDescriptor schema) =>
-			schema.CustomValidationMethod.Value.HasCustomValidation || schema.ImplementsAsyncValidatableObject;
+			schema.CustomValidationMethod.Value.HasCustomValidation
+			|| schema.ImplementsAsyncValidatableObject
+			|| schema.TypeAsyncValidationAttributes.Count > 0;
 	}
 }

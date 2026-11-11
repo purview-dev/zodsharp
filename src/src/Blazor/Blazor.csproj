@@ -25,13 +25,11 @@
 		<PackageTags>zod;validation;schema;blazor;webassembly;forms</PackageTags>
 		<!-- First release: there is no previous version to validate the public API against. -->
 		<ZodSharpNoPackageValidationBaseline>true</ZodSharpNoPackageValidationBaseline>
-		<!-- NU5104: the .NET 11 component packages are prerelease until .NET 11 GA. Remove with the GA bump. -->
-		<NoWarn>$(NoWarn);NU5104</NoWarn>
 		<!--
 			Directory.Packages.props picks the Microsoft.Extensions line by $(TargetFramework), which a single-targeted
 			project has not set yet when that file is evaluated; the component packages need the 11.x line.
 		-->
-		<MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
 	</PropertyGroup>
 
 	<ItemGroup>

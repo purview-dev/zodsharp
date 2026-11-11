@@ -36,12 +36,9 @@ public class ZodTuple<T1, T2>(IZodSchema<T1, T1> schema1, IZodSchema<T2, T2> sch
 			return ValidationResult<(T1, T2)>.Failure(lengthError);
 
 		List<ValidationError> errors = [];
-		T1 v1;
-		T2 v2;
 
-		ZodTupleElements.Validate(schema1, value[0], 0, errors, out v1);
-
-		ZodTupleElements.Validate(schema2, value[1], 1, errors, out v2);
+		ZodTupleElements.Validate(schema1, value[0], 0, errors, out var v1);
+		ZodTupleElements.Validate(schema2, value[1], 1, errors, out var v2);
 
 		return errors.Count > 0
 			? ValidationResult<(T1, T2)>.Failure(errors)
@@ -78,15 +75,10 @@ public class ZodTuple<T1, T2, T3>(IZodSchema<T1, T1> schema1, IZodSchema<T2, T2>
 			return ValidationResult<(T1, T2, T3)>.Failure(lengthError);
 
 		List<ValidationError> errors = [];
-		T1 v1;
-		T2 v2;
-		T3 v3;
 
-		ZodTupleElements.Validate(schema1, value[0], 0, errors, out v1);
-
-		ZodTupleElements.Validate(schema2, value[1], 1, errors, out v2);
-
-		ZodTupleElements.Validate(schema3, value[2], 2, errors, out v3);
+		ZodTupleElements.Validate(schema1, value[0], 0, errors, out var v1);
+		ZodTupleElements.Validate(schema2, value[1], 1, errors, out var v2);
+		ZodTupleElements.Validate(schema3, value[2], 2, errors, out var v3);
 
 		return errors.Count > 0
 			? ValidationResult<(T1, T2, T3)>.Failure(errors)

@@ -12,11 +12,7 @@ build_configuration := "Debug"
 artifacts_folder := "./artifacts"
 default_test_filter := "/*/*/*/*"
 
-# CSharpier is vendored in .assets/ rather than taken from the tool manifest: the released 1.3.0
-# cannot parse C# 15 `union` declarations and fails with CS1001, which would fail linting on the
-# four files that declare one. Build:CSharpierPath points the pipeline at the same binary.
-csharpier := "dotnet .assets/csharpier/CSharpier.dll"
-
+csharpier := "dotnet csharpier"
 pipeline_tool := "dotnet purview-build"
 
 [private]

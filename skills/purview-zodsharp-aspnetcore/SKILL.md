@@ -93,8 +93,10 @@ app.MapPost("/legacy", (UserDto dto) => …).WithZodSharpValidation<UserDto>(); 
 endpoint filter **factory** picks the parameters once, when the endpoint is built:
 
 - Skipped: services (`[FromServices]`, keyed services, anything the container resolves), `HttpContext`,
-  `HttpRequest`, `HttpResponse`, `ClaimsPrincipal`, `CancellationToken`, form files, streams and
-  `[SkipValidation]`. `[FromBody]`/`[FromRoute]`/`[FromQuery]`/`[FromHeader]`/`[FromForm]` force a parameter in.
+  `HttpRequest`, `HttpResponse`, `ClaimsPrincipal`, `CancellationToken`, form files, streams, and a
+  `[SkipValidation]` parameter or parameter type. The filter matches the real .NET 11
+  `SkipValidationAttribute`, not any same-named attribute (on .NET 10, where it does not exist, a name match is
+  the fallback). `[FromBody]`/`[FromRoute]`/`[FromQuery]`/`[FromHeader]`/`[FromForm]` force a parameter in.
 - Validators resolve through `IZodSchemaFactory.TryGetUntypedValidator(Type)`; **every** selected argument
   is validated with `ValidateAsync(value, RequestServices, RequestAborted)`.
 - Error keys follow Microsoft.Extensions.Validation: complex parameter unprefixed (`Name`), sequence

@@ -79,7 +79,19 @@ falls through to the next resolver, which is usually the generated DataAnnotatio
 Generated `[ZodSchema]` validators already apply DataAnnotations attributes, so a ZodSharp type is validated
 by ZodSharp only. Set `AlsoRunDataAnnotations = true` to also run the next resolver that knows the type: ZodSharp
 runs first, and an identical `(Path, ErrorMessage)` pair is reported once. Nested ZodSharp types are not
-validated twice.
+validated twice. Field-level validation falls through to that next resolver for a property ZodSharp does not own,
+so a DataAnnotations-only field still validates on a field change.
+
+## `[SkipValidation]`
+
+`Microsoft.Extensions.Validation`'s `[SkipValidation]` targets classes, properties and parameters (and is
+inherited). It is honored throughout the bridge:
+
+- A class marked `[SkipValidation]` is not claimed by the ZodSharp resolver, even when a validator is registered.
+- A property marked `[SkipValidation]` is omitted by the generated validator, `Paths`/`JsonNames` and JSON Schema,
+  and `TryFindProperty` does not offer it for field-level validation.
+- A parameter marked `[SkipValidation]`, or whose type is, is not claimed by the resolver or the ZodSharp endpoint
+  filter.
 
 ## Options
 
@@ -125,8 +137,8 @@ Parameters follow Microsoft.Extensions.Validation's own conventions:
 - An error about the value itself (a missing body, a root refinement) is keyed by the parameter name and has no
   container.
 
-A nullable or optional parameter that is `null` is not validated. `[SkipValidation]` and `[FromServices]`
-parameters and primitive types are never claimed by ZodSharp.
+A nullable or optional parameter that is `null` is not validated. `[SkipValidation]` (on the parameter or its
+type) and `[FromServices]` parameters and primitive types are never claimed by ZodSharp.
 
 ## Full-fidelity errors
 

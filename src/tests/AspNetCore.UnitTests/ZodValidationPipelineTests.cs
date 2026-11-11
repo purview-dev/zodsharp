@@ -460,6 +460,39 @@ public class ZodValidationPipelineTests
 	}
 
 	[Test]
+	public async Task Pipeline_GivenUnionTargetBodyWithAsyncCase_AwaitsTheCaseValidation(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - AsyncPet is a [ZodSchema] union target; its active case's rule only runs asynchronously.
+		await using var app = await TestApp.StartAsync(
+			services =>
+			{
+				services.AddZodSharp(options =>
+					options.ConfigureFactory = factory => factory.Register(new AsyncPetSchemaValidator())
+				);
+				services.AddZodSharpValidation();
+				services.AddZodSharpProblemDetails(options => options.Registry = new ErrorTypeRegistry());
+				services.AddValidation();
+			},
+			app => app.MapPost("/pets", (AsyncPet body) => TypedResults.Ok()),
+			cancellationToken
+		);
+		using StringContent content = new("""{"name":"taken"}""", System.Text.Encoding.UTF8, "application/json");
+
+		// Act
+		using var response = await app.Client.PostAsync(new Uri("/pets", UriKind.Relative), content, cancellationToken);
+		var json = await response.Content.ReadAsStringAsync(cancellationToken);
+		using var document = JsonDocument.Parse(json);
+
+		// Assert
+		await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+		await Assert.That(json).Contains("Name is taken");
+		var errors = document.RootElement.GetProperty("errors");
+		await Assert.That(errors.GetRawText()).Contains("Name");
+	}
+
+	[Test]
 	public async Task Pipeline_GivenUnionBodyWithoutApplicationAddValidation_StillValidatesActiveCase(
 		CancellationToken cancellationToken
 	)

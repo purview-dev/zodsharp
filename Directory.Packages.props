@@ -2,29 +2,28 @@
 	<PropertyGroup>
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
-		<TUnitVersion>1.76.0</TUnitVersion>
-		<PurviewSourceGenFramework>1.2.2</PurviewSourceGenFramework>
-		<DotnetRuntimeVersion>10.0.14</DotnetRuntimeVersion>
+		<TUnitVersion>1.83.0</TUnitVersion>
+		<PurviewSourceGenFramework>2.0.0</PurviewSourceGenFramework>
+		<DotnetRuntimeVersion>10.0.15</DotnetRuntimeVersion>
 		<!--
 			Microsoft.Extensions.Options and ...DependencyInjection.Abstractions are real dependencies of
 			the shipped Purview.ZodSharp package, so their version has to track the consumer's target
 			framework: referencing this package must not drag a net10.0 application onto .NET 11
 			assemblies. Keep one entry per supported TFM and leave the default as the oldest.
 
-			On net10.0 and later the SDK prunes these from the package graph entirely because the
-			targeted framework already supplies them — which is why the dependency groups in the
-			produced .nuspec are empty. That is expected, not a missing dependency.
+			On net11.0 the SDK prunes these from the package graph entirely because the targeted framework
+			already supplies them — which is why the net11.0 dependency group in the produced .nuspec is
+			empty. net10.0 still resolves the 10.0.x line, so it is not dragged onto .NET 11 assemblies.
+			That is expected, not a missing dependency.
 		-->
 		<MicrosoftExtensionsVersion>$(DotnetRuntimeVersion)</MicrosoftExtensionsVersion>
 		<!--
 			net11.0 needs the 11.x line for IAsyncValidateOptions<T> and OptionsBuilder<T>.Validate<TValidator>(),
 			which ZodSchemaOptionsValidator<T> implements and registers through on .NET 11.
 		-->
-		<MicrosoftExtensionsVersion Condition="'$(TargetFramework)' == 'net11.0'"
-			>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
+		<MicrosoftExtensionsVersion Condition="'$(TargetFramework)' == 'net11.0'">11.0.0</MicrosoftExtensionsVersion>
 		<AspNetCoreTestHostVersion>$(DotnetRuntimeVersion)</AspNetCoreTestHostVersion>
-		<AspNetCoreTestHostVersion Condition="'$(TargetFramework)' == 'net11.0'"
-			>11.0.0-rc.3.26522.148</AspNetCoreTestHostVersion>
+		<AspNetCoreTestHostVersion Condition="'$(TargetFramework)' == 'net11.0'">11.0.0</AspNetCoreTestHostVersion>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageVersion Include="Bogus" Version="35.6.5" />
@@ -32,27 +31,27 @@
 		     `just test` covers both sides of the parity guarantee rather than only the C# side. -->
 		<PackageVersion Include="CliWrap" Version="3.10.5" />
 		<!-- Test-only: renders the Purview.ZodSharp.Blazor components in Blazor.UnitTests. -->
-		<PackageVersion Include="bunit" Version="2.13.3" />
+		<PackageVersion Include="bunit" Version="2.15.2" />
 		<PackageVersion Include="FastGuid" Version="1.4.3" />
 		<!-- Test-only: validates fixture payloads against the OpenAPI document Purview.ZodSharp.AspNetCore.OpenApi
 		     emits, proving the document agrees with what ZodSharp enforces. -->
 		<PackageVersion Include="JsonSchema.Net" Version="9.6.0" />
 		<!-- net11.0 only: Purview.ZodSharp.AspNetCore.OpenApi targets the Microsoft.OpenApi 3.x object model that
 		     ASP.NET Core 11 ships. -->
-		<PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0-rc.3.26522.148" />
+		<PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
 		<!--
 			net11.0 only: Purview.ZodSharp.Blazor references the component packages rather than the ASP.NET Core
-			shared framework, so it runs in Blazor WebAssembly. Bump to GA when .NET 11 ships.
+			shared framework, so it runs in Blazor WebAssembly.
 		-->
-		<PackageVersion Include="Microsoft.AspNetCore.Components.Forms" Version="11.0.0-rc.3.26522.148" />
-		<PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="11.0.0-rc.3.26522.148" />
+		<PackageVersion Include="Microsoft.AspNetCore.Components.Forms" Version="11.0.0" />
+		<PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="11.0.0" />
 		<!-- Sample-only: the Blazor Web App sample (Examples.Blazor) and its WebAssembly client. -->
-		<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="11.0.0-rc.3.26522.148" />
-		<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="11.0.0-rc.3.26522.148" />
+		<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="11.0.0" />
+		<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="11.0.0" />
 		<PackageVersion Include="Microsoft.Extensions.Localization" Version="$(MicrosoftExtensionsVersion)" />
 		<!-- Test-only: hosts the Blazor sample in memory and parses its HTML (Examples.Blazor.IntegrationTests). -->
 		<PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(AspNetCoreTestHostVersion)" />
-		<PackageVersion Include="AngleSharp" Version="1.9.1" />
+		<PackageVersion Include="AngleSharp" Version="1.10.1" />
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsVersion)" />
 		<PackageVersion
 			Include="Microsoft.Extensions.DependencyInjection.Abstractions"
@@ -61,15 +60,15 @@
 		<PackageVersion Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsVersion)" />
 		<!-- In-memory ASP.NET Core host for the AspNetCore integration tests; tracks the test TFM's runtime. -->
 		<PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreTestHostVersion)" />
-		<!-- net11.0 only (Purview.ZodSharp.Extensions.Validation). Bump to GA when .NET 11 ships. -->
-		<PackageVersion Include="Microsoft.Extensions.Validation" Version="11.0.0-rc.3.26522.148" />
-		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.403" />
+		<!-- net11.0 only (Purview.ZodSharp.Extensions.Validation). -->
+		<PackageVersion Include="Microsoft.Extensions.Validation" Version="11.0.0" />
+		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="11.0.100" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynCompilerVersion)" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(RoslynCompilerVersion)" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynAnalyzersVersion)" />
 		<PackageVersion Include="TUnit" Version="$(TUnitVersion)" />
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
-		<PackageVersion Include="Purview.Skills.Testing" Version="1.2.0" />
+		<PackageVersion Include="Purview.Skills.Testing" Version="2.0.0" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageVersion Include="System.Text.Json" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="BenchmarkDotNet" Version="0.16.0-preview.2" />

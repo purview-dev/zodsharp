@@ -1,6 +1,6 @@
 # Purview.ZodSharp Performance Benchmarks
 
-BenchmarkDotNet performance suite for Purview.ZodSharp. This is a `net10.0` console application; every suite uses `[MemoryDiagnoser]` plus a `[SimpleJob]` profile so time and allocation data are captured together.
+BenchmarkDotNet performance suite for Purview.ZodSharp. This is a `net10.0;net11.0` console application; every suite uses `[MemoryDiagnoser]` plus a `[SimpleJob]` profile so time and allocation data are captured together.
 
 ## Structure
 
@@ -13,16 +13,20 @@ BenchmarkDotNet performance suite for Purview.ZodSharp. This is a `net10.0` cons
 | `MemoryPerformanceTests.cs` | Allocation-focused benchmarks for string, array and object validation (uses more iterations to surface allocation differences) |
 | `TransformPerformanceTests.cs` | Transformations — `ToLower`, `ToUpper`, `Trim`, chained transforms, and a transform combined with validation |
 | `UnionPerformanceTests.cs` | Union and discriminated-union validation, including invalid inputs |
+| `GeneratedValidationPerformanceTests.cs` | Source-generated (`[ZodSchema]`) validation — the success path, the failure path and a nested graph |
+| `NativeUnionPerformanceTests.cs` | The hand-rolled union against the .NET 11 native union when the case type is a value type (both stay allocation-free); `net11.0` only |
+| `ProblemDetailsMappingPerformanceTests.cs` | Turning a thrown `ZodException` into `HttpValidationProblemDetails`, with and without an `ErrorTypeRegistry` mapping |
+| `UuidPerformanceTests.cs` | UUID validation — the char-scan rule against the legacy compiled regex, plus the schema-level paths |
 
 ## How to run
 
 From the repository root:
 
 ```bash
-# Run the full benchmark suite
-dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release
+# Run the full benchmark suite (on .NET 10; pass -f net11.0 for .NET 11)
+dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net10.0
 
-# Or via just
+# Or via just (Release, net10.0 unless you pass `-f net11.0`)
 just perf-tests
 ```
 

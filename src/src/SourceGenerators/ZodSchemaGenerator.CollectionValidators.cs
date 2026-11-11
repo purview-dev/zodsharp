@@ -7,17 +7,35 @@ partial class ZodSchemaGenerator
 {
 	static bool RejectsDefaultArray(ZodPropertyDescriptor property) =>
 		property.IsImmutableArray
-		&& property.DefaultImmutableArrayBehavior != Models.DefaultImmutableArrayBehavior.TreatAsEmpty;
+		&& property.DefaultImmutableArrayBehavior != DefaultImmutableArrayBehavior.TreatAsEmpty;
 
 	static string MissingValueCondition(ZodPropertyDescriptor property)
 	{
+		if (property.DispatchKind == DispatchKind.Union)
+			return EmptyUnionCondition(property);
+
 		var value = $"value.{property.Name}";
 		if (!RejectsDefaultArray(property))
 			return $"{value} is null";
 
+		// The collection is a non-nullable array or immutable array that rejects its default value, so the member is
+		// absent when the property is null or its value is the default array.
 		return property.IsNullableValueType
 			? $"({value} is null || {value}.GetValueOrDefault().IsDefault)"
 			: $"{value}.IsDefault";
+	}
+
+	/// <summary>
+	/// The condition that an optional union has no value: its non-boxing <c>HasValue</c> is false when the union
+	/// exposes the access pattern, otherwise its <c>Value</c> is null. A nullable union is absent when the
+	/// wrapper has no value or the wrapped union is empty.
+	/// </summary>
+	static string EmptyUnionCondition(ZodPropertyDescriptor property)
+	{
+		var value = property.IsNullableValueType ? $"value.{property.Name}.Value" : $"value.{property.Name}";
+		var empty = property.UnionHasValue ? $"!{value}.HasValue" : $"{value}.Value is null";
+
+		return property.IsNullableValueType ? $"(!value.{property.Name}.HasValue || {empty})" : empty;
 	}
 
 	static string CollectionValueExpression(ZodPropertyDescriptor property)
@@ -124,9 +142,7 @@ partial class ZodSchemaGenerator
 						);
 					}
 
-#pragma warning disable PSGFR23 // ElseIfScope is not yet available in Purview.SourceGeneratorFramework
-					using (writer.OpenBlockScope($"else if ({propertyLengthName} > {length.MaximumLength})"))
-#pragma warning restore PSGFR23
+					using (writer.ElseIfScope($"{propertyLengthName} > {length.MaximumLength}"))
 					{
 						WriteAddError(
 							writer,

@@ -1,6 +1,6 @@
 # Source Generator Diagnostics
 
-The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`, `ZODSGEN051` and `ZODSGEN052` are warnings, `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are informational, and the rest are errors.
+The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`, `ZODSGEN051`, `ZODSGEN052`, `ZODSGEN053` and `ZODSGEN055` are warnings, `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are informational, and the rest are errors.
 
 | ID | Meaning |
 |---|---|
@@ -15,6 +15,7 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN010 | First custom method parameter is not the model type |
 | ZODSGEN011 | Last custom method parameter is not `CancellationToken` |
 | ZODSGEN054 | A three-parameter (service-aware) custom method's second parameter is not `IServiceProvider` |
+| ZODSGEN055 | (warning) A union (`union` declaration or `[Union]` type) has a case type with no `[ZodSchema]` validator in this compilation or a referenced assembly. The case is omitted from dispatch and values of that case fail as `invalid_union`; add a validator to the case type |
 | ZODSGEN012 | Custom method is generic |
 | ZODSGEN013 | Custom method must be static when defined on the model type |
 | ZODSGEN014 | Custom method is inaccessible from the generated validator (private/protected) |
@@ -39,7 +40,7 @@ The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerato
 | ZODSGEN038 | (warning) A hand-authored rule attribute's `[ZodRule(typeof(...))]` mapping does not address every rule declared under the name the attribute encodes (`XAttribute` → `XRule`), so some usages of the attribute resolve to no rule |
 | ZODSGEN039 | (warning) A rule accepts a `code`/`origin` constructor parameter but does not implement `IZodRule`, so the value never reaches the reported error identity |
 | ZODSGEN040 | (warning) An attribute argument has no effect: the resolved rule has no matching constructor parameter and the value is not part of the reported error identity |
-| ZODSGEN041 | (info) A typed union (`Z.Union`) whose option types are all reference types can use the allocation-free native C# 15 union returned by `Z.NativeUnion` on .NET 11+; a code fix is offered |
+| ZODSGEN041 | (info) A typed union (`Z.Union`) can use the native C# 15 union returned by `Z.NativeUnion` on .NET 11+; it implements the non-boxing access pattern (reference- and value-type cases are both allocation-free) and supports exhaustive pattern matching. A code fix is offered |
 | ZODSGEN042 | (warning) A validation rule (a type implementing `IValidationRule<T>`) does not expose a public `const string ErrorCode` and a public `const string MessageFormat`, so its error identity cannot be asserted in tests without duplicating literals |
 | ZODSGEN043 | (info) A built-in rule marked `[ZodRule]` does not generate a validation attribute, because a constructor parameter cannot be represented as an attribute property; the rule is still reachable through the runtime/fluent API. A derived name that collides with `System.ComponentModel.DataAnnotations` is *not* skipped — the attribute is emitted under a `Zod` suffix instead |
 | ZODSGEN044 | A `[ZodSchema]` type that uses an automatic `[Scalar]` form (`[Scalar<TValue>]` or `[Scalar(typeof(TValue))]`) cannot produce a usable schema, so the value-object generator's generated `Create` would reference a `{Type}Schema` that does not exist or cannot validate. Reported when `[ZodSchema(GenerateValidateMethod = false)]` suppresses the `Validate` method the value-object generator calls, or when the declared underlying type cannot be represented |

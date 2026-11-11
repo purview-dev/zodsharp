@@ -20,8 +20,22 @@ direct, typed codegen. Nothing is reflected at runtime.
 | `[Url]`, `[Phone]`, `[CreditCard]`, `[Base64String]` | reuse `UrlRule`, `PhoneRule`, `CreditCardRule`, `Base64StringRule` | `invalid_string` / `invalid_format` |
 | `[Compare(otherProperty)]` | typed equality between two properties | `mismatch` / `invalid_value` |
 | `[Display(Name=…)]`, `[Display(Name=…, ResourceType=…)]` | not validated; the display name in messages (`{displayName}`, `{0}`); `ResourceType` is read at runtime | — |
+| `[DisplayName(…)]` | fallback display name when `[Display]` is absent (matching .NET 11's Blazor `DisplayName` component) | — |
 `[Length]` follows DataAnnotations null semantics: `null` is valid unless `[Required]` is also
 present.
+
+## Attributes without a dedicated rule
+
+Any other `ValidationAttribute` still runs: `[CustomValidation]` on a property or the class,
+`[FileExtensions]`, `[EnumDataType]`, and a consumer's own attribute are constructed in a generated
+field and called through `GetValidationResult` (or `GetValidationResultAsync` for the .NET 11
+`AsyncValidationAttribute`). Class-level attributes are object-level rules and are collected from the
+base chain; a non-multiple attribute is taken from its most derived declaration. Attributes already
+mapped to a Zod rule are never run twice.
+
+`[SkipValidation]` (`Microsoft.Extensions.Validation`; classes, properties, parameters) removes a
+class or property from generated validation, `Paths`/`JsonNames` and JSON Schema. A minimal-API
+parameter or its type is skipped by the endpoint filter and the bridge.
 
 `[RequiredZod]` — the generated `RequiredRule<T>` attribute — mirrors `[Required]`: it is emitted
 *outside* the generator's non-null guard, so an absent value is reported as `missing_field` even

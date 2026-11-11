@@ -104,8 +104,8 @@ public sealed class ZodOpenApiOperationTransformer(ZodOpenApiOptions options) : 
 
 		// Which error types an endpoint's rules can raise is not known statically, so 422 is listed only when
 		// the registry the ProblemDetails mapping uses contains an error type that maps to it.
-		var registry =
-			services.GetService<IOptions<ZodProblemDetailsOptions>>()?.Value.Registry ?? ErrorTypeRegistry.Default;
+		var registry = services.GetService<IOptions<ZodProblemDetailsOptions>>()?.Value.Registry
+			?? ErrorTypeRegistry.Default;
 		if (registry.All.Any(static errorType => errorType.HttpStatus == StatusCodes.Status422UnprocessableEntity))
 			yield return StatusCodes.Status422UnprocessableEntity;
 	}

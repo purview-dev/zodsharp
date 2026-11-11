@@ -92,3 +92,4 @@
 | ZODSGEN052 | ZodSharp.SourceGenerator | Warning | An attribute ErrorMessage uses a placeholder the attribute does not supply, or an unbalanced brace |
 | ZODSGEN053 | ZodSharp.SourceGenerator | Warning | [MinLength]/[MaxLength]/[Length] on a collection member in a trimmed or AOT project; use [MinCount]/[MaxCount]/[CountRange] |
 | ZODSGEN054 | ZodSharp.SourceGenerator | Error | A three-parameter (service-aware) custom validation method's second parameter is not IServiceProvider |
+| ZODSGEN055 | ZodSharp.SourceGenerator | Warning | A union case type has no validator, so values of that case fail as invalid_union instead of validating |

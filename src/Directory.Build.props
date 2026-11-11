@@ -4,7 +4,19 @@
 		     listed here, so a runtime lifecycle change is an SDK bump instead of an edit in this file.
 		     net8.0 and net9.0 were dropped in 3.0.0. -->
 		<PurviewTargetFrameworkSet>Supported</PurviewTargetFrameworkSet>
+		<!-- `preview`, not `latest`: Purview.BuildSdk opts every net11.0+ target into the C# 15 *updated
+		     memory-safety rules* (MemorySafetyRules=2), and the .NET 11 GA compiler still classifies that
+		     feature as preview (CS8652 without `preview`). The two places this repository crosses the
+		     unmanaged boundary (`Unsafe.As` in the sentinel/required rules) wrap each read in an `unsafe`
+		     block, so the audit boundary is visible at the call site. C# 15 is the default for net11.0 and
+		     is still accepted by the net10.0 target. -->
 		<LangVersion>preview</LangVersion>
+		<!--
+			The .NET 11 System.Text.Json source generator emits unsafe code for its fast paths, so every
+			project that uses it needs the option even when the project itself has no pointer code. Only the
+			sentinel/required rules use it deliberately (see ZodSharp.csproj).
+		-->
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<NamespacePrefix>ZodSharp</NamespacePrefix>
 		<!-- Set project-by-project -->
 		<IsPackable>false</IsPackable>
@@ -14,6 +26,15 @@
 		<!-- Installed skills live in the universal .agents/skills/ folder only, and are committed. The
 		     SDK's default (*) would make InstallPurviewSkills write a copy into every agent's folder. -->
 		<PurviewSkillsAgents>universal</PurviewSkillsAgents>
+		<!--
+			MSBuild's multithreaded build stays off until the WebAssembly SDK can run its tasks in it:
+			.NET 11 GA's Microsoft.NET.Runtime.WebAssembly.Sdk declares `ReadWasmProps` with a custom
+			TaskFactory, which multithreaded mode refuses to execute out of process
+			("does not support out of process TaskHost execution"), so Examples.Blazor.Client could not
+			build. The SDK writes `-mt:false` into the managed Directory.Build.rsp; delete this property
+			(and the rsp) once dotnet/runtime ships a multithreadable-annotated task.
+		-->
+		<PurviewMultiThreadedBuild>false</PurviewMultiThreadedBuild>
 	</PropertyGroup>
 
 	<Import Sdk="Purview.BuildSdk" Project="Sdk.props" />

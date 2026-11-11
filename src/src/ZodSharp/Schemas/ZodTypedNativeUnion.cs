@@ -12,9 +12,11 @@ namespace ZodSharp.Schemas;
 /// <typeparam name="T1">The first option's type.</typeparam>
 /// <typeparam name="T2">The second option's type.</typeparam>
 /// <remarks>
-/// Only available when targeting <c>net11.0</c> or later. Prefer this over
-/// <see cref="ZodTypedUnion{T1,T2}"/> when both option types are reference types: the native union
-/// is allocation-free and supports exhaustive pattern matching, whereas value-type cases box.
+/// Only available when targeting <c>net11.0</c> or later. The union is a hand-written
+/// <see cref="NativeUnion{T1,T2}"/> that implements the language's non-boxing access pattern, so prefer it
+/// over <see cref="ZodTypedUnion{T1,T2}"/> for either reference- or value-type option types: neither allocates,
+/// and both support exhaustive pattern matching. Use <see cref="ZodTypedUnion{T1,T2}"/> only when the
+/// <see cref="Union{T1,T2}"/> surface (<c>Match</c>, <c>Switch</c>, equality) is required.
 /// </remarks>
 /// <param name="option1">The first option schema.</param>
 /// <param name="option2">The second option schema.</param>

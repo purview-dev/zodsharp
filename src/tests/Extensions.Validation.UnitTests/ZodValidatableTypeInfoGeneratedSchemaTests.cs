@@ -94,6 +94,28 @@ public class ZodValidatableTypeInfoGeneratedSchemaTests
 		await Assert.That(errors.Length).IsEqualTo(2);
 	}
 
+	[Test]
+	public async Task ValidateAsync_GivenGeneratedUnionTargetWithAsyncCase_AwaitsTheCaseSchema(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange - the union target dispatches to UnionCatSchema, whose AsyncTaken rule only runs asynchronously.
+		GeneratedPet pet = new UnionCat { Name = "taken" };
+		ServiceCollection services = new();
+		services.AddZodSharpFactory(static factory => factory.Register(new GeneratedPetSchemaValidator()));
+		services.AddZodSharpValidation();
+		using var provider = services.BuildServiceProvider();
+		var context = provider.CreateContext();
+
+		// Act
+		await provider.GetTypeInfo<GeneratedPet>().ValidateAsync(pet, context, cancellationToken);
+
+		// Assert
+		var error = context.Single();
+		await Assert.That(error.Path).IsEqualTo("Name");
+		await Assert.That(error.ErrorMessage).IsEqualTo("Name is taken");
+	}
+
 	static ServiceProvider CreatePersonProvider()
 	{
 		ServiceCollection services = new();

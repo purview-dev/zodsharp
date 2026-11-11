@@ -15,12 +15,15 @@ The library is developed and maintained at [github.com/purview-dev/zodsharp](htt
 - **Type-safe** - Strong typing with advanced C# generics
 - **High performance** - Sub-microsecond validation times; see [the measurements](#performance)
 - **Cross-platform** - Works on .NET 10.0 and .NET 11.0
+- **Native C# unions (.NET 11)** - `Z.NativeUnion` returns a non-boxing union with exhaustive pattern matching; `Z.Union` and the hand-rolled `Union<,>` remain available on both targets
+- **JSON Schema interoperability** - Export with `Z.ToJsonSchema` and import with `Z.FromJsonSchema`
 - **Source Generators** - Compile-time validator generation with `[ZodSchema]` attribute
 - **DataAnnotations Support** - Automatic validation from `[Required]`, `[StringLength]`, `[Length]`, `[MinLength]`, `[MaxLength]`, `[Range]`, `[RegularExpression]`, `[AllowedValues]`, `[DeniedValues]`, `[EmailAddress]`, etc.  
+- **Host integrations** - ASP.NET Core ProblemDetails, OpenAPI transformers, minimal-API and Blazor validation, `HttpClient` bodies, System.Text.Json and Newtonsoft.Json
 
 ## Installation
 
-Install the core `Purview.ZodSharp` package, plus the optional JSON integration packages you need:
+Install the core `Purview.ZodSharp` package, plus the optional JSON, HTTP, hosting and .NET 11 integration packages you need. The .NET 11 packages target `net11.0` only.
 
 ### NuGet Package Manager
 
@@ -28,7 +31,11 @@ Install the core `Purview.ZodSharp` package, plus the optional JSON integration 
 Install-Package Purview.ZodSharp
 Install-Package Purview.ZodSharp.SystemTextJson
 Install-Package Purview.ZodSharp.NewtonsoftJson
+Install-Package Purview.ZodSharp.Http
 Install-Package Purview.ZodSharp.AspNetCore
+Install-Package Purview.ZodSharp.Extensions.Validation
+Install-Package Purview.ZodSharp.AspNetCore.OpenApi
+Install-Package Purview.ZodSharp.Blazor
 ```
 
 ### .NET CLI
@@ -37,23 +44,33 @@ Install-Package Purview.ZodSharp.AspNetCore
 dotnet add package Purview.ZodSharp
 dotnet add package Purview.ZodSharp.SystemTextJson
 dotnet add package Purview.ZodSharp.NewtonsoftJson
+dotnet add package Purview.ZodSharp.Http
 dotnet add package Purview.ZodSharp.AspNetCore
+dotnet add package Purview.ZodSharp.Extensions.Validation
+dotnet add package Purview.ZodSharp.AspNetCore.OpenApi
+dotnet add package Purview.ZodSharp.Blazor
 ```
 
 ### PackageReference
 
 ```xml
-<PackageReference Include="Purview.ZodSharp" Version="2.0.0" />
-<PackageReference Include="Purview.ZodSharp.SystemTextJson" Version="2.0.0" />
-<PackageReference Include="Purview.ZodSharp.NewtonsoftJson" Version="2.0.0" />
-<PackageReference Include="Purview.ZodSharp.AspNetCore" Version="2.0.0" />
+<PackageReference Include="Purview.ZodSharp" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp.SystemTextJson" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp.NewtonsoftJson" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp.Http" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp.AspNetCore" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp.Extensions.Validation" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp.AspNetCore.OpenApi" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp.Blazor" Version="3.0.0-prerelease.5" />
 ```
 
-- **Purview.ZodSharp** — Core validation library and source generator (`[ZodSchema]`). See its [package README](src/src/ZodSharp/Sdk/README.md).
+- **Purview.ZodSharp** — Core validation library, source generator (`[ZodSchema]`) and JSON Schema export. See its [package README](src/src/ZodSharp/Sdk/README.md).
 - **Purview.ZodSharp.SystemTextJson** — System.Text.Json integration and JSON Schema import. See its [package README](src/src/SystemTextJson/Sdk/README.md).
 - **Purview.ZodSharp.NewtonsoftJson** — Newtonsoft.Json integration and JSON Schema import. See its [package README](src/src/NewtonsoftJson/Sdk/README.md).
 - **Purview.ZodSharp.Http** — `HttpClient` integration: validated request and response bodies, and server validation problems read back into ZodSharp errors; trim-, AOT- and WebAssembly-safe. See its [package README](src/src/Http/Sdk/README.md).
 - **Purview.ZodSharp.AspNetCore** — ASP.NET Core ProblemDetails integration. See its [package README](src/src/AspNetCore/Sdk/README.md).
+- **Purview.ZodSharp.Extensions.Validation** — the `Microsoft.Extensions.Validation` bridge for minimal APIs and Blazor (`net11.0`, WebAssembly-safe). See its [package README](src/src/Extensions.Validation/Sdk/README.md).
+- **Purview.ZodSharp.AspNetCore.OpenApi** — OpenAPI transformers for ZodSharp's constraints and error contract (`net11.0`). See its [package README](src/src/AspNetCore.OpenApi/Sdk/README.md).
 - **Purview.ZodSharp.Blazor** — Blazor forms validation for Server, WebAssembly and Auto render mode (`net11.0`). See its [package README](src/src/Blazor/Sdk/README.md).
 
 ## TypeScript and fixture tooling
@@ -68,10 +85,22 @@ bun run generate-fixtures
 
 The fixture generator script is intentionally run via Bun rather than `npx tsx` or Node because it keeps the TypeScript workflow consistent with the repo's Bun-based setup.
 
-## What's new in v2
+## What's new
 
-- **Packages are published under the `Purview.*` IDs.** The core `Purview.ZodSharp` package ships the validator and the source generator, with optional `Purview.ZodSharp.SystemTextJson`, `Purview.ZodSharp.NewtonsoftJson`, and `Purview.ZodSharp.AspNetCore` integration packages.
-- **Targets `net10.0` and `net11.0`** (3.0.0 dropped `net8.0` and `net9.0`; stay on 2.4.x for those). The source generator remains on `netstandard2.0` so it can run in any compiler host.
+### v3
+
+- **`net8.0` and `net9.0` are dropped.** Packages target `net10.0` and `net11.0`; applications on the older targets stay on the 2.4.x line. The source generator remains on `netstandard2.0` so it can run in any compiler host.
+- **Native C# 15 unions (.NET 11).** `Z.NativeUnion<T1, T2>` returns a non-boxing union (`ZodSharp.Unions.NativeUnion<T1, T2>`) whose cases are stored in typed fields, so reference- and value-type cases are both allocation-free and pattern matching is exhaustive. `ZODSGEN041` reports (and fixes) a `Z.Union<T1, T2>` that could use it. A union or a `closed` hierarchy can itself carry `[ZodSchema]`.
+- **.NET 11 host integrations.** `Purview.ZodSharp.Extensions.Validation` registers ZodSharp as the first `Microsoft.Extensions.Validation` resolver (minimal APIs and Blazor), `Purview.ZodSharp.AspNetCore.OpenApi` describes what ZodSharp enforces in the OpenAPI document, and `Purview.ZodSharp.Blazor` adds the full-fidelity form validator. See [.NET 11 validation](#net-11-validation).
+- **`Purview.ZodSharp.Http`.** Validated `HttpClient` request and response bodies, and a server validation problem read back as ZodSharp errors, WebAssembly-safe.
+- **Async and service-aware rules.** `AsyncValidationAttribute`, `IAsyncValidatableObject`, `[ZodAsyncMember]` and `ValidateAsync`; generated validators use `ValidateAsync` everywhere an async rule exists, and the options validator implements `IAsyncValidateOptions<T>`.
+- **`[SkipValidation]` is honoured everywhere.** The generator (type, property and parameter), the endpoint filter, the Microsoft.Extensions.Validation bridge and client validation all skip the annotated type or member.
+- **Dictionaries are maps.** An `IDictionary<TKey, TValue>`/`IReadOnlyDictionary<TKey, TValue>` member validates every value and exports as `additionalProperties`.
+- **`DateTimeOffset` wire form.** Exported as an offset-aware pattern by default, with an optional narrower UTC contract.
+
+### v2
+
+- **Packages are published under the `Purview.*` IDs.** The core `Purview.ZodSharp` package ships the validator and the source generator, with optional `Purview.ZodSharp.SystemTextJson`, `Purview.ZodSharp.NewtonsoftJson`, `Purview.ZodSharp.Http` and `Purview.ZodSharp.AspNetCore` integration packages.
 - **System.Text.Json integration.** JSON deserialize-and-validate is available for both major JSON libraries, including validating `JsonConverter<T>` instances.
 - **JSON Schema interoperability.** Schemas can be exported via `Z.ToJsonSchema` and imported via `Z.FromJsonSchema`, enabling cross-language reuse with TypeScript/Zod. The import API lives in the JSON integration package's namespace (`ZodSharp.JsonSchema.SystemTextJson` or `ZodSharp.JsonSchema.NewtonsoftJson`); export stays in the core package.
 - **ASP.NET Core ProblemDetails integration.** Failed validation results convert directly to `HttpValidationProblemDetails` via `result.ToHttpValidationProblemDetails(httpContext)`, which applies the application's `ZodProblemDetailsOptions`.
@@ -330,17 +359,27 @@ See the [performance README](src/src/Benchmarks/README.md) for detailed benchmar
 ```
 src/
 ├── src/
-│   ├── ZodSharp/              # Core validation library (Core, Schemas, Rules, JsonSchema)
-│   ├── SourceGenerators/      # Compile-time [ZodSchema] generator
-│   ├── SystemTextJson/        # System.Text.Json integration and JSON Schema import
-│   ├── NewtonsoftJson/        # Newtonsoft.Json integration and JSON Schema import
-│   ├── AspNetCore/            # ASP.NET Core ProblemDetails integration
-│   ├── Examples.CLI/          # Usage examples
-│   └── Benchmarks/   # BenchmarkDotNet performance suite
-└── tests/                     # TUnit test projects
+│   ├── ZodSharp/               # Core validation library (Core, Schemas, Rules, JsonSchema, Unions)
+│   ├── SourceGenerators/       # [ZodSchema] generator, analyzers and [ErrorType] generator (netstandard2.0)
+│   ├── CodeFixes/              # Code fixes for the ZODSGEN diagnostics
+│   ├── SystemTextJson/         # System.Text.Json integration and JSON Schema import
+│   ├── NewtonsoftJson/         # Newtonsoft.Json integration and JSON Schema import
+│   ├── Http/                   # HttpClient integration (browser-safe)
+│   ├── AspNetCore/             # ASP.NET Core ProblemDetails integration
+│   ├── Extensions.Validation/  # Microsoft.Extensions.Validation bridge (net11.0)
+│   ├── AspNetCore.OpenApi/     # OpenAPI transformers (net11.0)
+│   ├── Blazor/                 # Blazor forms integration (net11.0)
+│   ├── Examples.CLI/           # Usage examples
+│   ├── Examples.MinimalApi/    # Minimal-API sample host
+│   ├── Examples.Blazor*/       # Blazor sample host and client
+│   ├── Examples.Shared/        # Models shared by the samples
+│   └── Benchmarks/             # BenchmarkDotNet performance suite
+└── tests/
+    ├── *.UnitTests/            # TUnit test projects
+    └── cross-platform/         # Gitignored output shared with the vitest suites
 ```
 
-The source generator itself targets `netstandard2.0` so it can run in any compiler. The library packages target `net10.0` and `net11.0`.
+The source generator targets `netstandard2.0` so it can run in any compiler host. The library packages target `net10.0` and `net11.0`; the packages marked `net11.0` above target `net11.0` only.
 
 ## Advanced Features
 

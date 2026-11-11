@@ -15,8 +15,8 @@ metadata:
 # The `[ZodSchema]` source generator
 
 Mark a class, struct or record with `[ZodSchema]` and a static, zero-allocation validator is emitted
-at compile time — no reflection at runtime. The attribute itself is `ZodSharp.ZodSchemaAttribute` in the`
-`Purview.ZodSharp` assembly (as is `[ErrorType]`), so nothing beyond `Purview.ZodSharp` is needed and the`
+at compile time — no reflection at runtime. The attribute itself is `ZodSharp.ZodSchemaAttribute` in the
+`Purview.ZodSharp` assembly (as is `[ErrorType]`), so nothing beyond `Purview.ZodSharp` is needed and the
 generator emits no marker types into your project.
 
 ```csharp
@@ -47,6 +47,7 @@ var validated = UserSchema.Parse(user);   // throws ZodException on failure
 | --- | --- |
 | `{TypeName}Schema` | static partial class — the validator. Accessibility mirrors the target. Holds `Validate`, `ValidateAsync(value, services, ct)`, `RequiresAsyncValidation`, the member API below, `Parse`, `BuildJsonSchema`, and (with composition on) `ApplyAnd`, `ApplyOr`, `ApplyRefine`. Renamed by `SchemaName`. |
 | `{TypeName}Schema.Paths` | one `ZodPath` constant per member (`OrderSchema.Paths.Lines`) for refinements and tests |
+| `{TypeName}Schema.IsValidatableMember(name)` | true when a field change can validate that member alone (synchronous rules or a `[ZodAsyncMember]` method) |
 | `{TypeName}Schema.JsonNames` | `Get(memberName)` returns the `[JsonPropertyName]` name, or `null`; `ToJsonNamedPath(path, namingPolicy)` renames a whole path without reflection |
 | `{TypeName}SchemaValidator` | `partial class` implementing `IZodSchemaValidator<T>`, `IZodMemberValidator<T>`, `IZodMemberResolver<T>`, `IZodUntypedValidator`, `IZodJsonPathMapper` and `IJsonSchemaProvider` — the adapter hosts use. Primary schema only; `{SchemaName}Validator` when renamed. |
 | `{TypeName}Validator` | `sealed partial class : IValidateOptions<{TypeName}>` (and, on .NET 11, `IAsyncValidateOptions<T>` when the type has async rules) — only when `IValidateOptions` support is on, and the target is a class. |
@@ -90,7 +91,9 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
 
 ## What is validated
 
-- Properties must be public, non-static, non-indexer.
+- Properties must be public, non-static, non-indexer. They are read from the type **and its base chain**, so an
+  inherited public property is validated, exported and resolved like a declared one; an overridden or hidden
+  property is taken once, from the most derived declaration.
 - A property gets validation when it carries **any** DataAnnotations attribute, when its type is a
   source-defined complex type with a nested schema, or when its type is an enum.
 - Nested complex types are discovered recursively and get their own `{TypeName}Schema`, **even
@@ -131,7 +134,10 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
   synchronous `Validate` of such a type throws `InvalidOperationException` (`ZODSGEN048`).
 - **C# 15:** a member typed as a union dispatches to the active case's schema, and a member typed as a
   closed class to the derived type's schema (`ZODSGEN049` when a derived type has no `[ZodSchema]`).
-  Paths never include the union's `Value`.
+  Paths never include the union's `Value`. `[ZodSchema]` on a union itself emits a schema that dispatches to
+  the active case, matching a case with `TryGetValue` when the union implements the non-boxing access pattern;
+  an empty union or a case with no validator fails as `invalid_union` (`ZODSGEN055` when a case has no
+  validator). `[Required]`/`[RequiredZod]`/`[NonSentinel]` treat an empty union as absent/default.
 - Nested validation is depth-guarded: `ZodValidationDepth.MaxDepth` (32) throws
   `InvalidOperationException` instead of overflowing the stack on a cycle.
 - Paths are typed: `Items[0].Name`, `Map[en].Value`, `Map["0"].Value` from `FullPath.ToDottedString()`.

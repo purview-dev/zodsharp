@@ -52,10 +52,10 @@ if (result.IsSuccess)
 The `Union<...>` value type (namespace `ZodSharp.Unions`) is the result of a typed union:
 
 - `Create(T1)` / `Create(T2)` (and a three-case variant) — tagged construction.
-- Implicit conversions from the case types.
-- `int Tag` and `object Value` (`Value` throws if uninitialized).
+- Implicit conversions from the case types (a `null` reference produces an empty union).
+- `int Tag` (`0` empty, `1` `T1`, `2` `T2`, and `3` for the three-case `T3`) and `object? Value` (`null` when empty).
 - `TryGetValue(out T1)` / `TryGetValue(out T2)`.
-- `Match(Func<T1, TResult>, Func<T2, TResult>)` and `Switch(Action<T1>, Action<T2>)`.
+- `Match(Func<T1, TResult>, Func<T2, TResult>)` and `Switch(Action<T1>, Action<T2>)` (they throw on an empty union).
 - `==` / `!=`, `Equals`, `GetHashCode`, `ToString`.
 
 ## Native unions (.NET 11+)
@@ -64,25 +64,80 @@ When targeting `net11.0` or later, `Z.NativeUnion<T1, T2>` returns a native C# 1
 (`ZodSharp.Unions.NativeUnion<T1, T2>`) instead of `Union<T1, T2>`:
 
 ```csharp
-var schema = Z.NativeUnion(Z.String().Min(1), Z.Object().Build());
-var result = schema.Validate("hello");
+var schema = Z.NativeUnion(Z.Number(), Z.Boolean());
+var result = schema.Validate(3d);
 
 if (result.IsSuccess)
 {
-    var length = result.Value switch
+    var described = result.Value switch
     {
-        string s => s.Length,
-        Dictionary<string, object?> o => o.Count,
-        _ => -1,
+        double n => n,
+        bool b => b ? 1d : 0d,
+        // No discard arm: both case types are handled, so the switch is exhaustive.
     };
 }
 ```
 
-Prefer this when **both option types are reference types**: the native union is allocation-free and
-supports exhaustive pattern matching. Value-type cases box, so keep using `Z.Union<T1, T2>` (the
-hand-rolled `Union<T1, T2>`) when a case is a value type, or when you need
-`Tag`/`Match`/`Switch`/`TryGetValue`/equality. The analyzer reports `ZODSGEN041` (Info) and offers a
-code fix when a reference-type-only `Z.Union` can be switched to `Z.NativeUnion`.
+The type is declared by hand with `[Union]` rather than with the `union` keyword, so it implements the
+language's **non-boxing access pattern**. Each case is stored in its own typed field, and `TryGetValue(out T1)`
+/ `TryGetValue(out T2)` / `HasValue` let pattern matching read a value-type case without boxing; the compiler
+still treats it as a union (implicit conversions from each case type, and exhaustive `switch` expressions).
+`Value` is only the boxing view the union contract requires, and `Tag` identifies the active case.
+
+Use it whenever you need a two-option union on .NET 11+: reference-type and value-type cases are both
+allocation-free. Use the hand-rolled `Union<T1, T2>` on .NET 10, or when you need `Match`/`Switch`/equality.
+The analyzer reports `ZODSGEN041` (Info) and offers a code fix for any `Z.Union<T1, T2>` built on .NET 11+.
+
+### JSON serialization
+
+A native union carries `[JsonUnion]`, so `System.Text.Json` writes the active case directly - no wrapper and no
+discriminator - and reads it back. .NET 11's built-in classifier chooses a case by JSON token kind, which leaves
+the two shapes a web API actually produces unresolved; `NativeUnionTypeClassifierFactory` resolves them:
+
+- A case whose natural JSON shape matches the token wins. Under `JsonSerializerDefaults.Web` (minimal APIs) a
+  number may also be read from a string, so `NativeUnion<int, string>` reads `"hello"` as the string case and
+  `42` as the number case.
+- Object-shaped cases are matched by their root property names, using the platform's structural classifier.
+- Otherwise each candidate's own contract is tried; declaration order breaks a remaining tie for a scalar token.
+  An object or array token several cases can read, or a token no case can read, fails as `JsonException`.
+
+No registration is needed: the attribute is on `NativeUnion<T1, T2>`, so a source-generated
+`JsonSerializerContext` and `JsonSerializerDefaults.Web` get the same behaviour. A union whose cases share a JSON
+shape - two object types with the same property names, or two numeric types - is genuinely ambiguous; give the
+payload a distinct shape, or use a closed hierarchy with a discriminator
+(`[JsonPolymorphic(InferClosedTypePolymorphism = true)]`). See
+[System.Text.Json Integration](../serialization/SystemTextJson-Integration.md#native-unions-net-11).
+
+## Unions as schema targets
+
+A union type can itself carry `[ZodSchema]`, for either the `union` keyword or a hand-written `[Union]` struct:
+
+```csharp
+[ZodSchema]
+public readonly union Pet(Cat, Dog);
+```
+
+`PetSchema.Validate(pet)` dispatches on the union's active case and validates it with that case type's schema, so the
+error paths are the case's own (`Name`, `Weight`) without a synthetic `Value` segment. Both forms of the language's
+access pattern are understood:
+
+- A case with `TryGetValue(out TCase)` (the non-boxing access pattern: `NativeUnion`, hand-written unions) is matched
+  without boxing.
+- A case without it (a `union` declaration) is matched through `Value`.
+
+An empty union, or a case type with no validator, fails as `invalid_union` with one `invalid_type` per option instead
+of passing silently. A case type with no validator is also reported at build time as **ZODSGEN055** (warning): add
+`[ZodSchema]` to that case, or reference the assembly that generated its schema.
+
+A union member of a class target works the same way and needs no `[ZodSchema]` on the union: the member dispatches
+directly to the case schemas. `[Required]`, `[RequiredZod]` and `[NonSentinel]` treat an empty union as the member's
+absent/default value — `missing_field`, the rule's own error, or `invalid_type` respectively — using `HasValue` when the
+union provides it and `Value` otherwise. An empty union is never silently accepted.
+
+Async rules work end to end: a union whose active case has an `AsyncValidationAttribute` (or an
+`IAsyncValidatableObject`) reports `RequiresAsyncValidation = true`, `ValidateAsync` awaits the case schema,
+`Validate` throws, and the ASP.NET Core pipeline, Blazor forms, Microsoft.Extensions.Validation and options
+validation all await it through the same generated entry points.
 
 ## Discriminated union
 
@@ -123,6 +178,13 @@ derived type's schema. Paths do not include the union's `Value`: an error in the
 `public Pet Pet { get; set; }` is reported at `Pet.Name`, not `Pet.Value.Name`. Every derived type of a closed hierarchy needs its own
 `[ZodSchema]`; one without is reported as `ZODSGEN049` (see
 [Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md)).
+
+The generated JSON Schema follows the dispatch: a union member exports `oneOf` its case schemas, and a closed
+hierarchy member exports `oneOf` its derived schemas, each branch carrying the derived type's full schema
+(including inherited base members). See
+[JSON Schema Export](../serialization/JsonSchema-Export.md#export-a-generated-zodschema)). System.Text.Json error
+paths are mapped through the active case too, so `$.pet.name` becomes `Pet.Name` even though the union contract
+has no members of its own (`ZodJsonExceptions.ToMemberPath`).
 
 On .NET 11 the hosts understand unions too:
 
