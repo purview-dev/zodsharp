@@ -180,9 +180,10 @@ the JSON Schema; hosts that carry them (the OpenAPI transformers) read them.
 (`anyOf`/`oneOf`/`allOf`), `enum`/`const`, `$defs` and draft-07 `definitions`, and the metadata
 keywords including OpenAPI 3.0 `nullable`.
 
-Covered schema types: `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`,
-`ZodUnion`, `ZodDiscriminatedUnion` (as `oneOf`), `ZodArray`, `ZodLiteral`, `ZodNullable`,
-`ZodNativeEnum`/`ZodEnum`, `ZodLazy`. String formats: `IPAddress` exports `format: ipv4`/`ipv6`, `Duration`
+Covered schema types: `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodDate`, `ZodDateTimeOffset`,
+`ZodObject`, `ZodOptional`, `ZodUnion`, `ZodDiscriminatedUnion` (as `oneOf`), `ZodArray`, `ZodLiteral`,
+`ZodNullable`, `ZodRecord` (as an object with `additionalProperties`), `ZodNativeEnum`/`ZodEnum`,
+`ZodLazy`. String formats: `IPAddress` exports `format: ipv4`/`ipv6`, `Duration`
 `format: duration`, `DateString` `format: date`, `DatetimeString` `format: date-time` plus its UTC pattern,
 `TimeString` a local-time pattern, and `Base64String` `contentEncoding: base64`. Notable behaviours:
 

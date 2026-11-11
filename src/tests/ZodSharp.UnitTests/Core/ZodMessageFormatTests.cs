@@ -68,7 +68,11 @@ public class ZodMessageFormatTests
 		try
 		{
 			// Act
-			var message = ZodMessageFormat.Format("{0:0.0}", [1.5], provider: null);
+			var message = ZodMessageFormat.Format( /*lang=json*/
+				"{0:0.0}",
+				[1.5],
+				provider: null
+			);
 
 			// Assert
 			await Assert.That(message).IsEqualTo("1.5");

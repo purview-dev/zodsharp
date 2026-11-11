@@ -13,6 +13,7 @@ This package is the core library. It also ships the `[ZodSchema]` source generat
 - [Purview.ZodSharp.AspNetCore](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.AspNetCore.svg)](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore)
 - [Purview.ZodSharp.Extensions.Validation](https://www.nuget.org/packages/Purview.ZodSharp.Extensions.Validation) (.NET 11) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.Extensions.Validation.svg)](https://www.nuget.org/packages/Purview.ZodSharp.Extensions.Validation)
 - [Purview.ZodSharp.AspNetCore.OpenApi](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore.OpenApi) (.NET 11) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.AspNetCore.OpenApi.svg)](https://www.nuget.org/packages/Purview.ZodSharp.AspNetCore.OpenApi)
+- [Purview.ZodSharp.Blazor](https://www.nuget.org/packages/Purview.ZodSharp.Blazor) (.NET 11) [![NuGet version](https://img.shields.io/nuget/v/Purview.ZodSharp.Blazor.svg)](https://www.nuget.org/packages/Purview.ZodSharp.Blazor)
 
 ## Installation
 
@@ -231,7 +232,7 @@ public partial record struct AssetId
 }
 ```
 
-`[NotEmpty]` on a `Guid` property emits `NotEmptyRule<Guid>`; on an `int` property it emits `NotEmptyRule<int>`. See the [Custom Rules](https://purview.dev/docs/zodsharp/custom-rules/) page for the full precedence rules, and [Value Objects Integration](https://purview.dev/docs/zodsharp/value-objects-integration/) for the scalar value-object walkthrough and the error code / message definitions.
+`[NotEmpty]` on a `Guid` property emits `NotEmptyRule<Guid>`; on an `int` property it emits `NotEmptyRule<int>`. See the [Custom Rules](https://purview.dev/docs/zodsharp/schemas/custom-rules/) page for the full precedence rules, and [Value Objects Integration](https://purview.dev/docs/zodsharp/schemas/value-objects-integration/) for the scalar value-object walkthrough and the error code / message definitions.
 
 ### One attribute for a primitive and a scalar value object
 
@@ -335,7 +336,7 @@ public readonly partial record struct AssetId
 }
 ```
 
-The generated validator runs the rule against the value object (`NotEmptyRule<AssetId>`) and reports `Code`, `Message`, and `Origin` with an empty path. A rule written against the underlying value (for example `NonSentinelRule<Guid>`) is instead adapted automatically when applied to a `[Scalar]` type, so one rule serves every scalar backed by the same primitive. A rule attribute on a type that gets no schema is ignored, and the analyzer warns (`ZODSGEN033`) rather than failing silently. See [Value Objects Integration](https://purview.dev/docs/zodsharp/value-objects-integration/) for the full `[Scalar]` walkthrough and the error code / message definitions.
+The generated validator runs the rule against the value object (`NotEmptyRule<AssetId>`) and reports `Code`, `Message`, and `Origin` with an empty path. A rule written against the underlying value (for example `NonSentinelRule<Guid>`) is instead adapted automatically when applied to a `[Scalar]` type, so one rule serves every scalar backed by the same primitive. A rule attribute on a type that gets no schema is ignored, and the analyzer warns (`ZODSGEN033`) rather than failing silently. See [Value Objects Integration](https://purview.dev/docs/zodsharp/schemas/value-objects-integration/) for the full `[Scalar]` walkthrough and the error code / message definitions.
 
 `Purview.ValueObjects` 1.0.1 (or later) adds an **automatic** scalar form where the value-object generator declares the underlying property: `[Scalar<TValue>]` or `[Scalar(typeof(TValue))]` (for example `[Scalar<Guid>]` / `[Scalar(typeof(Guid))]`). The property is invisible to ZodSharp, so the schema is generated from the attribute and supports **type-level** rules only (property-level DataAnnotations have no host — use the manual `[Scalar]` form when you need them). A nullable reference scalar is written `[Scalar<string>(Nullable = true)]` (or `[Scalar(typeof(string), Nullable = true)]`) and round-trips JSON `null`; `[RequiredZod]` still rejects `null`, so use the shipped null-tolerant `[NullOrNonWhiteSpace]` (`NullOrNonWhiteSpaceRule`) to accept `null` while rejecting whitespace. A suppressed `Validate` method on a scalar schema is reported as `ZODSGEN044`.
 
@@ -422,7 +423,7 @@ patterns. The `DateTimeOffset` pattern is offset-aware, so the default preserves
 `<ZodSharpDateTimeOffsetSerialization>Utc</ZodSharpDateTimeOffsetSerialization>` (or
 `[assembly: ZodSharpSchemaDefaults(DateTimeOffsetSerialization = DateTimeOffsetSerialization.Utc)]`) and the
 JSON integration package's `UtcDateTimeOffsetConverter`. See the
-[JSON Schema Export](https://purview.dev/docs/zodsharp/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form)
+[JSON Schema Export](https://purview.dev/docs/zodsharp/serialization/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form)
 documentation.
 
 ## Documentation

@@ -2,7 +2,7 @@
 	<PropertyGroup>
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
-		<TUnitVersion>1.81.16</TUnitVersion>
+		<TUnitVersion>1.83.0</TUnitVersion>
 		<PurviewSourceGenFramework>2.0.0</PurviewSourceGenFramework>
 		<DotnetRuntimeVersion>10.0.15</DotnetRuntimeVersion>
 		<!--

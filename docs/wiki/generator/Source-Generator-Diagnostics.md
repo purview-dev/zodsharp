@@ -1,6 +1,6 @@
 # Source Generator Diagnostics
 
-The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`, `ZODSGEN051`, `ZODSGEN052` and `ZODSGEN055` are warnings, `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are informational, and the rest are errors.
+The `[ZodSchema]` generator ships an analyzer (category `ZodSharp.SourceGenerator`) that reports configuration and usage problems at compile time. Every diagnostic below is enabled by default; `ZODSGEN033`, `ZODSGEN037`–`ZODSGEN040`, `ZODSGEN042`, `ZODSGEN045`, `ZODSGEN046`, `ZODSGEN048`, `ZODSGEN049`, `ZODSGEN051`, `ZODSGEN052`, `ZODSGEN053` and `ZODSGEN055` are warnings, `ZODSGEN041`, `ZODSGEN043` and `ZODSGEN047` are informational, and the rest are errors.
 
 | ID | Meaning |
 |---|---|

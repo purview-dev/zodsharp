@@ -282,7 +282,11 @@ partial class ZodSchemaGenerator
 			.AsTypeReference();
 		var cancellationTokenReference = TypeLibraryGenerator.CancellationToken.AsTypeReference();
 		TypeReference zodPathReference = new(new TypeIdentity("ZodPath", TypeLibraryGenerator.ZodSharpCoreNamespace));
-		var errorsType = "global::System.Collections.Immutable.ImmutableArray<global::ZodSharp.Core.ValidationError>";
+		var errorsIdentity = PurviewTypeLibrary.System.Collections.Immutable.ImmutableArray.MakeGeneric(
+			TypeLibrary.ZodSharp.Core.ValidationError
+		);
+		var errorsType = errorsIdentity.AsTypeReference().RenderFullName;
+		var errorsTaskReference = TypeLibraryGenerator.ValueTask.MakeGeneric(errorsIdentity).AsTypeReference();
 		var baseType = TypeLibrary.ZodSharp.Core.IZodSchemaValidator.MakeGeneric(schema.TargetType).AsTypeReference();
 		var usesAdapterInstance =
 			schema.CustomValidationMethod.Value.InvocationKind
@@ -551,23 +555,101 @@ partial class ZodSchemaGenerator
 				}
 
 				body.NewLine();
-				// An explicit interface implementation cannot carry an accessibility modifier, and the
-				// structured member APIs always emit one, so these stay raw text.
-#pragma warning disable PSGFR19 // Prefer a structured CodeWriter statement API
-				body.Line(
-					$"global::System.Threading.Tasks.ValueTask<{errorsType}> global::ZodSharp.Core.IZodUntypedValidator.ValidateAsync(object? value, {ServiceProviderType}? services, {CancellationTokenType} cancellationToken) => {GeneratedValidation}.ToErrorsAsync({schemaName}.ValidateCoreAsync(Cast(value), services, 0, cancellationToken{instanceArgument}));"
-				);
-				body.NewLine();
-				body.Line(
-					$"global::System.Threading.Tasks.ValueTask<{errorsType}> global::ZodSharp.Core.IZodUntypedValidator.ValidateMemberAsync(object value, string memberName, {ServiceProviderType}? services, {CancellationTokenType} cancellationToken) => {GeneratedValidation}.ToErrorsAsync({schemaName}.ValidateMemberAsync(Cast(value), memberName, services, cancellationToken));"
-				);
 
-				body.NewLine();
-				body.Line(
-					$"bool global::ZodSharp.Core.IZodUntypedValidator.TryResolveMember(object value, {ZodPathType} path, out object? container, out string memberName) => {schemaName}.TryResolveMember(Cast(value), path, out container, out memberName);"
-				);
-#pragma warning restore PSGFR19
-				body.NewLine();
+				// An explicit interface implementation cannot carry an accessibility modifier. The member
+				// declaration APIs take that modifier from DefaultMethodAccessibility, so it is cleared for
+				// these three members: a null default omits it instead of emitting `public`.
+				var defaultMethodAccessibility = body.DefaultMethodAccessibility;
+				body.DefaultMethodAccessibility = null;
+				try
+				{
+					body.MethodExpression(
+							"global::ZodSharp.Core.IZodUntypedValidator.ValidateAsync",
+							errorsTaskReference,
+							accessibility: null,
+							expression =>
+								expression.Write(
+									$"{GeneratedValidation}.ToErrorsAsync({schemaName}.ValidateCoreAsync(Cast(value), services, 0, cancellationToken{instanceArgument}))"
+								),
+							declaration =>
+								declaration with
+								{
+									IncludeGeneratedAttributes = false,
+									Parameters =
+									[
+										new("value", new TypeIdentity(typeof(object)).AsTypeReference().Nullable(body)),
+										new(
+											"services",
+											new TypeIdentity(typeof(IServiceProvider)).AsTypeReference().Nullable(body)
+										),
+										new("cancellationToken", cancellationTokenReference),
+									],
+								}
+						)
+						.NewLine();
+
+					body.MethodExpression(
+							"global::ZodSharp.Core.IZodUntypedValidator.ValidateMemberAsync",
+							errorsTaskReference,
+							accessibility: null,
+							expression =>
+								expression.Write(
+									$"{GeneratedValidation}.ToErrorsAsync({schemaName}.ValidateMemberAsync(Cast(value), memberName, services, cancellationToken))"
+								),
+							declaration =>
+								declaration with
+								{
+									IncludeGeneratedAttributes = false,
+									Parameters =
+									[
+										new("value", new TypeIdentity(typeof(object)).AsTypeReference()),
+										new("memberName", PurviewTypeLibrary.System.String),
+										new(
+											"services",
+											new TypeIdentity(typeof(IServiceProvider)).AsTypeReference().Nullable(body)
+										),
+										new("cancellationToken", cancellationTokenReference),
+									],
+								}
+						)
+						.NewLine();
+
+					body.MethodExpression(
+							"global::ZodSharp.Core.IZodUntypedValidator.TryResolveMember",
+							PurviewTypeLibrary.System.Boolean,
+							accessibility: null,
+							expression =>
+								expression.Write(
+									$"{schemaName}.TryResolveMember(Cast(value), path, out container, out memberName)"
+								),
+							declaration =>
+								declaration with
+								{
+									IncludeGeneratedAttributes = false,
+									Parameters =
+									[
+										new("value", new TypeIdentity(typeof(object)).AsTypeReference()),
+										new("path", zodPathReference),
+										new(
+											"container",
+											new TypeIdentity(typeof(object)).AsTypeReference().Nullable(body)
+										)
+										{
+											Modifier = ParameterModifier.Out,
+										},
+										new("memberName", PurviewTypeLibrary.System.String.AsTypeReference())
+										{
+											Modifier = ParameterModifier.Out,
+										},
+									],
+								}
+						)
+						.NewLine();
+				}
+				finally
+				{
+					body.DefaultMethodAccessibility = defaultMethodAccessibility;
+				}
 
 				if (usesAdapterInstance)
 				{

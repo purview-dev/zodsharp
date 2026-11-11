@@ -28,7 +28,7 @@ namespace ZodSharp.Http.Fixtures
 		public EmailAddress(string value) => Value = value;
 
 		[Required]
-		[System.ComponentModel.DataAnnotations.EmailAddress]
+		[EmailAddress]
 		public string Value { get; }
 	}
 

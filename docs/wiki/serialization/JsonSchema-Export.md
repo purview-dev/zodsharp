@@ -43,7 +43,7 @@ var jsonSchema = Z.ToJsonSchema<Dictionary<string, object?>>(userSchema, new ToJ
 
 ## Supported schema types
 
-`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodRecord`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, `ZodDiscriminatedUnion` and `ZodLazy`.
+`ToJsonSchemaConverter` handles `ZodString`, `ZodNumber`, `ZodBoolean`, `ZodNull`, `ZodDate`, `ZodDateTimeOffset`, `ZodObject`, `ZodOptional`, `ZodUnion`, `ZodArray`, `ZodRecord`, `ZodLiteral`, `ZodNullable`, `ZodNativeEnum`/`ZodEnum`, `ZodDiscriminatedUnion` and `ZodLazy`.
 
 - Objects emit `additionalProperties: false`.
 - Records (`Z.Record(valueSchema)`) emit `{ "type": "object", "additionalProperties": <value> }`.

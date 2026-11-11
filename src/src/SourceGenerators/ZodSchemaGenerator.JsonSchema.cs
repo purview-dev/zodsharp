@@ -209,10 +209,15 @@ partial class ZodSchemaGenerator
 				? dispatchCase.DiscriminatorValue
 				: dispatchCase.DiscriminatorValue.StringLiteral();
 			body.Assignment("var", caseName, caseExpression);
-			body.Line(
-				$"{caseName}.Properties ??= new global::System.Collections.Generic.Dictionary<string, {JsonSchemaDefinitionTypeName}>(global::System.StringComparer.Ordinal);"
+			body.IfBlock($"{caseName}.Properties is null", block =>
+				block.Assignment(
+					$"{caseName}.Properties",
+					$"new global::System.Collections.Generic.Dictionary<string, {JsonSchemaDefinitionTypeName}>(global::System.StringComparer.Ordinal)"
+				)
 			);
-			body.Line($"{caseName}.Required ??= new global::System.Collections.Generic.List<string>();");
+			body.IfBlock($"{caseName}.Required is null", block =>
+				block.Assignment($"{caseName}.Required", "new global::System.Collections.Generic.List<string>()")
+			);
 			body.Assignment(
 				$"{caseName}.Properties[{nameLiteral}]",
 				$"new {JsonSchemaDefinitionTypeName} {{ Enum = new() {{ {valueExpression} }} }}"

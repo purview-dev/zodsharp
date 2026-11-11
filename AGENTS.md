@@ -22,15 +22,22 @@ src/
   src/
     ZodSharp/          Core validation library + JSON Schema export (Z.ToJsonSchema)
     SourceGenerators/  Compile-time [ZodSchema] generator (netstandard2.0, Roslyn)
+    CodeFixes/         Code fixes shipped beside the generator (netstandard2.0)
     SystemTextJson/    System.Text.Json integration + JSON Schema import (Z.FromJsonSchema); browser-safe
     Http/              HttpClient integration (browser-safe): validated bodies, ZodValidationProblemDetails reading
     NewtonsoftJson/    Newtonsoft.Json integration + JSON Schema import
     AspNetCore/        ASP.NET Core ProblemDetails integration (+ static-SSR client rules on net11)
+    Extensions.Validation/  Microsoft.Extensions.Validation bridge (net11)
+    AspNetCore.OpenApi/     OpenAPI transformers (net11)
     Blazor/            Blazor forms integration (net11): ZodValidator, message components, zodsharp-validation.js
     Examples.CLI/      Usage examples
-    Benchmarks/        BenchmarkDotNet performance suite
+    Examples.MinimalApi/    Minimal-API sample host
+    Examples.Blazor/   Blazor sample host, plus Examples.Blazor.Client for its WebAssembly client
+    Examples.Shared/   Models shared by the samples
+    Benchmarks/        BenchmarkDotNet performance suite (net10/net11)
   tests/
-    *.UnitTests/       TUnit test projects (ZodSharp, SystemTextJson, NewtonsoftJson, AspNetCore, SourceGenerators)
+    *.UnitTests/       TUnit test projects (ZodSharp, SystemTextJson, NewtonsoftJson, Http, AspNetCore,
+                       Extensions.Validation, Blazor, SourceGenerators, Repository)
     cross-platform/    Output directory shared between the C# and TS cross-platform tests
 src/ts/                TypeScript (Zod) schema + fixture generation; consumed by C# and vitest tests
 tests/ts/              Vitest cross-platform tests
@@ -47,7 +54,7 @@ The build is driven by `Purview.BuildSdk`, imported via `src/Directory.Build.pro
 - Package identities are `Purview.ZodSharp.*`; the SDK derives `AssemblyName`/`PackageId` from `RootNamespace` unless overridden explicitly.
 - Package versions are managed centrally in `Directory.Packages.props` (Central Package Management).
 - `global.json` pins the `Purview.BuildSdk` MSBuild SDK version.
-- Pack layout for all packages is validated by `purview-build.json` (`PackValidation.RequiredContent`).
+- Pack layout for all packages is validated by `.config/purview-build.json` (`PackValidation.RequiredContent`).
 - **.NET 11 opt-ins.** `Purview.BuildSdk` 2.0 compiles every `net11.0` target with Runtime Async (`runtime-async=on`) and the C# 15 updated memory-safety rules (`MemorySafetyRules=2`). The GA compiler still classifies the latter as a preview feature, so `LangVersion` is `preview`, and `AllowUnsafeBlocks` is on: the STJ generator emits unsafe fast paths, and the two `Unsafe.As` boundaries in the sentinel/required rules use `unsafe` blocks so the audit boundary is visible at the call site. Do not remove either without removing the tier-2 opt-in.
 - **Multithreaded MSBuild is off** (`PurviewMultiThreadedBuild=false`). The .NET 11 GA WebAssembly SDK declares `ReadWasmProps` with a custom `TaskFactory`, which `-mt` refuses to execute out of process, so `Examples.Blazor.Client` cannot build in that mode. Re-enable it once `dotnet/runtime` annotates the task as multithreadable.
 
@@ -138,7 +145,7 @@ A union can itself be a `[ZodSchema]` target. Its descriptor carries `IsUnionTar
 
 Each package ships its own `README.md`, placed in the project's `Sdk/` folder (for example `src/src/ZodSharp/Sdk/README.md`). The SDK's `PurviewAutoSdkPack` automatically maps `Sdk/*.md` to the package root and `Sdk/buildTransitive/**` to `buildTransitive/`, and the repo-root `README.md` is skipped when a package already packs its own README. Packages also ship `purview-logo-light.png` (linked via `src/Directory.Build.props`) and the core package ships `buildTransitive/Purview.ZodSharp.props`.
 
-Keep `purview-build.json`'s `PackValidation` requirements in sync with any packaging change.
+Keep `.config/purview-build.json`'s `PackValidation` requirements in sync with any packaging change.
 
 ## Documentation (`docs/wiki`)
 
@@ -188,7 +195,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 - Relevant tests pass.
 - `just lint-check` (CSharpier) reports no formatting changes.
 - Generated code is deterministic and reviewable; no scope leaks in `CodeWriter` output.
-- Packed packages match `purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`, and no `ForbiddenContent`: compiler-host assemblies outside `analyzers/`, generator or code-fix assemblies under `lib/`). After changing `PackValidation`, `just verify-pack-rules` proves every forbidden-content rule still rejects a package.
+- Packed packages match `.config/purview-build.json` `PackValidation` (including per-package `README.md` and `purview-logo-light.png`, and no `ForbiddenContent`: compiler-host assemblies outside `analyzers/`, generator or code-fix assemblies under `lib/`). After changing `PackValidation`, `just verify-pack-rules` proves every forbidden-content rule still rejects a package.
 - No build or publish output carries a compiler-host assembly (`Purview.SourceGeneratorFramework*`, `Microsoft.CodeAnalysis*`, `Purview.ZodSharp.SourceGenerators*`, `Purview.ZodSharp.CodeFixes*`): every publish recipe and CI publish job runs `scripts/assert-no-compiler-host-assemblies.ps1`, and `ReleaseGateTests` fails a workflow job that publishes without it.
 - Changes that affect what ships (packaging, `buildTransitive/`, package dependencies, the generator, trimming or AOT) also pass the gates that consume the real `.nupkg`: `just smoke-packed-generator` and `just smoke-packed-consumers` (Native AOT console, Blazor WebAssembly trimmed and AOT, Native AOT minimal API), plus `just wasm-size`, `just verify-trim <rid>` and `just publish-aot-sample`.
 - Before a release, run the pre-release checklist in `docs/wiki/development/Release-Flow.md` ("Release gates"): `just scrub`, `just pipeline-local-release ...`, then every gate above.

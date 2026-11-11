@@ -4,7 +4,7 @@ All notable changes to this repository are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). `package.json` is the authoritative version; see
-[Release Flow](docs/wiki/Release-Flow.md).
+[Release Flow](docs/wiki/development/Release-Flow.md).
 
 Released versions correspond to `v<version>` GitHub releases.
 
@@ -54,7 +54,7 @@ Released versions correspond to `v<version>` GitHub releases.
   every target framework and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
   suppressed. `src/tests/TrimSafety.Verification` publishes with `PublishAot=true` (every ZodSharp assembly except
   NewtonsoftJson rooted, then as a plain consumer), fails on any IL warning and runs the native binary
-  (`just verify-trim`, CI job `verify-trim`). See [Trimming and Native AOT](docs/wiki/Trimming-and-AOT.md).
+  (`just verify-trim`, CI job `verify-trim`). See [Trimming and Native AOT](docs/wiki/quality/Trimming-and-AOT.md).
 - **`[MinCount]`, `[MaxCount]` and `[CountRange]`** (`ZodSharp.Rules`, generated from the new `MinCountRule`,
   `MaxCountRule` and `CountRangeRule`): trim-safe collection/dictionary count attributes. The generator validates
   them exactly like `[MinLength]`/`[MaxLength]`/`[Length]` on a collection (same code, origin, bounds, `count`
@@ -777,8 +777,8 @@ Each note names the old form, the new form, and the edit to make.
 - **Record JSON Schema export and import.** `Z.ToJsonSchema(Z.Record(valueSchema))` now exports the same
   object/`additionalProperties` shape, and `Z.FromJsonSchema` imports an object with `additionalProperties`
   as a record in both JSON integration packages (`additionalProperties: true` treats every member as `any`).
-  See [JSON Schema Export](docs/wiki/JsonSchema-Export.md#dictionaries) and
-  [JSON Schema Import](docs/wiki/JsonSchema-Import.md#records).
+  See [JSON Schema Export](docs/wiki/serialization/JsonSchema-Export.md#dictionaries) and
+  [JSON Schema Import](docs/wiki/serialization/JsonSchema-Import.md#records).
 - **`IEnumerable<T>` properties validate their elements.** A property declared as the enumerable interface
   itself now resolves its element type, validates elements and exports its `items` schema, like `T[]`.
 
@@ -816,7 +816,7 @@ Each note names the old form, the new form, and the edit to make.
   correlates the local time with the offset and rejects every RFC 3339 representation of both instant bounds.
   `Z.Date().NonSentinel()` also exports `type: "string"`, `format: "date-time"` (previously it fell back to
   the empty schema). See
-  [JSON Schema Export](docs/wiki/JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
+  [JSON Schema Export](docs/wiki/serialization/JsonSchema-Export.md#temporal-sentinels-and-the-datetimeoffset-wire-form).
 - **Optional exact UTC `DateTimeOffset` contract.** `DateTimeOffsetSerialization.Utc` narrows
   `[NonSentinel] DateTimeOffset` to a zero-offset wire form. Configure it per project with
   `<ZodSharpDateTimeOffsetSerialization>Utc</ZodSharpDateTimeOffsetSerialization>` (for example in
@@ -937,7 +937,7 @@ release that introduced it, so `AnalyzerReleases.Shipped.md` shows `ZODSGEN037`â
 - A new `enum` rule, applied automatically on generated schemas, plus additional explicit rules.
 - `IZodRule` organisation with a supporting analyzer, and `RuleMessage` is now public.
 - Eight new diagnostics: `ZODSGEN037`â€“`ZODSGEN044`, recorded in `AnalyzerReleases.Shipped.md` under
-  `## Release 2.0.2`. See [Source Generator Diagnostics](docs/wiki/Source-Generator-Diagnostics.md).
+  `## Release 2.0.2`. See [Source Generator Diagnostics](docs/wiki/generator/Source-Generator-Diagnostics.md).
 - **Automatic scalar value-object support.** `[ZodSchema]` now works with the automatic scalar forms
   `[Scalar<TValue>]` and `[Scalar(typeof(TValue))]` (Purview.ValueObjects 1.0.1+), where the value-object
   generator declares the underlying property. ZodSharp resolves the underlying type and property name from

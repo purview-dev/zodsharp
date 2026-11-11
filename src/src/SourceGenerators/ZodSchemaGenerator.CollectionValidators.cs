@@ -7,7 +7,7 @@ partial class ZodSchemaGenerator
 {
 	static bool RejectsDefaultArray(ZodPropertyDescriptor property) =>
 		property.IsImmutableArray
-		&& property.DefaultImmutableArrayBehavior != Models.DefaultImmutableArrayBehavior.TreatAsEmpty;
+		&& property.DefaultImmutableArrayBehavior != DefaultImmutableArrayBehavior.TreatAsEmpty;
 
 	static string MissingValueCondition(ZodPropertyDescriptor property)
 	{
@@ -18,6 +18,8 @@ partial class ZodSchemaGenerator
 		if (!RejectsDefaultArray(property))
 			return $"{value} is null";
 
+		// The collection is a non-nullable array or immutable array that rejects its default value, so the member is
+		// absent when the property is null or its value is the default array.
 		return property.IsNullableValueType
 			? $"({value} is null || {value}.GetValueOrDefault().IsDefault)"
 			: $"{value}.IsDefault";
@@ -140,9 +142,7 @@ partial class ZodSchemaGenerator
 						);
 					}
 
-#pragma warning disable PSGFR23 // ElseIfScope is not yet available in Purview.SourceGeneratorFramework
-					using (writer.OpenBlockScope($"else if ({propertyLengthName} > {length.MaximumLength})"))
-#pragma warning restore PSGFR23
+					using (writer.ElseIfScope($"{propertyLengthName} > {length.MaximumLength}"))
 					{
 						WriteAddError(
 							writer,

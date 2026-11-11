@@ -6,19 +6,31 @@ Contributions are welcome. Please open an issue or pull request against [purview
 
 ```
 src/
+  ZodSharp.slnx
   src/
-    ZodSharp/          Core validation library + JSON Schema export (Z.ToJsonSchema)
-    SourceGenerators/  Compile-time [ZodSchema] generator (netstandard2.0, Roslyn)
-    SystemTextJson/    System.Text.Json integration + JSON Schema import
-    NewtonsoftJson/    Newtonsoft.Json integration + JSON Schema import
-    AspNetCore/        ASP.NET Core ProblemDetails integration
-    Examples.CLI/      Usage examples
-    Benchmarks/        BenchmarkDotNet performance suite
+    ZodSharp/               Core validation library + JSON Schema export (Z.ToJsonSchema)
+    SourceGenerators/       [ZodSchema] generator and analyzers (netstandard2.0, Roslyn)
+    CodeFixes/              Code fixes shipped beside the generator
+    SystemTextJson/         System.Text.Json integration + JSON Schema import
+    NewtonsoftJson/         Newtonsoft.Json integration + JSON Schema import
+    Http/                   HttpClient integration (browser-safe)
+    AspNetCore/             ASP.NET Core ProblemDetails integration
+    Extensions.Validation/  Microsoft.Extensions.Validation bridge (net11.0)
+    AspNetCore.OpenApi/     OpenAPI transformers (net11.0)
+    Blazor/                 Blazor forms integration (net11.0)
+    Examples.CLI/           Usage examples
+    Examples.MinimalApi/    Minimal-API sample host
+    Examples.Blazor/        Blazor sample host (+ Examples.Blazor.Client)
+    Examples.Shared/        Models shared by the samples
+    Benchmarks/             BenchmarkDotNet performance suite
   tests/
-    *.UnitTests/       TUnit test projects
-src/ts/                TypeScript (Zod) schema + fixture generation
-tests/ts/              Vitest cross-platform tests
-docs/wiki/             This documentation suite
+    *.UnitTests/            TUnit test projects
+    cross-platform/         Gitignored output shared with the vitest suites
+src/ts/                     TypeScript (Zod) schema + fixture generation
+tests/ts/                   Vitest cross-platform tests
+skills/                     Agent skills this repository publishes
+.agents/skills/             Skills installed from other repositories (committed, with skills-lock.json)
+docs/wiki/                  This documentation suite
 ```
 
 ## Commands
@@ -29,7 +41,7 @@ just test             # dotnet test src/ZodSharp.slnx -c Debug --treenode-filter
 just lint-check       # dotnet csharpier check .
 just lint-fix         # dotnet csharpier format .
 just pack             # dotnet pack src/ZodSharp.slnx -c Debug -o artifacts
-just perf-tests       # dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release
+just perf-tests       # dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net10.0
 ```
 
 TypeScript tooling uses Bun:

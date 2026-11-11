@@ -62,18 +62,18 @@ public class GeneratedLine
 }
 
 /// <summary>Rejects the value <c>taken</c> only asynchronously.</summary>
-public sealed class AsyncTakenAttribute : System.ComponentModel.DataAnnotations.AsyncValidationAttribute
+public sealed class AsyncTakenAttribute : AsyncValidationAttribute
 {
 	/// <inheritdoc/>
 	protected override System.ComponentModel.DataAnnotations.ValidationResult? IsValid(
 		object? value,
-		System.ComponentModel.DataAnnotations.ValidationContext validationContext
+		ValidationContext validationContext
 	) => throw new InvalidOperationException("Validated asynchronously.");
 
 	/// <inheritdoc/>
 	protected override async Task<System.ComponentModel.DataAnnotations.ValidationResult?> IsValidAsync(
 		object? value,
-		System.ComponentModel.DataAnnotations.ValidationContext validationContext,
+		ValidationContext validationContext,
 		CancellationToken cancellationToken
 	)
 	{

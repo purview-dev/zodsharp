@@ -75,6 +75,19 @@ the offset-equivalent bounds. The C# producer
 (`JsonSchema_GivenGeneratedTemporalSchemas_WritesZodParityArtifacts`) writes to
 `src/tests/cross-platform/temporal-parity/`; the UTC contract has its own generator tests.
 
+Two further suites pin the generated schemas to the wire forms the browser expects:
+
+- **GUID/UUID parity** (`tests/ts/guid-uuid-parity.test.ts`) checks that generated `Guid`/`Guid?` schemas and their
+  exported JSON Schema use the canonical string form. The producer is
+  `JsonSchema_GivenGeneratedGuidSchemas_WritesZodParityArtifacts`, writing to `src/tests/cross-platform/guid-parity/`.
+- **Client validators** (`tests/ts/client-validators.test.ts`) checks every rule the static-SSR JavaScript validators
+  map against the ZodSharp rule of the same name. The producer is
+  `ClientRules_GivenEveryMappedRule_WritesParityFixtures` (in `Blazor.UnitTests`), writing to
+  `src/tests/cross-platform/client-rules/`.
+
+Each suite fails rather than passing vacuously when its directory is empty, and the `cross-platform` CI job runs one
+producer step per suite so the ordering the vitest consumer needs is explicit.
+
 See [JSON Schema Export](../serialization/JsonSchema-Export.md) and [JSON Schema Import](../serialization/JsonSchema-Import.md).
 
 ## Directory layout
@@ -83,5 +96,6 @@ See [JSON Schema Export](../serialization/JsonSchema-Export.md) and [JSON Schema
 src/ts/                        TypeScript (Zod) schemas + fixture generation
 src/ts/fixtures/               generated JSON fixtures + manifest.json
 tests/ts/                      vitest cross-platform tests
-src/tests/cross-platform/      shared output directory for C#-generated JSON
+src/tests/cross-platform/      gitignored output shared with the vitest suites:
+                               output/, guid-parity/, temporal-parity/, client-rules/
 ```

@@ -76,7 +76,7 @@ the original offset, and adds the UTC converter. `UseZodSharpPreserveOffsetDateT
 per-type/property opt-out equivalent.
 
 `PreserveOffsetDateTimeOffsetConverter` is available to opt a type or property back out of a project-wide UTC
-converter. See [JSON Schema Export](https://purview.dev/docs/zodsharp/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form).
+converter. See [JSON Schema Export](https://purview.dev/docs/zodsharp/serialization/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form).
 
 ## Import from JSON Schema
 
@@ -99,7 +99,7 @@ generates code at runtime. Every API in this package that reaches Newtonsoft ser
 `[RequiresDynamicCode]`, so a trimmed or AOT application gets an IL2026/IL3050 warning at the call site instead of a
 runtime failure. Use [Purview.ZodSharp.SystemTextJson](https://www.nuget.org/packages/Purview.ZodSharp.SystemTextJson)
 with a source-generated `JsonSerializerContext` in those applications. See
-[Trimming and Native AOT](https://purview.dev/docs/zodsharp/trimming-and-aot/).
+[Trimming and Native AOT](https://purview.dev/docs/zodsharp/quality/trimming-and-aot/).
 
 ## Documentation
 

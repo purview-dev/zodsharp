@@ -211,7 +211,7 @@ static class ValidationInputsResolver
 	public static ImmutableArray<AttributeData> GetTypeValidationAttributes(INamedTypeSymbol type)
 	{
 		var attributes = ImmutableArray.CreateBuilder<AttributeData>();
-		HashSet<INamedTypeSymbol> seen = new(SymbolEqualityComparer.Default);
+		HashSet<INamedTypeSymbol> seen = [with(SymbolEqualityComparer.Default)];
 		for (var current = type; current is not null; current = current.BaseType)
 		{
 			foreach (var attribute in current.GetAttributes())

@@ -92,7 +92,7 @@ var options = new JsonSerializerOptions
 ```
 
 `PreserveOffsetDateTimeOffsetConverter` is available to opt a type or property back out of a project-wide UTC
-converter. See [JSON Schema Export](https://purview.dev/docs/zodsharp/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form).
+converter. See [JSON Schema Export](https://purview.dev/docs/zodsharp/serialization/json-schema-export/#temporal-sentinels-and-the-datetimeoffset-wire-form).
 
 ## Import from JSON Schema
 
