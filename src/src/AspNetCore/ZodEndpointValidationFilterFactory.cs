@@ -301,23 +301,13 @@ static class ZodEndpointValidationFilterFactory
 	static bool IsSkipped(ParameterInfo parameter, IServiceProviderIsService? isService)
 	{
 		var type = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
-		if (
-			type == typeof(HttpContext)
-			|| type == typeof(HttpRequest)
-			|| type == typeof(HttpResponse)
-			|| type == typeof(ClaimsPrincipal)
-			|| type == typeof(CancellationToken)
-			|| type == typeof(IFormFile)
-			|| type == typeof(IFormFileCollection)
-			|| type == typeof(IFormCollection)
-			|| type == typeof(Stream)
-			|| type == typeof(PipeReader)
-		)
-		{
+		if (IsIntrinsicallySkipped(type))
 			return true;
-		}
 
 		var forced = false;
+		if (HasSkipValidation(type))
+			return true;
+
 		foreach (var attribute in parameter.GetCustomAttributes(inherit: true))
 		{
 			switch (attribute)
@@ -333,9 +323,7 @@ static class ZodEndpointValidationFilterFactory
 					forced = true;
 					break;
 				default:
-					// Microsoft.Extensions.Validation's [SkipValidation], or an application's own, matched by name
-					// so no package reference is needed.
-					if (string.Equals(attribute.GetType().Name, "SkipValidationAttribute", StringComparison.Ordinal))
+					if (IsSkipValidationAttribute(attribute))
 						return true;
 					break;
 			}
@@ -343,6 +331,44 @@ static class ZodEndpointValidationFilterFactory
 
 		return !forced && isService?.IsService(parameter.ParameterType) == true;
 	}
+
+	/// <summary>
+	/// Whether a parameter of <paramref name="type"/> is a framework value that is never validated by ZodSharp.
+	/// </summary>
+	static bool IsIntrinsicallySkipped(Type type) =>
+		type == typeof(HttpContext)
+		|| type == typeof(HttpRequest)
+		|| type == typeof(HttpResponse)
+		|| type == typeof(ClaimsPrincipal)
+		|| type == typeof(CancellationToken)
+		|| type == typeof(IFormFile)
+		|| type == typeof(IFormFileCollection)
+		|| type == typeof(IFormCollection)
+		|| type == typeof(Stream)
+		|| type == typeof(PipeReader);
+
+	/// <summary>
+	/// Whether <paramref name="type"/> (or a base type) is marked with the platform's
+	/// <c>[SkipValidation]</c>. On .NET 11 the real type is matched; on .NET 10, where the attribute does not
+	/// exist, an application's own attribute with that name is honored.
+	/// </summary>
+	static bool HasSkipValidation(Type type)
+	{
+		foreach (var attribute in type.GetCustomAttributes(inherit: true))
+		{
+			if (IsSkipValidationAttribute(attribute))
+				return true;
+		}
+
+		return false;
+	}
+
+	static bool IsSkipValidationAttribute(object attribute) =>
+#if NET11_0_OR_GREATER
+		attribute is Microsoft.Extensions.Validation.SkipValidationAttribute;
+#else
+		string.Equals(attribute.GetType().Name, "SkipValidationAttribute", StringComparison.Ordinal);
+#endif
 
 	static bool IsBody(ParameterInfo parameter, Type validatedType, IServiceProviderIsService? isService)
 	{

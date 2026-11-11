@@ -181,6 +181,11 @@ static partial class SourceGenLibrary
 			var generateParseMethod = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateParseMethod;
 			var validateEnumValues = !zodSchemaAttribute.Exists || zodSchemaAttribute.ValidateEnumValues;
 			var generateJsonSchema = !zodSchemaAttribute.Exists || zodSchemaAttribute.GenerateJsonSchema;
+			var (typeSyncValidationAttributes, typeAsyncValidationAttributes) =
+				ValidationInputsResolver.GetFallbackValidationAttributes(
+					ValidationInputsResolver.GetTypeValidationAttributes(symbol),
+					isTypeLevel: true
+				);
 
 			schemas.Add(
 				new(
@@ -214,21 +219,16 @@ static partial class SourceGenLibrary
 					IsUnionTarget = isUnionTarget,
 					UnionCases = unionCases,
 					UnionHasValue = unionHasValue,
+					TypeSyncValidationAttributes = typeSyncValidationAttributes,
+					TypeAsyncValidationAttributes = typeAsyncValidationAttributes,
 				}
 			);
 
 			foreach (
-				var property in symbol
-					.GetMembers()
-					.OfType<IPropertySymbol>()
+				var property in GetValidatableProperties(symbol)
 					.Where(m =>
-						m.DeclaredAccessibility == Accessibility.Public
-						&& !m.IsStatic
-						&& !m.IsIndexer
-						&& (
-							TypeHelpers.HasDataAnnotationAttribute(GetValidationAttributes(m, compilation))
-							|| IsPropertyWithNestedSchema(m, externalSchemas)
-						)
+						TypeHelpers.HasDataAnnotationAttribute(GetValidationAttributes(m, compilation))
+						|| IsPropertyWithNestedSchema(m, externalSchemas)
 					)
 			)
 			{
@@ -285,16 +285,10 @@ static partial class SourceGenLibrary
 			}
 		}
 
-		foreach (var member in symbol.GetMembers())
+		foreach (var unionProperty in GetValidatableProperties(symbol))
 		{
 			if (
-				member
-					is not IPropertySymbol
-					{
-						DeclaredAccessibility: Accessibility.Public,
-						IsStatic: false
-					} unionProperty
-				|| TypeHelpers.UnwrapNullableType(unionProperty.Type) is not INamedTypeSymbol unionType
+				TypeHelpers.UnwrapNullableType(unionProperty.Type) is not INamedTypeSymbol unionType
 				|| !ValidationInputsResolver.RoslynFeatures.IsUnion(unionType)
 			)
 			{
@@ -387,12 +381,7 @@ static partial class SourceGenLibrary
 		DateTimeOffsetSerialization? typeDateTimeOffsetSerialization
 	)
 	{
-		var properties = symbol
-			.GetMembers()
-			.OfType<IPropertySymbol>()
-			.Where(property =>
-				property.DeclaredAccessibility == Accessibility.Public && !property.IsStatic && !property.IsIndexer
-			)
+		var properties = GetValidatableProperties(symbol)
 			.Select(property =>
 				GetValidatablePropertyDescriptor(
 					property,
@@ -405,6 +394,45 @@ static partial class SourceGenLibrary
 			.ToImmutableArray();
 
 		return new(properties);
+	}
+
+	/// <summary>
+	/// Gets every public instance property a generated schema validates: the properties declared on
+	/// <paramref name="type"/> first, then those inherited up its base chain. A property the derived type
+	/// overrides or hides is taken once, from the most derived declaration, because that is what
+	/// <c>value.Member</c> binds. Any declared member with the same name hides a base property, so the name is
+	/// recorded before its property shape is considered.
+	/// </summary>
+	/// <param name="type">The schema target type.</param>
+	/// <returns>The properties in validation order, without duplicate or hidden members.</returns>
+	internal static ImmutableArray<IPropertySymbol> GetValidatableProperties(INamedTypeSymbol type)
+	{
+		var properties = ImmutableArray.CreateBuilder<IPropertySymbol>();
+		HashSet<string> seen = [with(StringComparer.Ordinal)];
+		for (var current = type; current is not null; current = current.BaseType)
+		{
+			foreach (var member in current.GetMembers())
+			{
+				if (!seen.Add(member.Name))
+					continue;
+
+				if (
+					member
+						is IPropertySymbol
+						{
+							DeclaredAccessibility: Accessibility.Public,
+							IsStatic: false,
+							IsIndexer: false
+						} property
+					&& !ValidationInputsResolver.IsSkipValidation(property)
+				)
+				{
+					properties.Add(property);
+				}
+			}
+		}
+
+		return properties.ToImmutable();
 	}
 
 	/// <summary>
@@ -733,6 +761,8 @@ static partial class SourceGenLibrary
 			validationKind == PropertyValidationKind.Comparable
 			&& originalPropertyType is INamedTypeSymbol namedPropertyType
 			&& IsVersion(namedPropertyType);
+		var (syncValidationAttributes, asyncValidationAttributes) =
+			ValidationInputsResolver.GetFallbackValidationAttributes(validationAttributes, isTypeLevel: false);
 
 		return GeneratorResult<ZodPropertyDescriptor>.Create(
 			new(
@@ -792,7 +822,8 @@ static partial class SourceGenLibrary
 					originalPropertyType
 				),
 				ExternalNestedSchemaRequiresAsync = nestedRequiresAsync,
-				AsyncValidationAttributes = ValidationInputsResolver.GetAsyncValidationAttributes(validationAttributes),
+				SyncValidationAttributes = syncValidationAttributes,
+				AsyncValidationAttributes = asyncValidationAttributes,
 				DispatchKind = dispatchKind,
 				DispatchCases = dispatchCases,
 				UnionHasValue = unionHasValue,
@@ -1389,7 +1420,26 @@ static partial class SourceGenLibrary
 	static string GetDisplayName(ImmutableArray<AttributeData> attributes, string propertyName)
 	{
 		var display = DisplayAttributeData.FromAttributeData(attributes);
-		return display.Exists && !string.IsNullOrEmpty(display.Name) ? display.Name! : propertyName;
+		if (display.Exists && !string.IsNullOrEmpty(display.Name))
+			return display.Name!;
+
+		// .NET 11's Blazor DisplayName component also supports the older [DisplayName] attribute; use it when
+		// [Display] is absent, so messages and the component agree.
+		foreach (var attribute in attributes)
+		{
+			if (
+				attribute.AttributeClass is { MetadataName: "DisplayNameAttribute" } attributeClass
+				&& attributeClass.ContainingNamespace?.ToDisplayString() == "System.ComponentModel"
+				&& attribute.ConstructorArguments.Length > 0
+				&& attribute.ConstructorArguments[0].Value is string name
+				&& !string.IsNullOrEmpty(name)
+			)
+			{
+				return name;
+			}
+		}
+
+		return propertyName;
 	}
 
 	static Location GetAttributeLocation(AttributeData? attributeData) =>
@@ -1637,10 +1687,7 @@ static partial class SourceGenLibrary
 		if (!compareAttribute.Exists)
 			return;
 
-		var otherProperty = property
-			.ContainingType?.GetMembers(compareAttribute.OtherProperty)
-			.OfType<IPropertySymbol>()
-			.FirstOrDefault();
+		var otherProperty = FindCompareProperty(property.ContainingType, compareAttribute.OtherProperty);
 		if (otherProperty is null)
 		{
 			diagnostics.Add(
@@ -1653,6 +1700,34 @@ static partial class SourceGenLibrary
 				)
 			);
 		}
+	}
+
+	/// <summary>
+	/// Finds the property a <c>[Compare]</c> attribute references. The referenced property may be inherited,
+	/// so the search follows the base chain from the declaring type; only a public property is usable from the
+	/// generated schema.
+	/// </summary>
+	static IPropertySymbol? FindCompareProperty(INamedTypeSymbol? type, string name)
+	{
+		for (var current = type; current is not null; current = current.BaseType)
+		{
+			foreach (var member in current.GetMembers(name))
+			{
+				if (
+					member is IPropertySymbol
+					{
+						DeclaredAccessibility: Accessibility.Public,
+						IsStatic: false,
+						IsIndexer: false
+					} property
+				)
+				{
+					return property;
+				}
+			}
+		}
+
+		return null;
 	}
 
 	static bool IsValueSetSupportedType(ITypeSymbol propertyType)

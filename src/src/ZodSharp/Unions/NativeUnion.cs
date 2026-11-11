@@ -2,6 +2,7 @@
 #pragma warning disable CA1815 // Native unions do not synthesize equality; the schema result does not need it.
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace ZodSharp.Unions;
 
@@ -27,6 +28,7 @@ namespace ZodSharp.Unions;
 /// </para>
 /// </remarks>
 [Union]
+[JsonUnion(TypeClassifier = typeof(NativeUnionTypeClassifierFactory))]
 public readonly struct NativeUnion<T1, T2> : IUnion, System.Runtime.CompilerServices.IUnion
 {
 	/// <summary>No case is active (the default value, or a null reference/nullable case value).</summary>

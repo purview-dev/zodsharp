@@ -88,6 +88,26 @@ Use it whenever you need a two-option union on .NET 11+: reference-type and valu
 allocation-free. Use the hand-rolled `Union<T1, T2>` on .NET 10, or when you need `Match`/`Switch`/equality.
 The analyzer reports `ZODSGEN041` (Info) and offers a code fix for any `Z.Union<T1, T2>` built on .NET 11+.
 
+### JSON serialization
+
+A native union carries `[JsonUnion]`, so `System.Text.Json` writes the active case directly - no wrapper and no
+discriminator - and reads it back. .NET 11's built-in classifier chooses a case by JSON token kind, which leaves
+the two shapes a web API actually produces unresolved; `NativeUnionTypeClassifierFactory` resolves them:
+
+- A case whose natural JSON shape matches the token wins. Under `JsonSerializerDefaults.Web` (minimal APIs) a
+  number may also be read from a string, so `NativeUnion<int, string>` reads `"hello"` as the string case and
+  `42` as the number case.
+- Object-shaped cases are matched by their root property names, using the platform's structural classifier.
+- Otherwise each candidate's own contract is tried; declaration order breaks a remaining tie for a scalar token.
+  An object or array token several cases can read, or a token no case can read, fails as `JsonException`.
+
+No registration is needed: the attribute is on `NativeUnion<T1, T2>`, so a source-generated
+`JsonSerializerContext` and `JsonSerializerDefaults.Web` get the same behaviour. A union whose cases share a JSON
+shape - two object types with the same property names, or two numeric types - is genuinely ambiguous; give the
+payload a distinct shape, or use a closed hierarchy with a discriminator
+(`[JsonPolymorphic(InferClosedTypePolymorphism = true)]`). See
+[System.Text.Json Integration](../serialization/SystemTextJson-Integration.md#native-unions-net-11).
+
 ## Unions as schema targets
 
 A union type can itself carry `[ZodSchema]`, for either the `union` keyword or a hand-written `[Union]` struct:
@@ -158,6 +178,13 @@ derived type's schema. Paths do not include the union's `Value`: an error in the
 `public Pet Pet { get; set; }` is reported at `Pet.Name`, not `Pet.Value.Name`. Every derived type of a closed hierarchy needs its own
 `[ZodSchema]`; one without is reported as `ZODSGEN049` (see
 [Source Generator Diagnostics](../generator/Source-Generator-Diagnostics.md)).
+
+The generated JSON Schema follows the dispatch: a union member exports `oneOf` its case schemas, and a closed
+hierarchy member exports `oneOf` its derived schemas, each branch carrying the derived type's full schema
+(including inherited base members). See
+[JSON Schema Export](../serialization/JsonSchema-Export.md#export-a-generated-zodschema)). System.Text.Json error
+paths are mapped through the active case too, so `$.pet.name` becomes `Pet.Name` even though the union contract
+has no members of its own (`ZodJsonExceptions.ToMemberPath`).
 
 On .NET 11 the hosts understand unions too:
 

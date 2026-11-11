@@ -198,21 +198,14 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			}
 		}
 
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
 			// A positional record property inherits the attributes of the primary-constructor parameter it is
 			// synthesized from, so the analyzer resolves the same effective set the generator validates with.
 			var validationAttributes = SourceGenLibrary.GetValidationAttributes(property, context.Compilation);
 
-			if (
-				property.DeclaredAccessibility != Accessibility.Public
-				|| property.IsStatic
-				|| property.IsIndexer
-				|| !TypeHelpers.HasDataAnnotationAttribute(validationAttributes)
-			)
-			{
+			if (!TypeHelpers.HasDataAnnotationAttribute(validationAttributes))
 				continue;
-			}
 
 			_ = ZodSchemaAttributeData.FromAttributeData(type, out var schemaAttributeData);
 			var propertyResult = SourceGenLibrary.GetValidatablePropertyDescriptor(
@@ -336,11 +329,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		if (ValidationInputsResolver.RoslynFeatures.IsUnion(type))
 			ReportUnionCases(context, type, typeLocation, externalSchemas);
 
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
-			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-				continue;
-
 			if (
 				TypeHelpers.UnwrapNullableType(property.Type) is INamedTypeSymbol memberType
 				&& ValidationInputsResolver.RoslynFeatures.IsUnion(memberType)
@@ -403,11 +393,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		if (ValidationInputsResolver.GetValidatableObjectKinds(type).Async)
 			asyncOnlyRules.Add("IAsyncValidatableObject");
 
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
-			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-				continue;
-
 			foreach (var attribute in SourceGenLibrary.GetValidationAttributes(property, context.Compilation))
 			{
 				if (
@@ -548,11 +535,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		Location typeLocation
 	)
 	{
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
-			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-				continue;
-
 			if (!SourceGenLibrary.TryGetNestedSchemaType(property, externalSchemas, out var nested))
 				continue;
 
@@ -600,11 +584,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 			if (!reachable.Add(new TypeIdentity(symbol)))
 				continue;
 
-			foreach (var property in symbol.GetMembers().OfType<IPropertySymbol>())
+			foreach (var property in SourceGenLibrary.GetValidatableProperties(symbol))
 			{
-				if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-					continue;
-
 				if (SourceGenLibrary.TryGetNestedSchemaType(property, externalSchemas, out var nested))
 					queue.Enqueue(nested);
 			}
@@ -626,11 +607,8 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 		Location typeLocation
 	)
 	{
-		foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
+		foreach (var property in SourceGenLibrary.GetValidatableProperties(type))
 		{
-			if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer)
-				continue;
-
 			var hasAttribute = SourceGenLibrary
 				.GetValidationAttributes(property, context.Compilation)
 				.Any(attribute => TypeLibrary.ZodSharp.CollectionBehaviorAttribute.Equals(attribute.AttributeClass));

@@ -396,6 +396,89 @@ public class ZodEndpointValidationTests
 	}
 
 #if NET11_0_OR_GREATER
+	[Microsoft.Extensions.Validation.SkipValidation]
+	public sealed class SkippedRequest
+	{
+		public string? Email { get; set; }
+	}
+
+	sealed class SkippedRequestValidator : IZodSchemaValidator<SkippedRequest>
+	{
+		public ValidationResult<SkippedRequest> Validate(SkippedRequest value) =>
+			ValidationResult<SkippedRequest>.Failure(
+				ValidationError.Create("should_not_run", "must not run", ZodPath.Root)
+			);
+
+		public ValueTask<ValidationResult<SkippedRequest>> ValidateAsync(
+			SkippedRequest value,
+			CancellationToken cancellationToken = default
+		) => new(Validate(value));
+	}
+
+	[Test]
+	public async Task WithZodSharpValidation_GivenSkipValidationOnTheParameterType_SkipsIt(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — the platform attribute targets the class too; the filter must match the real .NET 11 type,
+		// not merely a type whose name ends in SkipValidationAttribute.
+		await using var app = await TestApp.StartAsync(
+			services =>
+			{
+				services.AddZodSharp(options =>
+					options.ConfigureFactory = factory => factory.Register(new SkippedRequestValidator())
+				);
+				services.AddZodSharpProblemDetails(options => options.Registry = new ErrorTypeRegistry());
+			},
+			app =>
+				app.MapPost("/skipped", (SkippedRequest request) => TypedResults.Ok("handled"))
+					.WithZodSharpValidation(),
+			cancellationToken
+		);
+		using StringContent content = new("""{"email":"x"}""", System.Text.Encoding.UTF8, "application/json");
+
+		// Act
+		using var response = await app.Client.PostAsync(
+			new Uri("/skipped", UriKind.Relative),
+			content,
+			cancellationToken
+		);
+		var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+		// Assert
+		await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+		await Assert.That(body).Contains("handled");
+	}
+
+	[Test]
+	public async Task WithZodSharpValidation_GivenAsyncRuleInUnionBody_AwaitsTheRule(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — the endpoint filter is a separate path from the Microsoft.Extensions.Validation pipeline;
+		// it must also await a union case's asynchronous rule and pass the request services.
+		await using var app = await TestApp.StartAsync(
+			services =>
+			{
+				services.AddZodSharp(options =>
+					options.ConfigureFactory = factory => factory.Register(new AsyncPetSchemaValidator())
+				);
+				services.AddZodSharpProblemDetails(options => options.Registry = new ErrorTypeRegistry());
+			},
+			app => app.MapPost("/pets", (AsyncPet body) => TypedResults.Ok()).WithZodSharpValidation(),
+			cancellationToken
+		);
+		using StringContent content = new("""{"name":"taken"}""", System.Text.Encoding.UTF8, "application/json");
+
+		// Act
+		using var response = await app.Client.PostAsync(new Uri("/pets", UriKind.Relative), content, cancellationToken);
+		var json = await response.Content.ReadAsStringAsync(cancellationToken);
+
+		// Assert
+		await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+		await Assert.That(json).Contains("Name is taken");
+	}
+
 	[Test]
 	public async Task WithZodSharpValidation_GivenBindingFailureAndPassThrough_KeepsTheBindersResponse(
 		CancellationToken cancellationToken

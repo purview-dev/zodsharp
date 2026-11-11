@@ -147,6 +147,12 @@ public sealed class ZodValidatableInfoResolver : IValidatableInfoResolver
 			return null;
 
 		var lookup = Nullable.GetUnderlyingType(type) ?? type;
+		if (
+			type.IsDefined(typeof(SkipValidationAttribute), inherit: true)
+			|| lookup.IsDefined(typeof(SkipValidationAttribute), inherit: true)
+		)
+			return null;
+
 		if (TryGetValidator(lookup, out var validator) || (lookup != type && TryGetValidator(type, out validator)))
 		{
 			ZodValidatableTypeInfo zod = new(validator, Options);

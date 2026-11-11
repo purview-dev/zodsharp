@@ -22,6 +22,34 @@ Released versions correspond to `v<version>` GitHub releases.
   absent/default value. Async rules on a case propagate: `RequiresAsyncValidation` is true, `ValidateAsync` awaits it,
   and ASP.NET Core, Blazor, Microsoft.Extensions.Validation and options validation all await it.
 
+- **Native union JSON round-trip.** `NativeUnion<T1, T2>` now carries `[JsonUnion]`, and the new
+  `NativeUnionTypeClassifierFactory` resolves the payloads .NET 11's token classifier cannot: a string token
+  under `JsonSerializerDefaults.Web` (where a number may also be read from a string) and two object-shaped cases.
+  `System.Text.Json` writes the active case with no wrapper or discriminator and reads it back on both the
+  reflection and source-generated paths, so a minimal-API union parameter works without a custom converter.
+  A genuinely ambiguous payload still fails as `JsonException`. See
+  [Unions and Discriminated Unions](docs/wiki/schemas/Unions-and-Discriminated-Unions.md#json-serialization).
+- **Union and closed-hierarchy members export their case schemas.** A generated `BuildJsonSchema` now emits
+  `oneOf` for a member typed as a C# 15 union or a closed class instead of the empty schema; a hierarchy that
+  opts into `[JsonPolymorphic(InferClosedTypePolymorphism = true)]` (or registers `[JsonDerivedType]`) also
+  constrains the discriminator (`$type` by default) on every branch. See
+  [JSON Schema Export](docs/wiki/serialization/JsonSchema-Export.md#export-a-generated-zodschema).
+- **The full DataAnnotations validation surface.** Every `ValidationAttribute` the generator has no dedicated
+  rule for now runs: `[CustomValidation]` (property or class), `[FileExtensions]`, `[EnumDataType]`, and a
+  consumer's own attribute are constructed in generated fields and called through
+  `GetValidationResult`/`GetValidationResultAsync`. Class-level sync and async attributes run as object-level
+  rules and are collected from the base chain; a non-multiple attribute is taken from its most derived
+  declaration. Attributes already mapped to a Zod rule are never run twice. See
+  [Source Generator DataAnnotations](docs/wiki/generator/Source-Generator-DataAnnotations.md#attributes-without-a-dedicated-rule).
+- **`[DisplayName]` as a display-name fallback.** When `[Display(Name=...)]` is absent, `[DisplayName]` supplies the
+  display name used in generated messages, matching .NET 11's Blazor `DisplayName` component.
+- **`[SkipValidation]` throughout the .NET 11 validation stack.** A class marked `[SkipValidation]` is not claimed
+  by the resolver (even with a registered validator); a property is omitted from generated validation,
+  `Paths`/`JsonNames`, JSON Schema, client rules and field-level validation; a parameter or its type is skipped by
+  the ZodSharp endpoint filter and the Microsoft.Extensions.Validation resolver. The endpoint filter now matches
+  the real .NET 11 `SkipValidationAttribute` rather than any attribute with that name. See
+  [Microsoft.Extensions.Validation](docs/wiki/hosting/Microsoft-Extensions-Validation.md#skipvalidation).
+
 - **Trimming and Native AOT across every package.** Every shipping package is `IsTrimmable`/`IsAotCompatible` on
   every target framework and analyzer-clean; APIs that cannot be trimmed are annotated with the alternative rather than
   suppressed. `src/tests/TrimSafety.Verification` publishes with `PublishAot=true` (every ZodSharp assembly except
@@ -284,6 +312,12 @@ Released versions correspond to `v<version>` GitHub releases.
   value, or a `null`-converted union) now fails: `missing_field` for `[Required]`, the rule's own error for
   `[RequiredZod]`/`[NonSentinel]`, and `invalid_type` otherwise. A union target's `Validate` reports `invalid_union`
   for an empty union. Previously the member dispatch skipped the value silently.
+- **A `[ZodSchema]` derived type now validates inherited members.** The generator reads the whole base chain, so
+  public properties inherited from a base class are validated, exported, given `Paths`/`JsonNames` entries and
+  resolved by `TryResolveMember`. A model that derives from a base with a non-nullable reference-type property
+  therefore reports that property as required; make the property nullable, or use a request DTO that does not
+  inherit the infrastructure base. An overridden or hidden property is taken once, from the most derived
+  declaration.
 - **Newly annotated APIs (not binary breaks; trimmed and AOT applications now get IL2026/IL3050 at the call site).**
   `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` were added to: every `Purview.ZodSharp.NewtonsoftJson` API
   that reaches Newtonsoft serialization (`NewtonsoftJsonExtensions.DeserializeAndValidate`,
@@ -434,6 +468,22 @@ Released versions correspond to `v<version>` GitHub releases.
   Nothing changes at runtime. See the upgrade note.
 ### Fixed
 
+- **`AlsoRunDataAnnotations` field-level fallthrough.** A field change on a property ZodSharp does not own (a
+  DataAnnotations-only property) now finds the next resolver's property info instead of returning no member, so
+  the platform's field-level validation runs for it.
+- **A member covered only by `[ZodAsyncMember]` is individually validatable.** `IsValidatableMember` listed only
+  members with synchronous rules, so a Blazor field change on a member whose sole rule is the custom asynchronous
+  method fell back to validating the whole form (and re-ran the method for unrelated fields). It now lists the
+  `[ZodAsyncMember]` names too, so `ValidateMemberAsync` runs the method for that field alone.
+- **Inherited members are validated.** The generator read only the properties declared on the `[ZodSchema]` type,
+  so a derived type never validated a public property inherited from its base class, and its JSON Schema never
+  described one. It now reads the whole base chain, taking an overridden or hidden property once from the most
+  derived declaration. A closed-hierarchy case therefore validates its base members too, and `Paths`, `JsonNames`,
+  `TryResolveMember`, JSON Schema export and the analyzer diagnostics follow the same member list.
+- **System.Text.Json error paths map through a union's active case.** `ZodJsonExceptions.ToMemberPath` treated a
+  union contract as a scalar, so every segment below a union member kept its JSON name (`Pet.name` instead of
+  `Pet.Name`). It now resolves a member, index or key through the case contracts, including a collection case,
+  and keeps the JSON name only when several cases name the segment differently.
 - **Generated validators compile for member types with their own equality operators.** The generator tested for null
   with `value.Member == null` (and `!= null`), which binds a user-defined operator when the member type declares
   one. A `[Required]` `Nullable<T>` member whose type defines `==(string?, T)` and an implicit conversion to `string`

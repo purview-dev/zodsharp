@@ -116,6 +116,15 @@ apart: property names, nested objects, native enums, nullable fields, required f
   switch, matching a global converter) makes them strings, and `ZodSharpEnumNamingPolicy=CamelCase` matches a
   `JsonNamingPolicy.CamelCase`. A member's `[JsonStringEnumMemberName]` name is used verbatim. A `[Flags]`
   enum exports as `type: integer`.
+- **Union and closed-hierarchy members** follow the generated dispatch: a member typed as a C# 15 union exports
+  `oneOf` its case schemas, and a member typed as a closed class exports `oneOf` its derived schemas, each
+  carrying the derived type's full schema including inherited base members. A closed hierarchy that opts into
+  `[JsonPolymorphic(InferClosedTypePolymorphism = true)]` (or registers `[JsonDerivedType]` explicitly) also
+  carries the discriminator property (`$type` by default, or the configured name) on each branch, constrained to
+  that type's registered discriminator value - a string for an inferred or string registration, a number for an
+  integer one - because that is the wire form System.Text.Json writes. A process-wide
+  `JsonSerializerOptions.InferClosedTypePolymorphism` cannot be seen by the generator, so the type-level
+  attribute is what the export follows.
 - **Unsupported rules** are not dropped silently: a rule the exporter cannot represent is listed under the
   `x-zodsharp-unsupported` extension so the exported schema is visibly incomplete.
 

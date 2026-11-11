@@ -169,25 +169,20 @@ public static class ZodJsonExceptions
 		var info = current!;
 		current = null;
 
+#if NET11_0_OR_GREATER
+		if (info.Kind == JsonTypeInfoKind.Union)
+			return StepUnion(ref current, info, segment);
+#endif
+
 		if (info.Kind == JsonTypeInfoKind.Object && segment.Kind == ZodPathSegmentKind.Member)
 		{
-			var comparison = info.Options.PropertyNameCaseInsensitive
-				? StringComparison.OrdinalIgnoreCase
-				: StringComparison.Ordinal;
-			foreach (var property in info.Properties)
-			{
-				if (!string.Equals(property.Name, segment.Name, comparison))
-					continue;
+			if (!TryFindProperty(info, segment.Name, out var property))
+				return segment;
 
-				current = Resolve(info.Options, property.PropertyType);
-				// The contract's attribute provider is the property or field it binds (source-generated contracts
-				// record it too), so its name is the member name; a custom contract may not set it.
-				return ZodPathSegment.Member(
-					property.AttributeProvider is MemberInfo member ? member.Name : property.Name
-				);
-			}
-
-			return segment;
+			current = Resolve(info.Options, property.PropertyType);
+			// The contract's attribute provider is the property or field it binds (source-generated contracts
+			// record it too), so its name is the member name; a custom contract may not set it.
+			return ZodPathSegment.Member(property.AttributeProvider is MemberInfo member ? member.Name : property.Name);
 		}
 
 		if (info.Kind == JsonTypeInfoKind.Enumerable && segment.Kind == ZodPathSegmentKind.Index)
@@ -207,6 +202,131 @@ public static class ZodJsonExceptions
 
 		// A scalar (or a value with its own converter) has no members the contract can describe.
 		return segment;
+	}
+
+	/// <summary>
+	/// Maps one segment through a union's case contracts. A union carries no members of its own, so the
+	/// segment belongs to the active case: a member name is looked up in every object-shaped case, and an
+	/// index or key is resolved through the single collection or dictionary case. A segment several cases
+	/// describe with different member names is kept as its JSON name, because the active case is not known
+	/// from the path alone.
+	/// </summary>
+#if NET11_0_OR_GREATER
+	static ZodPathSegment StepUnion(ref JsonTypeInfo? current, JsonTypeInfo union, ZodPathSegment segment)
+	{
+		var unionCases = union.UnionCases;
+		if (unionCases is null || unionCases.Count == 0)
+			return segment;
+
+		if (segment.Kind == ZodPathSegmentKind.Index)
+		{
+			JsonTypeInfo? element = null;
+			var matches = 0;
+			foreach (var unionCase in unionCases)
+			{
+				var caseInfo = Resolve(union.Options, unionCase.CaseType);
+				if (caseInfo?.Kind != JsonTypeInfoKind.Enumerable)
+					continue;
+
+				element = Resolve(union.Options, caseInfo.ElementType);
+				matches++;
+			}
+
+			if (matches == 1)
+				current = element;
+
+			return segment;
+		}
+
+		if (segment.Kind != ZodPathSegmentKind.Member)
+			return segment;
+
+		string? name = null;
+		Type? type = null;
+		var matchedObject = false;
+		var sameName = true;
+		var sameType = true;
+
+		foreach (var unionCase in unionCases)
+		{
+			var caseInfo = Resolve(union.Options, unionCase.CaseType);
+			if (caseInfo?.Kind != JsonTypeInfoKind.Object || !TryFindProperty(caseInfo, segment.Name, out var property))
+				continue;
+
+			var memberName = property.AttributeProvider is MemberInfo member ? member.Name : property.Name;
+			if (!matchedObject)
+			{
+				name = memberName;
+				type = property.PropertyType;
+			}
+			else
+			{
+				sameName &= string.Equals(memberName, name, StringComparison.Ordinal);
+				sameType &= type == property.PropertyType;
+			}
+
+			matchedObject = true;
+		}
+
+		if (!matchedObject)
+			return StepUnionDictionary(ref current, union, unionCases, segment);
+
+		if (!sameName)
+			return segment;
+
+		// Every case that describes the segment names it the same; continue into its type only when the
+		// cases agree on that type, otherwise the next segment has no single contract to follow.
+		current = sameType ? Resolve(union.Options, type) : null;
+		return ZodPathSegment.Member(name!);
+	}
+
+	/// <summary>
+	/// Maps an object member through a union whose only describing case is a dictionary: the member is one
+	/// of the dictionary's keys.
+	/// </summary>
+	static ZodPathSegment StepUnionDictionary(
+		ref JsonTypeInfo? current,
+		JsonTypeInfo union,
+		IList<JsonUnionCaseInfo> unionCases,
+		ZodPathSegment segment
+	)
+	{
+		JsonTypeInfo? element = null;
+		var matches = 0;
+		foreach (var unionCase in unionCases)
+		{
+			var caseInfo = Resolve(union.Options, unionCase.CaseType);
+			if (caseInfo?.Kind != JsonTypeInfoKind.Dictionary)
+				continue;
+
+			element = Resolve(union.Options, caseInfo.ElementType);
+			matches++;
+		}
+
+		if (matches != 1)
+			return segment;
+
+		current = element;
+		return ZodPathSegment.Key(segment.Name ?? string.Empty);
+	}
+#endif
+
+	static bool TryFindProperty(JsonTypeInfo info, string? jsonName, out JsonPropertyInfo property)
+	{
+		var comparison = info.Options.PropertyNameCaseInsensitive
+			? StringComparison.OrdinalIgnoreCase
+			: StringComparison.Ordinal;
+		foreach (var candidate in info.Properties)
+		{
+			if (!string.Equals(candidate.Name, jsonName, comparison))
+				continue;
+
+			property = candidate;
+			return true;
+		}
+
+		property = null!;
+		return false;
 	}
 
 	static JsonTypeInfo? Resolve(JsonSerializerOptions options, Type? type)

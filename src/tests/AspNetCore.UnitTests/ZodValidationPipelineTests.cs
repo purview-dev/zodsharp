@@ -269,12 +269,10 @@ public class ZodValidationPipelineTests
 		// Arrange
 		await using var app = await TestApp.StartAsync(
 			services =>
-				AddServices(
-					services,
-					configure: static options =>
-						options.MapErrorType(
-							new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
-						)
+				AddServices(services, configure: static options =>
+					options.MapErrorType(
+						new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
+					)
 				),
 			app => app.MapPost("/orders", (OrderRequest order) => TypedResults.Ok()),
 			cancellationToken
@@ -295,23 +293,15 @@ public class ZodValidationPipelineTests
 	public async Task Pipeline_GivenStatusCodeSelectorAndOverride_OverrideWinsLast(CancellationToken cancellationToken)
 	{
 		// Arrange
-		await using var app = await TestApp.StartAsync(
-			services =>
-				AddServices(
-					services,
-					configure: static options =>
-					{
-						options.MapErrorType(
-							new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
-						);
-						options.StatusCodeSelector = static _ => StatusCodes.Status409Conflict;
-						options.StatusCodeOverride = static (_, computed) =>
-							computed == StatusCodes.Status409Conflict ? StatusCodes.Status418ImATeapot : computed;
-					}
-				),
-			app => app.MapPost("/orders", (OrderRequest order) => TypedResults.Ok()),
-			cancellationToken
-		);
+		await using var app = await TestApp.StartAsync(services => AddServices(services, configure: static options =>
+				{
+					options.MapErrorType(
+						new ErrorType("invalid_email", HttpStatus: StatusCodes.Status422UnprocessableEntity)
+					);
+					options.StatusCodeSelector = static _ => StatusCodes.Status409Conflict;
+					options.StatusCodeOverride = static (_, computed) =>
+						computed == StatusCodes.Status409Conflict ? StatusCodes.Status418ImATeapot : computed;
+				}), app => app.MapPost("/orders", (OrderRequest order) => TypedResults.Ok()), cancellationToken);
 
 		// Act
 		var (status, mediaType, root) = await PostAsync(app, "/orders", InvalidOrder, cancellationToken);

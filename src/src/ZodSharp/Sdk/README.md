@@ -84,6 +84,10 @@ boxing. Reference- and value-type cases are both allocation-free, and an exhaust
 the hand-rolled `Union<T1, T2>` on .NET 10, or when you need `Match`/`Switch`/equality. The analyzer reports
 `ZODSGEN041` and offers a code fix for any `Z.Union<T1, T2>` on .NET 11+.
 
+`System.Text.Json` reads and writes it as the active case, with no wrapper or discriminator. The type carries
+`[JsonUnion]`, so the `NativeUnionTypeClassifierFactory` resolves a string token under Web defaults (where a number
+may also be read from a string) and two object-shaped cases without a converter registration.
+
 A union can itself be a `[ZodSchema]` target: `PetSchema.Validate(pet)` dispatches to the active case's schema,
 matches a case with `TryGetValue` without boxing, and reports `invalid_union` for an empty union. A case type with no
 validator is reported as `ZODSGEN055`, and `[Required]`/`[RequiredZod]`/`[NonSentinel]` treat an empty union as the

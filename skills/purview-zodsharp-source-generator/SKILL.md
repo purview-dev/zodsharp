@@ -47,6 +47,7 @@ var validated = UserSchema.Parse(user);   // throws ZodException on failure
 | --- | --- |
 | `{TypeName}Schema` | static partial class — the validator. Accessibility mirrors the target. Holds `Validate`, `ValidateAsync(value, services, ct)`, `RequiresAsyncValidation`, the member API below, `Parse`, `BuildJsonSchema`, and (with composition on) `ApplyAnd`, `ApplyOr`, `ApplyRefine`. Renamed by `SchemaName`. |
 | `{TypeName}Schema.Paths` | one `ZodPath` constant per member (`OrderSchema.Paths.Lines`) for refinements and tests |
+| `{TypeName}Schema.IsValidatableMember(name)` | true when a field change can validate that member alone (synchronous rules or a `[ZodAsyncMember]` method) |
 | `{TypeName}Schema.JsonNames` | `Get(memberName)` returns the `[JsonPropertyName]` name, or `null`; `ToJsonNamedPath(path, namingPolicy)` renames a whole path without reflection |
 | `{TypeName}SchemaValidator` | `partial class` implementing `IZodSchemaValidator<T>`, `IZodMemberValidator<T>`, `IZodMemberResolver<T>`, `IZodUntypedValidator`, `IZodJsonPathMapper` and `IJsonSchemaProvider` — the adapter hosts use. Primary schema only; `{SchemaName}Validator` when renamed. |
 | `{TypeName}Validator` | `sealed partial class : IValidateOptions<{TypeName}>` (and, on .NET 11, `IAsyncValidateOptions<T>` when the type has async rules) — only when `IValidateOptions` support is on, and the target is a class. |
@@ -90,7 +91,9 @@ validator all depend on `Validate` — `GenerateValidateMethod = false` removes 
 
 ## What is validated
 
-- Properties must be public, non-static, non-indexer.
+- Properties must be public, non-static, non-indexer. They are read from the type **and its base chain**, so an
+  inherited public property is validated, exported and resolved like a declared one; an overridden or hidden
+  property is taken once, from the most derived declaration.
 - A property gets validation when it carries **any** DataAnnotations attribute, when its type is a
   source-defined complex type with a nested schema, or when its type is an enum.
 - Nested complex types are discovered recursively and get their own `{TypeName}Schema`, **even

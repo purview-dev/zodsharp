@@ -3,6 +3,7 @@ using static ZodSharp.SourceGenerators.Infra.GeneratedSchemaRuntime;
 #if NET11_0_OR_GREATER
 using Microsoft.CodeAnalysis.CSharp;
 using ZodSharp.Core;
+using ZodSharp.JsonSchema;
 using ZodSharp.Rules;
 #endif
 
@@ -671,6 +672,213 @@ partial class ZodSchemaGeneratorTests
 		await Assert.That(errors[0].Code).IsEqualTo("too_small");
 		await Assert.That(errors[0].FullPath.ToDottedString()).IsEqualTo("Name");
 		await Assert.That(emptyErrors[0].Code).IsEqualTo("invalid_union");
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenMemberTypedAsUnion_ExportsOneOfTheCaseSchemas(CancellationToken cancellationToken)
+	{
+		// Arrange
+		const string source = """
+			using ZodSharp;
+
+			namespace Testing
+			{
+				public union Pet(Cat, Dog);
+
+				[ZodSchema]
+				public class Cat
+				{
+					public string? Name { get; set; }
+				}
+
+				[ZodSchema]
+				public class Dog
+				{
+					public string? Breed { get; set; }
+				}
+
+				[ZodSchema]
+				public class Owner
+				{
+					public Pet Pet { get; set; }
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var schemaType = assembly.GetType("Testing.OwnerSchema")!;
+
+		// Act
+		var definition = (JsonSchemaDefinition)schemaType.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
+
+		// Assert — the member dispatches to the case schemas, so its schema is one of them, not the empty schema.
+		var pet = definition.Properties!["pet"];
+		await Assert.That(pet.OneOf).IsNotNull();
+		await Assert.That(pet.OneOf!.Count).IsEqualTo(2);
+		await Assert.That(pet.OneOf![0].Properties!.ContainsKey("name")).IsTrue();
+		await Assert.That(pet.OneOf![1].Properties!.ContainsKey("breed")).IsTrue();
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenMemberTypedAsClosedHierarchy_ExportsOneOfWithTheDiscriminator(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			using System.Text.Json.Serialization;
+			using ZodSharp;
+
+			namespace Testing
+			{
+				[JsonPolymorphic(InferClosedTypePolymorphism = true)]
+				public closed class Shape
+				{
+					public string Id { get; set; } = "";
+				}
+
+				[ZodSchema]
+				public sealed class Circle : Shape
+				{
+					public double Radius { get; set; }
+				}
+
+				[ZodSchema]
+				public sealed class Square : Shape
+				{
+					public double Side { get; set; }
+				}
+
+				[ZodSchema]
+				public class Drawing
+				{
+					public Shape Shape { get; set; } = null!;
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var schemaType = assembly.GetType("Testing.DrawingSchema")!;
+
+		// Act
+		var definition = (JsonSchemaDefinition)schemaType.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
+
+		// Assert — inferred polymorphism writes "$type", so each branch constrains it to the derived type.
+		var shape = definition.Properties!["shape"];
+		await Assert.That(shape.OneOf).IsNotNull();
+		await Assert.That(shape.OneOf!.Count).IsEqualTo(2);
+		var circle = shape.OneOf!.Single(candidate => candidate.Properties!.ContainsKey("radius"));
+		await Assert.That(circle.Properties!.ContainsKey("id")).IsTrue();
+		await Assert.That(circle.Required!).Contains("id");
+		await Assert.That(circle.Properties!["$type"].Enum!).Contains("Circle");
+		await Assert.That(circle.Required!).Contains("$type");
+		var square = shape.OneOf!.Single(candidate => candidate.Properties!.ContainsKey("side"));
+		await Assert.That(square.Properties!.ContainsKey("id")).IsTrue();
+		await Assert.That(square.Properties!["$type"].Enum!).Contains("Square");
+	}
+
+	[Test]
+	public async Task ClosedHierarchy_GivenDerivedCaseWithInvalidBaseProperty_ValidatesTheBaseProperty(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange — the derived case's schema validates the inherited member too, under the case's own path.
+		const string source = """
+			using System.ComponentModel.DataAnnotations;
+			using ZodSharp;
+
+			namespace Testing
+			{
+				public closed class Shape
+				{
+					[Required]
+					public string? Id { get; set; }
+				}
+
+				[ZodSchema]
+				public sealed class Circle : Shape
+				{
+					[Range(1, 10)]
+					public int Radius { get; set; }
+				}
+
+				[ZodSchema]
+				public class Drawing
+				{
+					public Shape Shape { get; set; } = null!;
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var circle = Create(assembly, "Testing.Circle", ("Id", null), ("Radius", 5));
+		var drawing = Create(assembly, "Testing.Drawing", ("Shape", circle));
+
+		// Act
+		var errors = RunValidate(assembly, "Testing.DrawingSchema", drawing);
+
+		// Assert
+		await Assert.That(errors.Length).IsEqualTo(1);
+		await Assert.That(errors[0].Code).IsEqualTo("missing_field");
+		await Assert.That(errors[0].FullPath.ToDottedString()).IsEqualTo("Shape.Id");
+	}
+
+	[Test]
+	public async Task JsonSchema_GivenClosedHierarchyWithExplicitDerivedTypes_UsesTheConfiguredDiscriminators(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		const string source = """
+			using System.Text.Json.Serialization;
+			using ZodSharp;
+
+			namespace Testing
+			{
+				[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+				[JsonDerivedType(typeof(Circle), "circle")]
+				[JsonDerivedType(typeof(Square), 2)]
+				public closed class Shape
+				{
+				}
+
+				[ZodSchema]
+				public sealed class Circle : Shape
+				{
+					public double Radius { get; set; }
+				}
+
+				[ZodSchema]
+				public sealed class Square : Shape
+				{
+					public double Side { get; set; }
+				}
+
+				[ZodSchema]
+				public class Drawing
+				{
+					public Shape Shape { get; set; } = null!;
+				}
+			}
+			""";
+
+		using var result = await GenerateAsync(source, PreviewCompileOptions, cancellationToken);
+		var assembly = result.CompilationResult.Assembly!;
+		var schemaType = assembly.GetType("Testing.DrawingSchema")!;
+
+		// Act
+		var definition = (JsonSchemaDefinition)schemaType.GetMethod("BuildJsonSchema")!.Invoke(null, null)!;
+
+		// Assert — a string discriminator stays a string, and an integer one is written as a JSON number.
+		var shape = definition.Properties!["shape"];
+		var circle = shape.OneOf!.Single(candidate => candidate.Properties!.ContainsKey("radius"));
+		await Assert.That(circle.Properties!["kind"].Enum!).Contains("circle");
+		var square = shape.OneOf!.Single(candidate => candidate.Properties!.ContainsKey("side"));
+		await Assert.That(square.Properties!["kind"].Enum!).Contains(2);
+		await Assert.That(square.Properties!["kind"].Enum!).DoesNotContain("2");
 	}
 #endif
 }

@@ -149,6 +149,54 @@ partial class ZodSchemaGenerator
 					}
 				);
 			}
+
+			for (var i = 0; i < property.SyncValidationAttributes.Count; i++)
+			{
+				writer.Field(
+					new FieldDeclarationOptions(
+						SyncValidationAttributeFieldName(property.Name, i),
+						new TypeIdentity("ValidationAttribute", "System.ComponentModel.DataAnnotations")
+					)
+					{
+						Accessibility = TypeDeclarationAccessibility.Private,
+						IsStatic = true,
+						IsReadOnly = true,
+						Initializer = property.SyncValidationAttributes[i],
+					}
+				);
+			}
+		}
+
+		for (var i = 0; i < schema.TypeSyncValidationAttributes.Count; i++)
+		{
+			writer.Field(
+				new FieldDeclarationOptions(
+					TypeValidationAttributeFieldName(i),
+					new TypeIdentity("ValidationAttribute", "System.ComponentModel.DataAnnotations")
+				)
+				{
+					Accessibility = TypeDeclarationAccessibility.Private,
+					IsStatic = true,
+					IsReadOnly = true,
+					Initializer = schema.TypeSyncValidationAttributes[i],
+				}
+			);
+		}
+
+		for (var i = 0; i < schema.TypeAsyncValidationAttributes.Count; i++)
+		{
+			writer.Field(
+				new FieldDeclarationOptions(
+					TypeAsyncValidationAttributeFieldName(i),
+					new TypeIdentity("AsyncValidationAttribute", "System.ComponentModel.DataAnnotations")
+				)
+				{
+					Accessibility = TypeDeclarationAccessibility.Private,
+					IsStatic = true,
+					IsReadOnly = true,
+					Initializer = schema.TypeAsyncValidationAttributes[i],
+				}
+			);
 		}
 
 		if (
@@ -168,6 +216,12 @@ partial class ZodSchemaGenerator
 
 		writer.NewLine();
 	}
+
+	static string SyncValidationAttributeFieldName(string member, int index) => $"ValidationAttribute_{member}_{index}";
+
+	static string TypeValidationAttributeFieldName(int index) => $"TypeValidationAttribute_{index}";
+
+	static string TypeAsyncValidationAttributeFieldName(int index) => $"TypeAsyncValidationAttribute_{index}";
 
 	static string GetDeclaringTypeName(ZodSchemaDescriptor schema)
 	{
@@ -200,6 +254,7 @@ partial class ZodSchemaGenerator
 			|| Exists(attributes.DeniedValues, static values => values.Exists)
 			|| Exists(attributes.Compare, static compare => compare.Exists)
 			|| property.CustomRules.Count > 0
+			|| property.SyncValidationAttributes.Count > 0
 			|| property.AsyncValidationAttributes.Count > 0
 			|| HasNestedValidation(property)
 		)
@@ -275,10 +330,12 @@ partial class ZodSchemaGenerator
 	/// <summary>Whether the synchronous <c>Validate</c> cannot run: the type has async-only rules (defect G23).</summary>
 	static bool HasAsyncOnlyRules(ZodSchemaDescriptor schema) =>
 		schema.ImplementsAsyncValidatableObject
+		|| schema.TypeAsyncValidationAttributes.Count > 0
 		|| GetValidatedMembers(schema).Any(static property => property.AsyncValidationAttributes.Count > 0);
 
 	static bool HasTypeValidation(ZodSchemaDescriptor schema) =>
 		schema.TypeRules.Count > 0
+		|| schema.TypeSyncValidationAttributes.Count > 0
 		|| (schema.ImplementsValidatableObject && !schema.ImplementsAsyncValidatableObject)
 		|| schema.RefinementHook.Value.IsImplemented;
 
@@ -519,6 +576,8 @@ partial class ZodSchemaGenerator
 				if (HasTypeValidation(schema))
 					writer.MethodCall("ValidateType", "value", "ref errors", "services");
 
+				WriteTypeAsyncValidationAttributes(writer, schema);
+
 				if (schema.ImplementsAsyncValidatableObject)
 					WriteAsyncValidatableObject(writer, schema);
 
@@ -546,12 +605,10 @@ partial class ZodSchemaGenerator
 	{
 		if (schema.TargetCanBeNull)
 		{
-			writer.IfBlock(
-				"value is null",
-				ifBody =>
-					ifBody.Return(
-						$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
-					)
+			writer.IfBlock("value is null", ifBody =>
+				ifBody.Return(
+					$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
+				)
 			);
 			writer.NewLine();
 		}
@@ -631,6 +688,7 @@ partial class ZodSchemaGenerator
 		)
 		{
 			GenerateTypeRuleValidations(writer, schema);
+			WriteTypeSyncValidationAttributes(writer, schema);
 
 			if (schema.ImplementsValidatableObject && !schema.ImplementsAsyncValidatableObject)
 			{
@@ -661,6 +719,64 @@ partial class ZodSchemaGenerator
 		writer.NewLine();
 	}
 
+	/// <summary>
+	/// Emits the class-level synchronous DataAnnotations validation attributes the generator has no type rule
+	/// for (for example a class-level <c>[CustomValidation]</c> or a consumer's own <c>ValidationAttribute</c>).
+	/// </summary>
+	static void WriteTypeSyncValidationAttributes(CodeWriter writer, ZodSchemaDescriptor schema)
+	{
+		if (schema.TypeSyncValidationAttributes.Count == 0)
+			return;
+
+		writer.Assignment(
+			"var",
+			"validationContext",
+			$"{GeneratedValidation}.CreateValidationContext(value, {schema.TargetType.Name.StringLiteral()}, services)"
+		);
+		for (var i = 0; i < schema.TypeSyncValidationAttributes.Count; i++)
+		{
+			var resultName = $"TypeAttributeResult{i}";
+			writer.Assignment(
+				"var",
+				resultName,
+				$"{TypeValidationAttributeFieldName(i)}.GetValidationResult(value, validationContext)"
+			);
+			writer.Assignment(
+				"errors",
+				$"{GeneratedValidation}.WithDataAnnotationsResult(errors, {resultName}, EmptyPath, {TypeMemberFieldName})"
+			);
+		}
+	}
+
+	/// <summary>
+	/// Emits the class-level <c>AsyncValidationAttribute</c>s, awaited after the synchronous type validation and
+	/// before <c>IAsyncValidatableObject</c>, in the platform's order.
+	/// </summary>
+	static void WriteTypeAsyncValidationAttributes(CodeWriter writer, ZodSchemaDescriptor schema)
+	{
+		if (schema.TypeAsyncValidationAttributes.Count == 0)
+			return;
+
+		writer.Assignment(
+			"var",
+			"validationContext",
+			$"{GeneratedValidation}.CreateValidationContext(value, {schema.TargetType.Name.StringLiteral()}, services)"
+		);
+		for (var i = 0; i < schema.TypeAsyncValidationAttributes.Count; i++)
+		{
+			var resultName = $"TypeAsyncAttributeResult{i}";
+			writer.Assignment(
+				"var",
+				resultName,
+				$"await {TypeAsyncValidationAttributeFieldName(i)}.GetValidationResultAsync(value, validationContext, cancellationToken).ConfigureAwait(false)"
+			);
+			writer.Assignment(
+				"errors",
+				$"{GeneratedValidation}.WithDataAnnotationsResult(errors, {resultName}, EmptyPath, {TypeMemberFieldName})"
+			);
+		}
+	}
+
 	static void GenerateZodRefinement(ZodSchemaDescriptor schema, CodeWriter method)
 	{
 		var hook = schema.RefinementHook.Value;
@@ -682,9 +798,8 @@ partial class ZodSchemaGenerator
 		);
 		using (method.IfBlockScope("refineContext.HasIssues"))
 		{
-			method.Foreach(
-				"var refinementIssue in refineContext.Issues",
-				foreachBody => foreachBody.MethodCall($"{GeneratedValidation}.Add", "ref errors", "refinementIssue")
+			method.Foreach("var refinementIssue in refineContext.Issues", foreachBody =>
+				foreachBody.MethodCall($"{GeneratedValidation}.Add", "ref errors", "refinementIssue")
 			);
 		}
 	}
@@ -710,6 +825,11 @@ partial class ZodSchemaGenerator
 		var asyncMembers = schema.CustomValidationMethod.Value.HasCustomValidation
 			? schema.CustomValidationMethod.Value.AsyncMembers
 			: new([]);
+		var validatableMemberNames = members
+			.Select(static member => member.Name)
+			.Concat(asyncMembers)
+			.Distinct(StringComparer.Ordinal)
+			.ToArray();
 
 		foreach (var property in members)
 		{
@@ -722,14 +842,14 @@ partial class ZodSchemaGenerator
 		}
 
 		writer.XmlSummary(
-			"Gets whether a member has rules that ValidateMember runs. Matching is ordinal, on the C# member name."
+			"Gets whether a member has rules that ValidateMember or ValidateMemberAsync runs. Matching is ordinal, on the C# member name."
 		);
 		writer.XmlParam("memberName", "The C# member name.");
 		writer.XmlReturn("True when the member is individually validatable.");
 		writer.Line(
-			members.Count == 0
+			validatableMemberNames.Length == 0
 				? "public static bool IsValidatableMember(string memberName) => false;"
-				: $"public static bool IsValidatableMember(string memberName) => memberName is {string.Join(" or ", members.Select(static member => member.Name.StringLiteral()))};"
+				: $"public static bool IsValidatableMember(string memberName) => memberName is {string.Join(" or ", validatableMemberNames.Select(static name => name.StringLiteral()))};"
 		);
 		writer.NewLine();
 
@@ -748,12 +868,10 @@ partial class ZodSchemaGenerator
 		{
 			if (schema.TargetCanBeNull)
 			{
-				writer.IfBlock(
-					"value is null",
-					ifBody =>
-						ifBody.Return(
-							$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
-						)
+				writer.IfBlock("value is null", ifBody =>
+					ifBody.Return(
+						$"{resultType}.Failure({GeneratedValidation}.ForMember(global::ZodSharp.Core.ZodIssues.NullValue(global::ZodSharp.Core.ZodTypeNames.Object, EmptyPath), {TypeMemberFieldName}))"
+					)
 				);
 			}
 
@@ -1044,6 +1162,37 @@ partial class ZodSchemaGenerator
 		block?.Dispose();
 
 		GenerateCompareValidation(writer, property);
+		GenerateFallbackValidationAttributes(writer, property);
+	}
+
+	/// <summary>
+	/// Emits the synchronous DataAnnotations validation attributes the generator has no dedicated rule for, so
+	/// a <c>[CustomValidation]</c>, <c>[FileExtensions]</c>, <c>[EnumDataType]</c> or a consumer's own
+	/// <c>ValidationAttribute</c> runs exactly as the platform's <c>Validator</c> would run it.
+	/// </summary>
+	static void GenerateFallbackValidationAttributes(CodeWriter writer, ZodPropertyDescriptor property)
+	{
+		if (property.SyncValidationAttributes.Count == 0)
+			return;
+
+		writer.Assignment(
+			"var",
+			"validationContext",
+			$"{GeneratedValidation}.CreateValidationContext(value, {MemberOf(property)}.DisplayName, null, {property.Name.StringLiteral()})"
+		);
+		for (var i = 0; i < property.SyncValidationAttributes.Count; i++)
+		{
+			var resultName = CodeGenHelpers.GetLocalIdentifier(property.Name, $"AttributeResult{i}");
+			writer.Assignment(
+				"var",
+				resultName,
+				$"{SyncValidationAttributeFieldName(property.Name, i)}.GetValidationResult(value.{property.Name}, validationContext)"
+			);
+			writer.Assignment(
+				"errors",
+				$"{GeneratedValidation}.WithDataAnnotationsResult(errors, {resultName}, {PathOf(property)}, {MemberOf(property)})"
+			);
+		}
 	}
 
 	static string ForMemberMessage(string errorExpression, string memberExpression, MessageTemplate message) =>
@@ -1612,14 +1761,11 @@ partial class ZodSchemaGenerator
 			{
 				if (property.ElementTypeCanBeNull)
 				{
-					writer.IfBlock(
-						$"{itemName} is null",
-						body =>
-						{
-							body.Line($"{indexName}++;");
-							body.Line("continue;");
-						}
-					);
+					writer.IfBlock($"{itemName} is null", body =>
+					{
+						body.Line($"{indexName}++;");
+						body.Line("continue;");
+					});
 				}
 
 				writer.Assignment("var", resultName, NestedValidateAsyncCall(schemaType, itemExpression));

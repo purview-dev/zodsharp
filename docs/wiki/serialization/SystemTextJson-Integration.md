@@ -61,6 +61,15 @@ catch (ZodJsonValidationException ex)
 }
 ```
 
+## Native unions (.NET 11)
+
+`Z.NativeUnion<T1, T2>` yields `ZodSharp.Unions.NativeUnion<T1, T2>`, which `System.Text.Json` writes as its active
+case and reads back with no wrapper or discriminator. The type carries `[JsonUnion]`, so deserialization uses
+`NativeUnionTypeClassifierFactory` with no registration - including a string token under
+`JsonSerializerDefaults.Web` and two object-shaped cases. See
+[Unions and Discriminated Unions](../schemas/Unions-and-Discriminated-Unions.md#json-serialization) for the
+classification rules and the genuinely ambiguous shapes.
+
 ## API surface
 
 | Member | Signature |

@@ -113,6 +113,8 @@ partial class ZodSchemaGenerator
 			property.AsyncValidationAttributes.Count > 0 || NestedRequiresAsync(property);
 
 		static bool HasOwnAsyncRules(ZodSchemaDescriptor schema) =>
-			schema.CustomValidationMethod.Value.HasCustomValidation || schema.ImplementsAsyncValidatableObject;
+			schema.CustomValidationMethod.Value.HasCustomValidation
+			|| schema.ImplementsAsyncValidatableObject
+			|| schema.TypeAsyncValidationAttributes.Count > 0;
 	}
 }

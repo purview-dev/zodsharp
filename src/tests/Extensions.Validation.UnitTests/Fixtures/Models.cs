@@ -66,3 +66,13 @@ public sealed class Envelope
 
 	public Order Order { get; set; } = new();
 }
+
+/// <summary>
+/// A type the platform excludes from validation with [SkipValidation]; a registered ZodSharp validator must
+/// not claim it.
+/// </summary>
+[SkipValidation]
+public sealed class SkippedModel
+{
+	public string? Name { get; set; }
+}

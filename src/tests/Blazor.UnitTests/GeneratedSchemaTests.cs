@@ -226,6 +226,53 @@ public class GeneratedSchemaTests
 	}
 
 	[Test]
+	public async Task DataAnnotationsValidator_GivenAsyncOnlyMemberFieldChange_IsPendingThenShowsTheError()
+	{
+		// Arrange - the member's only rule is the AsyncValidationAttribute, so the member API must still
+		// report it as individually validatable for the field-change path.
+		GeneratedCat cat = new() { Name = "taken" };
+		await using var context = CreateContext();
+		EditContext editContext = new(cat);
+		var form = context.Render(editContext, FormHost.DataAnnotations());
+		FieldIdentifier field = new(cat, nameof(GeneratedCat.Name));
+
+		// Act
+		await form.ChangeAsync(editContext, field);
+		var pending = editContext.IsValidationPending(field);
+		await FormHost.WaitUntilAsync(() => !editContext.IsValidationPending(field), "resolved");
+
+		// Assert
+		await Assert.That(pending).IsTrue();
+		await Assert.That(editContext.IsValidationFaulted(field)).IsFalse();
+		await Assert.That(editContext.GetValidationMessages(field)).IsEquivalentTo(["Name is taken"]);
+	}
+
+	[Test]
+	public async Task DataAnnotationsValidator_GivenAsyncRuleOnTheForm_AwaitsItAndPlacesTheError(
+		CancellationToken cancellationToken
+	)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+
+		// Arrange - route 1: the platform's DataAnnotationsValidator must await the root type info's async
+		// validation, not call the synchronous Validate that throws for an async graph.
+		GeneratedCat cat = new() { Name = "taken" };
+		GeneratedOwner owner = new() { Pet = cat };
+		await using var context = CreateContext();
+		EditContext editContext = new(owner);
+		var form = context.Render(editContext, FormHost.DataAnnotations());
+
+		// Act
+		var valid = await form.ValidateAsync(editContext);
+
+		// Assert
+		await Assert.That(valid).IsFalse();
+		await Assert.That(editContext.IsValidationFaulted()).IsFalse();
+		FieldIdentifier field = new(cat, nameof(GeneratedCat.Name));
+		await Assert.That(editContext.GetValidationMessages(field)).IsEquivalentTo(["Name is taken"]);
+	}
+
+	[Test]
 	public async Task ZodValidator_GivenUnionMemberWithAsyncCase_AwaitsItAndPlacesTheErrorOnTheCase()
 	{
 		// Arrange - the owner's Pet member is a union target whose active case has an async-only rule.

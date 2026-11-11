@@ -99,9 +99,8 @@ partial class ZodSchemaGenerator
 		if (requiredRule.GuardedScalarPropertyName is { Length: > 0 } scalarPropertyName)
 		{ // The rule is closed over the scalar's unwrapped underlying value, so both an absent property and a
 			// present scalar with an absent underlying value are missing.
-			var scalarExpression = property.IsNullableValueType
-				? $"value.{propertyName}.Value"
-				: $"value.{propertyName}";
+			var scalarExpression =
+				property.IsNullableValueType ? $"value.{propertyName}.Value" : $"value.{propertyName}";
 
 			WriteRuleFailure(
 				writer,
@@ -306,23 +305,20 @@ partial class ZodSchemaGenerator
 			return;
 		}
 
-		writer.IfBlock(
-			$"{underlyingExpression} is {{ }} scalarValue",
-			body =>
-			{
-				var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
-				WriteRuleFailure(
-					body,
-					rule,
-					ruleVariable,
-					identity,
-					"scalarValue",
-					pathExpression,
-					memberExpression,
-					fallbackOrigin
-				);
-			}
-		);
+		writer.IfBlock($"{underlyingExpression} is {{ }} scalarValue", body =>
+		{
+			var identity = EmitRuleInstance(body, rule, identityVariable, ruleVariable, arguments);
+			WriteRuleFailure(
+				body,
+				rule,
+				ruleVariable,
+				identity,
+				"scalarValue",
+				pathExpression,
+				memberExpression,
+				fallbackOrigin
+			);
+		});
 
 		writer.NewLine();
 	}
@@ -433,9 +429,8 @@ partial class ZodSchemaGenerator
 				)
 				: $"{GeneratedValidation}.ForMember({ruleError}, {memberExpression}, fallbackCategory: {Category("Custom")})";
 
-		writer.IfBlock(
-			invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})",
-			ifBody => WriteAddError(ifBody, errorExpression)
+		writer.IfBlock(invalidCondition ?? $"!{ruleVariable}.IsValid({valueVariable})", ifBody =>
+			WriteAddError(ifBody, errorExpression)
 		);
 	}
 

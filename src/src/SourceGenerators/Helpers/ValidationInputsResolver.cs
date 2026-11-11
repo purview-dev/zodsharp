@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using ZodSharp.SourceGenerators.Models;
@@ -14,6 +15,8 @@ namespace ZodSharp.SourceGenerators.Helpers;
 static class ValidationInputsResolver
 {
 	public const string DataAnnotationsNamespace = "System.ComponentModel.DataAnnotations";
+
+	public const string ValidationNamespace = "Microsoft.Extensions.Validation";
 
 	const string AsyncValidationAttributeName = "AsyncValidationAttribute";
 
@@ -78,6 +81,168 @@ static class ValidationInputsResolver
 			{
 				return true;
 			}
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Gets the DataAnnotations validation attributes the generator has no dedicated rule for, so the generated
+	/// validator can run them through their own <c>GetValidationResult</c>/<c>GetValidationResultAsync</c>.
+	/// Mapped attributes (a Zod rule) and attributes already handled as a specific rule are excluded.
+	/// </summary>
+	/// <param name="attributes">The member's or type's effective attributes.</param>
+	/// <param name="isTypeLevel">
+	/// Whether these are class-level attributes. A class-level mapped DataAnnotations attribute is not handled by
+	/// a generated type rule, so it is included here; only a <c>[ZodRule]</c>-mapped attribute is excluded.
+	/// </param>
+	/// <returns>The construction expressions for the synchronous and asynchronous attributes.</returns>
+	public static (EquatableArray<string> Sync, EquatableArray<string> Async) GetFallbackValidationAttributes(
+		ImmutableArray<AttributeData> attributes,
+		bool isTypeLevel
+	)
+	{
+		ImmutableArray<string>.Builder? sync = null;
+		ImmutableArray<string>.Builder? async = null;
+		foreach (var attribute in attributes)
+		{
+			if (attribute.AttributeClass is not { } attributeClass)
+				continue;
+
+			var isAsync = InheritsAsyncValidationAttribute(attributeClass);
+			if (!isAsync)
+			{
+				if (!InheritsValidationAttribute(attributeClass) || CustomRuleResolver.IsRuleMapped(attributeClass))
+					continue;
+
+				// A mapped DataAnnotations attribute is already emitted as a Zod rule. [DataType] itself has no
+				// validation semantics; its subclasses that are not mapped (EnumDataType, FileExtensions, a
+				// consumer's own) fall through to their own implementation below.
+				if (
+					!isTypeLevel
+					&& (IsMappedDataAnnotationAttribute(attributeClass) || IsDataTypeAttribute(attributeClass))
+				)
+				{
+					continue;
+				}
+			}
+
+			if (!TryRenderAttributeConstruction(attribute, out var expression))
+				continue;
+
+			if (isAsync)
+				(async ??= ImmutableArray.CreateBuilder<string>()).Add(expression);
+			else
+				(sync ??= ImmutableArray.CreateBuilder<string>()).Add(expression);
+		}
+
+		return (sync is null ? new([]) : new(sync.ToImmutable()), async is null ? new([]) : new(async.ToImmutable()));
+	}
+
+	/// <summary>
+	/// Determines whether <paramref name="type"/> derives from the DataAnnotations
+	/// <c>ValidationAttribute</c>.
+	/// </summary>
+	public static bool InheritsValidationAttribute(INamedTypeSymbol type)
+	{
+		for (var current = type; current is not null; current = current.BaseType)
+		{
+			if (
+				current.MetadataName == "ValidationAttribute"
+				&& current.ContainingNamespace?.ToDisplayString() == DataAnnotationsNamespace
+			)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Determines whether <paramref name="type"/> is a DataAnnotations attribute the generator maps to a Zod rule.
+	/// </summary>
+	static bool IsMappedDataAnnotationAttribute(INamedTypeSymbol type) =>
+		type.ContainingNamespace?.ToDisplayString() == DataAnnotationsNamespace
+		&& type.MetadataName
+			is "RequiredAttribute"
+				or "CompareAttribute"
+				or "EmailAddressAttribute"
+				or "CreditCardAttribute"
+				or "PhoneAttribute"
+				or "UrlAttribute"
+				or "StringLengthAttribute"
+				or "MinLengthAttribute"
+				or "MaxLengthAttribute"
+				or "RegularExpressionAttribute"
+				or "Base64StringAttribute"
+				or "DeniedValuesAttribute"
+				or "AllowedValuesAttribute"
+				or "LengthAttribute"
+				or "RangeAttribute";
+
+	/// <summary>
+	/// Determines whether <paramref name="type"/> is <c>DataTypeAttribute</c> itself, which has no validation
+	/// semantics. Its subclasses are validated (mapped ones by a Zod rule, the rest through their own
+	/// implementation).
+	/// </summary>
+	static bool IsDataTypeAttribute(INamedTypeSymbol type) =>
+		type.MetadataName == "DataTypeAttribute"
+		&& type.ContainingNamespace?.ToDisplayString() == DataAnnotationsNamespace;
+
+	/// <summary>
+	/// Determines whether <paramref name="member"/> is excluded from Microsoft.Extensions.Validation with
+	/// <c>[SkipValidation]</c>.
+	/// </summary>
+	public static bool IsSkipValidation(ISymbol member) =>
+		member
+			.GetAttributes()
+			.Any(attribute =>
+				attribute.AttributeClass is { MetadataName: "SkipValidationAttribute" } attributeClass
+				&& attributeClass.ContainingNamespace?.ToDisplayString() == ValidationNamespace
+			);
+
+	/// <summary>
+	/// Collects the class-level DataAnnotations validation attributes that apply to <paramref name="type"/>,
+	/// following the base chain because <c>ValidationAttribute</c> is inherited. A non-multiple attribute is
+	/// taken from its most derived declaration; a multiple one (for example <c>[CustomValidation]</c>) keeps
+	/// every declaration.
+	/// </summary>
+	public static ImmutableArray<AttributeData> GetTypeValidationAttributes(INamedTypeSymbol type)
+	{
+		var attributes = ImmutableArray.CreateBuilder<AttributeData>();
+		HashSet<INamedTypeSymbol> seen = new(SymbolEqualityComparer.Default);
+		for (var current = type; current is not null; current = current.BaseType)
+		{
+			foreach (var attribute in current.GetAttributes())
+			{
+				if (attribute.AttributeClass is not { } attributeClass || !InheritsValidationAttribute(attributeClass))
+					continue;
+
+				if (!AllowsMultiple(attributeClass) && !seen.Add(attributeClass))
+					continue;
+
+				attributes.Add(attribute);
+			}
+		}
+
+		return attributes.ToImmutable();
+	}
+
+	static bool AllowsMultiple(INamedTypeSymbol attributeClass)
+	{
+		foreach (var attribute in attributeClass.GetAttributes())
+		{
+			if (attribute.AttributeClass is not { MetadataName: "AttributeUsageAttribute" })
+				continue;
+
+			foreach (var argument in attribute.NamedArguments)
+			{
+				if (argument.Key == "AllowMultiple" && argument.Value.Value is true)
+					return true;
+			}
+
+			return false;
 		}
 
 		return false;
@@ -169,7 +334,8 @@ static class ValidationInputsResolver
 			var cases = ResolveCases(
 				RoslynFeatures.GetClosedDerivedTypes(namedType, cancellationToken),
 				externalSchemas,
-				requireSchemaAttribute: true
+				requireSchemaAttribute: true,
+				closedType: namedType
 			);
 			return cases.Count == 0 ? (DispatchKind.None, cases) : (DispatchKind.ClosedHierarchy, cases);
 		}
@@ -354,25 +520,51 @@ static class ValidationInputsResolver
 		ImmutableArray<INamedTypeSymbol> caseTypes,
 		ExternalSchemaResolver? externalSchemas,
 		bool requireSchemaAttribute,
-		INamedTypeSymbol? unionType = null
+		INamedTypeSymbol? unionType = null,
+		INamedTypeSymbol? closedType = null
 	)
 	{
 		var builder = ImmutableArray.CreateBuilder<DispatchCase>();
 		HashSet<TypeIdentity> seen = [];
+		var (polymorphismEnabled, discriminatorPropertyName) = closedType is null
+			? (false, string.Empty)
+			: ReadPolymorphism(closedType);
 		foreach (var caseType in caseTypes)
 		{
 			if (!TypeIdentity.TryCreate(caseType, out var caseIdentity) || !seen.Add(caseIdentity))
 				continue;
 
+			string? discriminator = null;
+			var discriminatorIsNumber = false;
+			if (polymorphismEnabled)
+			{
+				var (configured, configuredIsNumber) = GetDiscriminatorValue(closedType!, caseType);
+				discriminator = configured ?? caseType.Name;
+				discriminatorIsNumber = configured is not null && configuredIsNumber;
+			}
+
 			var nonBoxing = unionType is not null && HasTryGetValue(unionType, caseType);
 			var owned = externalSchemas?.IsSchemaOwnedByThisCompilation(caseType) ?? IsInSource(caseType);
 			if (owned)
 			{
-				if (requireSchemaAttribute && !ZodSchemaAttributeData.FromAttributeData(caseType, out _).Exists)
+				var attributeData = ZodSchemaAttributeData.FromAttributeData(caseType, out _);
+				if (requireSchemaAttribute && !attributeData.Exists)
 					continue;
 
 				builder.Add(
-					new(caseIdentity, caseIdentity with { Name = $"{caseIdentity.Name}Schema" }, true, nonBoxing)
+					new(
+						caseIdentity,
+						caseIdentity with
+						{
+							Name = $"{caseIdentity.Name}Schema",
+						},
+						true,
+						nonBoxing,
+						!attributeData.Exists || attributeData.GenerateJsonSchema,
+						polymorphismEnabled ? discriminatorPropertyName : null,
+						discriminator,
+						discriminatorIsNumber
+					)
 				);
 				continue;
 			}
@@ -380,11 +572,90 @@ static class ValidationInputsResolver
 			if (externalSchemas is not null && externalSchemas.TryGetExistingSchema(caseType, out var existing))
 			{
 				var (isModern, _) = externalSchemas.GetExistingSchemaFeatures(caseType);
-				builder.Add(new(caseIdentity, existing, isModern, nonBoxing));
+				builder.Add(
+					new(
+						caseIdentity,
+						existing,
+						isModern,
+						nonBoxing,
+						true,
+						polymorphismEnabled ? discriminatorPropertyName : null,
+						discriminator,
+						discriminatorIsNumber
+					)
+				);
 			}
 		}
 
 		return new(builder.ToImmutable());
+	}
+
+	/// <summary>
+	/// Reads whether a closed hierarchy opts into System.Text.Json polymorphism and the discriminator
+	/// property name it uses. A hierarchy that does not opt in has no discriminator in its wire form; a
+	/// process-wide <c>JsonSerializerOptions.InferClosedTypePolymorphism</c> is not visible to the generator,
+	/// so the type-level attribute is what the exported schema follows.
+	/// </summary>
+	static (bool Enabled, string PropertyName) ReadPolymorphism(INamedTypeSymbol closedType)
+	{
+		var enabled = false;
+		var propertyName = "$type";
+		foreach (var attribute in closedType.GetAttributes())
+		{
+			var attributeType = attribute.AttributeClass?.ToDisplayString();
+			if (attributeType == "System.Text.Json.Serialization.JsonPolymorphicAttribute")
+			{
+				foreach (var argument in attribute.NamedArguments)
+				{
+					if (argument.Key == "TypeDiscriminatorPropertyName" && argument.Value.Value is string configured)
+						propertyName = configured;
+
+					if (argument.Key == "InferClosedTypePolymorphism" && argument.Value.Value is true)
+						enabled = true;
+				}
+			}
+			else if (attributeType == "System.Text.Json.Serialization.JsonDerivedTypeAttribute")
+			{
+				// Explicit registrations make the type polymorphic without inference.
+				enabled = true;
+			}
+		}
+
+		return (enabled, propertyName);
+	}
+
+	/// <summary>
+	/// Gets the discriminator System.Text.Json writes for <paramref name="caseType"/>, from an explicit
+	/// <c>[JsonDerivedType]</c> registration, and whether it is written as a JSON number. Inferred
+	/// registrations use the simple type name, which the caller supplies when this returns no value.
+	/// </summary>
+	static (string? Value, bool IsNumber) GetDiscriminatorValue(INamedTypeSymbol closedType, INamedTypeSymbol caseType)
+	{
+		foreach (var attribute in closedType.GetAttributes())
+		{
+			if (
+				attribute.AttributeClass?.ToDisplayString() != "System.Text.Json.Serialization.JsonDerivedTypeAttribute"
+			)
+				continue;
+
+			if (attribute.ConstructorArguments.Length < 2)
+				continue;
+
+			if (attribute.ConstructorArguments[0].Value is not INamedTypeSymbol derived)
+				continue;
+
+			if (!SymbolEqualityComparer.Default.Equals(derived, caseType))
+				continue;
+
+			return attribute.ConstructorArguments[1].Value switch
+			{
+				string value => (value, false),
+				int value => (value.ToString(CultureInfo.InvariantCulture), true),
+				_ => (null, false),
+			};
+		}
+
+		return (null, false);
 	}
 
 	static bool IsInSource(INamedTypeSymbol type) =>

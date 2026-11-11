@@ -47,11 +47,28 @@ enum DispatchKind
 /// Whether the union exposes <c>TryGetValue(out CaseType)</c>, so the case can be tested without boxing a
 /// value-type case. Always false for a closed hierarchy.
 /// </param>
+/// <param name="ExportsJsonSchema">
+/// Whether the case's schema emits <c>BuildJsonSchema</c>; a schema can opt out with
+/// <c>[ZodSchema(GenerateJsonSchema = false)]</c>, in which case the member exports an empty branch.
+/// </param>
+/// <param name="DiscriminatorPropertyName">
+/// The JSON property that identifies the case for a polymorphic closed hierarchy, or <see langword="null"/>
+/// for a union (which carries no discriminator) or a hierarchy that has not opted into polymorphism.
+/// </param>
+/// <param name="DiscriminatorValue">The discriminator value for this case, or <see langword="null"/>.</param>
+/// <param name="DiscriminatorValueIsNumber">
+/// Whether System.Text.Json writes <paramref name="DiscriminatorValue"/> as a JSON number (an
+/// <c>[JsonDerivedType]</c> registered with an integer discriminator) rather than a string.
+/// </param>
 readonly record struct DispatchCase(
 	TypeIdentity CaseType,
 	TypeIdentity SchemaType,
 	bool IsModern,
-	bool NonBoxing = false
+	bool NonBoxing = false,
+	bool ExportsJsonSchema = true,
+	string? DiscriminatorPropertyName = null,
+	string? DiscriminatorValue = null,
+	bool DiscriminatorValueIsNumber = false
 );
 
 readonly record struct SchemaSet(EquatableArray<ZodSchemaDescriptor> Schemas);
@@ -182,6 +199,18 @@ readonly record struct ZodSchemaDescriptor(
 
 	/// <summary>Whether the target implements <c>System.ComponentModel.DataAnnotations.IAsyncValidatableObject</c> (.NET 11).</summary>
 	public bool ImplementsAsyncValidatableObject { get; init; }
+
+	/// <summary>
+	/// The construction expressions of synchronous DataAnnotations validation attributes declared on the type
+	/// itself that the generator has no dedicated type rule for, in declaration order.
+	/// </summary>
+	public EquatableArray<string> TypeSyncValidationAttributes { get; init; } = new([]);
+
+	/// <summary>
+	/// The construction expressions of class-level <c>AsyncValidationAttribute</c>s (.NET 11) declared on the
+	/// type itself, in declaration order.
+	/// </summary>
+	public EquatableArray<string> TypeAsyncValidationAttributes { get; init; } = new([]);
 
 	/// <summary>
 	/// Whether a hand-authored <c>[OptionsValidator]</c> class named <c>{Type}Validator</c> exists, so the generated
@@ -326,6 +355,13 @@ readonly record struct ZodPropertyDescriptor(
 	/// declaration order.
 	/// </summary>
 	public EquatableArray<string> AsyncValidationAttributes { get; init; } = new([]);
+
+	/// <summary>
+	/// The construction expressions of synchronous DataAnnotations validation attributes declared on the member
+	/// that the generator has no dedicated rule for (for example <c>[CustomValidation]</c>,
+	/// <c>[FileExtensions]</c> or a consumer's own <c>ValidationAttribute</c>), in declaration order.
+	/// </summary>
+	public EquatableArray<string> SyncValidationAttributes { get; init; } = new([]);
 
 	/// <summary>How the member dispatches to a case or derived type's schema, when it does.</summary>
 	public DispatchKind DispatchKind { get; init; }

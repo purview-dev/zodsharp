@@ -152,7 +152,10 @@ partial class ZodSchemaGenerator
 		var isRequired = hasRequiredAttribute || !property.IsDeclaredNullable;
 		var isNullable = property.IsDeclaredNullable && !hasRequiredAttribute && !hasRequiredRule;
 
-		body.Assignment("var", localName, BuildPropertySchemaExpression(property, schema));
+		if (property.DispatchKind != DispatchKind.None)
+			EmitDispatchJsonSchema(body, localName, property);
+		else
+			body.Assignment("var", localName, BuildPropertySchemaExpression(property, schema));
 
 		EmitAttributeConstraints(body, property, localName);
 
@@ -173,6 +176,50 @@ partial class ZodSchemaGenerator
 
 		if (isRequired)
 			body.MethodCallOn("schema.Required", "Add", nameLiteral);
+	}
+
+	/// <summary>
+	/// Emits the JSON Schema of a member that dispatches to a case or derived type's schema: <c>oneOf</c>
+	/// the case schemas, because exactly one case is active. A polymorphic closed hierarchy also constrains
+	/// the <c>$type</c> discriminator each branch carries, so the schema describes the wire form System.Text.Json
+	/// writes when the hierarchy opts into inferred polymorphism.
+	/// </summary>
+	static void EmitDispatchJsonSchema(CodeWriter body, string localName, ZodPropertyDescriptor property)
+	{
+		body.Assignment("var", localName, $"new {JsonSchemaDefinitionTypeName} {{ OneOf = new() }}");
+		for (var i = 0; i < property.DispatchCases.Count; i++)
+		{
+			var dispatchCase = property.DispatchCases[i];
+			var caseExpression = dispatchCase.ExportsJsonSchema
+				? $"{dispatchCase.SchemaType.AsTypeReference().RenderFullName}.BuildJsonSchema()"
+				: $"new {JsonSchemaDefinitionTypeName}()";
+
+			if (
+				dispatchCase.DiscriminatorPropertyName is not { } discriminatorName
+				|| dispatchCase.DiscriminatorValue is null
+			)
+			{
+				body.MethodCallOn($"{localName}.OneOf", "Add", caseExpression);
+				continue;
+			}
+
+			var caseName = $"{localName}Case{i}";
+			var nameLiteral = discriminatorName.StringLiteral();
+			var valueExpression = dispatchCase.DiscriminatorValueIsNumber
+				? dispatchCase.DiscriminatorValue
+				: dispatchCase.DiscriminatorValue.StringLiteral();
+			body.Assignment("var", caseName, caseExpression);
+			body.Line(
+				$"{caseName}.Properties ??= new global::System.Collections.Generic.Dictionary<string, {JsonSchemaDefinitionTypeName}>(global::System.StringComparer.Ordinal);"
+			);
+			body.Line($"{caseName}.Required ??= new global::System.Collections.Generic.List<string>();");
+			body.Assignment(
+				$"{caseName}.Properties[{nameLiteral}]",
+				$"new {JsonSchemaDefinitionTypeName} {{ Enum = new() {{ {valueExpression} }} }}"
+			);
+			body.MethodCallOn($"{caseName}.Required", "Add", nameLiteral);
+			body.MethodCallOn($"{localName}.OneOf", "Add", caseName);
+		}
 	}
 
 	/// <summary>

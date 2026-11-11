@@ -156,7 +156,9 @@ See [references/error-model.md](references/error-model.md) for the error contrac
 On `net11.0` and later, prefer `Z.NativeUnion<T1, T2>`: its result is a C# 15 union declared with the
 non-boxing access pattern, so reference-type **and** value-type cases stay allocation-free and an exhaustive
 `switch` needs no discard arm. `Z.Union<T1, T2>` remains the choice on `net10.0`, or when `Match`/`Switch`/
-equality is needed.
+equality is needed. On the wire it carries `[JsonUnion]`: System.Text.Json writes the active case and the
+`NativeUnionTypeClassifierFactory` reads it back, including a string token under Web defaults and two
+object-shaped cases (see the `purview-zodsharp-json` skill).
 
 ```csharp
 var userSchema = Z.Object()
