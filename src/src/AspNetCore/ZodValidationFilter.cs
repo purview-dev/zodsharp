@@ -31,8 +31,7 @@ public sealed class ZodValidationFilter<T> : IEndpointFilter
 			return await next(context).ConfigureAwait(false);
 #endif
 
-		var factory =
-			httpContext.RequestServices.GetService<IZodSchemaFactory>()
+		var factory = httpContext.RequestServices.GetService<IZodSchemaFactory>()
 			?? throw new InvalidOperationException(
 				"No IZodSchemaFactory is registered. Call AddZodSharp (or AddZodSharpFactory) before applying WithZodSharpValidation."
 			);
@@ -45,8 +44,7 @@ public sealed class ZodValidationFilter<T> : IEndpointFilter
 			if (argument is not T value)
 				continue;
 
-			validator ??=
-				factory.Resolve<T>()
+			validator ??= factory.Resolve<T>()
 				?? throw new InvalidOperationException(
 					$"No Zod schema validator is registered for type '{typeof(T).FullName}'."
 				);

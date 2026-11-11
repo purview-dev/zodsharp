@@ -196,8 +196,8 @@ public class StaticSsrTests
 	/// </summary>
 	static string MessageAfter(IHtmlDocument document, string name)
 	{
-		var input =
-			document.QuerySelector($"[name='{name}']") ?? throw new InvalidOperationException($"No input '{name}'.");
+		var input = document.QuerySelector($"[name='{name}']")
+			?? throw new InvalidOperationException($"No input '{name}'.");
 		var sibling = input.NextElementSibling;
 		var text = string.Empty;
 		while (sibling is not null && sibling.ClassList.Contains("validation-message"))
@@ -216,8 +216,7 @@ public class StaticSsrTests
 	/// </summary>
 	internal static Dictionary<string, List<Rule>> ReadRules(IDocument document)
 	{
-		var element =
-			document.QuerySelector("blazor-client-validation-data")
+		var element = document.QuerySelector("blazor-client-validation-data")
 			?? throw new InvalidOperationException("No client validation payload was rendered.");
 		using var json = JsonDocument.Parse(element.GetAttribute("data-rules") ?? "{}");
 

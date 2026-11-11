@@ -29,8 +29,7 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 		T deserialized;
 		try
 		{
-			deserialized =
-				token.ToObject<T>(validationSerializer)
+			deserialized = token.ToObject<T>(validationSerializer)
 				?? throw new JsonSerializationException("Failed to deserialize JSON", path, line, position, null);
 		}
 		catch (ZodNewtonsoftJsonValidationException nested)

@@ -37,8 +37,7 @@ sealed class ZodJsonConverter<T>(IZodSchema<T, T> schema) : JsonConverter<T>
 		T deserialized;
 		try
 		{
-			deserialized =
-				JsonSerializer.Deserialize(document.RootElement, TypeInfoFor(options))
+			deserialized = JsonSerializer.Deserialize(document.RootElement, TypeInfoFor(options))
 				?? throw new JsonException("Failed to deserialize JSON");
 		}
 		catch (ZodJsonValidationException nested)

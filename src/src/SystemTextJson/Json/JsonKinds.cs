@@ -57,6 +57,7 @@ static class JsonKinds
 	/// </summary>
 	/// <param name="typeInfo">The contract.</param>
 	/// <returns>The Zod type name, or <see langword="null"/>.</returns>
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0072:Add missing cases")]
 	public static string? OfContract(JsonTypeInfo typeInfo) =>
 		typeInfo.Kind switch
 		{

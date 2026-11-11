@@ -367,6 +367,9 @@ public static class ZodJsonExceptions
 		if (path.IsRoot)
 			return true;
 
+		// The error is at the value object's own member when it has one member segment, and the error's display name
+		// is that member's name. A deeper error, or one with its own display name, keeps it. The display name is the one the serializer shows in a JsonException, which
+		// is the same as the one ZodSharp generates for a scalar value object's error.
 		return path.Length == 1
 			&& path[0].Kind == ZodPathSegmentKind.Member
 			&& error.Parameters is { } parameters

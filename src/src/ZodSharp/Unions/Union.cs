@@ -115,6 +115,7 @@ public readonly struct Union<T1, T2> : IUnion, IEquatable<Union<T1, T2>>
 		if (case2 is null)
 			throw new ArgumentNullException(nameof(case2));
 
+		// The default case is unreachable because the union is never empty when Match is called, but the compiler cannot see that.
 		return Tag switch
 		{
 			1 => case1(_value1!),
@@ -302,6 +303,7 @@ public readonly struct Union<T1, T2, T3> : IUnion, IEquatable<Union<T1, T2, T3>>
 		if (case3 is null)
 			throw new ArgumentNullException(nameof(case3));
 
+		// The default case is unreachable because the union is never empty when Match is called, but the compiler cannot see that.
 		return Tag switch
 		{
 			1 => case1(_value1!),

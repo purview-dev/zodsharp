@@ -45,8 +45,7 @@ sealed class SampleAppFactory : WebApplicationFactory<App>
 		CancellationToken cancellationToken
 	)
 	{
-		var token =
-			page.QuerySelector("input[name='__RequestVerificationToken']")?.GetAttribute("value")
+		var token = page.QuerySelector("input[name='__RequestVerificationToken']")?.GetAttribute("value")
 			?? throw new InvalidOperationException("The form rendered no antiforgery token.");
 
 		using FormUrlEncodedContent content = new([
@@ -70,8 +69,8 @@ sealed class SampleAppFactory : WebApplicationFactory<App>
 	/// </summary>
 	public static string MessageAfter(IDocument document, string name)
 	{
-		var input =
-			document.QuerySelector($"[name='{name}']") ?? throw new InvalidOperationException($"No input '{name}'.");
+		var input = document.QuerySelector($"[name='{name}']")
+			?? throw new InvalidOperationException($"No input '{name}'.");
 		var text = string.Empty;
 		for (
 			var sibling = input.NextElementSibling;
@@ -94,8 +93,7 @@ sealed class SampleAppFactory : WebApplicationFactory<App>
 	/// </summary>
 	public static Dictionary<string, List<ClientRule>> ReadClientRules(IDocument document)
 	{
-		var element =
-			document.QuerySelector("blazor-client-validation-data")
+		var element = document.QuerySelector("blazor-client-validation-data")
 			?? throw new InvalidOperationException("No client validation payload was rendered.");
 		using var json = JsonDocument.Parse(element.GetAttribute("data-rules") ?? "{}");
 

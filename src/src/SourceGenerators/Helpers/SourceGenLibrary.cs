@@ -616,8 +616,8 @@ static partial class SourceGenLibrary
 		var nestedSchemaType = GetNestedSchemaTypeIdentity(property, validationKind, externalSchemas);
 		var lengthAccessor = ClassifyLengthAccessor(originalPropertyType);
 		var validationAttributes = GetValidationAttributes(property, compilation);
-		var dateTimeOffsetSerialization =
-			ReadDateTimeOffsetSerialization(validationAttributes) ?? typeDateTimeOffsetSerialization;
+		var dateTimeOffsetSerialization = ReadDateTimeOffsetSerialization(validationAttributes)
+			?? typeDateTimeOffsetSerialization;
 		var allowNulls =
 			validationKind == PropertyValidationKind.Collection
 				? ResolveAllowNulls(originalPropertyType, validationAttributes, typeAllowNulls)
@@ -1511,8 +1511,7 @@ static partial class SourceGenLibrary
 			&& !IsValueSetSupportedType(originalPropertyType)
 		)
 		{
-			var valuesAttribute =
-				FindAttribute(attributes, "AllowedValuesAttribute")
+			var valuesAttribute = FindAttribute(attributes, "AllowedValuesAttribute")
 				?? FindAttribute(attributes, "DeniedValuesAttribute");
 			if (valuesAttribute is not null)
 				AddUnsupportedDataAnnotationsUsage(propertyName, valuesAttribute, diagnostics);

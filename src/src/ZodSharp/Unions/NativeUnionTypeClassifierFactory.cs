@@ -94,7 +94,7 @@ public sealed class NativeUnionTypeClassifierFactory : JsonTypeClassifierFactory
 		if (token == JsonTokenType.StartObject && structural is not null)
 			return structural(ref reader);
 
-		List<Type> natural = new(caseTypes.Length);
+		List<Type> natural = [with(caseTypes.Length)];
 		foreach (var caseType in caseTypes)
 		{
 			if (IsNaturalType(caseType, token, options))
@@ -105,7 +105,7 @@ public sealed class NativeUnionTypeClassifierFactory : JsonTypeClassifierFactory
 			return natural[0];
 
 		IReadOnlyList<Type> candidates = natural.Count > 0 ? natural : caseTypes;
-		List<Type> readable = new(candidates.Count);
+		List<Type> readable = [with(candidates.Count)];
 		foreach (var caseType in candidates)
 		{
 			if (CanRead(ref reader, caseType, options))
@@ -120,6 +120,8 @@ public sealed class NativeUnionTypeClassifierFactory : JsonTypeClassifierFactory
 		if (readable.Count > 1 && token is not (JsonTokenType.StartObject or JsonTokenType.StartArray))
 			return readable[0];
 
+		// Let the serializer report the ambiguity or lack of a match as a JsonException, which is the same
+		// behaviour as a compiler-declared union.
 		return null;
 	}
 
@@ -136,6 +138,7 @@ public sealed class NativeUnionTypeClassifierFactory : JsonTypeClassifierFactory
 		return IsNaturalScalar(caseType, token, options);
 	}
 
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0072:Add missing cases")]
 	static bool IsNaturalScalar(Type caseType, JsonTokenType token, JsonSerializerOptions options) =>
 		token switch
 		{

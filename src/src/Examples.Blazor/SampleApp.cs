@@ -131,8 +131,7 @@ static class SampleApp
 	static Uri? SelfBaseAddress(IServiceProvider provider)
 	{
 		var addresses = provider.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()?.Addresses;
-		var address =
-			addresses?.FirstOrDefault(static a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+		var address = addresses?.FirstOrDefault(static a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
 			?? addresses?.FirstOrDefault();
 		if (address is null)
 			return null;

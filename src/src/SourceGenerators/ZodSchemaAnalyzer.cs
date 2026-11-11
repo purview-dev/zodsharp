@@ -380,8 +380,7 @@ public sealed class ZodSchemaAnalyzer : DiagnosticAnalyzer
 				&& attributeClass.ContainingNamespace?.ToDisplayString() == "Microsoft.Extensions.Validation"
 			)
 			{
-				var location =
-					attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
+				var location = attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
 					?? typeLocation;
 				context.ReportDiagnostic(
 					Diagnostic.Create(DiagnosticLibrary.ValidatableTypeRedundant, location, type.Name)
