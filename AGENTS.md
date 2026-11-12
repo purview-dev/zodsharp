@@ -55,7 +55,17 @@ The build is driven by `Purview.BuildSdk`, imported via `src/Directory.Build.pro
 - Package versions are managed centrally in `Directory.Packages.props` (Central Package Management).
 - `global.json` pins the `Purview.BuildSdk` MSBuild SDK version.
 - Pack layout for all packages is validated by `.config/purview-build.json` (`PackValidation.RequiredContent`).
-- **.NET 11 opt-ins.** `Purview.BuildSdk` 2.0 compiles every `net11.0` target with Runtime Async (`runtime-async=on`) and the C# 15 updated memory-safety rules (`MemorySafetyRules=2`). The GA compiler still classifies the latter as a preview feature, so `LangVersion` is `preview`, and `AllowUnsafeBlocks` is on: the STJ generator emits unsafe fast paths, and the two `Unsafe.As` boundaries in the sentinel/required rules use `unsafe` blocks so the audit boundary is visible at the call site. Do not remove either without removing the tier-2 opt-in.
+- **.NET 11 opt-ins.** `Purview.BuildSdk` 2.0 compiles every `net11.0` target with Runtime Async (`runtime-async=on`)
+  unless told otherwise; this repository sets `PurviewRuntimeAsync=false`, because Runtime Async is not supported by
+  Mono, and Mono is what Blazor WebAssembly runs on
+  ([dotnet/aspnetcore#68067](https://github.com/dotnet/aspnetcore/issues/68067)). A package built with it throws an
+  empty `InvalidProgramException` at the first async method a wasm consumer runs (`ZodValidator` validation, for
+  example). Almost every package here is browser-facing — the core package, SystemTextJson, Http and Blazor — so the
+  opt-out is repository-wide rather than per project; re-enable it only for a project that can never be consumed from
+  WebAssembly. The C# 15 updated memory-safety rules (`MemorySafetyRules=2`) stay on, and the GA compiler still
+  classifies them as a preview feature, so `LangVersion` is `preview`, and `AllowUnsafeBlocks` is on: the STJ generator
+  emits unsafe fast paths, and the two `Unsafe.As` boundaries in the sentinel/required rules use `unsafe` blocks so the
+  audit boundary is visible at the call site. Do not remove either without removing the tier-2 opt-in.
 - **Multithreaded MSBuild is off** (`PurviewMultiThreadedBuild=false`). The .NET 11 GA WebAssembly SDK declares `ReadWasmProps` with a custom `TaskFactory`, which `-mt` refuses to execute out of process, so `Examples.Blazor.Client` cannot build in that mode. Re-enable it once `dotnet/runtime` annotates the task as multithreadable.
 
 Before changing build/SDK configuration or adding/moving projects, consult the SDK's own skills, which are committed under `.agents/skills/` (see [Installed skills](#installed-skills-agentsskills)): `purview-buildsdk-configuration`, `purview-buildsdk-project-detection`, `purview-buildsdk-project-layout`.

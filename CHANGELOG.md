@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Released versions correspond to `v<version>` GitHub releases.
 
+## 3.0.0-prerelease.6
+
+### Fixed
+
+- **Blazor WebAssembly consumers no longer fail with `InvalidProgramException`.** The `net11.0` assemblies were
+  compiled with Runtime Async, which Mono does not support, so the first async method a WebAssembly consumer ran
+  (validating a form through `ZodValidator`, for example) threw an empty `InvalidProgramException` before any of its
+  own code executed. The repository now builds with `PurviewRuntimeAsync=false`; the C# 15 updated memory-safety rules
+  are unaffected. See [dotnet/aspnetcore#68067](https://github.com/dotnet/aspnetcore/issues/68067).
+
 ## 3.0.0-prerelease.5
 
 ### Added
