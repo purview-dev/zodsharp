@@ -17,6 +17,18 @@
 			sentinel/required rules use it deliberately (see ZodSharp.csproj).
 		-->
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<!--
+			Runtime Async stays off. Purview.BuildSdk 2.0 turns `runtime-async=on` on for every net11.0 target,
+			but Runtime Async is not supported by Mono, and Mono is the runtime behind Blazor WebAssembly.
+			3.0.0-prerelease.5 shipped with it on and a wasm consumer failed at its first validation with an
+			empty InvalidProgramException raised from the AsyncHelpers.Await IL
+			(dotnet/aspnetcore#68067: "Runtime async is not supported for Mono"; ASP.NET Core itself
+			compiles with `runtime-async=off` whenever the target is browser). Almost everything shipped here is
+			browser-facing - the core package, SystemTextJson, Http and Blazor - so the whole repository opts
+			out instead of carrying a per-project split that would still leave the core library unusable on
+			WebAssembly. The C# 15 updated memory-safety rules are independent of this and stay on.
+		-->
+		<PurviewRuntimeAsync>false</PurviewRuntimeAsync>
 		<NamespacePrefix>ZodSharp</NamespacePrefix>
 		<!-- Set project-by-project -->
 		<IsPackable>false</IsPackable>
