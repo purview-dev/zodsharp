@@ -45,9 +45,7 @@ sealed class Order : IValidatableObject
 
 	public string? Notes { get; set; }
 
-	public IEnumerable<ValidationResult> Validate(
-		ValidationContext validationContext
-	)
+	public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
 	{
 		if (string.Equals(Notes, "forbidden", StringComparison.Ordinal))
 			yield return new("Notes may not be 'forbidden'.", [nameof(Notes)]);

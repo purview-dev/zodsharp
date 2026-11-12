@@ -4,7 +4,7 @@
 		"rollForward": "latestFeature"
 	},
 	"msbuild-sdks": {
-		"Purview.BuildSdk": "2.0.0"
+		"Purview.BuildSdk": "2.0.1"
 	},
 	"test": {
 		"runner": "Microsoft.Testing.Platform"
