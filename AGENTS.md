@@ -42,7 +42,7 @@ src/
 src/ts/                TypeScript (Zod) schema + fixture generation; consumed by C# and vitest tests
 tests/ts/              Vitest cross-platform tests
 skills/                Agent skills this repository authors and publishes
-.agents/skills/        Skills installed from other repositories by the skills CLI (committed, with skills-lock.json)
+.agents/skills/        Installed skills (gitignored; restored with just skills-install from skills-lock.json)
 ```
 
 ## Build system
@@ -68,7 +68,7 @@ The build is driven by `Purview.BuildSdk`, imported via `src/Directory.Build.pro
   audit boundary is visible at the call site. Do not remove either without removing the tier-2 opt-in.
 - **Multithreaded MSBuild is off** (`PurviewMultiThreadedBuild=false`). The .NET 11 GA WebAssembly SDK declares `ReadWasmProps` with a custom `TaskFactory`, which `-mt` refuses to execute out of process, so `Examples.Blazor.Client` cannot build in that mode. Re-enable it once `dotnet/runtime` annotates the task as multithreadable.
 
-Before changing build/SDK configuration or adding/moving projects, consult the SDK's own skills, which are committed under `.agents/skills/` (see [Installed skills](#installed-skills-agentsskills)): `purview-buildsdk-configuration`, `purview-buildsdk-project-detection`, `purview-buildsdk-project-layout`.
+Before changing build/SDK configuration or adding/moving projects, consult the SDK's own skills, which are installed under `.agents/skills/` (`just skills-install`; see [Installed skills](#installed-skills-agentsskills)): `purview-buildsdk-configuration`, `purview-buildsdk-project-detection`, `purview-buildsdk-project-layout`.
 
 ## Commands
 
@@ -213,9 +213,10 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 ## Installed skills (`.agents/skills/`)
 
 Specialist SDK, source-generator and engineering guidance is published by the repositories that own
-it, and installed here by the skills CLI. The installed skills are **committed**: `.agents/skills/**`
-and the CLI's `skills-lock.json` (source, skill path and content hash of every entry) are both in
-source, so a clone has them without running anything.
+it, and installed here by the skills CLI. Only the CLI's `skills-lock.json` (source, skill path and
+content hash of every entry) is committed: `.agents/skills/` is a local install, gitignored so a skill
+this repository does not publish can never be found through `skills add purview-dev/zodsharp`. A fresh
+clone restores the set with `just skills-install`.
 
 | Skill | Source | Load before |
 | --- | --- | --- |
@@ -232,8 +233,9 @@ This repository's own skills in `skills/` are authored for **consumers** of its 
 
 Skills are installed into the universal `.agents/skills/` location **only**. Never install copies
 into `.claude/` or any other per-agent folder, and never commit a `CLAUDE.md`: this repository is not
-agent-specific, and `AGENTS.md` is its one instruction file. `/.claude/` is gitignored for that
-reason. Pass `-a universal`, which writes `.agents/skills/` and nothing else:
+agent-specific, and `AGENTS.md` is its one instruction file. Both folders are gitignored, so neither
+an installed copy nor a per-agent one can be committed. Pass `-a universal`, which writes
+`.agents/skills/` and nothing else:
 
 ```bash
 # add or update every skill from a source
@@ -245,17 +247,19 @@ npx -y skills@1 add purview-dev/engineering-playbook -s '*' -a universal -y
 npx -y skills@1 experimental_install
 ```
 
-Commit the changed `.agents/skills/**` and `skills-lock.json` together, in their own `chore` commit.
-Do not edit anything under `.agents/skills/` by hand - the CLI is its only writer, and a hand edit no
+Commit the changed `skills-lock.json` in its own `chore` commit. `.agents/skills/` is gitignored and
+must never be committed: a skill this repository installs but does not publish would otherwise be
+findable through `skills add purview-dev/zodsharp`. Do not edit anything under `.agents/skills/` by
+hand - the CLI is its only writer, and a hand edit no
 longer matches the lockfile's hash. This repository's *own* skills are never installed here; they live
 in `skills/` (below), and a second copy would drift. `Purview.BuildSdk`'s `InstallPurviewSkills`
 target delegates to the same CLI; `src/Directory.Build.props` sets `PurviewSkillsAgents=universal` so
 it is restricted the same way rather than defaulting to every agent (`*`).
 
-`src/tests/Repository.UnitTests/InstalledSkillTests.cs` keeps this honest: every `skills-lock.json`
-entry has its `.agents/skills/<name>/SKILL.md`, every installed folder is in the lockfile, no
-authored `skills/` skill is copied into `.agents/skills/`, no `.claude/skills/` copy exists, and no
-`CLAUDE.md` is present.
+`src/tests/Repository.UnitTests/InstalledSkillTests.cs` keeps this honest: nothing under
+`.agents/skills/` is tracked, the `.agents/skills/` and `.claude/` ignore rules are in place, every
+installed folder is in the lockfile (when a local install exists), no authored `skills/` skill is
+copied into `.agents/skills/`, and no `CLAUDE.md` is present.
 
 ## Authoring skills
 

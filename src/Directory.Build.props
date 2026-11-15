@@ -35,8 +35,9 @@
 		<ExcludePurviewTelemetry>true</ExcludePurviewTelemetry>
 		<RepositoryUrl>https://github.com/purview-dev/zodsharp</RepositoryUrl>
 		<NoWarn>$(NoWarn);CA1031;CA1307;CA1510;</NoWarn>
-		<!-- Installed skills live in the universal .agents/skills/ folder only, and are committed. The
-		     SDK's default (*) would make InstallPurviewSkills write a copy into every agent's folder. -->
+		<!-- Installed skills live in the universal .agents/skills/ folder only, which is gitignored: the
+		     committed skills-lock.json is the record. The SDK's default (*) would make
+		     InstallPurviewSkills write a copy into every agent's folder. -->
 		<PurviewSkillsAgents>universal</PurviewSkillsAgents>
 		<!--
 			MSBuild's multithreaded build stays off until the WebAssembly SDK can run its tasks in it:
