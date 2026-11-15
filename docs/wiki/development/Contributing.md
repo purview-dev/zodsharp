@@ -29,7 +29,7 @@ src/
 src/ts/                     TypeScript (Zod) schema + fixture generation
 tests/ts/                   Vitest cross-platform tests
 skills/                     Agent skills this repository publishes
-.agents/skills/             Skills installed from other repositories (committed, with skills-lock.json)
+.agents/skills/             Installed skills (gitignored; restored with just skills-install from skills-lock.json)
 docs/wiki/                  This documentation suite
 ```
 
