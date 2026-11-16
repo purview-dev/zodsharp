@@ -56,14 +56,14 @@ dotnet add package Purview.ZodSharp.Blazor
 ### PackageReference
 
 ```xml
-<PackageReference Include="Purview.ZodSharp" Version="3.0.0-prerelease.5" />
-<PackageReference Include="Purview.ZodSharp.SystemTextJson" Version="3.0.0-prerelease.5" />
-<PackageReference Include="Purview.ZodSharp.NewtonsoftJson" Version="3.0.0-prerelease.5" />
-<PackageReference Include="Purview.ZodSharp.Http" Version="3.0.0-prerelease.5" />
-<PackageReference Include="Purview.ZodSharp.AspNetCore" Version="3.0.0-prerelease.5" />
-<PackageReference Include="Purview.ZodSharp.Extensions.Validation" Version="3.0.0-prerelease.5" />
-<PackageReference Include="Purview.ZodSharp.AspNetCore.OpenApi" Version="3.0.0-prerelease.5" />
-<PackageReference Include="Purview.ZodSharp.Blazor" Version="3.0.0-prerelease.5" />
+<PackageReference Include="Purview.ZodSharp" Version="3.0.0" />
+<PackageReference Include="Purview.ZodSharp.SystemTextJson" Version="3.0.0" />
+<PackageReference Include="Purview.ZodSharp.NewtonsoftJson" Version="3.0.0" />
+<PackageReference Include="Purview.ZodSharp.Http" Version="3.0.0" />
+<PackageReference Include="Purview.ZodSharp.AspNetCore" Version="3.0.0" />
+<PackageReference Include="Purview.ZodSharp.Extensions.Validation" Version="3.0.0" />
+<PackageReference Include="Purview.ZodSharp.AspNetCore.OpenApi" Version="3.0.0" />
+<PackageReference Include="Purview.ZodSharp.Blazor" Version="3.0.0" />
 ```
 
 - **Purview.ZodSharp** — Core validation library, source generator (`[ZodSchema]`) and JSON Schema export. See its [package README](src/src/ZodSharp/Sdk/README.md).

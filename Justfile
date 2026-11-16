@@ -83,11 +83,10 @@ verify-pack-rules *args: ensure-tools
 scan-compiler-host-leaks +paths:
     pwsh -NoProfile -File scripts/assert-no-compiler-host-assemblies.ps1 -Path {{ paths }}
 
-# Run the performance benchmarks with the specified configuration, defaulting to "Debug"
+# Run the performance benchmarks in Release for net10.0; pass `-f net11.0` to run them on .NET 11
 [group('Build and Test')]
 perf-tests *args:
     echo "Running performance tests for {{ BLUE }}{{ perf_tests_project }}{{ NORMAL }}"
-    # Benchmarks multi-target net10.0/net11.0; default to net10.0. Pass `-f net11.0` to run on .NET 11.
     dotnet run --project {{ perf_tests_project }} -c Release -f net10.0 {{ args }}
 
 # The CI `aot-sample` job runs the same publish for linux-x64. Windows needs the MSVC C++ build tools, Linux clang.
