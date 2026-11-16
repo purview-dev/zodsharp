@@ -1,0 +1,51 @@
+// The three projects of a Blazor Web App and the ZodSharp packages each one references.
+//
+// Embedded by host!docs/wiki/hosting/Blazor-Integration.md through a purview:likec4 block, paired with
+// a Mermaid fence so GitHub and purview.dev each render the diagram their renderer can show. One
+// self-contained file per diagram: purview.dev compiles it on its own, so it carries its own
+// specification, model and views and imports nothing.
+
+specification {
+  element project {
+    style {
+      shape rectangle
+    }
+  }
+  element package {
+    style {
+      shape rectangle
+      color secondary
+    }
+  }
+}
+
+model {
+  server = project 'MyApp (server)' {
+    description 'Renders the components on the server and hosts the endpoints'
+  }
+  client = project 'MyApp.Client (WebAssembly)' {
+    description 'Runs the same components in the browser'
+  }
+  shared = project 'MyApp.Shared (models)' {
+    description 'The ZodSchema models, where the generator runs'
+  }
+
+  blazor = package 'Purview.ZodSharp.Blazor'
+  aspnetcore = package 'Purview.ZodSharp.AspNetCore'
+  core = package 'Purview.ZodSharp'
+
+  server -> blazor
+  server -> aspnetcore
+  client -> blazor
+  shared -> core
+  server -> shared 'references'
+  client -> shared 'references'
+}
+
+views {
+  view blazorProjects {
+    title 'Blazor projects and the packages they reference'
+    include *
+    autoLayout LeftRight
+  }
+}

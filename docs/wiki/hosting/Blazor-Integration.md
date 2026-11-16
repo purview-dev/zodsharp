@@ -20,11 +20,19 @@ builder.Services.AddZodSharpBlazor();
 
 A Blazor Web App typically looks like this:
 
+<!-- purview:likec4 file="../diagrams/blazor-projects.c4" view="blazorProjects" title="Blazor projects and the packages they reference" -->
+```mermaid
+flowchart LR
+  server["MyApp (server)"] --> blazor[Purview.ZodSharp.Blazor]
+  server --> aspnetcore[Purview.ZodSharp.AspNetCore]
+  client["MyApp.Client (WebAssembly)"] --> blazor
+  shared["MyApp.Shared (models)"] --> core[Purview.ZodSharp]
+  server -- references --> shared
+  client -- references --> shared
 ```
-MyApp/          (server)  -> Purview.ZodSharp.Blazor, Purview.ZodSharp.AspNetCore
-MyApp.Client/   (WASM)    -> Purview.ZodSharp.Blazor
-MyApp.Shared/   (models)  -> Purview.ZodSharp (the generator runs here)
-```
+
+[LikeC4 model](../diagrams/blazor-projects.c4)
+<!-- /purview:likec4 -->
 
 `AddZodSharpBlazor(configureValidation, configure)` registers the Microsoft.Extensions.Validation bridge for **type
 validation only** (`AddZodSharpValidation(configureValidation, validateParameters: false)`), registers
