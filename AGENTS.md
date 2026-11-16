@@ -83,7 +83,7 @@ just test             # dotnet test --project src/ZodSharp.slnx -c Debug --treen
 just lint-check       # dotnet csharpier check .
 just lint-fix         # dotnet csharpier format .
 just pack             # dotnet pack src/ZodSharp.slnx -c Debug -o artifacts
-just perf-tests       # dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Debug
+just perf-tests       # dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Release -f net10.0
 just pipeline-pr      # PR pipeline via Purview.Build (restore, build, lint, tests)
 just pipeline-release # Release pipeline (pack, publish, GitHub release)
 just bump patch       # bump package.json's version (major|minor|patch); --dry-run prints only
