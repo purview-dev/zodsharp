@@ -72,17 +72,21 @@ Before changing build/SDK configuration or adding/moving projects, consult the S
 
 ## Commands
 
-Build and test (see also the `Justfile`):
+Build and test. The root `Justfile` holds only this repository's variables and recipes; the shared
+recipes — `build`, `test`, `pack`, `restore`, `lint-check`/`lint-fix`, `vs`, `scrub`, `version`,
+`bump`, the pipeline runs and the `skills-*` targets — are modules under `.build/just/`, copied
+verbatim from the `purview-buildsdk-justfile` skill. Change a shared recipe there, not in the copy:
 
 ```bash
 just build            # dotnet build src/ZodSharp.slnx -c Debug
-just test             # dotnet test src/ZodSharp.slnx -c Debug --treenode-filter "/*/*/*/*"
+just test             # dotnet test --project src/ZodSharp.slnx -c Debug --treenode-filter "/*/*/*/*"
 just lint-check       # dotnet csharpier check .
 just lint-fix         # dotnet csharpier format .
 just pack             # dotnet pack src/ZodSharp.slnx -c Debug -o artifacts
 just perf-tests       # dotnet run --project src/src/Benchmarks/Benchmarks.csproj -c Debug
 just pipeline-pr      # PR pipeline via Purview.Build (restore, build, lint, tests)
 just pipeline-release # Release pipeline (pack, publish, GitHub release)
+just bump patch       # bump package.json's version (major|minor|patch); --dry-run prints only
 ```
 
 TypeScript-side tooling uses Bun:
@@ -254,7 +258,10 @@ hand - the CLI is its only writer, and a hand edit no
 longer matches the lockfile's hash. This repository's *own* skills are never installed here; they live
 in `skills/` (below), and a second copy would drift. `Purview.BuildSdk`'s `InstallPurviewSkills`
 target delegates to the same CLI; `src/Directory.Build.props` sets `PurviewSkillsAgents=universal` so
-it is restricted the same way rather than defaulting to every agent (`*`).
+it is restricted the same way rather than defaulting to every agent (`*`). The `skills-add`,
+`skills-install`, `skills-update`, `skills-check` and `skills-fix` recipes in `.build/just/skills.just`
+run those targets; every one but `skills-check` changes the repository, so they are run by hand and
+never as a dependency of a build, test or hook.
 
 `src/tests/Repository.UnitTests/InstalledSkillTests.cs` keeps this honest: nothing under
 `.agents/skills/` is tracked, the `.agents/skills/` and `.claude/` ignore rules are in place, every
