@@ -7,6 +7,8 @@
 
 The library is developed and maintained at [github.com/purview-dev/zodsharp](https://github.com/purview-dev/zodsharp).
 
+**Documentation:** [ZodSharp documentation](https://purview.dev/docs/zodsharp/)
+
 ## Key Features
 
 - **Zero-allocation validation** - Minimizes allocations using structs and `Span<T>`
