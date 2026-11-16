@@ -3,7 +3,7 @@
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.83.0</TUnitVersion>
-		<PurviewSourceGenFramework>2.0.0</PurviewSourceGenFramework>
+		<PurviewSourceGenFramework>2.1.0</PurviewSourceGenFramework>
 		<DotnetRuntimeVersion>10.0.15</DotnetRuntimeVersion>
 		<!--
 			Microsoft.Extensions.Options and ...DependencyInjection.Abstractions are real dependencies of
@@ -68,7 +68,7 @@
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(RoslynAnalyzersVersion)" />
 		<PackageVersion Include="TUnit" Version="$(TUnitVersion)" />
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
-		<PackageVersion Include="Purview.Skills.Testing" Version="2.0.0" />
+		<PackageVersion Include="Purview.Skills.Testing" Version="2.1.0" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageVersion Include="System.Text.Json" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="BenchmarkDotNet" Version="0.16.0-preview.2" />

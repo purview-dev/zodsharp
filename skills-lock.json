@@ -11,7 +11,7 @@
       "source": "purview-dev/purview-dev.github.io",
       "sourceType": "github",
       "skillPath": "skills/add-project-intake/SKILL.md",
-      "computedHash": "7bbdebc825ad435e35ebd350585dec218da32d44005b87b1949005e5356045ec"
+      "computedHash": "407e6ede1873adf3e933dfb402a0536eb1bfd4c9bd587af68408ec49b1ae6604"
     },
     "audit-catalogue-projects": {
       "source": "purview-dev/purview-dev.github.io",
@@ -29,7 +29,7 @@
       "source": "purview-dev/purview-dev.github.io",
       "sourceType": "github",
       "skillPath": "skills/github-repo-metadata/SKILL.md",
-      "computedHash": "94429f2e0a07fbccbb2af8316759768ce86759ea9557e9118ae3a686f04a3c23"
+      "computedHash": "29b2c46599846f57a15dc63d440c808e4f90f84056f73c7d1d1be2fed71ec18d"
     },
     "project-manifest-reference": {
       "source": "purview-dev/purview-dev.github.io",
@@ -155,19 +155,19 @@
       "source": "purview-dev/purview-dev.github.io",
       "sourceType": "github",
       "skillPath": "skills/purview-site-assessment/SKILL.md",
-      "computedHash": "6112f08130fda26f0ef5fafbb7084d20b758c1cd5edd70d7a689d7933c6b2afa"
+      "computedHash": "f5277c639e5beb6f781625307de26329eb91f548928cfe6aefdd37d9ddb73045"
     },
     "purview-site-docs": {
       "source": "purview-dev/purview-dev.github.io",
       "sourceType": "github",
       "skillPath": "skills/purview-site-docs/SKILL.md",
-      "computedHash": "b11f8d1d71e5c07b978dd8308a15896890a2384f3545075d582a935565fb1ca1"
+      "computedHash": "9c1aa10adf8e6a3fe1de89f6509f88b3f76875b30574299454b9c0903c50db1a"
     },
     "purview-site-integration": {
       "source": "purview-dev/purview-dev.github.io",
       "sourceType": "github",
       "skillPath": "skills/purview-site-integration/SKILL.md",
-      "computedHash": "56ed9760a93e60a2abae8d790eb6405b93950d9de010e22ce3d5cf9e10e25802"
+      "computedHash": "4f79ec42946f295526a70742b1ee42be51f4a3dd3d955b2101cb87fa6a3a5bcb"
     },
     "purview-sourcegenerator-attribute-data-models": {
       "source": "purview-dev/sourcegenerator-framework",
@@ -227,7 +227,7 @@
       "source": "purview-dev/purview-dev.github.io",
       "sourceType": "github",
       "skillPath": "skills/site-validation-loop/SKILL.md",
-      "computedHash": "fbeadc96c6cf59d54cd037b5084aa3d0fb1dd89542705dd1c3a8ca5704b5b5da"
+      "computedHash": "cee0c49a7737b88f2367a4a3052c19584dbf12da639cf22f110942be8fa44284"
     },
     "use-case-authoring": {
       "source": "purview-dev/purview-dev.github.io",
