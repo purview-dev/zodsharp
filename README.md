@@ -356,7 +356,7 @@ See the [performance README](src/src/Benchmarks/README.md) for detailed benchmar
 
 ## Architecture
 
-```
+```text
 src/
 ├── src/
 │   ├── ZodSharp/               # Core validation library (Core, Schemas, Rules, JsonSchema, Unions)

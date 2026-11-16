@@ -92,7 +92,7 @@ See [JSON Schema Export](../serialization/JsonSchema-Export.md) and [JSON Schema
 
 ## Directory layout
 
-```
+```text
 src/ts/                        TypeScript (Zod) schemas + fixture generation
 src/ts/fixtures/               generated JSON fixtures + manifest.json
 tests/ts/                      vitest cross-platform tests

@@ -4,7 +4,7 @@ Contributions are welcome. Please open an issue or pull request against [purview
 
 ## Repository layout
 
-```
+```text
 src/
   ZodSharp.slnx
   src/
@@ -70,7 +70,7 @@ This wiki lives in `docs/wiki/`, which is the documentation source for [purview.
 
 One folder per topic area, so a page can be found by what it is about rather than by remembering its file name:
 
-```
+```text
 docs/wiki/
   Getting-Started.md          The landing page (docs.rootPage)
   Fluent-Schema-API.md        Deep-linked by the site catalogue (docsPage)
@@ -84,6 +84,7 @@ docs/wiki/
   hosting/                    Microsoft.Extensions.Validation, OpenAPI, Blazor, HttpClient, DI, localization
   quality/                    Guarantees, performance, trimming/AOT, cross-platform interop
   development/                This page and the release flow
+  diagrams/                   LikeC4 models the pages embed (never published as pages)
 ```
 
 The pages are also grouped into seven sections, in reading order. The same seven sections, in the same order, are the groups in `_Sidebar.md`, the `## ` headings in `Home.md`, and the seven `Where to go next` bullets at the end of `Getting-Started.md` (the last of those name each section by the goal it serves rather than by its title).
@@ -109,6 +110,8 @@ The pages are also grouped into seven sections, in reading order. The same seven
 - **Link to a sibling by file name, and to anything else by its path from the page**: `[Custom Rules](Custom-Rules.md)` within `schemas/`, `[Core Concepts](../concepts/Core-Concepts.md)` across folders, optionally with a fragment (`Core-Concepts.md#error-fields`). The sync resolves each link relative to the page it appears on.
 - **Renaming or moving a page changes its published URL.** Add the old slug to `docs.redirects` in the site's `zodsharp.yml` so bookmarks and inbound links keep working; the generated redirect never shadows a real page, so it activates when the move is released.
 - GitHub alert blockquotes (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, `> [!CAUTION]`, `> [!IMPORTANT]`) are converted to Starlight asides.
+- **Every fence declares a language** (`csharp`, `json`, `bash`, `text`, ...): an unlabelled fence loses its syntax highlighting on GitHub and on the site.
+- **Diagrams are never ASCII art.** Draw one as a LikeC4 model in `diagrams/`, paired with the Mermaid that GitHub renders, inside a `purview:likec4` block: an opening `<!-- purview:likec4 file="../diagrams/<name>.c4" view="<view>" title="..." -->` marker, one `mermaid` fence carrying the same nodes and edges, a `[LikeC4 model](../diagrams/<name>.c4)` link, and the closing marker. purview.dev swaps the whole block for the model's interactive view and GitHub shows the Mermaid; a `.c4` file is never published as a page. Validate a model with `bunx likec4 validate docs/wiki/diagrams` before committing it.
 - Relative repository-path links (e.g. `src/src/ZodSharp/Z.cs`) are rewritten to GitHub blob URLs automatically.
 - Keep the `CrossPlatformUserSchema` (C#) and `UserSchema` (TypeScript) in sync when either changes.
 
@@ -118,7 +121,7 @@ The pages are also grouped into seven sections, in reading order. The same seven
 2. Add it to `_Sidebar.md` exactly once, inside that section's list and in the position a reader should meet it, with its path relative to the wiki root.
 3. Add it to `Home.md` exactly once, in that section's table, with a one-line "what it answers".
 
-`DocumentationWikiTests` (`src/tests/Repository.UnitTests`) enforces all three: every page is listed exactly once in the sidebar and is reachable from `Home.md`, every sidebar and page link resolves to an existing file, every sidebar section has a matching `## ` heading in `Home.md`, every folder holds at least one page listed in the sidebar, and every page opens with a single `# ` title. `just test` runs it.
+`DocumentationWikiTests` (`src/tests/Repository.UnitTests`) enforces all three: every page is listed exactly once in the sidebar and is reachable from `Home.md`, every sidebar and page link resolves to an existing file, every sidebar section has a matching `## ` heading in `Home.md`, every folder that holds pages is one of the seven topic folders listed above (`diagrams/` holds only the LikeC4 models, which are not pages), and every page opens with a single `# ` title. `just test` runs it.
 
 ## Formatting
 
